@@ -144,27 +144,42 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
       const config: Record<string, any> = require(this.sharedConfig.config);
       const configKeys = keys(config);
 
+      // If a specific branch is provided and exists in the config
       if (this.flags.branch && includes(configKeys, this.flags.branch)) {
         this.sharedConfig.currentConfig = config[this.flags.branch];
       } else if (configKeys?.length > 1) {
-        this.sharedConfig.currentConfig = await ux
-          .inquire({
-            name: 'branch',
-            type: 'search-list',
-            choices: configKeys,
-            message: 'Choose a branch',
-          })
-          .then((val: any) => config[val])
-          .catch((err) => {
-            this.log(err, 'error');
-          });
+        await this.handleBranchSelection(config, configKeys);
       } else {
+        // By default there is only one configuration ("project"), set it as the default
         this.sharedConfig.currentConfig = config[configKeys[0]];
       }
 
       this.sharedConfig.provider = (this.sharedConfig.providerMapper as Record<string, string>)[
         this.sharedConfig.currentConfig.projectType
       ] as Providers;
+    }
+  }
+
+  private async handleBranchSelection(config: Record<string, any>, configKeys: string[]): Promise<void> {
+    // Filter out the "project" key from the branch choices
+    const branchChoices = configKeys.filter((key) => key !== 'project');
+
+    // If there are multiple keys (branches), excluding "project", prompt user to choose
+    if (branchChoices.length > 1) {
+      this.sharedConfig.currentConfig = await ux
+        .inquire({
+          name: 'branch',
+          type: 'search-list',
+          choices: configKeys,
+          message: 'Choose a branch',
+        })
+        .then((val: any) => config[val])
+        .catch((err) => {
+          this.log(err, 'error');
+        });
+    } else {
+      // Only one valid branch, set it directly
+      this.sharedConfig.currentConfig = config[branchChoices[0]];
     }
   }
 
