@@ -23,8 +23,8 @@ jobs:
       - name: Upload dist
         uses: actions/upload-artifact@v3.1.2
         with:
-          name: lib
-          path: lib
+          name: dist
+          path: dist
 
   release:
     name: Download dist and release
