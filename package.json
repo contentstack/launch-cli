@@ -91,7 +91,7 @@
     "build": "npm run clean && npm run compile",
     "clean": "rm -rf ./dist ./node_modules tsconfig.build.tsbuildinfo",
     "compile": "tsc -b tsconfig.json",
-    "prepack": "pnpm compile && oclif manifest && oclif readme",
+    "prepack": "npm run build && oclif manifest && oclif readme",
     "test:unit": "mocha --forbid-only \"test/unit/**/*.test.ts\"",
     "test:unit:report": "nyc --extension .ts mocha --forbid-only \"test/unit/**/*.test.ts\""
   },
