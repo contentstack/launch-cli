@@ -27,14 +27,15 @@ export default class FileUpload extends BaseClass {
   async run(): Promise<void> {
     if (this.config.isExistingProject) {
       await this.initApolloClient();
-      if (
-        !(await cliux.inquire({
+      const uploadLastFile =
+        this.config['redeploy-last-upload'] ||
+        (await cliux.inquire({
           type: 'confirm',
           default: false,
           name: 'uploadLastFile',
           message: 'Redeploy with last file upload?',
-        }))
-      ) {
+        }));
+      if (!uploadLastFile) {
         await this.createSignedUploadUrl();
         const { zipName, zipPath } = await this.archive();
         await this.uploadFile(zipName, zipPath);
