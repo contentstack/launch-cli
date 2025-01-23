@@ -64,6 +64,7 @@ export default class GitHub extends BaseClass {
       outputDirectory,
       environmentName,
       provider: gitProvider,
+      serverCommand,
     } = this.config;
     const username = split(repository?.fullName, '/')[0];
 
@@ -87,6 +88,7 @@ export default class GitHub extends BaseClass {
               name: environmentName || 'Default',
               environmentVariables: map(this.envVariables, ({ key, value }) => ({ key, value })),
               buildCommand: buildCommand === undefined || buildCommand === null ? 'npm run build' : buildCommand,
+              serverCommand: serverCommand === undefined || serverCommand === null ? 'npm run start' : serverCommand,
             },
           },
         },
@@ -122,6 +124,7 @@ export default class GitHub extends BaseClass {
       'out-dir': outputDirectory,
       'variable-type': variableType,
       'env-variables': envVariables,
+      'server-command': serverCommand,
       alias,
     } = this.config.flags;
     const { token, apiKey } = configHandler.get(`tokens.${alias}`) ?? {};
@@ -182,6 +185,15 @@ export default class GitHub extends BaseClass {
         message: 'Output Directory',
         default: (this.config.outputDirectories as Record<string, string>)[this.config?.framework || 'OTHER'],
       }));
+    if (this.config.framework && this.config.supportedFrameworksForServerCommands.includes(this.config.framework)) {
+      this.config.serverCommand =
+        serverCommand ||
+        (await ux.inquire({
+          type: 'input',
+          name: 'serverCommand',
+          message: 'Server Command',
+        }));
+    }
     this.config.variableType = variableType as unknown as string;
     this.config.envVariables = envVariables;
     await this.handleEnvImportFlow();

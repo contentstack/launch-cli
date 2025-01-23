@@ -17,8 +17,11 @@ export default class Launch extends BaseCommand<typeof Launch> {
     '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file>',
     '<%= config.bin %> <%= command.id %> --type <options: GitHub|FileUpload>',
     '<%= config.bin %> <%= command.id %> --data-dir <path/of/current/working/dir> --type <options: GitHub|FileUpload>',
+    '<%= config.bin %> <%= command.id %> --data-dir <path/of/current/working/dir> --redeploy-latest',
+    '<%= config.bin %> <%= command.id %> --data-dir <path/of/current/working/dir> --redeploy-latest --redeploy-last-upload',
     '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload>',
     '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload> --name=<value> --environment=<value> --branch=<value> --build-command=<value> --framework=<option> --org=<value> --out-dir=<value>',
+    '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload> --name=<value> --environment=<value> --branch=<value> --build-command=<value> --framework=<option> --org=<value> --out-dir=<value> --server-command=<value>',
     '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload> --name=<value> --environment=<value> --branch=<value> --build-command=<value> --framework=<option> --org=<value> --out-dir=<value> --variable-type="Import variables from a stack" --alias=<value>',
     '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload> --name=<value> --environment=<value> --branch=<value> --build-command=<value> --framework=<option> --org=<value> --out-dir=<value> --variable-type="Manually add custom variables to the list" --env-variables="APP_ENV:prod, TEST_ENV:testVal"',
   ];
@@ -52,9 +55,13 @@ export default class Launch extends BaseCommand<typeof Launch> {
     'out-dir': Flags.string({
       description: '[optional] Output Directory.',
     }),
+    'server-command': Flags.string({
+      description: '[optional] Server Command.',
+    }),
     'variable-type': Flags.string({
       options: [...config.variablePreparationTypeOptions],
-      description: '[optional] Provide a variable type. <options: Import variables from a stack|Manually add custom variables to the list|Import variables from the local env file>',
+      description:
+        '[optional] Provide a variable type. <options: Import variables from a stack|Manually add custom variables to the list|Import variables from the local env file>',
     }),
     'show-variables': Flags.boolean({
       hidden: true,
@@ -70,9 +77,18 @@ export default class Launch extends BaseCommand<typeof Launch> {
       description: '[optional] Alias (name) for the delivery token.',
     }),
     'env-variables': Flags.string({
-      description: '[optional] Provide the environment variables in the key:value format, separated by comma. For example: APP_ENV:prod, TEST_ENV:testVal.',
+      description:
+        '[optional] Provide the environment variables in the key:value format, separated by comma. For example: APP_ENV:prod, TEST_ENV:testVal.',
     }),
-  };  
+    'redeploy-latest': Flags.boolean({
+      description: '[optional] Redeploy latest commit/code',
+      default: false,
+    }),
+    'redeploy-last-upload': Flags.boolean({
+      description: '[optional] Redeploy with last file upload',
+      default: false,
+    }),
+  };
 
   async run(): Promise<void> {
     if (!this.flags.init) {
@@ -134,7 +150,7 @@ export default class Launch extends BaseCommand<typeof Launch> {
       managementSdk: this.managementSdk,
       analyticsInfo: this.context.analyticsInfo,
     });
-
+        
     await this.preCheck.run(!this.flags.type);
   }
 }

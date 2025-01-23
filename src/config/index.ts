@@ -40,6 +40,7 @@ const config = {
     'Import variables from the local env file',
   ],
   variableType: '',
+  supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX']
 };
 
 export default config;
