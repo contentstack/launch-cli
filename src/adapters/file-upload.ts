@@ -27,14 +27,15 @@ export default class FileUpload extends BaseClass {
   async run(): Promise<void> {
     if (this.config.isExistingProject) {
       await this.initApolloClient();
-      if (
-        !(await cliux.inquire({
+      const uploadLastFile =
+        this.config['redeploy-last-upload'] ||
+        (await cliux.inquire({
           type: 'confirm',
           default: false,
           name: 'uploadLastFile',
           message: 'Redeploy with last file upload?',
-        }))
-      ) {
+        }));
+      if (!uploadLastFile) {
         await this.createSignedUploadUrl();
         const { zipName, zipPath } = await this.archive();
         await this.uploadFile(zipName, zipPath);
@@ -62,7 +63,7 @@ export default class FileUpload extends BaseClass {
    * @memberof FileUpload
    */
   async createNewProject(): Promise<void> {
-    const { framework, projectName, buildCommand, outputDirectory, environmentName } = this.config;
+    const { framework, projectName, buildCommand, outputDirectory, environmentName, serverCommand } = this.config;
     await this.apolloClient
       .mutate({
         mutation: importProjectMutation,
@@ -77,6 +78,7 @@ export default class FileUpload extends BaseClass {
               name: environmentName || 'Default',
               environmentVariables: map(this.envVariables, ({ key, value }) => ({ key, value })),
               buildCommand: buildCommand === undefined || buildCommand === null ? 'npm run build' : buildCommand,
+              serverCommand: serverCommand === undefined || serverCommand === null ? 'npm run start' : serverCommand,
             },
           },
           skipGitData: true,
@@ -113,6 +115,7 @@ export default class FileUpload extends BaseClass {
       'out-dir': outputDirectory,
       'variable-type': variableType,
       'env-variables': envVariables,
+      'server-command': serverCommand,
       alias,
     } = this.config.flags;
     const { token, apiKey } = configHandler.get(`tokens.${alias}`) ?? {};
@@ -171,6 +174,15 @@ export default class FileUpload extends BaseClass {
         message: 'Output Directory',
         default: (this.config.outputDirectories as Record<string, string>)[this.config?.framework || 'OTHER'],
       }));
+    if (this.config.framework && this.config.supportedFrameworksForServerCommands.includes(this.config.framework)) {
+      this.config.serverCommand =
+        serverCommand ||
+        (await cliux.inquire({
+          type: 'input',
+          name: 'serverCommand',
+          message: 'Server Command',
+        }));
+    }
     this.config.variableType = variableType as unknown as string;
     this.config.envVariables = envVariables;
     await this.handleEnvImportFlow();

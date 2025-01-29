@@ -6,7 +6,6 @@ With Launch CLI, you can interact with the Contentstack Launch platform using th
 
 <!-- toc -->
 * [Launch CLI plugin](#launch-cli-plugin)
-* [Usage](#usage)
 * [Installation steps](#installation-steps)
 * [Commands](#commands)
 <!-- tocstop -->
