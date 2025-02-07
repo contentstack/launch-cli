@@ -1,5 +1,4 @@
 import dotenv from 'dotenv';
-import esm from 'esm';
 import express, {
   Request,
   Response,
@@ -70,13 +69,11 @@ export class CloudFunctions {
     cloudFunctionResources: CloudFunctionResource[],
     app: Express
   ): Promise<void> {
-    const loadAsESM = esm(module);
-
     await Promise.all(
       cloudFunctionResources.map(async (cloudFunctionResource) => {
-        const handler = loadAsESM(
+        const handler = await import(
           `${cloudFunctionResource.cloudFunctionFilePath}`
-        ).default;
+        );
         app.use(express.json());
         app.use(express.urlencoded({ extended: true }));
 
@@ -182,12 +179,11 @@ export class CloudFunctions {
 
   private async checkDefaultExport(filepath: string): Promise<boolean> {
     const exportType = "function";
-    const loadAsESM = esm(module);
     const fullPath = normalize(path.resolve(process.cwd(), filepath)).replace(
       /^(\.\.(\/|\\|$))+/,
       ""
     );
-    const handler = await loadAsESM(fullPath);
+    const handler = await import(fullPath);
 
     return typeof handler.default === exportType;
   }
