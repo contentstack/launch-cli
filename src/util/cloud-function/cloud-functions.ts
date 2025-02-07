@@ -71,9 +71,10 @@ export class CloudFunctions {
   ): Promise<void> {
     await Promise.all(
       cloudFunctionResources.map(async (cloudFunctionResource) => {
-        const handler = await import(
-          `${cloudFunctionResource.cloudFunctionFilePath}`
-        );
+       // Import the cloud function dynamically using the import() syntax
+       const { default: handler } = await import(
+        `${cloudFunctionResource.cloudFunctionFilePath}`
+      );
         app.use(express.json());
         app.use(express.urlencoded({ extended: true }));
 
