@@ -16,6 +16,11 @@ import { FunctionsDirectoryNotFoundError } from "./errors/cloud-function.errors"
 import { walkFileSystem, checkIfDirectoryExists } from "./os-helper";
 import { CloudFunctionResource } from "./types";
 
+import rollup from "rollup";
+import { nodeResolve } from "@rollup/plugin-node-resolve";
+import commonjs from "@rollup/plugin-commonjs";
+import json from "@rollup/plugin-json";
+
 export class CloudFunctions {
   private cloudFunctionsDirectoryPath: string;
   private pathToSourceCode: string;
@@ -71,10 +76,7 @@ export class CloudFunctions {
   ): Promise<void> {
     await Promise.all(
       cloudFunctionResources.map(async (cloudFunctionResource) => {
-       // Import the cloud function dynamically using the import() syntax
-       const { default: handler } = await import(
-        `${cloudFunctionResource.cloudFunctionFilePath}`
-      );
+
         app.use(express.json());
         app.use(express.urlencoded({ extended: true }));
 
@@ -89,7 +91,7 @@ export class CloudFunctions {
           cloudFunctionResource.apiResourceURI,
           async (request: Request, response: Response) => {
             try {
-              return await handler(request, response);
+              return await cloudFunctionResource.handler(request, response);
             } catch (error) {
               console.error(error);
               response.status(500).send();
@@ -116,7 +118,12 @@ export class CloudFunctions {
 
       if (this.isProxyEdgeFile(parsedPath.base)
         || parsedPath.ext !== CLOUD_FUNCTIONS_SUPPORTED_EXTENSION
-        || !await this.checkDefaultExport(filePath)) {
+      ) {
+        continue;
+      }
+
+      const handler = await this.buildHandlerForFilepath(filePath);
+      if(!handler) {
         continue;
       }
 
@@ -132,6 +139,7 @@ export class CloudFunctions {
       cloudFunctionResources.push({
         cloudFunctionFilePath: filePath,
         apiResourceURI,
+        handler
       });
     }
 
@@ -178,14 +186,34 @@ export class CloudFunctions {
     return { exactRouteResources, dynamicRouteResources };
   }
 
-  private async checkDefaultExport(filepath: string): Promise<boolean> {
-    const exportType = "function";
-    const fullPath = normalize(path.resolve(process.cwd(), filepath)).replace(
-      /^(\.\.(\/|\\|$))+/,
-      ""
-    );
-    const handler = await import(fullPath);
+  private async buildHandlerForFilepath(cloudFunctionFilePath: string) {
+    const bundle = await rollup.rollup({
+      input: cloudFunctionFilePath,
+      plugins: [nodeResolve({ preferBuiltins: false }), commonjs(), json()],
+    });
+  
+    const { output } = await bundle.generate({
+      format: "esm",
+      inlineDynamicImports: true,
+    });
+  
+    const builtCode = output[0].code;
+  
+    const builtCodeInDataURLFormat =
+      "data:text/javascript;base64," + Buffer.from(builtCode).toString("base64");
+  
+    const module = await import(builtCodeInDataURLFormat);
+    
+    let handler = null;
+    const isDefaultExportESModuleFunction = typeof module.default === 'function';
+    const isDefaultExportCommonjsFunction = typeof module.default?.default === 'function';
+    if (isDefaultExportESModuleFunction) {
+        handler = module.default;
+    }
+    else if (isDefaultExportCommonjsFunction) {
+        handler = module.default.default;
+    }
 
-    return typeof handler.default === exportType;
+    return handler;
   }
 }
