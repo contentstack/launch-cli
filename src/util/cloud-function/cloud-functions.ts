@@ -4,7 +4,7 @@ import express, {
   Response,
 } from 'express';
 import { Express } from 'express-serve-static-core';
-import path, { normalize } from "path";
+import path from "path";
 
 import { CloudFunctionsValidator } from "./cloud-functions-validator";
 import {
@@ -20,6 +20,7 @@ import rollup from "rollup";
 import { nodeResolve } from "@rollup/plugin-node-resolve";
 import commonjs from "@rollup/plugin-commonjs";
 import json from "@rollup/plugin-json";
+import { loadDataURL } from './load-data-url';
 
 export class CloudFunctions {
   private cloudFunctionsDirectoryPath: string;
@@ -189,7 +190,7 @@ export class CloudFunctions {
   private async buildHandlerForFilepath(cloudFunctionFilePath: string) {
     const bundle = await rollup.rollup({
       input: cloudFunctionFilePath,
-      plugins: [nodeResolve({ preferBuiltins: false }), commonjs(), json()],
+      plugins: [nodeResolve({ preferBuiltins: true }), commonjs(), json()],
     });
   
     const { output } = await bundle.generate({
@@ -202,7 +203,7 @@ export class CloudFunctions {
     const builtCodeInDataURLFormat =
       "data:text/javascript;base64," + Buffer.from(builtCode).toString("base64");
   
-    const module = await import(builtCodeInDataURLFormat);
+    const module = await loadDataURL(builtCodeInDataURLFormat);
     
     let handler = null;
     const isDefaultExportESModuleFunction = typeof module.default === 'function';

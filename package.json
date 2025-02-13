@@ -29,6 +29,7 @@
     "@rollup/plugin-commonjs": "^28.0.2",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.0",
+    "@rollup/plugin-typescript": "^12.1.2",
     "@types/express": "^4.17.21",
     "@types/express-serve-static-core": "^4.17.34",
     "adm-zip": "^0.5.16",
@@ -92,7 +93,8 @@
     "version": "oclif readme && git add README.md",
     "build": "npm run clean && npm run compile",
     "clean": "rm -rf ./dist tsconfig.build.tsbuildinfo",
-    "compile": "tsc -b tsconfig.json",
+    "compile": "tsc -b tsconfig.json && npm run patch-load-data-url",
+    "patch-load-data-url": "node scripts/patch-load-data-url-file.js",
     "prepack": "npm run build && oclif manifest && oclif readme",
     "test:unit": "mocha --forbid-only \"test/unit/**/*.test.ts\"",
     "test:unit:report": "nyc --extension .ts mocha --forbid-only \"test/unit/**/*.test.ts\""
