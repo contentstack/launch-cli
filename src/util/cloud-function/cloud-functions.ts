@@ -60,6 +60,7 @@ export class CloudFunctions {
       this.transformAndSegregateResourcesByRoutes(cloudFunctionResources);
 
     const app = express();
+    app.disable('x-powered-by');
 
     await this.applyAppRouter(exactRouteResources, app);
     await this.applyAppRouter(dynamicRouteResources, app);
