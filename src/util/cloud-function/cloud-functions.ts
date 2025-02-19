@@ -1,11 +1,10 @@
 import dotenv from 'dotenv';
-import esm from 'esm';
 import express, {
   Request,
   Response,
 } from 'express';
 import { Express } from 'express-serve-static-core';
-import path, { normalize } from "path";
+import path from "path";
 
 import { CloudFunctionsValidator } from "./cloud-functions-validator";
 import {
@@ -16,6 +15,12 @@ import {
 import { FunctionsDirectoryNotFoundError } from "./errors/cloud-function.errors";
 import { walkFileSystem, checkIfDirectoryExists } from "./os-helper";
 import { CloudFunctionResource } from "./types";
+
+import rollup from "rollup";
+import { nodeResolve } from "@rollup/plugin-node-resolve";
+import commonjs from "@rollup/plugin-commonjs";
+import json from "@rollup/plugin-json";
+import { loadDataURL } from './load-data-url';
 
 export class CloudFunctions {
   private cloudFunctionsDirectoryPath: string;
@@ -55,6 +60,7 @@ export class CloudFunctions {
       this.transformAndSegregateResourcesByRoutes(cloudFunctionResources);
 
     const app = express();
+    app.disable('x-powered-by');
 
     await this.applyAppRouter(exactRouteResources, app);
     await this.applyAppRouter(dynamicRouteResources, app);
@@ -70,13 +76,9 @@ export class CloudFunctions {
     cloudFunctionResources: CloudFunctionResource[],
     app: Express
   ): Promise<void> {
-    const loadAsESM = esm(module);
-
     await Promise.all(
       cloudFunctionResources.map(async (cloudFunctionResource) => {
-        const handler = loadAsESM(
-          `${cloudFunctionResource.cloudFunctionFilePath}`
-        ).default;
+
         app.use(express.json());
         app.use(express.urlencoded({ extended: true }));
 
@@ -91,7 +93,7 @@ export class CloudFunctions {
           cloudFunctionResource.apiResourceURI,
           async (request: Request, response: Response) => {
             try {
-              return await handler(request, response);
+              return await cloudFunctionResource.handler(request, response);
             } catch (error) {
               console.error(error);
               response.status(500).send();
@@ -118,7 +120,12 @@ export class CloudFunctions {
 
       if (this.isProxyEdgeFile(parsedPath.base)
         || parsedPath.ext !== CLOUD_FUNCTIONS_SUPPORTED_EXTENSION
-        || !await this.checkDefaultExport(filePath)) {
+      ) {
+        continue;
+      }
+
+      const handler = await this.buildHandlerForFilepath(filePath);
+      if(!handler) {
         continue;
       }
 
@@ -134,6 +141,7 @@ export class CloudFunctions {
       cloudFunctionResources.push({
         cloudFunctionFilePath: filePath,
         apiResourceURI,
+        handler
       });
     }
 
@@ -180,15 +188,34 @@ export class CloudFunctions {
     return { exactRouteResources, dynamicRouteResources };
   }
 
-  private async checkDefaultExport(filepath: string): Promise<boolean> {
-    const exportType = "function";
-    const loadAsESM = esm(module);
-    const fullPath = normalize(path.resolve(process.cwd(), filepath)).replace(
-      /^(\.\.(\/|\\|$))+/,
-      ""
-    );
-    const handler = await loadAsESM(fullPath);
+  private async buildHandlerForFilepath(cloudFunctionFilePath: string) {
+    const bundle = await rollup.rollup({
+      input: cloudFunctionFilePath,
+      plugins: [nodeResolve({ preferBuiltins: true }), commonjs(), json()],
+    });
+  
+    const { output } = await bundle.generate({
+      format: "esm",
+      inlineDynamicImports: true,
+    });
+  
+    const builtCode = output[0].code;
+  
+    const builtCodeInDataURLFormat =
+      "data:text/javascript;base64," + Buffer.from(builtCode).toString("base64");
+  
+    const module = await loadDataURL(builtCodeInDataURLFormat);
+    
+    let handler = null;
+    const isDefaultExportESModuleFunction = typeof module.default === 'function';
+    const isDefaultExportCommonjsFunction = typeof module.default?.default === 'function';
+    if (isDefaultExportESModuleFunction) {
+        handler = module.default;
+    }
+    else if (isDefaultExportCommonjsFunction) {
+        handler = module.default.default;
+    }
 
-    return typeof handler.default === exportType;
+    return handler;
   }
 }
