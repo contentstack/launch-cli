@@ -8,6 +8,8 @@ With Launch CLI, you can interact with the Contentstack Launch platform using th
 * [Launch CLI plugin](#launch-cli-plugin)
 * [Installation steps](#installation-steps)
 * [Commands](#commands)
+* [How to test Changes Locally?](#how-to-test-changes-locally)
+* [Release & SRE Process:-](#release--sre-process-)
 <!-- tocstop -->
 
 # Installation steps

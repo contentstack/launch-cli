@@ -15,7 +15,7 @@ async function transpileTsFileToESM(inputFile, outputFile) {
 
   await bundle.write({
     file: outputFile,
-    format: 'esm',
+    format: 'commonjs',
     sourcemap: false,
   });
 }
