@@ -1,7 +1,7 @@
 import keys from 'lodash/keys';
-import { existsSync } from 'fs';
+import { existsSync, statSync } from 'fs';
 import EventEmitter from 'events';
-import { dirname, resolve } from 'path';
+import { resolve } from 'path';
 import includes from 'lodash/includes';
 import { ApolloClient } from '@apollo/client/core';
 import { Command } from '@contentstack/cli-command';
@@ -101,14 +101,19 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
    * @memberof BaseCommand
    */
   async prepareConfig(): Promise<void> {
-    let configPath =
-      this.flags['data-dir'] || this.flags.config
-        ? this.flags.config || resolve(this.flags['data-dir'], config.configName)
-        : resolve(process.cwd(), config.configName);
+    const projectBasePath = this.flags['data-dir'] || process.cwd();
+    if (!existsSync(projectBasePath) || !statSync(projectBasePath).isDirectory()) {
+      ux.print(`Invalid directory: ${projectBasePath}`, { color: 'red' });
+      this.exit(1);
+    }
+
+    const configPath = this.flags.config ?? resolve(process.cwd(), config.configName);
+
     let baseUrl = config.launchBaseUrl || this.launchHubUrl;
     if (!baseUrl) {
       baseUrl = getLaunchHubUrl();
     }
+
     this.sharedConfig = {
       ...require('./config').default,
       currentConfig: {},
@@ -116,7 +121,7 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
       flags: this.flags,
       host: this.cmaHost,
       config: configPath,
-      projectBasePath: dirname(configPath),
+      projectBasePath: projectBasePath,
       authtoken: configHandler.get('authtoken'),
       authType: configHandler.get('authorisationType'),
       authorization: configHandler.get('oauthAccessToken'),
