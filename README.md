@@ -68,6 +68,9 @@ csdx plugins:link <plugin local path>
 csdx <command-name>
 ```
 
+# How to run tests Locally?
+- To run tests locally, create a .env file by cloning the .env.sample file and populate the values with uid of existing Launch org, project, environment and so on.
+- Run the command: `npm run test:unit` or `npm run test:unit:report`
 
 # Release & SRE Process:- 
 
