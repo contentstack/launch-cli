@@ -163,6 +163,8 @@ describe('GitHub', () => {
           { name: 'Other', value: 'OTHER' },
         ],
         repository: { fullName: 'Gatsby Starter' },
+        outputDirectories:"",
+        supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX']
       },
     };
     beforeEach(function () {
