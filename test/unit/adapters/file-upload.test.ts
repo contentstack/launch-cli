@@ -152,7 +152,8 @@ describe('File Upload', () => {
           { name: 'NextJs', value: 'NEXTJS' },
           { name: 'Other', value: 'OTHER' },
         ],
-        outputDirectories:""
+        outputDirectories:"",
+        supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX']
       },
     };
     let archiveMockData = { zipName: 'abc.zip', zipPath: 'path/to/zip', projectName: 'test' };

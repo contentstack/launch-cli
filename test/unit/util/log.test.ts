@@ -12,12 +12,18 @@ describe('Log Util', () => {
     };
     beforeEach(() => {
       createLoggerStub = stub(winston, 'createLogger');
-      processExitStub = stub(process, 'exit');
+      if (!process.exit.restore) {
+        processExitStub = stub(process, 'exit');
+      } else {
+        processExitStub = process.exit;
+      }
     });
 
     afterEach(() => {
       createLoggerStub.restore();
-      processExitStub.restore();
+      if (processExitStub.restore) {
+        processExitStub.restore();
+      }
     });
 
     it('should create a logger with file and console transports when project base path exists', () => {
