@@ -109,33 +109,33 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
 
     const configPath = this.flags.config ?? resolve(process.cwd(), config.configName);
 
-    let baseUrl = config.launchBaseUrl || this.launchHubUrl;
-    if (!baseUrl) {
-      baseUrl = getLaunchHubUrl();
-    }
+    // let baseUrl = config.launchBaseUrl || this.launchHubUrl;
+    // if (!baseUrl) {
+    //   baseUrl = getLaunchHubUrl();
+    // }
 
     this.sharedConfig = {
       ...require('./config').default,
-      currentConfig: {},
-      ...this.flags,
-      flags: this.flags,
-      host: this.cmaHost,
+      // currentConfig: {},
+      // ...this.flags,
+      // flags: this.flags,
+      // host: this.cmaHost,
       config: configPath,
       projectBasePath: projectBasePath,
-      authtoken: configHandler.get('authtoken'),
-      authType: configHandler.get('authorisationType'),
-      authorization: configHandler.get('oauthAccessToken'),
-      logsApiBaseUrl: `${baseUrl}/${config.logsApiEndpoint}`,
-      manageApiBaseUrl: `${baseUrl}/${config.manageApiEndpoint}`,
+      // authtoken: configHandler.get('authtoken'),
+      // authType: configHandler.get('authorisationType'),
+      // authorization: configHandler.get('oauthAccessToken'),
+      // logsApiBaseUrl: `${baseUrl}/${config.logsApiEndpoint}`,
+      // manageApiBaseUrl: `${baseUrl}/${config.manageApiEndpoint}`,
     };
 
-    if (this.flags.type) {
-      this.sharedConfig.provider = this.flags.type;
-    }
+    // if (this.flags.type) {
+    //   this.sharedConfig.provider = this.flags.type;
+    // }
 
-    if (existsSync(configPath)) {
-      this.sharedConfig.isExistingProject = true;
-    }
+    // if (existsSync(configPath)) {
+    //   this.sharedConfig.isExistingProject = true;
+    // }
   }
 
   /**
