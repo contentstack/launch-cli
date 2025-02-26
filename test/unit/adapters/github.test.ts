@@ -102,7 +102,10 @@ describe('GitHub', () => {
           },
         };
 
-        new GitHub(adapterConstructorOptions).run()
+        await new GitHub(adapterConstructorOptions).run()
+
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.calledOnce).to.be.true;
       });
     });
 

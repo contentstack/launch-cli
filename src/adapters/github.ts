@@ -43,7 +43,6 @@ export default class GitHub extends BaseClass {
       return;
     }
 
-    await this.initApolloClient();
     await this.createNewDeployment();
   }
 

@@ -64,6 +64,18 @@ type GraphqlApiClientInput = {
   headers?: GraphqlHeaders;
 };
 
+type FormField = {
+  formFieldKey: string;
+  formFieldValue: string;
+};
+type SignedUploadUrlData = {
+  uploadUrl: string;
+  fields: FormField[];
+  headers: { key: string; value: string }[];
+  method: string;
+  uploadUid: string;
+};
+
 export {
   LogFn,
   ExitFn,
@@ -73,4 +85,5 @@ export {
   AdapterConstructorInputs,
   GraphqlHeaders,
   GraphqlApiClientInput,
+  SignedUploadUrlData,
 };
