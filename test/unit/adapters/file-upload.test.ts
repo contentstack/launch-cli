@@ -7,11 +7,12 @@ import { FileUpload, BaseClass } from '../../../src/adapters';
 import { BaseCommand } from '../../../src/base-command';
 
 describe('File Upload', () => {
-  let inquireStub, prepareApiClientsStub, prepareConfigStub, getConfigStub;
+  let inquireStub, exitStub, prepareApiClientsStub, prepareConfigStub, getConfigStub;
   let adapterConstructorInputs;
 
   beforeEach(() => {
     inquireStub = stub(cliux, 'inquire');
+    exitStub = stub(BaseCommand.prototype, 'exit');
     prepareConfigStub = stub(BaseCommand.prototype, 'prepareConfig').resolves();
     prepareApiClientsStub = stub(BaseCommand.prototype, 'prepareApiClients').resolves();
     getConfigStub = stub(BaseCommand.prototype, 'getConfig').resolves();
@@ -25,6 +26,7 @@ describe('File Upload', () => {
 
   afterEach(() => {
     inquireStub.restore();
+    exitStub.restore();
     prepareConfigStub.restore();
     getConfigStub.restore();
     prepareApiClientsStub.restore();
@@ -43,9 +45,6 @@ describe('File Upload', () => {
       showDeploymentUrlStub,
       showSuggestionStub;
 
-    let adapterConstructorOptions = {
-      config: { isExistingProject: true, currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' } },
-    };
     beforeEach(() => {
       initApolloClientStub = stub(BaseClass.prototype, 'initApolloClient').resolves();
       createSignedUploadUrlStub = stub(FileUpload.prototype, 'createSignedUploadUrl').resolves();
@@ -75,8 +74,40 @@ describe('File Upload', () => {
       showSuggestionStub.restore();
     });
 
-    it('should run github flow', async () => {
-      new FileUpload(adapterConstructorOptions).run();
+    describe('Redeploy existing project', () => {
+      
+      it('should run file upload flow for existing project where flag passed is redeploy-latest', async () => {
+        let adapterConstructorOptions = {
+          config: { 
+            isExistingProject: true,
+            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx', }, 
+            'redeploy-latest': true
+          },
+        };
+        new FileUpload(adapterConstructorOptions).run();
+      });
+
+      it('should run file upload flow for existing project where flag passed is redeploy-last-upload', async () => {
+        let adapterConstructorOptions = {
+          config: { 
+            isExistingProject: true, 
+            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx', },
+            'redeploy-last-upload': true
+            },
+        };
+        new FileUpload(adapterConstructorOptions).run();
+      });
+    });
+
+    describe('Deploy new project', () => {
+      let adapterConstructorOptions = {
+        config: { 
+          isExistingProject: false 
+        },
+      };
+      it('should run file upload flow for new project', async () => {
+        new FileUpload(adapterConstructorOptions).run();
+      });
     });
   });
 

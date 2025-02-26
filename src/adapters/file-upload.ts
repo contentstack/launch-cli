@@ -26,34 +26,35 @@ export default class FileUpload extends BaseClass {
    */
   async run(): Promise<void> {
     if (this.config.isExistingProject) {
-      await this.initApolloClient();
-      const uploadLastFile =
-        this.config['redeploy-last-upload'] ||
-        (await cliux.inquire({
-          type: 'confirm',
-          default: false,
-          name: 'uploadLastFile',
-          message: 'Redeploy with last file upload?',
-        }));
-      if (!uploadLastFile) {
-        await this.createSignedUploadUrl();
-        const { zipName, zipPath } = await this.archive();
-        await this.uploadFile(zipName, zipPath);
-      }
-
-      const { uploadUid } = this.signedUploadUrlData || {
-        uploadUid: undefined,
-      };
-      await this.createNewDeployment(true, uploadUid);
+      await this.handleExistingProject();
     } else {
-      await this.prepareForNewProjectCreation();
-      await this.createNewProject();
+      await this.handleNewProject();
     }
-
+  
     this.prepareLaunchConfig();
     await this.showLogs();
     this.showDeploymentUrl();
     this.showSuggestion();
+  }
+  
+  private async handleExistingProject(): Promise<void> {
+    await this.initApolloClient();
+    
+    let redeployLatest = this.config['redeploy-latest'];
+
+    if (redeployLatest) {
+      await this.createSignedUploadUrl();
+      const { zipName, zipPath } = await this.archive();
+      await this.uploadFile(zipName, zipPath);
+    }
+
+    const { uploadUid } = this.signedUploadUrlData || { uploadUid: undefined };
+    await this.createNewDeployment(true, uploadUid);
+  }
+  
+  private async handleNewProject(): Promise<void> {
+    await this.prepareForNewProjectCreation();
+    await this.createNewProject();
   }
 
   /**

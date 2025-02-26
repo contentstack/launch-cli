@@ -5,6 +5,8 @@ import { cliux } from '@contentstack/cli-utilities';
 import { githubAdapterMockData } from '../mock/index';
 import { GitHub, BaseClass } from '../../../src/adapters';
 import { BaseCommand } from '../../../src/base-command';
+import { exit } from 'process';
+import fs from 'fs';
 
 describe('GitHub', () => {
   let inquireStub, prepareApiClientsStub, prepareConfigStub, getConfigStub;
@@ -41,6 +43,7 @@ describe('GitHub', () => {
       prepareLaunchConfigStub,
       showLogsStub,
       showDeploymentUrlStub,
+      exitStub,
       showSuggestionStub;
 
     beforeEach(() => {
@@ -53,11 +56,11 @@ describe('GitHub', () => {
       checkUserGitHubAccessStub = stub(GitHub.prototype, 'checkUserGitHubAccess').resolves(true);
       prepareForNewProjectCreationStub = stub(GitHub.prototype, 'prepareForNewProjectCreation').resolves();
       createNewProjectStub = stub(GitHub.prototype, 'createNewProject').resolves();
-
       prepareLaunchConfigStub = stub(BaseClass.prototype, 'prepareLaunchConfig').resolves();
       showLogsStub = stub(BaseClass.prototype, 'showLogs').resolves();
       showDeploymentUrlStub = stub(BaseClass.prototype, 'showDeploymentUrl').resolves();
       showSuggestionStub = stub(BaseClass.prototype, 'showSuggestion').resolves();
+      exitStub = stub(BaseCommand.prototype, 'exit').resolves();
     });
 
     afterEach(() => {
@@ -72,10 +75,46 @@ describe('GitHub', () => {
       showLogsStub.restore();
       showDeploymentUrlStub.restore();
       showSuggestionStub.restore();
+      exitStub.restore();
     });
 
-    it('should run github flow', async () => {
-      new GitHub(adapterConstructorInputs).run();
+    describe('Redeploy existing project', () => {
+      it('should abort github flow for existing project and flag redeploy-last-upload is passed', async () => {
+        const adapterConstructorOptions = {
+          config: { 
+            isExistingProject: true,
+            'redeploy-last-upload': true 
+          },
+        };
+        const exitStub = stub(process, 'exit');
+        const githubInstance = new GitHub(adapterConstructorOptions);
+  
+        await githubInstance.handleExistingProject();
+        
+        expect(exitStub.calledOnceWithExactly(1)).to.be.true;
+      });
+      
+      it('should run github flow for existing project and flag redeploy-latest is passed ', async () => {
+        let adapterConstructorOptions = {
+          config: { 
+            isExistingProject: true,
+            'redeploy-latest': true 
+          },
+        };
+
+        new GitHub(adapterConstructorOptions).run()
+      });
+    });
+
+    describe('Deploy new project', () => {
+      let adapterConstructorOptions = {
+        config: { 
+          isExistingProject: false 
+        },
+      };
+      it('should run file upload flow for new project', async () => {
+        new GitHub(adapterConstructorOptions).run();
+      });
     });
   });
 
