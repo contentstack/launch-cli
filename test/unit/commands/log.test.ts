@@ -273,8 +273,7 @@ describe('Log', () => {
       expect(logStub.calledTwice).to.be.true;
     });
 
-    // TODO: Fix failing text
-    it.skip('should log "No server logs to display" and exit the process for error messages with NoServerlessRoutesError', () => {
+    it('should log "No server logs to display" and exit the process for error messages with NoServerlessRoutesError', () => {
       const isArrayStub = sandbox.stub().returns(true);
       const includesStub = sandbox.stub().returns(true);
       const mapStub = sandbox.stub().returns(['NoServerlessRoutesError']);
@@ -287,8 +286,6 @@ describe('Log', () => {
 
       sandbox.stub(logInstance, 'log').callsFake(logStub);
       sandbox.stub(Array, 'isArray').callsFake(isArrayStub);
-      sandbox.stub(Array.prototype, 'includes').callsFake(includesStub);
-      sandbox.stub(Array.prototype, 'map').callsFake(mapStub);
 
       logInstance.showLogs(event);
     });
