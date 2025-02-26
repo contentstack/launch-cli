@@ -1,7 +1,7 @@
 import keys from 'lodash/keys';
-import { existsSync } from 'fs';
+import { existsSync, statSync } from 'fs';
 import EventEmitter from 'events';
-import { dirname, resolve } from 'path';
+import { resolve } from 'path';
 import includes from 'lodash/includes';
 import { ApolloClient } from '@apollo/client/core';
 import { Command } from '@contentstack/cli-command';
@@ -18,7 +18,8 @@ import {
 } from '@contentstack/cli-utilities';
 
 import config from './config';
-import { getLaunchHubUrl, GraphqlApiClient, Logger } from './util';
+import { GraphqlApiClient, Logger } from './util';
+import { getLaunchHubUrl } from './util/common-utility';
 import { ConfigType, LogFn, Providers } from './types';
 
 export type Flags<T extends typeof Command> = Interfaces.InferredFlags<(typeof BaseCommand)['baseFlags'] & T['flags']>;
@@ -101,14 +102,21 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
    * @memberof BaseCommand
    */
   async prepareConfig(): Promise<void> {
-    let configPath =
-      this.flags['data-dir'] || this.flags.config
-        ? this.flags.config || resolve(this.flags['data-dir'], config.configName)
-        : resolve(process.cwd(), config.configName);
+    const currentWorkingDirectory = process.cwd();
+    
+    const projectBasePath = this.flags['data-dir'] || currentWorkingDirectory;
+    if (!existsSync(projectBasePath) || !statSync(projectBasePath).isDirectory()) {
+      ux.print(`Invalid directory: ${projectBasePath}`, { color: 'red' });
+      this.exit(1);
+    }
+
+    const configPath = this.flags.config || resolve(currentWorkingDirectory, config.configName);
+    
     let baseUrl = config.launchBaseUrl || this.launchHubUrl;
     if (!baseUrl) {
       baseUrl = getLaunchHubUrl();
     }
+
     this.sharedConfig = {
       ...require('./config').default,
       currentConfig: {},
@@ -116,7 +124,7 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
       flags: this.flags,
       host: this.cmaHost,
       config: configPath,
-      projectBasePath: dirname(configPath),
+      projectBasePath: projectBasePath,
       authtoken: configHandler.get('authtoken'),
       authType: configHandler.get('authorisationType'),
       authorization: configHandler.get('oauthAccessToken'),
