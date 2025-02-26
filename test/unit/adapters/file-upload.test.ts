@@ -1,10 +1,13 @@
 //@ts-nocheck
 import { expect } from 'chai';
-import { stub, createSandbox } from 'sinon';
+import { stub, createSandbox , sinon} from 'sinon';
 import { cliux } from '@contentstack/cli-utilities';
 import fs from 'fs';
 import { FileUpload, BaseClass } from '../../../src/adapters';
 import { BaseCommand } from '../../../src/base-command';
+import e from 'express';
+import { isNull } from 'util';
+import { log } from 'console';
 
 describe('File Upload', () => {
   let inquireStub, exitStub, prepareApiClientsStub, prepareConfigStub, getConfigStub;
@@ -38,7 +41,7 @@ describe('File Upload', () => {
       archiveStub,
       uploadFileStub,
       createNewDeploymentStub,
-      prepareForNewProjectCreationStub,
+      prepareAndUploadNewProjectFile,
       createNewProjectStub,
       prepareLaunchConfigStub,
       showLogsStub,
@@ -51,9 +54,8 @@ describe('File Upload', () => {
       archiveStub = stub(FileUpload.prototype, 'archive').resolves({ zipName: 'test.zip', zipPath: '/path/to/zip' });
       uploadFileStub = stub(FileUpload.prototype, 'uploadFile').resolves();
       createNewDeploymentStub = stub(FileUpload.prototype, 'createNewDeployment').resolves();
-      prepareForNewProjectCreationStub = stub(FileUpload.prototype, 'prepareForNewProjectCreation').resolves();
+      prepareAndUploadNewProjectFile = stub(FileUpload.prototype, 'prepareAndUploadNewProjectFile').resolves();
       createNewProjectStub = stub(FileUpload.prototype, 'createNewProject').resolves();
-
       prepareLaunchConfigStub = stub(BaseClass.prototype, 'prepareLaunchConfig').resolves();
       showLogsStub = stub(BaseClass.prototype, 'showLogs').resolves();
       showDeploymentUrlStub = stub(BaseClass.prototype, 'showDeploymentUrl').resolves();
@@ -66,7 +68,7 @@ describe('File Upload', () => {
       archiveStub.restore();
       uploadFileStub.restore();
       createNewDeploymentStub.restore();
-      prepareForNewProjectCreationStub.restore();
+      prepareAndUploadNewProjectFile.restore();
       createNewProjectStub.restore();
       prepareLaunchConfigStub.restore();
       showLogsStub.restore();
@@ -75,38 +77,64 @@ describe('File Upload', () => {
     });
 
     describe('Redeploy existing project', () => {
-      
       it('should run file upload flow for existing project where flag passed is redeploy-latest', async () => {
         let adapterConstructorOptions = {
-          config: { 
+          config: {
             isExistingProject: true,
-            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx', }, 
-            'redeploy-latest': true
+            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
+            'redeploy-latest': true,
           },
         };
-        new FileUpload(adapterConstructorOptions).run();
+        await new FileUpload(adapterConstructorOptions).run();
+
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createSignedUploadUrlStub.calledOnce).to.be.true;
+        expect(archiveStub.calledOnce).to.be.true;
+        expect(uploadFileStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(prepareLaunchConfigStub.calledOnce).to.be.true;
+        expect(showLogsStub.calledOnce).to.be.true;
+        expect(showDeploymentUrlStub.calledOnce).to.be.true;
+        expect(showSuggestionStub.calledOnce).to.be.true;
       });
 
       it('should run file upload flow for existing project where flag passed is redeploy-last-upload', async () => {
         let adapterConstructorOptions = {
-          config: { 
-            isExistingProject: true, 
-            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx', },
-            'redeploy-last-upload': true
-            },
+          config: {
+            isExistingProject: true,
+            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
+            'redeploy-last-upload': true,
+          },
         };
-        new FileUpload(adapterConstructorOptions).run();
+        await new FileUpload(adapterConstructorOptions).run();
+
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createSignedUploadUrlStub.calledOnce).to.be.false;
+        expect(archiveStub.calledOnce).to.be.false;
+        expect(uploadFileStub.calledOnce).to.be.false;
+        expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(prepareLaunchConfigStub.calledOnce).to.be.true;
+        expect(showLogsStub.calledOnce).to.be.true;
+        expect(showDeploymentUrlStub.calledOnce).to.be.true;
+        expect(showSuggestionStub.calledOnce).to.be.true;
       });
     });
 
     describe('Deploy new project', () => {
       let adapterConstructorOptions = {
-        config: { 
-          isExistingProject: false 
+        config: {
+          isExistingProject: false,
         },
       };
       it('should run file upload flow for new project', async () => {
-        new FileUpload(adapterConstructorOptions).run();
+        await new FileUpload(adapterConstructorOptions).run();
+
+        expect(prepareAndUploadNewProjectFile.calledOnce).to.be.true;
+        expect(createNewProjectStub.calledOnce).to.be.true;
+        expect(prepareLaunchConfigStub.calledOnce).to.be.true;
+        expect(showLogsStub.calledOnce).to.be.true;
+        expect(showDeploymentUrlStub.calledOnce).to.be.true;
+        expect(showSuggestionStub.calledOnce).to.be.true;
       });
     });
   });
@@ -162,7 +190,7 @@ describe('File Upload', () => {
     });
   });
 
-  describe('prepareForNewProjectCreation', () => {
+  describe('prepareAndUploadNewProjectFile', () => {
     let createSignedUploadUrlStub,
       archiveStub,
       uploadFileStub,
@@ -183,13 +211,15 @@ describe('File Upload', () => {
           { name: 'NextJs', value: 'NEXTJS' },
           { name: 'Other', value: 'OTHER' },
         ],
-        outputDirectories:"",
-        supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX']
+        outputDirectories: '',
+        supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX'],
       },
     };
     let archiveMockData = { zipName: 'abc.zip', zipPath: 'path/to/zip', projectName: 'test' };
     beforeEach(function () {
-      createSignedUploadUrlStub = stub(FileUpload.prototype, 'createSignedUploadUrl').resolves();
+      createSignedUploadUrlStub = stub(FileUpload.prototype, 'createSignedUploadUrl').resolves({
+        uploadUid: '123456789',
+      });
       archiveStub = stub(FileUpload.prototype, 'archive').resolves(archiveMockData);
       uploadFileStub = stub(FileUpload.prototype, 'uploadFile');
       uploadFileStub.withArgs(archiveMockData.zipName, archiveMockData.zipPath);
@@ -207,7 +237,7 @@ describe('File Upload', () => {
     });
 
     it('prepare for new project', async function () {
-      await new FileUpload(adapterConstructorOptions).prepareForNewProjectCreation();
+      await new FileUpload(adapterConstructorOptions).prepareAndUploadNewProjectFile();
     });
   });
 
@@ -252,36 +282,55 @@ describe('File Upload', () => {
   });
 
   describe('createSignedUploadUrl', () => {
-    let sandbox;
+    let sandbox, logStub, exitStub;
 
     beforeEach(() => {
       sandbox = createSandbox();
+      logStub = sandbox.stub(console, 'log');
+      exitStub = sandbox.stub(process, 'exit');
     });
 
     afterEach(() => {
       sandbox.restore();
+      logStub.restore();
+      exitStub.restore();
     });
 
     it('should set the signed upload URL and upload UID in the config', async () => {
-      const signedUploadUrl = 'http://example.com/upload';
+      const expectedSignedUploadUrl = { uploadUrl: 'http://example.com/upload', uploadUid: '123456789' };
       const apolloClientMock = {
-        mutate: sandbox.stub().resolves({ data: { signedUploadUrl } }),
+        mutate: sandbox.stub().resolves({ data: { signedUploadUrl: expectedSignedUploadUrl } }),
       };
-      const logStub = sandbox.stub(console, 'log');
-      const exitStub = sandbox.stub(process, 'exit');
 
       const fileUploadInstance = new FileUpload(adapterConstructorInputs);
       fileUploadInstance.apolloClient = apolloClientMock;
+      fileUploadInstance.signedUploadUrlData = expectedSignedUploadUrl.uploadUrl;
+      fileUploadInstance.config.uploadUid = expectedSignedUploadUrl.uploadUid;
+
+      const signedUploadUrlData = await fileUploadInstance.createSignedUploadUrl();
+
+      expect(fileUploadInstance.config.uploadUid).to.equal(expectedSignedUploadUrl.uploadUid);
+      expect(signedUploadUrlData).to.equal(expectedSignedUploadUrl);
+    });
+
+    it('should log an error message and exit when the mutation fails', async () => {
+      const expectedSignedUploadUrl = { uploadUrl: null, uploadUid: null };
+      const apolloClientMock = {
+        mutate: sandbox.stub().rejects(new Error('Mutation failed')),
+      };
+      const fileUploadInstance = new FileUpload(adapterConstructorInputs);
+
+      fileUploadInstance.apolloClient = apolloClientMock;
       fileUploadInstance.log = logStub;
       fileUploadInstance.exit = exitStub;
-      fileUploadInstance.signedUploadUrlData = null;
-      fileUploadInstance.config = { uploadUid: null };
+      fileUploadInstance.signedUploadUrlData = expectedSignedUploadUrl.uploadUrl;
+      fileUploadInstance.config.uploadUid = expectedSignedUploadUrl.uploadUid;
 
       await fileUploadInstance.createSignedUploadUrl();
 
-      expect(logStub.called).to.be.false;
-      expect(exitStub.called).to.be.false;
-      expect(fileUploadInstance.signedUploadUrlData).to.equal('http://example.com/upload');
+      expect(logStub.calledWith('Something went wrong. Please try again.', 'warn')).to.be.true;
+      expect(logStub.calledWith('Mutation failed', 'error')).to.be.true;
+      expect(exitStub.calledOnceWithExactly(1)).to.be.true;
     });
   });
 });

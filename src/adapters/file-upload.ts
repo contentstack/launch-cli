@@ -14,10 +14,9 @@ import { print } from '../util';
 import BaseClass from './base-class';
 import { getFileList } from '../util/fs';
 import { createSignedUploadUrlMutation, importProjectMutation } from '../graphql';
+import { SignedUploadUrlData } from '../types/launch';
 
 export default class FileUpload extends BaseClass {
-  private signedUploadUrlData!: Record<string, any>;
-
   /**
    * @method run
    *
@@ -30,31 +29,31 @@ export default class FileUpload extends BaseClass {
     } else {
       await this.handleNewProject();
     }
-  
+
     this.prepareLaunchConfig();
     await this.showLogs();
     this.showDeploymentUrl();
     this.showSuggestion();
   }
-  
+
   private async handleExistingProject(): Promise<void> {
     await this.initApolloClient();
-    
+
     let redeployLatest = this.config['redeploy-latest'];
 
     if (redeployLatest) {
-      await this.createSignedUploadUrl();
+      const signedUploadUrlData = await this.createSignedUploadUrl();
       const { zipName, zipPath } = await this.archive();
-      await this.uploadFile(zipName, zipPath);
+      await this.uploadFile(zipName, zipPath, signedUploadUrlData);
     }
 
-    const { uploadUid } = this.signedUploadUrlData || { uploadUid: undefined };
+    const { uploadUid } = { uploadUid: undefined };
     await this.createNewDeployment(true, uploadUid);
   }
-  
+
   private async handleNewProject(): Promise<void> {
-    await this.prepareForNewProjectCreation();
-    await this.createNewProject();
+    const uploadUid = await this.prepareAndUploadNewProjectFile();
+    await this.createNewProject(uploadUid);
   }
 
   /**
@@ -63,7 +62,7 @@ export default class FileUpload extends BaseClass {
    * @return {*}  {Promise<void>}
    * @memberof FileUpload
    */
-  async createNewProject(): Promise<void> {
+  async createNewProject(uploadUid: string): Promise<void> {
     const { framework, projectName, buildCommand, outputDirectory, environmentName, serverCommand } = this.config;
     await this.apolloClient
       .mutate({
@@ -72,7 +71,7 @@ export default class FileUpload extends BaseClass {
           project: {
             projectType: 'FILEUPLOAD',
             name: projectName,
-            fileUpload: { uploadUid: this.signedUploadUrlData.uploadUid },
+            fileUpload: { uploadUid },
             environment: {
               frameworkPreset: framework,
               outputDirectory: outputDirectory,
@@ -96,7 +95,7 @@ export default class FileUpload extends BaseClass {
         const canRetry = await this.handleNewProjectCreationError(error);
 
         if (canRetry) {
-          return this.createNewProject();
+          return this.createNewProject(uploadUid);
         }
       });
   }
@@ -107,7 +106,7 @@ export default class FileUpload extends BaseClass {
    * @return {*}  {Promise<void>}
    * @memberof FileUpload
    */
-  async prepareForNewProjectCreation(): Promise<void> {
+  async prepareAndUploadNewProjectFile(): Promise<string> {
     const {
       name,
       framework,
@@ -124,9 +123,9 @@ export default class FileUpload extends BaseClass {
     this.config.deliveryToken = token;
     // this.fileValidation();
     await this.selectOrg();
-    await this.createSignedUploadUrl();
+    const signedUploadUrlData = await this.createSignedUploadUrl();
     const { zipName, zipPath, projectName } = await this.archive();
-    await this.uploadFile(zipName, zipPath);
+    await this.uploadFile(zipName, zipPath, signedUploadUrlData);
     this.config.projectName =
       name ||
       (await cliux.inquire({
@@ -187,6 +186,7 @@ export default class FileUpload extends BaseClass {
     this.config.variableType = variableType as unknown as string;
     this.config.envVariables = envVariables;
     await this.handleEnvImportFlow();
+    return signedUploadUrlData.uploadUid;
   }
 
   /**
@@ -252,19 +252,23 @@ export default class FileUpload extends BaseClass {
   /**
    * @method createSignedUploadUrl - create pre signed url for file upload
    *
-   * @return {*}  {Promise<void>}
+   * @return {*}  {Promise<SignedUploadUrlData>}
    * @memberof FileUpload
    */
-  async createSignedUploadUrl(): Promise<void> {
-    this.signedUploadUrlData = await this.apolloClient
-      .mutate({ mutation: createSignedUploadUrlMutation })
-      .then(({ data: { signedUploadUrl } }) => signedUploadUrl)
-      .catch((error) => {
-        this.log('Something went wrong. Please try again.', 'warn');
-        this.log(error, 'error');
-        this.exit(1);
-      });
-    this.config.uploadUid = this.signedUploadUrlData.uploadUid;
+  async createSignedUploadUrl(): Promise<SignedUploadUrlData> {
+    try {
+      const result = await this.apolloClient.mutate({ mutation: createSignedUploadUrlMutation });
+      const signedUploadUrlData = result.data.signedUploadUrl;
+      this.config.uploadUid = signedUploadUrlData.uploadUid;
+      return signedUploadUrlData;
+    } catch (error) {
+      this.log('Something went wrong. Please try again.', 'warn');
+      if (error instanceof Error) {
+        this.log(error.message, 'error');
+      }
+      this.exit(1);
+      return {} as SignedUploadUrlData;
+    }
   }
 
   /**
@@ -275,8 +279,8 @@ export default class FileUpload extends BaseClass {
    * @return {*}  {Promise<void>}
    * @memberof FileUpload
    */
-  async uploadFile(fileName: string, filePath: PathLike): Promise<void> {
-    const { uploadUrl, fields, headers, method } = this.signedUploadUrlData;
+  async uploadFile(fileName: string, filePath: PathLike, signedUploadUrlData: SignedUploadUrlData): Promise<void> {
+    const { uploadUrl, fields, headers, method } = signedUploadUrlData;
     const formData = new FormData();
 
     if (!isEmpty(fields)) {
