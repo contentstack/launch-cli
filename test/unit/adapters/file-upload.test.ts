@@ -1,6 +1,6 @@
 //@ts-nocheck
 import { expect } from 'chai';
-import { stub, createSandbox , sinon} from 'sinon';
+import { stub, createSandbox , sinon } from 'sinon';
 import { cliux } from '@contentstack/cli-utilities';
 import fs from 'fs';
 import { FileUpload, BaseClass } from '../../../src/adapters';
@@ -47,11 +47,14 @@ describe('File Upload', () => {
       showLogsStub,
       showDeploymentUrlStub,
       showSuggestionStub;
+    const signedUploadUrlData = { uploadUrl: 'http://example.com/upload', uploadUid: '123456789' };
+    const zipName = 'test.zip';
+    const zipPath = '/path/to/zip';
 
     beforeEach(() => {
       initApolloClientStub = stub(BaseClass.prototype, 'initApolloClient').resolves();
-      createSignedUploadUrlStub = stub(FileUpload.prototype, 'createSignedUploadUrl').resolves({ uploadUrl: 'http://example.com/upload', uploadUid: '123456789' });
-      archiveStub = stub(FileUpload.prototype, 'archive').resolves({ zipName: 'test.zip', zipPath: '/path/to/zip' });
+      createSignedUploadUrlStub = stub(FileUpload.prototype, 'createSignedUploadUrl').resolves(signedUploadUrlData);
+      archiveStub = stub(FileUpload.prototype, 'archive').resolves({ zipName, zipPath });
       uploadFileStub = stub(FileUpload.prototype, 'uploadFile').resolves();
       createNewDeploymentStub = stub(FileUpload.prototype, 'createNewDeployment').resolves();
       prepareAndUploadNewProjectFile = stub(FileUpload.prototype, 'prepareAndUploadNewProjectFile').resolves();
@@ -107,7 +110,9 @@ describe('File Upload', () => {
         expect(createSignedUploadUrlStub.calledOnce).to.be.true;
         expect(archiveStub.calledOnce).to.be.true;
         expect(uploadFileStub.calledOnce).to.be.true;
+        expect(uploadFileStub.args[0]).to.deep.equal([zipName, zipPath, signedUploadUrlData]);
         expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, signedUploadUrlData.uploadUid]);
         expect(prepareLaunchConfigStub.calledOnce).to.be.true;
         expect(showLogsStub.calledOnce).to.be.true;
         expect(showDeploymentUrlStub.calledOnce).to.be.true;
@@ -129,6 +134,7 @@ describe('File Upload', () => {
         expect(archiveStub.calledOnce).to.be.false;
         expect(uploadFileStub.calledOnce).to.be.false;
         expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, undefined]);
         expect(prepareLaunchConfigStub.calledOnce).to.be.true;
         expect(showLogsStub.calledOnce).to.be.true;
         expect(showDeploymentUrlStub.calledOnce).to.be.true;
@@ -185,7 +191,9 @@ describe('File Upload', () => {
         expect(createSignedUploadUrlStub.calledOnce).to.be.true;
         expect(archiveStub.calledOnce).to.be.true;
         expect(uploadFileStub.calledOnce).to.be.true;
+        expect(uploadFileStub.args[0]).to.deep.equal([zipName, zipPath, signedUploadUrlData]);
         expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, signedUploadUrlData.uploadUid]);
         expect(prepareLaunchConfigStub.calledOnce).to.be.true;
         expect(showLogsStub.calledOnce).to.be.true;
         expect(showDeploymentUrlStub.calledOnce).to.be.true;
@@ -213,6 +221,7 @@ describe('File Upload', () => {
         expect(archiveStub.calledOnce).to.be.false;
         expect(uploadFileStub.calledOnce).to.be.false;
         expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, undefined]);
         expect(prepareLaunchConfigStub.calledOnce).to.be.true;
         expect(showLogsStub.calledOnce).to.be.true;
         expect(showDeploymentUrlStub.calledOnce).to.be.true;
