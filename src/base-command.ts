@@ -110,7 +110,7 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
       this.exit(1);
     }
 
-    const configPath = this.flags.config || resolve(currentWorkingDirectory, config.configName);
+    const configPath = this.flags.config || resolve(projectBasePath, config.configName);
     
     let baseUrl = config.launchBaseUrl || this.launchHubUrl;
     if (!baseUrl) {
