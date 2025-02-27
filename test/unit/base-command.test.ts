@@ -133,6 +133,7 @@ describe('BaseCommand', () => {
         'data-dir': '/root/subdirectory/project1',
       };
       baseCommandInstance.flags = flags;
+      existsSyncStub.withArgs('/root/subdirectory/project1/.cs-launch.json').returns(false);
 
       await baseCommandInstance.prepareConfig();
 
@@ -146,7 +147,7 @@ describe('BaseCommand', () => {
         host: 'host.contentstack.io',
         'data-dir': '/root/subdirectory/project1',
         projectBasePath: '/root/subdirectory/project1',
-        config: '/root/.cs-launch.json',
+        config: '/root/subdirectory/project1/.cs-launch.json',
         authtoken: 'testauthtoken',
         authType: 'testauthorisationType',
         authorization: 'testoauthAccessToken',

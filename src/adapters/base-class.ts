@@ -394,7 +394,7 @@ export default class BaseClass {
       data.project = this.config.currentConfig;
     }
 
-    writeFileSync(`${this.config.projectBasePath}/${this.config.configName}`, JSON.stringify(data), {
+    writeFileSync(this.config.configName, JSON.stringify(data), {
       encoding: 'utf8',
       flag: 'w',
     });
