@@ -41,13 +41,14 @@ export default class FileUpload extends BaseClass {
 
     let redeployLatest = this.config['redeploy-latest'];
 
+    let uploadUid;
     if (redeployLatest) {
       const signedUploadUrlData = await this.createSignedUploadUrl();
+      uploadUid = signedUploadUrlData.uploadUid;
       const { zipName, zipPath } = await this.archive();
       await this.uploadFile(zipName, zipPath, signedUploadUrlData);
     }
 
-    const { uploadUid } = { uploadUid: undefined };
     await this.createNewDeployment(true, uploadUid);
   }
 
