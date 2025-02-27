@@ -30,7 +30,7 @@ type ConfigType = {
   cwd?: string;
   host: string;
   branch?: string;
-  config?: string;
+  config: string;
   authType: string;
   flags: FlagInput;
   framework?: string;
