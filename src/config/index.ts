@@ -40,7 +40,9 @@ const config = {
     'Import variables from the local env file',
   ],
   variableType: '',
-  supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX']
+  supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX'],
+  supportedFileUploadMethods: ['last file upload', 'new file']
+
 };
 
 export default config;

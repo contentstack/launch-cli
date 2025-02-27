@@ -14,7 +14,8 @@ import { print } from '../util';
 import BaseClass from './base-class';
 import { getFileList } from '../util/fs';
 import { createSignedUploadUrlMutation, importProjectMutation } from '../graphql';
-import { SignedUploadUrlData } from '../types/launch';
+import { SignedUploadUrlData, FileUploadMethod } from '../types/launch';
+import config from '../config';
 
 export default class FileUpload extends BaseClass {
   /**
@@ -40,6 +41,19 @@ export default class FileUpload extends BaseClass {
     await this.initApolloClient();
 
     let redeployLatest = this.config['redeploy-latest'];
+    let redeployLastUpload = this.config['redeploy-last-upload'];
+
+    if (!redeployLatest && !redeployLastUpload) {
+      await this.confirmRedeployment();
+      const latestRedeploymentConfirmed = await this.confirmLatestRedeployment();
+      redeployLatest = latestRedeploymentConfirmed;
+      redeployLastUpload = !latestRedeploymentConfirmed;
+    }
+
+    if (redeployLastUpload && redeployLatest) {
+      this.log('redeploy-last-upload and redeploy-latest flags are not supported together.', 'error');
+      this.exit(1);
+    }
 
     let uploadUid;
     if (redeployLatest) {
@@ -50,6 +64,38 @@ export default class FileUpload extends BaseClass {
     }
 
     await this.createNewDeployment(true, uploadUid);
+  }
+
+  private async confirmRedeployment(): Promise<void> {
+    const redeploy = await cliux.inquire({
+      type: 'confirm',
+      name: 'deployLatestCommit',
+      message: 'Do you want to redeploy this existing Launch project?',
+    });
+    if (!redeploy) {
+      this.log('Project redeployment aborted.', 'info');
+      this.exit(1);
+    }
+  }
+
+  private async confirmLatestRedeployment(): Promise<boolean | void> {
+    const choices = [
+      ...map(config.supportedFileUploadMethods, (fileUploadMethod) => ({
+        value: fileUploadMethod,
+        name: `Redeploy with ${fileUploadMethod}`,
+      }))
+    ];
+
+    const selectedFileUploadMethod: FileUploadMethod = await cliux.inquire({
+      choices: choices,
+      type: 'search-list',
+      name: 'fileUploadMethod',
+      message: 'Choose a redeploy method to proceed',
+    });
+    if (selectedFileUploadMethod === FileUploadMethod.LastFileUpload) {
+      return false;
+    }
+    return true;
   }
 
   private async handleNewProject(): Promise<void> {
