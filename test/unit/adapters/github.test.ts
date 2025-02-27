@@ -5,7 +5,6 @@ import { cliux } from '@contentstack/cli-utilities';
 import { githubAdapterMockData } from '../mock/index';
 import { GitHub, BaseClass } from '../../../src/adapters';
 import { BaseCommand } from '../../../src/base-command';
-import { exit } from 'process';
 import fs from 'fs';
 
 describe('GitHub', () => {
@@ -79,22 +78,23 @@ describe('GitHub', () => {
     });
 
     describe('Redeploy existing project', () => {
-      it('should abort github flow for existing project and flag redeploy-last-upload is passed', async () => {
-        const adapterConstructorOptions = {
-          config: {
-            isExistingProject: true,
-            'redeploy-last-upload': true,
-          },
-        };
-        const exitStub = stub(process, 'exit');
-        const githubInstance = new GitHub(adapterConstructorOptions);
+      let sandbox;
+      let processExitStub;
 
-        await githubInstance.handleExistingProject();
-
-        expect(exitStub.calledOnceWithExactly(1)).to.be.true;
+      beforeEach(() => {
+        sandbox = createSandbox();
+        
+        processExitStub = sandbox.stub(process, 'exit').callsFake((code) => {
+          throw new Error(code);
+        });
+      
       });
 
-      it('should run github flow for existing project and flag redeploy-latest is passed ', async () => {
+      afterEach(() => {
+        sandbox.restore();
+      });
+
+      it('should successfully run github flow for existing project when flag redeploy-latest is passed ', async () => {
         let adapterConstructorOptions = {
           config: {
             isExistingProject: true,
@@ -106,7 +106,88 @@ describe('GitHub', () => {
 
         expect(initApolloClientStub.calledOnce).to.be.true;
         expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(prepareLaunchConfigStub.calledOnce).to.be.true;
+        expect(showLogsStub.calledOnce).to.be.true;
+        expect(showDeploymentUrlStub.calledOnce).to.be.true;
+        expect(showSuggestionStub.calledOnce).to.be.true;
       });
+
+      it('should abort github flow for existing project when flag redeploy-last-upload is passed', async () => {
+        const adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            'redeploy-last-upload': true,
+          },
+        };
+        let exitStatusCode;
+
+        try {
+          await new GitHub(adapterConstructorOptions).run();
+        } catch (err) {
+          exitStatusCode = err.message;
+        }
+
+        expect(processExitStub.calledOnceWithExactly(1)).to.be.true;
+        expect(exitStatusCode).to.equal('1');
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.calledOnce).to.be.false;
+        expect(prepareLaunchConfigStub.calledOnce).to.be.false;
+        expect(showLogsStub.calledOnce).to.be.false;
+        expect(showDeploymentUrlStub.calledOnce).to.be.false;
+        expect(showSuggestionStub.calledOnce).to.be.false;
+      });
+
+      it('should show prompt and successfully redeploy with "latest commit" if the option to redeploy is selected, when --redeploy-latest flag is not passed', async() => {
+        const adapterConstructorOptions = {
+          config: {
+            isExistingProject: true
+          },
+        };
+        inquireStub.withArgs({
+          type: 'confirm',
+          name: 'deployLatestCommit',
+          message: 'Redeploy latest commit?',
+        }).resolves(true);
+
+        await new GitHub(adapterConstructorOptions).run();
+
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(prepareLaunchConfigStub.calledOnce).to.be.true;
+        expect(showLogsStub.calledOnce).to.be.true;
+        expect(showDeploymentUrlStub.calledOnce).to.be.true;
+        expect(showSuggestionStub.calledOnce).to.be.true;
+      });
+
+      it('should exit if "No" is selected for prompt to redeploy, when --redeploy-latest flag is not passed', async() => {
+        const adapterConstructorOptions = {
+          config: {
+            isExistingProject: true
+          },
+        };
+        inquireStub.withArgs({
+          type: 'confirm',
+          name: 'deployLatestCommit',
+          message: 'Redeploy latest commit?',
+        }).resolves(false);
+        let exitStatusCode;
+
+        try {
+          await new GitHub(adapterConstructorOptions).run();
+        } catch (err) {
+          exitStatusCode = err.message;
+        }
+
+        expect(processExitStub.calledOnceWithExactly(1)).to.be.true;
+        expect(exitStatusCode).to.equal('1');
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.calledOnce).to.be.false;
+        expect(prepareLaunchConfigStub.calledOnce).to.be.false;
+        expect(showLogsStub.calledOnce).to.be.false;
+        expect(showDeploymentUrlStub.calledOnce).to.be.false;
+        expect(showSuggestionStub.calledOnce).to.be.false;
+      });
+
     });
 
     describe('Deploy new project', () => {
