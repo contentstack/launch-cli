@@ -50,7 +50,7 @@ describe('File Upload', () => {
 
     beforeEach(() => {
       initApolloClientStub = stub(BaseClass.prototype, 'initApolloClient').resolves();
-      createSignedUploadUrlStub = stub(FileUpload.prototype, 'createSignedUploadUrl').resolves();
+      createSignedUploadUrlStub = stub(FileUpload.prototype, 'createSignedUploadUrl').resolves({ uploadUrl: 'http://example.com/upload', uploadUid: '123456789' });
       archiveStub = stub(FileUpload.prototype, 'archive').resolves({ zipName: 'test.zip', zipPath: '/path/to/zip' });
       uploadFileStub = stub(FileUpload.prototype, 'uploadFile').resolves();
       createNewDeploymentStub = stub(FileUpload.prototype, 'createNewDeployment').resolves();
