@@ -81,28 +81,28 @@ describe('GitHub', () => {
     describe('Redeploy existing project', () => {
       it('should abort github flow for existing project and flag redeploy-last-upload is passed', async () => {
         const adapterConstructorOptions = {
-          config: { 
+          config: {
             isExistingProject: true,
-            'redeploy-last-upload': true 
+            'redeploy-last-upload': true,
           },
         };
         const exitStub = stub(process, 'exit');
         const githubInstance = new GitHub(adapterConstructorOptions);
-  
+
         await githubInstance.handleExistingProject();
-        
+
         expect(exitStub.calledOnceWithExactly(1)).to.be.true;
       });
-      
+
       it('should run github flow for existing project and flag redeploy-latest is passed ', async () => {
         let adapterConstructorOptions = {
-          config: { 
+          config: {
             isExistingProject: true,
-            'redeploy-latest': true 
+            'redeploy-latest': true,
           },
         };
 
-        await new GitHub(adapterConstructorOptions).run()
+        await new GitHub(adapterConstructorOptions).run();
 
         expect(initApolloClientStub.calledOnce).to.be.true;
         expect(createNewDeploymentStub.calledOnce).to.be.true;
@@ -111,12 +111,59 @@ describe('GitHub', () => {
 
     describe('Deploy new project', () => {
       let adapterConstructorOptions = {
-        config: { 
-          isExistingProject: false 
+        config: {
+          isExistingProject: false,
         },
       };
-      it('should run file upload flow for new project', async () => {
-        new GitHub(adapterConstructorOptions).run();
+      it('should create new project if GitHub is not connected', async () => {
+        checkGitHubConnectedStub.resolves(false);
+
+        await new GitHub(adapterConstructorOptions).run();
+
+        expect(checkGitHubConnectedStub.calledOnce).to.be.true;
+        expect(checkGitRemoteAvailableAndValidStub.called).to.be.false;
+        expect(checkUserGitHubAccessStub.called).to.be.false;
+        expect(prepareForNewProjectCreationStub.called).to.be.false;
+        expect(createNewProjectStub.calledOnce).to.be.true;
+      });
+
+      it('should create new project if git remote is not available', async () => {
+        checkGitRemoteAvailableAndValidStub.resolves(false);
+
+        await new GitHub(adapterConstructorOptions).run();
+
+        expect(checkGitHubConnectedStub.calledOnce).to.be.true;
+        expect(checkGitRemoteAvailableAndValidStub.calledOnce).to.be.true;
+        expect(checkUserGitHubAccessStub.called).to.be.false;
+        expect(prepareForNewProjectCreationStub.called).to.be.false;
+        expect(createNewProjectStub.calledOnce).to.be.true;
+      });
+      it('should not proceed if user does not have GitHub access', async () => {
+        checkGitHubConnectedStub.resolves(true);
+        checkGitRemoteAvailableAndValidStub.resolves(true);
+        checkUserGitHubAccessStub.resolves(false);
+    
+        await new GitHub(adapterConstructorOptions).run();
+    
+        expect(checkGitHubConnectedStub.calledOnce).to.be.true;
+        expect(checkGitRemoteAvailableAndValidStub.calledOnce).to.be.true;
+        expect(checkUserGitHubAccessStub.calledOnce).to.be.true;
+        expect(prepareForNewProjectCreationStub.called).to.be.false;
+        expect(createNewProjectStub.calledOnce).to.be.true;
+    });
+
+      it('should proceed to prepare for new project creation if user has GitHub access', async () => {
+        checkGitHubConnectedStub.resolves(true);
+        checkGitRemoteAvailableAndValidStub.resolves(true);
+        checkUserGitHubAccessStub.resolves(true);
+
+        await new GitHub(adapterConstructorOptions).handleNewProject();
+
+        expect(checkGitHubConnectedStub.calledOnce).to.be.true;
+        expect(checkGitRemoteAvailableAndValidStub.calledOnce).to.be.true;
+        expect(checkUserGitHubAccessStub.calledOnce).to.be.true;
+        expect(prepareForNewProjectCreationStub.calledOnce).to.be.true;
+        expect(createNewProjectStub.calledOnce).to.be.true;
       });
     });
   });
@@ -205,8 +252,8 @@ describe('GitHub', () => {
           { name: 'Other', value: 'OTHER' },
         ],
         repository: { fullName: 'Gatsby Starter' },
-        outputDirectories:"",
-        supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX']
+        outputDirectories: '',
+        supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX'],
       },
     };
     beforeEach(function () {

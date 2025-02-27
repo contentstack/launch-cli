@@ -35,7 +35,9 @@ export default class GitHub extends BaseClass {
 
   private async handleExistingProject(): Promise<void> {
     await this.initApolloClient();
+
     const redeployLastUpload = this.config['redeploy-last-upload'];
+    const redeployLatest = this.config['redeploy-latest'];
 
     if (redeployLastUpload) {
       this.log('redeploy-last-upload flag is not supported for Github Project.', 'error');
@@ -43,7 +45,23 @@ export default class GitHub extends BaseClass {
       return;
     }
 
+    if(!redeployLatest && !redeployLastUpload){
+      await this.confirmLatestRedeployment();
+    }
+
     await this.createNewDeployment();
+  }
+
+  private async confirmLatestRedeployment(): Promise<void> {
+    const deployLatestCommit = (await ux.inquire({
+      type: 'confirm',
+      name: 'deployLatestCommit',
+      message: 'Redeploy latest commit?',
+    }));
+    if (!deployLatestCommit) {
+      this.log('Cannot create a new project because its an existing project.', 'info');
+      this.exit(1);
+    }
   }
 
   private async handleNewProject(): Promise<void> {
@@ -59,6 +77,22 @@ export default class GitHub extends BaseClass {
     }
     await this.createNewProject();
   }
+  // private async handleNewProject(): Promise<void> {
+  //   // NOTE Step 1: Check is Github connected
+  //   // NOTE Step 2: check is the git remote available in the user's repo list
+  //   // NOTE Step 3: check is the user has proper git access
+  //   const isGithubConnected = await this.checkGitHubConnected();
+  //   console.log('thor1--------------git connected', isGithubConnected);
+  //   const isGitRemoteAvailableAndValid = await this.checkGitRemoteAvailableAndValid();
+  //   console.log('thor2--------------git remote available', isGitRemoteAvailableAndValid);
+  //   const isUserGitHubAccess = await this.checkUserGitHubAccess();
+  //   console.log('thor6--------------git user access', isUserGitHubAccess);
+  
+  //   if(isGithubConnected && isGitRemoteAvailableAndValid && isUserGitHubAccess){
+  //     await this.prepareForNewProjectCreation();
+  //   } 
+  //   await this.createNewProject();
+  // }
 
   /**
    * @method createNewProject - Create new launch project
@@ -241,7 +275,7 @@ export default class GitHub extends BaseClass {
       this.log('GitHub connection not found!', 'warn');
       await this.connectToAdapterOnUi();
     }
-
+console.log('thor5--------------git connected');
     return this.config.userConnection;
   }
 
@@ -272,7 +306,7 @@ export default class GitHub extends BaseClass {
       this.log('Repository not found in the list!', 'error');
       this.exit(1);
     }
-
+console.log('thor6--------------git remote available');
     return true;
   }
 

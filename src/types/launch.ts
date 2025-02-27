@@ -7,6 +7,11 @@ import { LoggerType } from './utils';
 
 type Providers = 'GitHub' | 'FileUpload';
 
+enum FileUploadMethod {
+  LastFileUpload = 'last file upload',
+  NewFile = 'new file',
+}
+
 type LogFn = (message: string | any, logType?: LoggerType | PrintOptions | undefined) => void;
 
 type ExitFn = (code?: number | undefined) => void;
@@ -38,6 +43,7 @@ type ConfigType = {
   deployment?: string;
   environment?: string;
   provider?: Providers;
+  fileUploadMethod?: FileUploadMethod;
   authorization?: string;
   logsApiBaseUrl: string;
   projectBasePath: string;
@@ -86,4 +92,5 @@ export {
   GraphqlHeaders,
   GraphqlApiClientInput,
   SignedUploadUrlData,
+  FileUploadMethod,
 };

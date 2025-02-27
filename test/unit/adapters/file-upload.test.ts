@@ -5,9 +5,9 @@ import { cliux } from '@contentstack/cli-utilities';
 import fs from 'fs';
 import { FileUpload, BaseClass } from '../../../src/adapters';
 import { BaseCommand } from '../../../src/base-command';
-import e from 'express';
 import { isNull } from 'util';
 import { log } from 'console';
+import { FileUploadMethod } from '../../../src/types/launch';
 
 describe('File Upload', () => {
   let inquireStub, exitStub, prepareApiClientsStub, prepareConfigStub, getConfigStub;
@@ -77,7 +77,23 @@ describe('File Upload', () => {
     });
 
     describe('Redeploy existing project', () => {
-      it('should run file upload flow for existing project where flag passed is redeploy-latest', async () => {
+      let sandbox;
+      let processExitStub;
+
+      beforeEach(() => {
+        sandbox = createSandbox();
+        
+        processExitStub = sandbox.stub(process, 'exit').callsFake((code) => {
+          throw new Error(code);
+        });
+      
+      });
+
+      afterEach(() => {
+        sandbox.restore();
+      });
+
+      it('should run file upload flow successfully for existing project where flag passed is redeploy-latest', async () => {
         let adapterConstructorOptions = {
           config: {
             isExistingProject: true,
@@ -98,7 +114,7 @@ describe('File Upload', () => {
         expect(showSuggestionStub.calledOnce).to.be.true;
       });
 
-      it('should run file upload flow for existing project where flag passed is redeploy-last-upload', async () => {
+      it('should run file upload flow successfully for existing project where flag passed is redeploy-last-upload', async () => {
         let adapterConstructorOptions = {
           config: {
             isExistingProject: true,
@@ -118,8 +134,126 @@ describe('File Upload', () => {
         expect(showDeploymentUrlStub.calledOnce).to.be.true;
         expect(showSuggestionStub.calledOnce).to.be.true;
       });
-    });
 
+      it('should exit with an error message when both --redeploy-last-upload and --redeploy-latest flags are passed', async () => {
+        let adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
+            'redeploy-last-upload': true,
+            'redeploy-latest': true,
+          },
+        };
+        let exitStatusCode;
+
+        try {
+          await new FileUpload(adapterConstructorOptions).run();
+        } catch (err) {
+          exitStatusCode = err.message;
+        }
+
+        expect(processExitStub.calledOnceWithExactly(1)).to.be.true;
+        expect(exitStatusCode).to.equal('1');
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createSignedUploadUrlStub.calledOnce).to.be.false;
+        expect(archiveStub.calledOnce).to.be.false;
+        expect(uploadFileStub.calledOnce).to.be.false;
+        expect(createNewDeploymentStub.calledOnce).to.be.false;
+        expect(prepareLaunchConfigStub.calledOnce).to.be.false;
+        expect(showLogsStub.calledOnce).to.be.false;
+        expect(showDeploymentUrlStub.calledOnce).to.be.false;
+        expect(showSuggestionStub.calledOnce).to.be.false;
+      });
+
+      it('should show prompt and successfully redeploy with "new file" if the option to redeploy with new file is selected, when --redeploy-latest and --redeploy-last-upload flags are not passed', async () => {
+        let adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
+          },
+        };
+        inquireStub.withArgs({
+          type: 'confirm',
+          name: 'deployLatestCommit',
+          message: 'Do you want to redeploy this existing Launch project?',
+        }).resolves(true);
+        inquireStub.resolves(FileUploadMethod.NewFile);
+
+        await new FileUpload(adapterConstructorOptions).run();
+
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createSignedUploadUrlStub.calledOnce).to.be.true;
+        expect(archiveStub.calledOnce).to.be.true;
+        expect(uploadFileStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(prepareLaunchConfigStub.calledOnce).to.be.true;
+        expect(showLogsStub.calledOnce).to.be.true;
+        expect(showDeploymentUrlStub.calledOnce).to.be.true;
+        expect(showSuggestionStub.calledOnce).to.be.true;
+      });
+
+      it('should show prompt and successfully redeploy with "last file upload" if the option to redeploy with last file upload is selected, when --redeploy-latest and --redeploy-last-upload flags are not passed', async () => {
+        let adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
+          },
+        };
+        inquireStub.withArgs({
+          type: 'confirm',
+          name: 'deployLatestCommit',
+          message: 'Do you want to redeploy this existing Launch project?',
+        }).resolves(true);
+        inquireStub.resolves(FileUploadMethod.LastFileUpload);
+
+        await new FileUpload(adapterConstructorOptions).run();
+
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createSignedUploadUrlStub.calledOnce).to.be.false;
+        expect(archiveStub.calledOnce).to.be.false;
+        expect(uploadFileStub.calledOnce).to.be.false;
+        expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(prepareLaunchConfigStub.calledOnce).to.be.true;
+        expect(showLogsStub.calledOnce).to.be.true;
+        expect(showDeploymentUrlStub.calledOnce).to.be.true;
+        expect(showSuggestionStub.calledOnce).to.be.true;
+      });
+
+      it('should exit if "No" is selected for prompt to redeploy, when --redeploy-latest and --redeploy-last-upload flags are not passed', async() => {
+        let adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
+          },
+        };
+        inquireStub.withArgs({
+          type: 'confirm',
+          name: 'deployLatestCommit',
+          message: 'Do you want to redeploy this existing Launch project?',
+        }).resolves(false);
+        let exitStatusCode;
+
+        try {
+          await new FileUpload(adapterConstructorOptions).run();
+        } catch (err) {
+          exitStatusCode = err.message;
+        }
+
+        expect(processExitStub.calledOnceWithExactly(1)).to.be.true;
+        expect(exitStatusCode).to.equal('1');
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createSignedUploadUrlStub.calledOnce).to.be.false;
+        expect(archiveStub.calledOnce).to.be.false;
+        expect(uploadFileStub.calledOnce).to.be.false;
+        expect(createNewDeploymentStub.calledOnce).to.be.false;
+        expect(prepareLaunchConfigStub.calledOnce).to.be.false;
+        expect(showLogsStub.calledOnce).to.be.false;
+        expect(showDeploymentUrlStub.calledOnce).to.be.false;
+        expect(showSuggestionStub.calledOnce).to.be.false;
+      });
+
+    });
+    
     describe('Deploy new project', () => {
       let adapterConstructorOptions = {
         config: {
