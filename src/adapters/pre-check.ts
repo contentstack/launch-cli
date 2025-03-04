@@ -47,16 +47,6 @@ export default class PreCheck extends BaseClass {
         this.log('Existing launch project identified', 'info');
 
         await this.displayPreDeploymentDetails();
-        const deployLatestCode =
-          this.config['redeploy-latest'] ||
-          (await ux.inquire({
-            type: 'confirm',
-            name: 'deployLatestSource',
-            message: 'Redeploy latest commit/code?',
-          }));
-        if (!deployLatestCode) {
-          this.exit(1);
-        }
       }
     }
   }

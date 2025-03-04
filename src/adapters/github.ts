@@ -21,30 +21,60 @@ export default class GitHub extends BaseClass {
    * @memberof GitHub
    */
   async run(): Promise<void> {
-    // NOTE New project creation Flow
     if (this.config.isExistingProject) {
-      await this.initApolloClient();
-      await this.createNewDeployment();
+      await this.handleExistingProject();
     } else {
-      // NOTE Existing project flow
-      // NOTE Step 1: Check is Github connected
-      if (await this.checkGitHubConnected()) {
-        // NOTE Step 2: check is the git remote available in the user's repo list
-        if (await this.checkGitRemoteAvailableAndValid()) {
-          if (await this.checkUserGitHubAccess()) {
-            // NOTE Step 3: check is the user has proper git access
-            await this.prepareForNewProjectCreation();
-          }
-        }
-      }
-
-      await this.createNewProject();
+      await this.handleNewProject();
     }
 
     this.prepareLaunchConfig();
     await this.showLogs();
     this.showDeploymentUrl();
     this.showSuggestion();
+  }
+
+  private async handleExistingProject(): Promise<void> {
+    await this.initApolloClient();
+
+    const redeployLastUpload = this.config['redeploy-last-upload'];
+    const redeployLatest = this.config['redeploy-latest'];
+
+    if (redeployLastUpload) {
+      this.log('redeploy-last-upload flag is not supported for Github Project.', 'error');
+      this.exit(1);
+    }
+
+    if(!redeployLatest && !redeployLastUpload){
+      await this.confirmLatestRedeployment();
+    }
+
+    await this.createNewDeployment();
+  }
+
+  private async confirmLatestRedeployment(): Promise<void> {
+    const deployLatestCommit = await ux.inquire({
+      type: 'confirm',
+      name: 'deployLatestCommit',
+      message: 'Redeploy latest commit?',
+    });
+    if (!deployLatestCommit) {
+      this.log('Cannot create a new project because its an existing project.', 'info');
+      this.exit(1);
+    }
+  }
+
+  private async handleNewProject(): Promise<void> {
+    // NOTE Step 1: Check is Github connected
+    if (await this.checkGitHubConnected()) {
+      // NOTE Step 2: check is the git remote available in the user's repo list
+      if (await this.checkGitRemoteAvailableAndValid()) {
+        if (await this.checkUserGitHubAccess()) {
+          // NOTE Step 3: check is the user has proper git access
+          await this.prepareForNewProjectCreation();
+        }
+      }
+    }
+    await this.createNewProject();
   }
 
   /**

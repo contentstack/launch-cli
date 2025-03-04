@@ -14,10 +14,10 @@ import { print } from '../util';
 import BaseClass from './base-class';
 import { getFileList } from '../util/fs';
 import { createSignedUploadUrlMutation, importProjectMutation } from '../graphql';
+import { SignedUploadUrlData, FileUploadMethod } from '../types/launch';
+import config from '../config';
 
 export default class FileUpload extends BaseClass {
-  private signedUploadUrlData!: Record<string, any>;
-
   /**
    * @method run
    *
@@ -26,28 +26,9 @@ export default class FileUpload extends BaseClass {
    */
   async run(): Promise<void> {
     if (this.config.isExistingProject) {
-      await this.initApolloClient();
-      const uploadLastFile =
-        this.config['redeploy-last-upload'] ||
-        (await cliux.inquire({
-          type: 'confirm',
-          default: false,
-          name: 'uploadLastFile',
-          message: 'Redeploy with last file upload?',
-        }));
-      if (!uploadLastFile) {
-        await this.createSignedUploadUrl();
-        const { zipName, zipPath } = await this.archive();
-        await this.uploadFile(zipName, zipPath);
-      }
-
-      const { uploadUid } = this.signedUploadUrlData || {
-        uploadUid: undefined,
-      };
-      await this.createNewDeployment(true, uploadUid);
+      await this.handleExistingProject();
     } else {
-      await this.prepareForNewProjectCreation();
-      await this.createNewProject();
+      await this.handleNewProject();
     }
 
     this.prepareLaunchConfig();
@@ -56,13 +37,79 @@ export default class FileUpload extends BaseClass {
     this.showSuggestion();
   }
 
+  private async handleExistingProject(): Promise<void> {
+    await this.initApolloClient();
+
+    let redeployLatest = this.config['redeploy-latest'];
+    let redeployLastUpload = this.config['redeploy-last-upload'];
+
+    if (!redeployLatest && !redeployLastUpload) {
+      await this.confirmRedeployment();
+      const latestRedeploymentConfirmed = await this.confirmLatestRedeployment();
+      redeployLatest = latestRedeploymentConfirmed;
+      redeployLastUpload = !latestRedeploymentConfirmed;
+    }
+
+    if (redeployLastUpload && redeployLatest) {
+      this.log('redeploy-last-upload and redeploy-latest flags are not supported together.', 'error');
+      this.exit(1);
+    }
+
+    let uploadUid;
+    if (redeployLatest) {
+      const signedUploadUrlData = await this.createSignedUploadUrl();
+      uploadUid = signedUploadUrlData.uploadUid;
+      const { zipName, zipPath } = await this.archive();
+      await this.uploadFile(zipName, zipPath, signedUploadUrlData);
+    }
+
+    await this.createNewDeployment(true, uploadUid);
+  }
+
+  private async confirmRedeployment(): Promise<void> {
+    const redeploy = await cliux.inquire({
+      type: 'confirm',
+      name: 'deployLatestCommit',
+      message: 'Do you want to redeploy this existing Launch project?',
+    });
+    if (!redeploy) {
+      this.log('Project redeployment aborted.', 'info');
+      this.exit(1);
+    }
+  }
+
+  private async confirmLatestRedeployment(): Promise<boolean | void> {
+    const choices = [
+      ...map(config.supportedFileUploadMethods, (fileUploadMethod) => ({
+        value: fileUploadMethod,
+        name: `Redeploy with ${fileUploadMethod}`,
+      }))
+    ];
+
+    const selectedFileUploadMethod: FileUploadMethod = await cliux.inquire({
+      choices: choices,
+      type: 'search-list',
+      name: 'fileUploadMethod',
+      message: 'Choose a redeploy method to proceed',
+    });
+    if (selectedFileUploadMethod === FileUploadMethod.LastFileUpload) {
+      return false;
+    }
+    return true;
+  }
+
+  private async handleNewProject(): Promise<void> {
+    const uploadUid = await this.prepareAndUploadNewProjectFile();
+    await this.createNewProject(uploadUid);
+  }
+
   /**
    * @method createNewProject - Create new launch project
    *
    * @return {*}  {Promise<void>}
    * @memberof FileUpload
    */
-  async createNewProject(): Promise<void> {
+  async createNewProject(uploadUid: string): Promise<void> {
     const { framework, projectName, buildCommand, outputDirectory, environmentName, serverCommand } = this.config;
     await this.apolloClient
       .mutate({
@@ -71,7 +118,7 @@ export default class FileUpload extends BaseClass {
           project: {
             projectType: 'FILEUPLOAD',
             name: projectName,
-            fileUpload: { uploadUid: this.signedUploadUrlData.uploadUid },
+            fileUpload: { uploadUid },
             environment: {
               frameworkPreset: framework,
               outputDirectory: outputDirectory,
@@ -95,7 +142,7 @@ export default class FileUpload extends BaseClass {
         const canRetry = await this.handleNewProjectCreationError(error);
 
         if (canRetry) {
-          return this.createNewProject();
+          return this.createNewProject(uploadUid);
         }
       });
   }
@@ -106,7 +153,7 @@ export default class FileUpload extends BaseClass {
    * @return {*}  {Promise<void>}
    * @memberof FileUpload
    */
-  async prepareForNewProjectCreation(): Promise<void> {
+  async prepareAndUploadNewProjectFile(): Promise<string> {
     const {
       name,
       framework,
@@ -123,9 +170,9 @@ export default class FileUpload extends BaseClass {
     this.config.deliveryToken = token;
     // this.fileValidation();
     await this.selectOrg();
-    await this.createSignedUploadUrl();
+    const signedUploadUrlData = await this.createSignedUploadUrl();
     const { zipName, zipPath, projectName } = await this.archive();
-    await this.uploadFile(zipName, zipPath);
+    await this.uploadFile(zipName, zipPath, signedUploadUrlData);
     this.config.projectName =
       name ||
       (await cliux.inquire({
@@ -186,6 +233,7 @@ export default class FileUpload extends BaseClass {
     this.config.variableType = variableType as unknown as string;
     this.config.envVariables = envVariables;
     await this.handleEnvImportFlow();
+    return signedUploadUrlData.uploadUid;
   }
 
   /**
@@ -251,19 +299,23 @@ export default class FileUpload extends BaseClass {
   /**
    * @method createSignedUploadUrl - create pre signed url for file upload
    *
-   * @return {*}  {Promise<void>}
+   * @return {*}  {Promise<SignedUploadUrlData>}
    * @memberof FileUpload
    */
-  async createSignedUploadUrl(): Promise<void> {
-    this.signedUploadUrlData = await this.apolloClient
-      .mutate({ mutation: createSignedUploadUrlMutation })
-      .then(({ data: { signedUploadUrl } }) => signedUploadUrl)
-      .catch((error) => {
-        this.log('Something went wrong. Please try again.', 'warn');
-        this.log(error, 'error');
-        this.exit(1);
-      });
-    this.config.uploadUid = this.signedUploadUrlData.uploadUid;
+  async createSignedUploadUrl(): Promise<SignedUploadUrlData> {
+    try {
+      const result = await this.apolloClient.mutate({ mutation: createSignedUploadUrlMutation });
+      const signedUploadUrlData = result.data.signedUploadUrl;
+      this.config.uploadUid = signedUploadUrlData.uploadUid;
+      return signedUploadUrlData;
+    } catch (error) {
+      this.log('Something went wrong. Please try again.', 'warn');
+      if (error instanceof Error) {
+        this.log(error.message, 'error');
+      }
+      this.exit(1);
+      return {} as SignedUploadUrlData;
+    }
   }
 
   /**
@@ -274,8 +326,8 @@ export default class FileUpload extends BaseClass {
    * @return {*}  {Promise<void>}
    * @memberof FileUpload
    */
-  async uploadFile(fileName: string, filePath: PathLike): Promise<void> {
-    const { uploadUrl, fields, headers, method } = this.signedUploadUrlData;
+  async uploadFile(fileName: string, filePath: PathLike, signedUploadUrlData: SignedUploadUrlData): Promise<void> {
+    const { uploadUrl, fields, headers, method } = signedUploadUrlData;
     const formData = new FormData();
 
     if (!isEmpty(fields)) {

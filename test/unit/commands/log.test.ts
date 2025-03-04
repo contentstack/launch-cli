@@ -286,8 +286,6 @@ describe('Log', () => {
 
       sandbox.stub(logInstance, 'log').callsFake(logStub);
       sandbox.stub(Array, 'isArray').callsFake(isArrayStub);
-      sandbox.stub(Array.prototype, 'includes').callsFake(includesStub);
-      sandbox.stub(Array.prototype, 'map').callsFake(mapStub);
 
       logInstance.showLogs(event);
     });

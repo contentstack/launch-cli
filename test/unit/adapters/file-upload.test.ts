@@ -1,17 +1,21 @@
 //@ts-nocheck
 import { expect } from 'chai';
-import { stub, createSandbox } from 'sinon';
+import { stub, createSandbox , sinon } from 'sinon';
 import { cliux } from '@contentstack/cli-utilities';
 import fs from 'fs';
 import { FileUpload, BaseClass } from '../../../src/adapters';
 import { BaseCommand } from '../../../src/base-command';
+import { isNull } from 'util';
+import { log } from 'console';
+import { FileUploadMethod } from '../../../src/types/launch';
 
 describe('File Upload', () => {
-  let inquireStub, prepareApiClientsStub, prepareConfigStub, getConfigStub;
+  let inquireStub, exitStub, prepareApiClientsStub, prepareConfigStub, getConfigStub;
   let adapterConstructorInputs;
 
   beforeEach(() => {
     inquireStub = stub(cliux, 'inquire');
+    exitStub = stub(BaseCommand.prototype, 'exit');
     prepareConfigStub = stub(BaseCommand.prototype, 'prepareConfig').resolves();
     prepareApiClientsStub = stub(BaseCommand.prototype, 'prepareApiClients').resolves();
     getConfigStub = stub(BaseCommand.prototype, 'getConfig').resolves();
@@ -25,6 +29,7 @@ describe('File Upload', () => {
 
   afterEach(() => {
     inquireStub.restore();
+    exitStub.restore();
     prepareConfigStub.restore();
     getConfigStub.restore();
     prepareApiClientsStub.restore();
@@ -36,25 +41,24 @@ describe('File Upload', () => {
       archiveStub,
       uploadFileStub,
       createNewDeploymentStub,
-      prepareForNewProjectCreationStub,
+      prepareAndUploadNewProjectFile,
       createNewProjectStub,
       prepareLaunchConfigStub,
       showLogsStub,
       showDeploymentUrlStub,
       showSuggestionStub;
+    const signedUploadUrlData = { uploadUrl: 'http://example.com/upload', uploadUid: '123456789' };
+    const zipName = 'test.zip';
+    const zipPath = '/path/to/zip';
 
-    let adapterConstructorOptions = {
-      config: { isExistingProject: true, currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' } },
-    };
     beforeEach(() => {
       initApolloClientStub = stub(BaseClass.prototype, 'initApolloClient').resolves();
-      createSignedUploadUrlStub = stub(FileUpload.prototype, 'createSignedUploadUrl').resolves();
-      archiveStub = stub(FileUpload.prototype, 'archive').resolves({ zipName: 'test.zip', zipPath: '/path/to/zip' });
+      createSignedUploadUrlStub = stub(FileUpload.prototype, 'createSignedUploadUrl').resolves(signedUploadUrlData);
+      archiveStub = stub(FileUpload.prototype, 'archive').resolves({ zipName, zipPath });
       uploadFileStub = stub(FileUpload.prototype, 'uploadFile').resolves();
       createNewDeploymentStub = stub(FileUpload.prototype, 'createNewDeployment').resolves();
-      prepareForNewProjectCreationStub = stub(FileUpload.prototype, 'prepareForNewProjectCreation').resolves();
+      prepareAndUploadNewProjectFile = stub(FileUpload.prototype, 'prepareAndUploadNewProjectFile').resolves();
       createNewProjectStub = stub(FileUpload.prototype, 'createNewProject').resolves();
-
       prepareLaunchConfigStub = stub(BaseClass.prototype, 'prepareLaunchConfig').resolves();
       showLogsStub = stub(BaseClass.prototype, 'showLogs').resolves();
       showDeploymentUrlStub = stub(BaseClass.prototype, 'showDeploymentUrl').resolves();
@@ -67,7 +71,7 @@ describe('File Upload', () => {
       archiveStub.restore();
       uploadFileStub.restore();
       createNewDeploymentStub.restore();
-      prepareForNewProjectCreationStub.restore();
+      prepareAndUploadNewProjectFile.restore();
       createNewProjectStub.restore();
       prepareLaunchConfigStub.restore();
       showLogsStub.restore();
@@ -75,8 +79,206 @@ describe('File Upload', () => {
       showSuggestionStub.restore();
     });
 
-    it('should run github flow', async () => {
-      new FileUpload(adapterConstructorOptions).run();
+    describe('Redeploy existing project', () => {
+      let sandbox;
+      let processExitStub;
+
+      beforeEach(() => {
+        sandbox = createSandbox();
+        
+        processExitStub = sandbox.stub(process, 'exit').callsFake((code) => {
+          throw new Error(code);
+        });
+      
+      });
+
+      afterEach(() => {
+        sandbox.restore();
+      });
+
+      it('should run file upload flow successfully for existing project where flag passed is redeploy-latest', async () => {
+        let adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
+            'redeploy-latest': true,
+          },
+        };
+        await new FileUpload(adapterConstructorOptions).run();
+
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createSignedUploadUrlStub.calledOnce).to.be.true;
+        expect(archiveStub.calledOnce).to.be.true;
+        expect(uploadFileStub.calledOnce).to.be.true;
+        expect(uploadFileStub.args[0]).to.deep.equal([zipName, zipPath, signedUploadUrlData]);
+        expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, signedUploadUrlData.uploadUid]);
+        expect(prepareLaunchConfigStub.calledOnce).to.be.true;
+        expect(showLogsStub.calledOnce).to.be.true;
+        expect(showDeploymentUrlStub.calledOnce).to.be.true;
+        expect(showSuggestionStub.calledOnce).to.be.true;
+      });
+
+      it('should run file upload flow successfully for existing project where flag passed is redeploy-last-upload', async () => {
+        let adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
+            'redeploy-last-upload': true,
+          },
+        };
+        await new FileUpload(adapterConstructorOptions).run();
+
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createSignedUploadUrlStub.calledOnce).to.be.false;
+        expect(archiveStub.calledOnce).to.be.false;
+        expect(uploadFileStub.calledOnce).to.be.false;
+        expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, undefined]);
+        expect(prepareLaunchConfigStub.calledOnce).to.be.true;
+        expect(showLogsStub.calledOnce).to.be.true;
+        expect(showDeploymentUrlStub.calledOnce).to.be.true;
+        expect(showSuggestionStub.calledOnce).to.be.true;
+      });
+
+      it('should exit with an error message when both --redeploy-last-upload and --redeploy-latest flags are passed', async () => {
+        let adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
+            'redeploy-last-upload': true,
+            'redeploy-latest': true,
+          },
+        };
+        let exitStatusCode;
+
+        try {
+          await new FileUpload(adapterConstructorOptions).run();
+        } catch (err) {
+          exitStatusCode = err.message;
+        }
+
+        expect(processExitStub.calledOnceWithExactly(1)).to.be.true;
+        expect(exitStatusCode).to.equal('1');
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createSignedUploadUrlStub.calledOnce).to.be.false;
+        expect(archiveStub.calledOnce).to.be.false;
+        expect(uploadFileStub.calledOnce).to.be.false;
+        expect(createNewDeploymentStub.calledOnce).to.be.false;
+        expect(prepareLaunchConfigStub.calledOnce).to.be.false;
+        expect(showLogsStub.calledOnce).to.be.false;
+        expect(showDeploymentUrlStub.calledOnce).to.be.false;
+        expect(showSuggestionStub.calledOnce).to.be.false;
+      });
+
+      it('should show prompt and successfully redeploy with "new file" if the option to redeploy with new file is selected, when --redeploy-latest and --redeploy-last-upload flags are not passed', async () => {
+        let adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
+          },
+        };
+        inquireStub.withArgs({
+          type: 'confirm',
+          name: 'deployLatestCommit',
+          message: 'Do you want to redeploy this existing Launch project?',
+        }).resolves(true);
+        inquireStub.resolves(FileUploadMethod.NewFile);
+
+        await new FileUpload(adapterConstructorOptions).run();
+
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createSignedUploadUrlStub.calledOnce).to.be.true;
+        expect(archiveStub.calledOnce).to.be.true;
+        expect(uploadFileStub.calledOnce).to.be.true;
+        expect(uploadFileStub.args[0]).to.deep.equal([zipName, zipPath, signedUploadUrlData]);
+        expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, signedUploadUrlData.uploadUid]);
+        expect(prepareLaunchConfigStub.calledOnce).to.be.true;
+        expect(showLogsStub.calledOnce).to.be.true;
+        expect(showDeploymentUrlStub.calledOnce).to.be.true;
+        expect(showSuggestionStub.calledOnce).to.be.true;
+      });
+
+      it('should show prompt and successfully redeploy with "last file upload" if the option to redeploy with last file upload is selected, when --redeploy-latest and --redeploy-last-upload flags are not passed', async () => {
+        let adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
+          },
+        };
+        inquireStub.withArgs({
+          type: 'confirm',
+          name: 'deployLatestCommit',
+          message: 'Do you want to redeploy this existing Launch project?',
+        }).resolves(true);
+        inquireStub.resolves(FileUploadMethod.LastFileUpload);
+
+        await new FileUpload(adapterConstructorOptions).run();
+
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createSignedUploadUrlStub.calledOnce).to.be.false;
+        expect(archiveStub.calledOnce).to.be.false;
+        expect(uploadFileStub.calledOnce).to.be.false;
+        expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, undefined]);
+        expect(prepareLaunchConfigStub.calledOnce).to.be.true;
+        expect(showLogsStub.calledOnce).to.be.true;
+        expect(showDeploymentUrlStub.calledOnce).to.be.true;
+        expect(showSuggestionStub.calledOnce).to.be.true;
+      });
+
+      it('should exit if "No" is selected for prompt to redeploy, when --redeploy-latest and --redeploy-last-upload flags are not passed', async() => {
+        let adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
+          },
+        };
+        inquireStub.withArgs({
+          type: 'confirm',
+          name: 'deployLatestCommit',
+          message: 'Do you want to redeploy this existing Launch project?',
+        }).resolves(false);
+        let exitStatusCode;
+
+        try {
+          await new FileUpload(adapterConstructorOptions).run();
+        } catch (err) {
+          exitStatusCode = err.message;
+        }
+
+        expect(processExitStub.calledOnceWithExactly(1)).to.be.true;
+        expect(exitStatusCode).to.equal('1');
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createSignedUploadUrlStub.calledOnce).to.be.false;
+        expect(archiveStub.calledOnce).to.be.false;
+        expect(uploadFileStub.calledOnce).to.be.false;
+        expect(createNewDeploymentStub.calledOnce).to.be.false;
+        expect(prepareLaunchConfigStub.calledOnce).to.be.false;
+        expect(showLogsStub.calledOnce).to.be.false;
+        expect(showDeploymentUrlStub.calledOnce).to.be.false;
+        expect(showSuggestionStub.calledOnce).to.be.false;
+      });
+
+    });
+    
+    describe('Deploy new project', () => {
+      let adapterConstructorOptions = {
+        config: {
+          isExistingProject: false,
+        },
+      };
+      it('should run file upload flow for new project', async () => {
+        await new FileUpload(adapterConstructorOptions).run();
+
+        expect(prepareAndUploadNewProjectFile.calledOnce).to.be.true;
+        expect(createNewProjectStub.calledOnce).to.be.true;
+        expect(prepareLaunchConfigStub.calledOnce).to.be.true;
+        expect(showLogsStub.calledOnce).to.be.true;
+        expect(showDeploymentUrlStub.calledOnce).to.be.true;
+        expect(showSuggestionStub.calledOnce).to.be.true;
+      });
     });
   });
 
@@ -131,7 +333,7 @@ describe('File Upload', () => {
     });
   });
 
-  describe('prepareForNewProjectCreation', () => {
+  describe('prepareAndUploadNewProjectFile', () => {
     let createSignedUploadUrlStub,
       archiveStub,
       uploadFileStub,
@@ -152,12 +354,15 @@ describe('File Upload', () => {
           { name: 'NextJs', value: 'NEXTJS' },
           { name: 'Other', value: 'OTHER' },
         ],
-        outputDirectories:""
+        outputDirectories: '',
+        supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX'],
       },
     };
     let archiveMockData = { zipName: 'abc.zip', zipPath: 'path/to/zip', projectName: 'test' };
     beforeEach(function () {
-      createSignedUploadUrlStub = stub(FileUpload.prototype, 'createSignedUploadUrl').resolves();
+      createSignedUploadUrlStub = stub(FileUpload.prototype, 'createSignedUploadUrl').resolves({
+        uploadUid: '123456789',
+      });
       archiveStub = stub(FileUpload.prototype, 'archive').resolves(archiveMockData);
       uploadFileStub = stub(FileUpload.prototype, 'uploadFile');
       uploadFileStub.withArgs(archiveMockData.zipName, archiveMockData.zipPath);
@@ -175,7 +380,7 @@ describe('File Upload', () => {
     });
 
     it('prepare for new project', async function () {
-      await new FileUpload(adapterConstructorOptions).prepareForNewProjectCreation();
+      await new FileUpload(adapterConstructorOptions).prepareAndUploadNewProjectFile();
     });
   });
 
@@ -220,36 +425,55 @@ describe('File Upload', () => {
   });
 
   describe('createSignedUploadUrl', () => {
-    let sandbox;
+    let sandbox, logStub, exitStub;
 
     beforeEach(() => {
       sandbox = createSandbox();
+      logStub = sandbox.stub(console, 'log');
+      exitStub = sandbox.stub(process, 'exit');
     });
 
     afterEach(() => {
       sandbox.restore();
+      logStub.restore();
+      exitStub.restore();
     });
 
     it('should set the signed upload URL and upload UID in the config', async () => {
-      const signedUploadUrl = 'http://example.com/upload';
+      const expectedSignedUploadUrl = { uploadUrl: 'http://example.com/upload', uploadUid: '123456789' };
       const apolloClientMock = {
-        mutate: sandbox.stub().resolves({ data: { signedUploadUrl } }),
+        mutate: sandbox.stub().resolves({ data: { signedUploadUrl: expectedSignedUploadUrl } }),
       };
-      const logStub = sandbox.stub(console, 'log');
-      const exitStub = sandbox.stub(process, 'exit');
 
       const fileUploadInstance = new FileUpload(adapterConstructorInputs);
       fileUploadInstance.apolloClient = apolloClientMock;
+      fileUploadInstance.signedUploadUrlData = expectedSignedUploadUrl.uploadUrl;
+      fileUploadInstance.config.uploadUid = expectedSignedUploadUrl.uploadUid;
+
+      const signedUploadUrlData = await fileUploadInstance.createSignedUploadUrl();
+
+      expect(fileUploadInstance.config.uploadUid).to.equal(expectedSignedUploadUrl.uploadUid);
+      expect(signedUploadUrlData).to.equal(expectedSignedUploadUrl);
+    });
+
+    it('should log an error message and exit when the mutation fails', async () => {
+      const expectedSignedUploadUrl = { uploadUrl: null, uploadUid: null };
+      const apolloClientMock = {
+        mutate: sandbox.stub().rejects(new Error('Mutation failed')),
+      };
+      const fileUploadInstance = new FileUpload(adapterConstructorInputs);
+
+      fileUploadInstance.apolloClient = apolloClientMock;
       fileUploadInstance.log = logStub;
       fileUploadInstance.exit = exitStub;
-      fileUploadInstance.signedUploadUrlData = null;
-      fileUploadInstance.config = { uploadUid: null };
+      fileUploadInstance.signedUploadUrlData = expectedSignedUploadUrl.uploadUrl;
+      fileUploadInstance.config.uploadUid = expectedSignedUploadUrl.uploadUid;
 
       await fileUploadInstance.createSignedUploadUrl();
 
-      expect(logStub.called).to.be.false;
-      expect(exitStub.called).to.be.false;
-      expect(fileUploadInstance.signedUploadUrlData).to.equal('http://example.com/upload');
+      expect(logStub.calledWith('Something went wrong. Please try again.', 'warn')).to.be.true;
+      expect(logStub.calledWith('Mutation failed', 'error')).to.be.true;
+      expect(exitStub.calledOnceWithExactly(1)).to.be.true;
     });
   });
 });
