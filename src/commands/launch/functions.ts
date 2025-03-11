@@ -1,18 +1,15 @@
-import { FlagInput, Flags } from '@contentstack/cli-utilities';
-
-import { BaseCommand } from '../../base-command';
+import { FlagInput } from '@contentstack/cli-utilities';
 import Contentfly from '../../util/cloud-function';
+import { Flags, Command } from '@oclif/core';
 
-export default class Functions extends BaseCommand<typeof Functions> {
+export default class Functions extends Command {
   static description = 'Serve cloud functions';
 
   static examples = [
     '$ csdx launch:functions',
     '$ csdx launch:functions --port=port',
     '$ csdx launch:functions --data-dir <path/of/current/working/dir>',
-    '$ csdx launch:functions --config <path/to/launch/config/file>',
     '$ csdx launch:functions --data-dir <path/of/current/working/dir> -p "port number"',
-    '$ csdx launch:functions --config <path/to/launch/config/file> --port=port',
   ];
 
   static flags: FlagInput = {
@@ -21,13 +18,17 @@ export default class Functions extends BaseCommand<typeof Functions> {
       default: '3000',
       description: 'Port number',
     }),
+    'data-dir': Flags.string({
+      char: 'd',
+      description: 'Current working directory',
+    }),
   };
 
   async run(): Promise<void> {
-    this.sharedConfig.config =
-      this.flags['data-dir'] || this.flags.config
-        ? this.flags.config?.split(`${this.sharedConfig.configName}`)[0] || this.flags['data-dir']
-        : process.cwd();
-    await new Contentfly(this.sharedConfig.config as string).serveCloudFunctions(+this.flags.port);
+    const { flags } = await this.parse(Functions);
+    const currentWorkingDirectory = process.cwd();
+    const projectBasePath = flags['data-dir'] || currentWorkingDirectory;
+
+    await new Contentfly(projectBasePath).serveCloudFunctions(+flags.port);
   }
 }
