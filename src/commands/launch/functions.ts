@@ -29,6 +29,8 @@ export default class Functions extends Command {
     const currentWorkingDirectory = process.cwd();
     const projectBasePath = flags['data-dir'] || currentWorkingDirectory;
 
-    await new Contentfly(projectBasePath).serveCloudFunctions(+flags.port);
+    const port = process.env.PORT || flags.port;
+
+    await new Contentfly(projectBasePath).serveCloudFunctions(port);
   }
 }
