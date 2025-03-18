@@ -22,7 +22,8 @@ export default class GitHub extends BaseClass {
    */
   async run(): Promise<void> {
     if (this.config.isExistingProject) {
-      await this.handleExistingProject();
+      const environment = await this.getEnvironment();
+      await this.handleExistingProject(environment);
     } else {
       await this.handleNewProject();
     }
@@ -33,7 +34,7 @@ export default class GitHub extends BaseClass {
     this.showSuggestion();
   }
 
-  private async handleExistingProject(): Promise<void> {
+  private async handleExistingProject(environment:string): Promise<void> {
     await this.initApolloClient();
 
     const redeployLastUpload = this.config['redeploy-last-upload'];
@@ -48,7 +49,7 @@ export default class GitHub extends BaseClass {
       await this.confirmLatestRedeployment();
     }
 
-    await this.createNewDeployment();
+    await this.createNewDeployment(false, environment);
   }
 
   private async confirmLatestRedeployment(): Promise<void> {

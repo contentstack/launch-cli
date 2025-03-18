@@ -26,6 +26,7 @@ import {
   fileFrameworkQuery,
   createDeploymentMutation,
   cmsEnvironmentVariablesQuery,
+  environmentsQuery
 } from '../graphql';
 import {
   LogFn,
@@ -85,14 +86,14 @@ export default class BaseClass {
    * @return {*}  {Promise<void>}
    * @memberof GitHub
    */
-  async createNewDeployment(skipGitData = false, uploadUid?: string): Promise<void> {
+  async createNewDeployment(skipGitData = false, environment:string, uploadUid?: string): Promise<void> {
     const deployment: Record<string, any> = {
-      environment: (first(this.config.currentConfig.environments) as Record<string, any>)?.uid,
+      environment: environment
     };
 
     if (uploadUid) {
       deployment.uploadUid = uploadUid;
-    }
+    } 
 
     await this.apolloClient
       .mutate({
@@ -394,7 +395,7 @@ export default class BaseClass {
       data.project = this.config.currentConfig;
     }
 
-    writeFileSync(this.config.config, JSON.stringify(data), {
+    writeFileSync(this.config.config, JSON.stringify(data, null, 2), {
       encoding: 'utf8',
       flag: 'w',
     });
@@ -675,7 +676,7 @@ export default class BaseClass {
       },
       baseUrl: this.config.manageApiBaseUrl,
     }).apolloClient;
-    this.config.environment = (last(this.config.currentConfig.environments) as Record<string, any>)?.uid;
+    this.config.environment = await this.getEnvironment();
     this.config.deployment = (last(this.config.currentConfig.deployments) as Record<string, any>)?.uid;
     const logs = new LogPolling({
       config: this.config,
@@ -742,6 +743,37 @@ export default class BaseClass {
       this.log(error, 'error');
     }
     this.exit(1);
+  }
+
+  async getEnvironment(): Promise<any> {
+    const environmentFlagInput = this.config['environment'];
+    if (environmentFlagInput) {
+      const environmentList = await this.fetchEnvironments();
+      const isValidEnvironment = environmentList.find((env: any) => env.name === environmentFlagInput || env.uid === environmentFlagInput);
+      if (isValidEnvironment) {
+        this.config.environment = isValidEnvironment.uid;
+        return isValidEnvironment.uid;
+      } else {
+        this.log('Invalid environment name!', 'error');
+        this.exit(1);
+      }
+    }
+    else {
+      const defaultEnvironment = (first(this.config.currentConfig.environments) as Record<string, any>)?.uid;
+      this.config.environment = defaultEnvironment;
+      return defaultEnvironment;
+    }
+  }
+
+  async fetchEnvironments(): Promise<any> {
+    try {
+        const { data } = await this.apolloClient.query({ query: environmentsQuery });
+        const environments = map(data.Environments.edges, 'node');
+        return environments;
+      } catch (error: any) {
+        this.log(error?.message, 'error');
+        process.exit(1);
+      }
   }
 
   /**

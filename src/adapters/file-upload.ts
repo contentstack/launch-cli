@@ -26,7 +26,8 @@ export default class FileUpload extends BaseClass {
    */
   async run(): Promise<void> {
     if (this.config.isExistingProject) {
-      await this.handleExistingProject();
+      const environment = await this.getEnvironment();
+      await this.handleExistingProject(environment);
     } else {
       await this.handleNewProject();
     }
@@ -37,7 +38,7 @@ export default class FileUpload extends BaseClass {
     this.showSuggestion();
   }
 
-  private async handleExistingProject(): Promise<void> {
+  private async handleExistingProject(environment: string): Promise<void> {
     await this.initApolloClient();
 
     let redeployLatest = this.config['redeploy-latest'];
@@ -63,7 +64,7 @@ export default class FileUpload extends BaseClass {
       await this.uploadFile(zipName, zipPath, signedUploadUrlData);
     }
 
-    await this.createNewDeployment(true, uploadUid);
+    await this.createNewDeployment(true, environment, uploadUid);
   }
 
   private async confirmRedeployment(): Promise<void> {
