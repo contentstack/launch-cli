@@ -46,8 +46,12 @@ describe('GitHub', () => {
       exitStub,
       showSuggestionStub;
 
-      const defaultEnvironment = 'Default';
-      const environmentFlagInput = 'environmentFlagInput';
+      const defaultEnvironment = { uid: 'testEnvUid', name: 'Default', frameworkPreset: 'OTHER' };
+      const environmentMatchedByEnvironmentFlagInput = {
+        uid: 'environmentFlagInput',
+        name: 'environmentFlagInput',
+        frameworkPreset: 'OTHER',
+      };
 
     beforeEach(() => {
       getEnvironmentStub = stub(BaseClass.prototype, 'getEnvironment').resolves();
@@ -117,7 +121,7 @@ describe('GitHub', () => {
         expect(createNewDeploymentStub.calledOnce).to.be.true;
         expect(createNewDeploymentStub.args[0]).to.deep.equal([
           false,
-          defaultEnvironment
+          defaultEnvironment.uid
         ]);
         expect(prepareLaunchConfigStub.calledOnce).to.be.true;
         expect(showLogsStub.calledOnce).to.be.true;
@@ -126,13 +130,13 @@ describe('GitHub', () => {
       });
 
       it('should successfully run github flow for existing project when flag redeploy-latest and environment is passed ', async () => {
-        getEnvironmentStub.resolves(environmentFlagInput);
+        getEnvironmentStub.resolves(environmentMatchedByEnvironmentFlagInput);
 
         let adapterConstructorOptions = {
           config: {
             isExistingProject: true,
             'redeploy-latest': true,
-            environment: environmentFlagInput,
+            environment: 'environmentFlagInput',
           },
         };
 
@@ -143,7 +147,7 @@ describe('GitHub', () => {
         expect(createNewDeploymentStub.calledOnce).to.be.true;
         expect(createNewDeploymentStub.args[0]).to.deep.equal([
           false,
-          environmentFlagInput
+          environmentMatchedByEnvironmentFlagInput.uid
         ]);
         expect(prepareLaunchConfigStub.calledOnce).to.be.true;
         expect(showLogsStub.calledOnce).to.be.true;
@@ -180,12 +184,12 @@ describe('GitHub', () => {
       });
 
       it('should abort github flow for existing project when flag redeploy-last-upload is passed and environment flag passed', async () => {
-        getEnvironmentStub.resolves(environmentFlagInput)
+        getEnvironmentStub.resolves(environmentMatchedByEnvironmentFlagInput)
         const adapterConstructorOptions = {
           config: {
             isExistingProject: true,
             'redeploy-last-upload': true,
-            environment: environmentFlagInput,
+            environment: 'environmentFlagInput',
           },
         };
         let exitStatusCode;
@@ -228,7 +232,7 @@ describe('GitHub', () => {
         expect(createNewDeploymentStub.calledOnce).to.be.true;
         expect(createNewDeploymentStub.args[0]).to.deep.equal([
           false,
-          defaultEnvironment
+          defaultEnvironment.uid
         ]);
         expect(prepareLaunchConfigStub.calledOnce).to.be.true;
         expect(showLogsStub.calledOnce).to.be.true;
@@ -237,12 +241,12 @@ describe('GitHub', () => {
       });
 
       it('should show prompt and successfully redeploy with "latest commit" if the option to redeploy is selected, when --redeploy-latest flag is not passed and environment flag is passed', async() => {
-        getEnvironmentStub.resolves(environmentFlagInput);
+        getEnvironmentStub.resolves(environmentMatchedByEnvironmentFlagInput);
 
         const adapterConstructorOptions = {
           config: {
             isExistingProject: true,
-            environment: environmentFlagInput
+            environment: 'environmentFlagInput'
           },
         };
         inquireStub.withArgs({
@@ -258,7 +262,7 @@ describe('GitHub', () => {
         expect(createNewDeploymentStub.calledOnce).to.be.true;
         expect(createNewDeploymentStub.args[0]).to.deep.equal([
           false,
-          environmentFlagInput
+          environmentMatchedByEnvironmentFlagInput.uid
         ]);
         expect(prepareLaunchConfigStub.calledOnce).to.be.true;
         expect(showLogsStub.calledOnce).to.be.true;
@@ -299,12 +303,12 @@ describe('GitHub', () => {
       });
 
       it('should exit if "No" is selected for prompt to redeploy, when --redeploy-latest flag is not passed and environment flag passed', async() => {
-        getEnvironmentStub.resolves(environmentFlagInput);
+        getEnvironmentStub.resolves(environmentMatchedByEnvironmentFlagInput);
 
         const adapterConstructorOptions = {
           config: {
             isExistingProject: true,
-            environment: environmentFlagInput
+            environment: 'environmentFlagInput'
           },
         };
         inquireStub.withArgs({

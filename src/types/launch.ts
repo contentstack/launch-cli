@@ -82,6 +82,12 @@ type SignedUploadUrlData = {
   uploadUid: string;
 };
 
+export type Environment = {
+  uid: string;
+  name: string;
+  frameworkPreset: string;
+};
+
 export {
   LogFn,
   ExitFn,

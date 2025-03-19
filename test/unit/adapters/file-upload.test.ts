@@ -51,8 +51,12 @@ describe('File Upload', () => {
     const signedUploadUrlData = { uploadUrl: 'http://example.com/upload', uploadUid: '123456789' };
     const zipName = 'test.zip';
     const zipPath = '/path/to/zip';
-    const defaultEnvironment = 'Default';
-    const environmentFlagInput = 'environmentFlagInput';
+    const defaultEnvironment = { uid: 'testEnvUid', name: 'Default', frameworkPreset: 'OTHER' };
+    const environmentMatchedByEnvironmentFlagInput = {
+      uid: 'environmentFlagInput',
+      name: 'environmentFlagInput',
+      frameworkPreset: 'OTHER',
+    };
 
     beforeEach(() => {
       getEnvironmentStub = stub(BaseClass.prototype, 'getEnvironment');
@@ -121,7 +125,7 @@ describe('File Upload', () => {
         expect(createNewDeploymentStub.calledOnce).to.be.true;
         expect(createNewDeploymentStub.args[0]).to.deep.equal([
           true,
-          defaultEnvironment,
+          defaultEnvironment.uid,
           signedUploadUrlData.uploadUid,
         ]);
         expect(prepareLaunchConfigStub.calledOnce).to.be.true;
@@ -131,7 +135,7 @@ describe('File Upload', () => {
       });
 
       it('should run file upload flow successfully for existing project where environment and redeploy-latest flags are passed.', async () => {
-        getEnvironmentStub.resolves(environmentFlagInput);
+        getEnvironmentStub.resolves(environmentMatchedByEnvironmentFlagInput);
         
         let adapterConstructorOptions = {
           config: {
@@ -152,7 +156,7 @@ describe('File Upload', () => {
         expect(createNewDeploymentStub.calledOnce).to.be.true;
         expect(createNewDeploymentStub.args[0]).to.deep.equal([
           true,
-          environmentFlagInput,
+          environmentMatchedByEnvironmentFlagInput.uid,
           signedUploadUrlData.uploadUid,
         ]);
         expect(prepareLaunchConfigStub.calledOnce).to.be.true;
@@ -179,7 +183,7 @@ describe('File Upload', () => {
         expect(archiveStub.calledOnce).to.be.false;
         expect(uploadFileStub.calledOnce).to.be.false;
         expect(createNewDeploymentStub.calledOnce).to.be.true;
-        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, defaultEnvironment, undefined]);
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, defaultEnvironment.uid, undefined]);
         expect(prepareLaunchConfigStub.calledOnce).to.be.true;
         expect(showLogsStub.calledOnce).to.be.true;
         expect(showDeploymentUrlStub.calledOnce).to.be.true;
@@ -187,7 +191,7 @@ describe('File Upload', () => {
       });
 
       it('should run file upload flow successfully for existing project where environment and redeploy-last-upload flags are passed', async () => {
-        getEnvironmentStub.resolves(environmentFlagInput);
+        getEnvironmentStub.resolves(environmentMatchedByEnvironmentFlagInput);
 
         let adapterConstructorOptions = {
           config: {
@@ -205,7 +209,7 @@ describe('File Upload', () => {
         expect(archiveStub.calledOnce).to.be.false;
         expect(uploadFileStub.calledOnce).to.be.false;
         expect(createNewDeploymentStub.calledOnce).to.be.true;
-        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, environmentFlagInput, undefined]);
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, environmentMatchedByEnvironmentFlagInput.uid, undefined]);
         expect(prepareLaunchConfigStub.calledOnce).to.be.true;
         expect(showLogsStub.calledOnce).to.be.true;
         expect(showDeploymentUrlStub.calledOnce).to.be.true;
@@ -246,7 +250,7 @@ describe('File Upload', () => {
       });
 
       it('should exit with an error message when both --redeploy-last-upload and --redeploy-latest flags are passed alongwith environment flag', async () => {
-        getEnvironmentStub.resolves(environmentFlagInput);
+        getEnvironmentStub.resolves(environmentMatchedByEnvironmentFlagInput);
 
         let adapterConstructorOptions = {
           config: {
@@ -305,7 +309,7 @@ describe('File Upload', () => {
         expect(uploadFileStub.calledOnce).to.be.true;
         expect(uploadFileStub.args[0]).to.deep.equal([zipName, zipPath, signedUploadUrlData]);
         expect(createNewDeploymentStub.calledOnce).to.be.true;
-        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, defaultEnvironment, signedUploadUrlData.uploadUid]);
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, defaultEnvironment.uid, signedUploadUrlData.uploadUid]);
         expect(prepareLaunchConfigStub.calledOnce).to.be.true;
         expect(showLogsStub.calledOnce).to.be.true;
         expect(showDeploymentUrlStub.calledOnce).to.be.true;
@@ -313,7 +317,7 @@ describe('File Upload', () => {
       });
 
       it('should show prompt and successfully redeploy with "new file" if the option to redeploy with new file is selected, when --redeploy-latest and --redeploy-last-upload flags are not passed and environment flag passed', async () => {
-        getEnvironmentStub.resolves(environmentFlagInput);
+        getEnvironmentStub.resolves(environmentMatchedByEnvironmentFlagInput);
         let adapterConstructorOptions = {
           config: {
             isExistingProject: true,
@@ -339,7 +343,7 @@ describe('File Upload', () => {
         expect(uploadFileStub.calledOnce).to.be.true;
         expect(uploadFileStub.args[0]).to.deep.equal([zipName, zipPath, signedUploadUrlData]);
         expect(createNewDeploymentStub.calledOnce).to.be.true;
-        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, environmentFlagInput, signedUploadUrlData.uploadUid]);
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, environmentMatchedByEnvironmentFlagInput.uid, signedUploadUrlData.uploadUid]);
         expect(prepareLaunchConfigStub.calledOnce).to.be.true;
         expect(showLogsStub.calledOnce).to.be.true;
         expect(showDeploymentUrlStub.calledOnce).to.be.true;
@@ -372,7 +376,7 @@ describe('File Upload', () => {
         expect(archiveStub.calledOnce).to.be.false;
         expect(uploadFileStub.calledOnce).to.be.false;
         expect(createNewDeploymentStub.calledOnce).to.be.true;
-        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, defaultEnvironment, undefined]);
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, defaultEnvironment.uid, undefined]);
         expect(prepareLaunchConfigStub.calledOnce).to.be.true;
         expect(showLogsStub.calledOnce).to.be.true;
         expect(showDeploymentUrlStub.calledOnce).to.be.true;
@@ -380,7 +384,7 @@ describe('File Upload', () => {
       });
 
       it('should show prompt and successfully redeploy with "last file upload" if the option to redeploy with last file upload is selected, when --redeploy-latest and --redeploy-last-upload flags are not passed and environment flag passed', async () => {
-        getEnvironmentStub.resolves(environmentFlagInput);
+        getEnvironmentStub.resolves(environmentMatchedByEnvironmentFlagInput);
 
         let adapterConstructorOptions = {
           config: {
@@ -405,7 +409,7 @@ describe('File Upload', () => {
         expect(archiveStub.calledOnce).to.be.false;
         expect(uploadFileStub.calledOnce).to.be.false;
         expect(createNewDeploymentStub.calledOnce).to.be.true;
-        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, environmentFlagInput, undefined]);
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, environmentMatchedByEnvironmentFlagInput.uid, undefined]);
         expect(prepareLaunchConfigStub.calledOnce).to.be.true;
         expect(showLogsStub.calledOnce).to.be.true;
         expect(showDeploymentUrlStub.calledOnce).to.be.true;
@@ -451,6 +455,7 @@ describe('File Upload', () => {
       });
 
       it('should exit if "No" is selected for prompt to redeploy, when --redeploy-latest and --redeploy-last-upload flags are not passed and environment flag is passed', async () => {
+        getEnvironmentStub.resolves(defaultEnvironment);
         let adapterConstructorOptions = {
           config: {
             isExistingProject: true,

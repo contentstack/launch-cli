@@ -27,7 +27,7 @@ export default class FileUpload extends BaseClass {
   async run(): Promise<void> {
     if (this.config.isExistingProject) {
       const environment = await this.getEnvironment();
-      await this.handleExistingProject(environment);
+      await this.handleExistingProject(environment.uid);
     } else {
       await this.handleNewProject();
     }
