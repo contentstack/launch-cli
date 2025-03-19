@@ -747,22 +747,21 @@ export default class BaseClass {
 
   async getEnvironment(): Promise<any> {
     const environmentFlagInput = this.config['environment'];
-    if (environmentFlagInput) {
-      const environmentList = await this.fetchEnvironments();
-      const isValidEnvironment = environmentList.find((env: any) => env.name === environmentFlagInput || env.uid === environmentFlagInput);
-      if (isValidEnvironment) {
-        this.config.environment = isValidEnvironment.uid;
-        return isValidEnvironment.uid;
-      } else {
-        this.log('Invalid environment name!', 'error');
-        this.exit(1);
-      }
-    }
-    else {
+
+    if (!environmentFlagInput) {
       const defaultEnvironment = (first(this.config.currentConfig.environments) as Record<string, any>)?.uid;
       this.config.environment = defaultEnvironment;
       return defaultEnvironment;
     }
+    const environmentList = await this.fetchEnvironments();
+    const isValidEnvironment = environmentList.find((env: any) => env.name === environmentFlagInput || env.uid === environmentFlagInput);
+    
+    if (!isValidEnvironment) {
+      this.log('Invalid environment name!', 'error');
+      this.exit(1);
+    }
+    this.config.environment = isValidEnvironment.uid;
+    return isValidEnvironment.uid;
   }
 
   async fetchEnvironments(): Promise<any> {
