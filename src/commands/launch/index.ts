@@ -20,6 +20,7 @@ export default class Launch extends BaseCommand<typeof Launch> {
     '<%= config.bin %> <%= command.id %> --data-dir <path/of/current/working/dir> --redeploy-latest',
     '<%= config.bin %> <%= command.id %> --data-dir <path/of/current/working/dir> --redeploy-last-upload',
     '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload>',
+    '<%= config.bin %> <%= command.id %> --environment=<value> --redeploy-latest',
     '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload> --name=<value> --environment=<value> --branch=<value> --build-command=<value> --framework=<option> --org=<value> --out-dir=<value>',
     '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload> --name=<value> --environment=<value> --branch=<value> --build-command=<value> --framework=<option> --org=<value> --out-dir=<value> --server-command=<value>',
     '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload> --name=<value> --environment=<value> --branch=<value> --build-command=<value> --framework=<option> --org=<value> --out-dir=<value> --variable-type="Import variables from a stack" --alias=<value>',
