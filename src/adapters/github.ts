@@ -12,6 +12,7 @@ import { print } from '../util';
 import BaseClass from './base-class';
 import { getRemoteUrls } from '../util/create-git-meta';
 import { repositoriesQuery, userConnectionsQuery, importProjectMutation } from '../graphql';
+import { DeploymentStatus } from '../types';
 
 export default class GitHub extends BaseClass {
   /**
@@ -30,6 +31,9 @@ export default class GitHub extends BaseClass {
 
     this.prepareLaunchConfig();
     await this.showLogs();
+    if(this.config.currentDeploymentStatus === DeploymentStatus.FAILED) {
+      this.exit(1);
+    }
     this.showDeploymentUrl();
     this.showSuggestion();
   }

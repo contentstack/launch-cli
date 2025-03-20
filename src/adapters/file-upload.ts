@@ -14,7 +14,7 @@ import { print } from '../util';
 import BaseClass from './base-class';
 import { getFileList } from '../util/fs';
 import { createSignedUploadUrlMutation, importProjectMutation } from '../graphql';
-import { SignedUploadUrlData, FileUploadMethod } from '../types/launch';
+import { SignedUploadUrlData, FileUploadMethod, DeploymentStatus } from '../types/launch';
 import config from '../config';
 
 export default class FileUpload extends BaseClass {
@@ -34,6 +34,9 @@ export default class FileUpload extends BaseClass {
 
     this.prepareLaunchConfig();
     await this.showLogs();
+    if(this.config.currentDeploymentStatus === DeploymentStatus.FAILED) {
+      this.exit(1);
+    }
     this.showDeploymentUrl();
     this.showSuggestion();
   }

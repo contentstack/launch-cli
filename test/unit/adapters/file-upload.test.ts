@@ -7,7 +7,7 @@ import { FileUpload, BaseClass } from '../../../src/adapters';
 import { BaseCommand } from '../../../src/base-command';
 import { isNull } from 'util';
 import { log } from 'console';
-import { FileUploadMethod } from '../../../src/types/launch';
+import { DeploymentStatus, FileUploadMethod } from '../../../src/types/launch';
 
 describe('File Upload', () => {
   let inquireStub, exitStub, prepareApiClientsStub, prepareConfigStub, getConfigStub;
@@ -214,6 +214,44 @@ describe('File Upload', () => {
         expect(showLogsStub.calledOnce).to.be.true;
         expect(showDeploymentUrlStub.calledOnce).to.be.true;
         expect(showSuggestionStub.calledOnce).to.be.true;
+      });
+
+      it('should exit with non zero status code if deployment fails', async () => {
+        getEnvironmentStub.resolves(defaultEnvironment);
+        let adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
+            'redeploy-latest': true,
+            currentDeploymentStatus: DeploymentStatus.FAILED,
+          },
+        };
+        let exitStatusCode;
+
+        try {
+          await new FileUpload(adapterConstructorOptions).run();
+        } catch (err) {
+          exitStatusCode = err.message;
+        }
+
+        expect(getEnvironmentStub.calledOnce).to.be.true;
+        expect(processExitStub.calledOnceWithExactly(1)).to.be.true;
+        expect(exitStatusCode).to.equal('1');
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createSignedUploadUrlStub.calledOnce).to.be.true;
+        expect(archiveStub.calledOnce).to.be.true;
+        expect(uploadFileStub.calledOnce).to.be.true;
+        expect(uploadFileStub.args[0]).to.deep.equal([zipName, zipPath, signedUploadUrlData]);
+        expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([
+          true,
+          defaultEnvironment.uid,
+          signedUploadUrlData.uploadUid,
+        ]);
+        expect(prepareLaunchConfigStub.calledOnce).to.be.true;
+        expect(showLogsStub.calledOnce).to.be.true;
+        expect(showDeploymentUrlStub.calledOnce).to.be.false;
+        expect(showSuggestionStub.calledOnce).to.be.false;
       });
 
       it('should exit with an error message when both --redeploy-last-upload and --redeploy-latest flags are passed', async () => {

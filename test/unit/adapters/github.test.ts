@@ -6,6 +6,7 @@ import { githubAdapterMockData } from '../mock/index';
 import { GitHub, BaseClass } from '../../../src/adapters';
 import { BaseCommand } from '../../../src/base-command';
 import fs from 'fs';
+import { DeploymentStatus } from '../../../src/types';
 
 describe('GitHub', () => {
   let inquireStub, prepareApiClientsStub, prepareConfigStub, getConfigStub;
@@ -153,6 +154,38 @@ describe('GitHub', () => {
         expect(showLogsStub.calledOnce).to.be.true;
         expect(showDeploymentUrlStub.calledOnce).to.be.true;
         expect(showSuggestionStub.calledOnce).to.be.true;
+      });
+
+      it('should exit with non zero status code if deployment fails', async () => {
+        getEnvironmentStub.resolves(defaultEnvironment);
+        let adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            'redeploy-latest': true,
+            currentDeploymentStatus: DeploymentStatus.FAILED
+          },
+        };
+        let exitStatusCode;
+
+        try {
+          await new GitHub(adapterConstructorOptions).run();
+        } catch (err) {
+          exitStatusCode = err.message;
+        }
+
+        expect(getEnvironmentStub.calledOnce).to.be.true
+        expect(processExitStub.calledOnceWithExactly(1)).to.be.true;
+        expect(exitStatusCode).to.equal('1');
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([
+          false,
+          defaultEnvironment.uid
+        ]);
+        expect(prepareLaunchConfigStub.calledOnce).to.be.true;
+        expect(showLogsStub.calledOnce).to.be.true;
+        expect(showDeploymentUrlStub.calledOnce).to.be.false;
+        expect(showSuggestionStub.calledOnce).to.be.false;
       });
 
       it('should abort github flow for existing project when flag redeploy-last-upload is passed', async () => {

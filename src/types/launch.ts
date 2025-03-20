@@ -88,6 +88,17 @@ export type Environment = {
   frameworkPreset: string;
 };
 
+export enum DeploymentStatus {
+  QUEUED = 'QUEUED',
+  LIVE = 'LIVE',
+  DEPLOYED = 'DEPLOYED',
+  ARCHIVED = 'ARCHIVED',
+  DEPLOYING = 'DEPLOYING',
+  SKIPPED = 'SKIPPED',
+  FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
+}
+
 export {
   LogFn,
   ExitFn,
