@@ -1,13 +1,13 @@
 //@ts-nocheck
 import { expect } from 'chai';
-import { stub, createSandbox , sinon } from 'sinon';
+import { stub, createSandbox, sinon } from 'sinon';
 import { cliux } from '@contentstack/cli-utilities';
 import fs from 'fs';
 import { FileUpload, BaseClass } from '../../../src/adapters';
 import { BaseCommand } from '../../../src/base-command';
 import { isNull } from 'util';
 import { log } from 'console';
-import { FileUploadMethod } from '../../../src/types/launch';
+import { DeploymentStatus, FileUploadMethod } from '../../../src/types/launch';
 
 describe('File Upload', () => {
   let inquireStub, exitStub, prepareApiClientsStub, prepareConfigStub, getConfigStub;
@@ -36,7 +36,8 @@ describe('File Upload', () => {
   });
 
   describe('Run', () => {
-    let initApolloClientStub,
+    let getEnvironmentStub,
+      initApolloClientStub,
       createSignedUploadUrlStub,
       archiveStub,
       uploadFileStub,
@@ -50,8 +51,15 @@ describe('File Upload', () => {
     const signedUploadUrlData = { uploadUrl: 'http://example.com/upload', uploadUid: '123456789' };
     const zipName = 'test.zip';
     const zipPath = '/path/to/zip';
+    const defaultEnvironment = { uid: 'testEnvUid', name: 'Default', frameworkPreset: 'OTHER' };
+    const environmentMatchedByEnvironmentFlagInput = {
+      uid: 'environmentFlagInput',
+      name: 'environmentFlagInput',
+      frameworkPreset: 'OTHER',
+    };
 
     beforeEach(() => {
+      getEnvironmentStub = stub(BaseClass.prototype, 'getEnvironment');
       initApolloClientStub = stub(BaseClass.prototype, 'initApolloClient').resolves();
       createSignedUploadUrlStub = stub(FileUpload.prototype, 'createSignedUploadUrl').resolves(signedUploadUrlData);
       archiveStub = stub(FileUpload.prototype, 'archive').resolves({ zipName, zipPath });
@@ -66,6 +74,7 @@ describe('File Upload', () => {
     });
 
     afterEach(() => {
+      getEnvironmentStub.restore();
       initApolloClientStub.restore();
       createSignedUploadUrlStub.restore();
       archiveStub.restore();
@@ -97,6 +106,7 @@ describe('File Upload', () => {
       });
 
       it('should run file upload flow successfully for existing project where flag passed is redeploy-latest', async () => {
+        getEnvironmentStub.resolves(defaultEnvironment);
         let adapterConstructorOptions = {
           config: {
             isExistingProject: true,
@@ -106,13 +116,49 @@ describe('File Upload', () => {
         };
         await new FileUpload(adapterConstructorOptions).run();
 
+        expect(getEnvironmentStub.calledOnce).to.be.true;
         expect(initApolloClientStub.calledOnce).to.be.true;
         expect(createSignedUploadUrlStub.calledOnce).to.be.true;
         expect(archiveStub.calledOnce).to.be.true;
         expect(uploadFileStub.calledOnce).to.be.true;
         expect(uploadFileStub.args[0]).to.deep.equal([zipName, zipPath, signedUploadUrlData]);
         expect(createNewDeploymentStub.calledOnce).to.be.true;
-        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, signedUploadUrlData.uploadUid]);
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([
+          true,
+          defaultEnvironment.uid,
+          signedUploadUrlData.uploadUid,
+        ]);
+        expect(prepareLaunchConfigStub.calledOnce).to.be.true;
+        expect(showLogsStub.calledOnce).to.be.true;
+        expect(showDeploymentUrlStub.calledOnce).to.be.true;
+        expect(showSuggestionStub.calledOnce).to.be.true;
+      });
+
+      it('should run file upload flow successfully for existing project where environment and redeploy-latest flags are passed.', async () => {
+        getEnvironmentStub.resolves(environmentMatchedByEnvironmentFlagInput);
+        
+        let adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
+            'redeploy-latest': true,
+            environment: 'environmentFlagInput',
+          },
+        };
+        await new FileUpload(adapterConstructorOptions).run();
+
+        expect(getEnvironmentStub.calledOnce).to.be.true;
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createSignedUploadUrlStub.calledOnce).to.be.true;
+        expect(archiveStub.calledOnce).to.be.true;
+        expect(uploadFileStub.calledOnce).to.be.true;
+        expect(uploadFileStub.args[0]).to.deep.equal([zipName, zipPath, signedUploadUrlData]);
+        expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([
+          true,
+          environmentMatchedByEnvironmentFlagInput.uid,
+          signedUploadUrlData.uploadUid,
+        ]);
         expect(prepareLaunchConfigStub.calledOnce).to.be.true;
         expect(showLogsStub.calledOnce).to.be.true;
         expect(showDeploymentUrlStub.calledOnce).to.be.true;
@@ -120,6 +166,8 @@ describe('File Upload', () => {
       });
 
       it('should run file upload flow successfully for existing project where flag passed is redeploy-last-upload', async () => {
+        getEnvironmentStub.resolves(defaultEnvironment);
+
         let adapterConstructorOptions = {
           config: {
             isExistingProject: true,
@@ -129,19 +177,86 @@ describe('File Upload', () => {
         };
         await new FileUpload(adapterConstructorOptions).run();
 
+        expect(getEnvironmentStub.calledOnce).to.be.true
         expect(initApolloClientStub.calledOnce).to.be.true;
         expect(createSignedUploadUrlStub.calledOnce).to.be.false;
         expect(archiveStub.calledOnce).to.be.false;
         expect(uploadFileStub.calledOnce).to.be.false;
         expect(createNewDeploymentStub.calledOnce).to.be.true;
-        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, undefined]);
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, defaultEnvironment.uid, undefined]);
         expect(prepareLaunchConfigStub.calledOnce).to.be.true;
         expect(showLogsStub.calledOnce).to.be.true;
         expect(showDeploymentUrlStub.calledOnce).to.be.true;
         expect(showSuggestionStub.calledOnce).to.be.true;
       });
 
+      it('should run file upload flow successfully for existing project where environment and redeploy-last-upload flags are passed', async () => {
+        getEnvironmentStub.resolves(environmentMatchedByEnvironmentFlagInput);
+
+        let adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
+            'redeploy-last-upload': true,
+            environment: 'environmentFlagInput'
+          },
+        };
+        await new FileUpload(adapterConstructorOptions).run();
+
+        expect(getEnvironmentStub.calledOnce).to.be.true
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createSignedUploadUrlStub.calledOnce).to.be.false;
+        expect(archiveStub.calledOnce).to.be.false;
+        expect(uploadFileStub.calledOnce).to.be.false;
+        expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, environmentMatchedByEnvironmentFlagInput.uid, undefined]);
+        expect(prepareLaunchConfigStub.calledOnce).to.be.true;
+        expect(showLogsStub.calledOnce).to.be.true;
+        expect(showDeploymentUrlStub.calledOnce).to.be.true;
+        expect(showSuggestionStub.calledOnce).to.be.true;
+      });
+
+      it('should exit with non zero status code if deployment fails', async () => {
+        getEnvironmentStub.resolves(defaultEnvironment);
+        let adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
+            'redeploy-latest': true,
+            currentDeploymentStatus: DeploymentStatus.FAILED,
+          },
+        };
+        let exitStatusCode;
+
+        try {
+          await new FileUpload(adapterConstructorOptions).run();
+        } catch (err) {
+          exitStatusCode = err.message;
+        }
+
+        expect(getEnvironmentStub.calledOnce).to.be.true;
+        expect(processExitStub.calledOnceWithExactly(1)).to.be.true;
+        expect(exitStatusCode).to.equal('1');
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createSignedUploadUrlStub.calledOnce).to.be.true;
+        expect(archiveStub.calledOnce).to.be.true;
+        expect(uploadFileStub.calledOnce).to.be.true;
+        expect(uploadFileStub.args[0]).to.deep.equal([zipName, zipPath, signedUploadUrlData]);
+        expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([
+          true,
+          defaultEnvironment.uid,
+          signedUploadUrlData.uploadUid,
+        ]);
+        expect(prepareLaunchConfigStub.calledOnce).to.be.true;
+        expect(showLogsStub.calledOnce).to.be.true;
+        expect(showDeploymentUrlStub.calledOnce).to.be.false;
+        expect(showSuggestionStub.calledOnce).to.be.false;
+      });
+
       it('should exit with an error message when both --redeploy-last-upload and --redeploy-latest flags are passed', async () => {
+        getEnvironmentStub.resolves(defaultEnvironment);
+
         let adapterConstructorOptions = {
           config: {
             isExistingProject: true,
@@ -158,6 +273,41 @@ describe('File Upload', () => {
           exitStatusCode = err.message;
         }
 
+        expect(getEnvironmentStub.calledOnce).to.be.true;
+        expect(processExitStub.calledOnceWithExactly(1)).to.be.true;
+        expect(exitStatusCode).to.equal('1');
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createSignedUploadUrlStub.calledOnce).to.be.false;
+        expect(archiveStub.calledOnce).to.be.false;
+        expect(uploadFileStub.calledOnce).to.be.false;
+        expect(createNewDeploymentStub.calledOnce).to.be.false;
+        expect(prepareLaunchConfigStub.calledOnce).to.be.false;
+        expect(showLogsStub.calledOnce).to.be.false;
+        expect(showDeploymentUrlStub.calledOnce).to.be.false;
+        expect(showSuggestionStub.calledOnce).to.be.false;
+      });
+
+      it('should exit with an error message when both --redeploy-last-upload and --redeploy-latest flags are passed alongwith environment flag', async () => {
+        getEnvironmentStub.resolves(environmentMatchedByEnvironmentFlagInput);
+
+        let adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
+            'redeploy-last-upload': true,
+            'redeploy-latest': true,
+            environment: 'environmentFlagInput'
+          },
+        };
+        let exitStatusCode;
+
+        try {
+          await new FileUpload(adapterConstructorOptions).run();
+        } catch (err) {
+          exitStatusCode = err.message;
+        }
+
+        expect(getEnvironmentStub.calledOnce).to.be.true;
         expect(processExitStub.calledOnceWithExactly(1)).to.be.true;
         expect(exitStatusCode).to.equal('1');
         expect(initApolloClientStub.calledOnce).to.be.true;
@@ -172,28 +322,66 @@ describe('File Upload', () => {
       });
 
       it('should show prompt and successfully redeploy with "new file" if the option to redeploy with new file is selected, when --redeploy-latest and --redeploy-last-upload flags are not passed', async () => {
+        getEnvironmentStub.resolves(defaultEnvironment);
         let adapterConstructorOptions = {
           config: {
             isExistingProject: true,
             currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
           },
         };
-        inquireStub.withArgs({
-          type: 'confirm',
-          name: 'deployLatestCommit',
-          message: 'Do you want to redeploy this existing Launch project?',
-        }).resolves(true);
+        inquireStub
+          .withArgs({
+            type: 'confirm',
+            name: 'deployLatestCommit',
+            message: 'Do you want to redeploy this existing Launch project?',
+          })
+          .resolves(true);
         inquireStub.resolves(FileUploadMethod.NewFile);
 
         await new FileUpload(adapterConstructorOptions).run();
 
+        expect(getEnvironmentStub.calledOnce).to.be.true;
         expect(initApolloClientStub.calledOnce).to.be.true;
         expect(createSignedUploadUrlStub.calledOnce).to.be.true;
         expect(archiveStub.calledOnce).to.be.true;
         expect(uploadFileStub.calledOnce).to.be.true;
         expect(uploadFileStub.args[0]).to.deep.equal([zipName, zipPath, signedUploadUrlData]);
         expect(createNewDeploymentStub.calledOnce).to.be.true;
-        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, signedUploadUrlData.uploadUid]);
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, defaultEnvironment.uid, signedUploadUrlData.uploadUid]);
+        expect(prepareLaunchConfigStub.calledOnce).to.be.true;
+        expect(showLogsStub.calledOnce).to.be.true;
+        expect(showDeploymentUrlStub.calledOnce).to.be.true;
+        expect(showSuggestionStub.calledOnce).to.be.true;
+      });
+
+      it('should show prompt and successfully redeploy with "new file" if the option to redeploy with new file is selected, when --redeploy-latest and --redeploy-last-upload flags are not passed and environment flag passed', async () => {
+        getEnvironmentStub.resolves(environmentMatchedByEnvironmentFlagInput);
+        let adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
+            environment: 'environmentFlagInput',
+          },
+        };
+        inquireStub
+          .withArgs({
+            type: 'confirm',
+            name: 'deployLatestCommit',
+            message: 'Do you want to redeploy this existing Launch project?',
+          })
+          .resolves(true);
+        inquireStub.resolves(FileUploadMethod.NewFile);
+
+        await new FileUpload(adapterConstructorOptions).run();
+
+        expect(getEnvironmentStub.calledOnce).to.be.true;
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createSignedUploadUrlStub.calledOnce).to.be.true;
+        expect(archiveStub.calledOnce).to.be.true;
+        expect(uploadFileStub.calledOnce).to.be.true;
+        expect(uploadFileStub.args[0]).to.deep.equal([zipName, zipPath, signedUploadUrlData]);
+        expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, environmentMatchedByEnvironmentFlagInput.uid, signedUploadUrlData.uploadUid]);
         expect(prepareLaunchConfigStub.calledOnce).to.be.true;
         expect(showLogsStub.calledOnce).to.be.true;
         expect(showDeploymentUrlStub.calledOnce).to.be.true;
@@ -201,45 +389,87 @@ describe('File Upload', () => {
       });
 
       it('should show prompt and successfully redeploy with "last file upload" if the option to redeploy with last file upload is selected, when --redeploy-latest and --redeploy-last-upload flags are not passed', async () => {
+        getEnvironmentStub.resolves(defaultEnvironment);
+
         let adapterConstructorOptions = {
           config: {
             isExistingProject: true,
             currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
           },
         };
-        inquireStub.withArgs({
-          type: 'confirm',
-          name: 'deployLatestCommit',
-          message: 'Do you want to redeploy this existing Launch project?',
-        }).resolves(true);
+        inquireStub
+          .withArgs({
+            type: 'confirm',
+            name: 'deployLatestCommit',
+            message: 'Do you want to redeploy this existing Launch project?',
+          })
+          .resolves(true);
         inquireStub.resolves(FileUploadMethod.LastFileUpload);
 
         await new FileUpload(adapterConstructorOptions).run();
 
+        expect(getEnvironmentStub.calledOnce).to.be.true;
         expect(initApolloClientStub.calledOnce).to.be.true;
         expect(createSignedUploadUrlStub.calledOnce).to.be.false;
         expect(archiveStub.calledOnce).to.be.false;
         expect(uploadFileStub.calledOnce).to.be.false;
         expect(createNewDeploymentStub.calledOnce).to.be.true;
-        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, undefined]);
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, defaultEnvironment.uid, undefined]);
         expect(prepareLaunchConfigStub.calledOnce).to.be.true;
         expect(showLogsStub.calledOnce).to.be.true;
         expect(showDeploymentUrlStub.calledOnce).to.be.true;
         expect(showSuggestionStub.calledOnce).to.be.true;
       });
 
-      it('should exit if "No" is selected for prompt to redeploy, when --redeploy-latest and --redeploy-last-upload flags are not passed', async() => {
+      it('should show prompt and successfully redeploy with "last file upload" if the option to redeploy with last file upload is selected, when --redeploy-latest and --redeploy-last-upload flags are not passed and environment flag passed', async () => {
+        getEnvironmentStub.resolves(environmentMatchedByEnvironmentFlagInput);
+
         let adapterConstructorOptions = {
           config: {
             isExistingProject: true,
             currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
           },
         };
-        inquireStub.withArgs({
-          type: 'confirm',
-          name: 'deployLatestCommit',
-          message: 'Do you want to redeploy this existing Launch project?',
-        }).resolves(false);
+        inquireStub
+          .withArgs({
+            type: 'confirm',
+            name: 'deployLatestCommit',
+            message: 'Do you want to redeploy this existing Launch project?',
+          })
+          .resolves(true);
+        inquireStub.resolves(FileUploadMethod.LastFileUpload);
+
+        await new FileUpload(adapterConstructorOptions).run();
+
+        expect(getEnvironmentStub.calledOnce).to.be.true;
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createSignedUploadUrlStub.calledOnce).to.be.false;
+        expect(archiveStub.calledOnce).to.be.false;
+        expect(uploadFileStub.calledOnce).to.be.false;
+        expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([true, environmentMatchedByEnvironmentFlagInput.uid, undefined]);
+        expect(prepareLaunchConfigStub.calledOnce).to.be.true;
+        expect(showLogsStub.calledOnce).to.be.true;
+        expect(showDeploymentUrlStub.calledOnce).to.be.true;
+        expect(showSuggestionStub.calledOnce).to.be.true;
+      });
+
+      it('should exit if "No" is selected for prompt to redeploy, when --redeploy-latest and --redeploy-last-upload flags are not passed and environment flag not passed', async () => {
+        getEnvironmentStub.resolves(defaultEnvironment);
+
+        let adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
+          },
+        };
+        inquireStub
+          .withArgs({
+            type: 'confirm',
+            name: 'deployLatestCommit',
+            message: 'Do you want to redeploy this existing Launch project?',
+          })
+          .resolves(false);
         let exitStatusCode;
 
         try {
@@ -248,6 +478,7 @@ describe('File Upload', () => {
           exitStatusCode = err.message;
         }
 
+        expect(getEnvironmentStub.calledOnce).to.be.true;
         expect(processExitStub.calledOnceWithExactly(1)).to.be.true;
         expect(exitStatusCode).to.equal('1');
         expect(initApolloClientStub.calledOnce).to.be.true;
@@ -261,8 +492,45 @@ describe('File Upload', () => {
         expect(showSuggestionStub.calledOnce).to.be.false;
       });
 
+      it('should exit if "No" is selected for prompt to redeploy, when --redeploy-latest and --redeploy-last-upload flags are not passed and environment flag is passed', async () => {
+        getEnvironmentStub.resolves(defaultEnvironment);
+        let adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            currentConfig: { uid: '123244', organizationUid: 'bltxxxxxxxx' },
+            environment: 'environmentFlagInput',
+          },
+        };
+        inquireStub
+          .withArgs({
+            type: 'confirm',
+            name: 'deployLatestCommit',
+            message: 'Do you want to redeploy this existing Launch project?',
+          })
+          .resolves(false);
+        let exitStatusCode;
+
+        try {
+          await new FileUpload(adapterConstructorOptions).run();
+        } catch (err) {
+          exitStatusCode = err.message;
+        }
+
+        expect(getEnvironmentStub.calledOnce).to.be.true;
+        expect(processExitStub.calledOnceWithExactly(1)).to.be.true;
+        expect(exitStatusCode).to.equal('1');
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createSignedUploadUrlStub.calledOnce).to.be.false;
+        expect(archiveStub.calledOnce).to.be.false;
+        expect(uploadFileStub.calledOnce).to.be.false;
+        expect(createNewDeploymentStub.calledOnce).to.be.false;
+        expect(prepareLaunchConfigStub.calledOnce).to.be.false;
+        expect(showLogsStub.calledOnce).to.be.false;
+        expect(showDeploymentUrlStub.calledOnce).to.be.false;
+        expect(showSuggestionStub.calledOnce).to.be.false;
+      });
     });
-    
+
     describe('Deploy new project', () => {
       let adapterConstructorOptions = {
         config: {

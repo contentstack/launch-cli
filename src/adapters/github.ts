@@ -12,6 +12,7 @@ import { print } from '../util';
 import BaseClass from './base-class';
 import { getRemoteUrls } from '../util/create-git-meta';
 import { repositoriesQuery, userConnectionsQuery, importProjectMutation } from '../graphql';
+import { DeploymentStatus } from '../types';
 
 export default class GitHub extends BaseClass {
   /**
@@ -22,18 +23,22 @@ export default class GitHub extends BaseClass {
    */
   async run(): Promise<void> {
     if (this.config.isExistingProject) {
-      await this.handleExistingProject();
+      const environment = await this.getEnvironment();
+      await this.handleExistingProject(environment.uid);
     } else {
       await this.handleNewProject();
     }
 
     this.prepareLaunchConfig();
     await this.showLogs();
+    if(this.config.currentDeploymentStatus === DeploymentStatus.FAILED) {
+      this.exit(1);
+    }
     this.showDeploymentUrl();
     this.showSuggestion();
   }
 
-  private async handleExistingProject(): Promise<void> {
+  private async handleExistingProject(environmentUid:string): Promise<void> {
     await this.initApolloClient();
 
     const redeployLastUpload = this.config['redeploy-last-upload'];
@@ -48,7 +53,7 @@ export default class GitHub extends BaseClass {
       await this.confirmLatestRedeployment();
     }
 
-    await this.createNewDeployment();
+    await this.createNewDeployment(false, environmentUid);
   }
 
   private async confirmLatestRedeployment(): Promise<void> {

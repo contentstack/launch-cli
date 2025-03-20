@@ -4,6 +4,7 @@ import { ApolloClient, ObservableQuery } from '@apollo/client/core';
 
 import { LogPollingInput, ConfigType } from '../types';
 import { deploymentQuery, deploymentLogsQuery, serverlessLogsQuery } from '../graphql';
+import { setTimeout as sleep } from "timers/promises";
 
 export default class LogPolling {
   private config: ConfigType;
@@ -79,6 +80,7 @@ export default class LogPolling {
       }
       this.deploymentStatus = data?.Deployment?.status;
       if (this.config.deploymentStatus.includes(this.deploymentStatus)) {
+        this.config.currentDeploymentStatus = this.deploymentStatus;
         statusWatchQuery.stopPolling();
       }
     });
@@ -109,7 +111,7 @@ export default class LogPolling {
     >,
   ): void {
     let timestamp: number = 0;
-    logsWatchQuery.subscribe(({ data, errors, error }) => {
+    logsWatchQuery.subscribe(async({ data, errors, error }) => {
       ux.action.start('Loading deployment logs...');
 
       if (error) {
@@ -152,6 +154,7 @@ export default class LogPolling {
         }
 
         if (this.config.deploymentStatus.includes(this.deploymentStatus)) {
+          await sleep(1_000);
           logsWatchQuery.stopPolling();
           this.$event.emit('deployment-logs', {
             message: 'DONE',

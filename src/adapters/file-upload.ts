@@ -14,7 +14,7 @@ import { print } from '../util';
 import BaseClass from './base-class';
 import { getFileList } from '../util/fs';
 import { createSignedUploadUrlMutation, importProjectMutation } from '../graphql';
-import { SignedUploadUrlData, FileUploadMethod } from '../types/launch';
+import { SignedUploadUrlData, FileUploadMethod, DeploymentStatus } from '../types/launch';
 import config from '../config';
 
 export default class FileUpload extends BaseClass {
@@ -26,18 +26,22 @@ export default class FileUpload extends BaseClass {
    */
   async run(): Promise<void> {
     if (this.config.isExistingProject) {
-      await this.handleExistingProject();
+      const environment = await this.getEnvironment();
+      await this.handleExistingProject(environment.uid);
     } else {
       await this.handleNewProject();
     }
 
     this.prepareLaunchConfig();
     await this.showLogs();
+    if(this.config.currentDeploymentStatus === DeploymentStatus.FAILED) {
+      this.exit(1);
+    }
     this.showDeploymentUrl();
     this.showSuggestion();
   }
 
-  private async handleExistingProject(): Promise<void> {
+  private async handleExistingProject(environment: string): Promise<void> {
     await this.initApolloClient();
 
     let redeployLatest = this.config['redeploy-latest'];
@@ -63,7 +67,7 @@ export default class FileUpload extends BaseClass {
       await this.uploadFile(zipName, zipPath, signedUploadUrlData);
     }
 
-    await this.createNewDeployment(true, uploadUid);
+    await this.createNewDeployment(true, environment, uploadUid);
   }
 
   private async confirmRedeployment(): Promise<void> {

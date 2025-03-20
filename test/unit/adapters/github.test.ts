@@ -6,6 +6,7 @@ import { githubAdapterMockData } from '../mock/index';
 import { GitHub, BaseClass } from '../../../src/adapters';
 import { BaseCommand } from '../../../src/base-command';
 import fs from 'fs';
+import { DeploymentStatus } from '../../../src/types';
 
 describe('GitHub', () => {
   let inquireStub, prepareApiClientsStub, prepareConfigStub, getConfigStub;
@@ -32,7 +33,8 @@ describe('GitHub', () => {
   });
 
   describe('Run', () => {
-    let initApolloClientStub,
+    let getEnvironmentStub,
+      initApolloClientStub,
       createNewDeploymentStub,
       checkGitHubConnectedStub,
       checkGitRemoteAvailableAndValidStub,
@@ -45,7 +47,15 @@ describe('GitHub', () => {
       exitStub,
       showSuggestionStub;
 
+      const defaultEnvironment = { uid: 'testEnvUid', name: 'Default', frameworkPreset: 'OTHER' };
+      const environmentMatchedByEnvironmentFlagInput = {
+        uid: 'environmentFlagInput',
+        name: 'environmentFlagInput',
+        frameworkPreset: 'OTHER',
+      };
+
     beforeEach(() => {
+      getEnvironmentStub = stub(BaseClass.prototype, 'getEnvironment').resolves();
       initApolloClientStub = stub(BaseClass.prototype, 'initApolloClient').resolves();
       createNewDeploymentStub = stub(GitHub.prototype, 'createNewDeployment').resolves();
       checkGitHubConnectedStub = stub(GitHub.prototype, 'checkGitHubConnected').resolves(
@@ -63,6 +73,7 @@ describe('GitHub', () => {
     });
 
     afterEach(() => {
+      getEnvironmentStub.restore();
       initApolloClientStub.restore();
       createNewDeploymentStub.restore();
       checkGitHubConnectedStub.restore();
@@ -77,6 +88,7 @@ describe('GitHub', () => {
       exitStub.restore();
     });
 
+  
     describe('Redeploy existing project', () => {
       let sandbox;
       let processExitStub;
@@ -94,7 +106,8 @@ describe('GitHub', () => {
         sandbox.restore();
       });
 
-      it('should successfully run github flow for existing project when flag redeploy-latest is passed ', async () => {
+      it('should successfully run github flow for existing project when flag redeploy-latest is passed', async () => {
+        getEnvironmentStub.resolves(defaultEnvironment);
         let adapterConstructorOptions = {
           config: {
             isExistingProject: true,
@@ -104,15 +117,80 @@ describe('GitHub', () => {
 
         await new GitHub(adapterConstructorOptions).run();
 
+        expect(getEnvironmentStub.calledOnce).to.be.true;
         expect(initApolloClientStub.calledOnce).to.be.true;
         expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([
+          false,
+          defaultEnvironment.uid
+        ]);
         expect(prepareLaunchConfigStub.calledOnce).to.be.true;
         expect(showLogsStub.calledOnce).to.be.true;
         expect(showDeploymentUrlStub.calledOnce).to.be.true;
         expect(showSuggestionStub.calledOnce).to.be.true;
       });
 
+      it('should successfully run github flow for existing project when flag redeploy-latest and environment is passed ', async () => {
+        getEnvironmentStub.resolves(environmentMatchedByEnvironmentFlagInput);
+
+        let adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            'redeploy-latest': true,
+            environment: 'environmentFlagInput',
+          },
+        };
+
+        await new GitHub(adapterConstructorOptions).run();
+
+        expect(getEnvironmentStub.calledOnce).to.be.true;
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([
+          false,
+          environmentMatchedByEnvironmentFlagInput.uid
+        ]);
+        expect(prepareLaunchConfigStub.calledOnce).to.be.true;
+        expect(showLogsStub.calledOnce).to.be.true;
+        expect(showDeploymentUrlStub.calledOnce).to.be.true;
+        expect(showSuggestionStub.calledOnce).to.be.true;
+      });
+
+      it('should exit with non zero status code if deployment fails', async () => {
+        getEnvironmentStub.resolves(defaultEnvironment);
+        let adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            'redeploy-latest': true,
+            currentDeploymentStatus: DeploymentStatus.FAILED
+          },
+        };
+        let exitStatusCode;
+
+        try {
+          await new GitHub(adapterConstructorOptions).run();
+        } catch (err) {
+          exitStatusCode = err.message;
+        }
+
+        expect(getEnvironmentStub.calledOnce).to.be.true
+        expect(processExitStub.calledOnceWithExactly(1)).to.be.true;
+        expect(exitStatusCode).to.equal('1');
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([
+          false,
+          defaultEnvironment.uid
+        ]);
+        expect(prepareLaunchConfigStub.calledOnce).to.be.true;
+        expect(showLogsStub.calledOnce).to.be.true;
+        expect(showDeploymentUrlStub.calledOnce).to.be.false;
+        expect(showSuggestionStub.calledOnce).to.be.false;
+      });
+
       it('should abort github flow for existing project when flag redeploy-last-upload is passed', async () => {
+        getEnvironmentStub.resolves(defaultEnvironment)
+
         const adapterConstructorOptions = {
           config: {
             isExistingProject: true,
@@ -127,6 +205,35 @@ describe('GitHub', () => {
           exitStatusCode = err.message;
         }
 
+        expect(getEnvironmentStub.calledOnce).to.be.true
+        expect(processExitStub.calledOnceWithExactly(1)).to.be.true;
+        expect(exitStatusCode).to.equal('1');
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.calledOnce).to.be.false;
+        expect(prepareLaunchConfigStub.calledOnce).to.be.false;
+        expect(showLogsStub.calledOnce).to.be.false;
+        expect(showDeploymentUrlStub.calledOnce).to.be.false;
+        expect(showSuggestionStub.calledOnce).to.be.false;
+      });
+
+      it('should abort github flow for existing project when flag redeploy-last-upload is passed and environment flag passed', async () => {
+        getEnvironmentStub.resolves(environmentMatchedByEnvironmentFlagInput)
+        const adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            'redeploy-last-upload': true,
+            environment: 'environmentFlagInput',
+          },
+        };
+        let exitStatusCode;
+
+        try {
+          await new GitHub(adapterConstructorOptions).run();
+        } catch (err) {
+          exitStatusCode = err.message;
+        }
+
+        expect(getEnvironmentStub.calledOnce).to.be.true
         expect(processExitStub.calledOnceWithExactly(1)).to.be.true;
         expect(exitStatusCode).to.equal('1');
         expect(initApolloClientStub.calledOnce).to.be.true;
@@ -138,6 +245,8 @@ describe('GitHub', () => {
       });
 
       it('should show prompt and successfully redeploy with "latest commit" if the option to redeploy is selected, when --redeploy-latest flag is not passed', async() => {
+        getEnvironmentStub.resolves(defaultEnvironment);
+
         const adapterConstructorOptions = {
           config: {
             isExistingProject: true
@@ -151,8 +260,43 @@ describe('GitHub', () => {
 
         await new GitHub(adapterConstructorOptions).run();
 
+        expect(getEnvironmentStub.calledOnce).to.be.true;
         expect(initApolloClientStub.calledOnce).to.be.true;
         expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([
+          false,
+          defaultEnvironment.uid
+        ]);
+        expect(prepareLaunchConfigStub.calledOnce).to.be.true;
+        expect(showLogsStub.calledOnce).to.be.true;
+        expect(showDeploymentUrlStub.calledOnce).to.be.true;
+        expect(showSuggestionStub.calledOnce).to.be.true;
+      });
+
+      it('should show prompt and successfully redeploy with "latest commit" if the option to redeploy is selected, when --redeploy-latest flag is not passed and environment flag is passed', async() => {
+        getEnvironmentStub.resolves(environmentMatchedByEnvironmentFlagInput);
+
+        const adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            environment: 'environmentFlagInput'
+          },
+        };
+        inquireStub.withArgs({
+          type: 'confirm',
+          name: 'deployLatestCommit',
+          message: 'Redeploy latest commit?',
+        }).resolves(true);
+
+        await new GitHub(adapterConstructorOptions).run();
+
+        expect(getEnvironmentStub.calledOnce).to.be.true;
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.args[0]).to.deep.equal([
+          false,
+          environmentMatchedByEnvironmentFlagInput.uid
+        ]);
         expect(prepareLaunchConfigStub.calledOnce).to.be.true;
         expect(showLogsStub.calledOnce).to.be.true;
         expect(showDeploymentUrlStub.calledOnce).to.be.true;
@@ -160,6 +304,8 @@ describe('GitHub', () => {
       });
 
       it('should exit if "No" is selected for prompt to redeploy, when --redeploy-latest flag is not passed', async() => {
+        getEnvironmentStub.resolves(defaultEnvironment);
+
         const adapterConstructorOptions = {
           config: {
             isExistingProject: true
@@ -178,6 +324,7 @@ describe('GitHub', () => {
           exitStatusCode = err.message;
         }
 
+        expect(getEnvironmentStub.calledOnce).to.be.true;
         expect(processExitStub.calledOnceWithExactly(1)).to.be.true;
         expect(exitStatusCode).to.equal('1');
         expect(initApolloClientStub.calledOnce).to.be.true;
@@ -188,6 +335,38 @@ describe('GitHub', () => {
         expect(showSuggestionStub.calledOnce).to.be.false;
       });
 
+      it('should exit if "No" is selected for prompt to redeploy, when --redeploy-latest flag is not passed and environment flag passed', async() => {
+        getEnvironmentStub.resolves(environmentMatchedByEnvironmentFlagInput);
+
+        const adapterConstructorOptions = {
+          config: {
+            isExistingProject: true,
+            environment: 'environmentFlagInput'
+          },
+        };
+        inquireStub.withArgs({
+          type: 'confirm',
+          name: 'deployLatestCommit',
+          message: 'Redeploy latest commit?',
+        }).resolves(false);
+        let exitStatusCode;
+
+        try {
+          await new GitHub(adapterConstructorOptions).run();
+        } catch (err) {
+          exitStatusCode = err.message;
+        }
+
+        expect(getEnvironmentStub.calledOnce).to.be.true;
+        expect(processExitStub.calledOnceWithExactly(1)).to.be.true;
+        expect(exitStatusCode).to.equal('1');
+        expect(initApolloClientStub.calledOnce).to.be.true;
+        expect(createNewDeploymentStub.calledOnce).to.be.false;
+        expect(prepareLaunchConfigStub.calledOnce).to.be.false;
+        expect(showLogsStub.calledOnce).to.be.false;
+        expect(showDeploymentUrlStub.calledOnce).to.be.false;
+        expect(showSuggestionStub.calledOnce).to.be.false;
+      });
     });
 
     describe('Deploy new project', () => {

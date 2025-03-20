@@ -62,7 +62,7 @@ export default class PreCheck extends BaseClass {
       this.log('Current Project details:', { bold: true, color: 'green' });
       this.log(''); // Empty line
       const { name, projectType, repository, environments } = this.config.currentConfig;
-      const [environment] = environments;
+      const environment = await this.getEnvironment();
 
       const detail: Record<string, any> = {
         'Project Name': name,
