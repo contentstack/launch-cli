@@ -126,8 +126,7 @@ export default class Environments extends BaseCommand<typeof Environments> {
         process.exit(1);
       });
 
-    ux.table(
-      map(environments, ({ uid, name, frameworkPreset }) => {
+      const environmentsData = map(environments, ({ uid, name, frameworkPreset }) => {
         return {
           uid: chalk.green(uid),
           name: chalk.green(name),
@@ -137,21 +136,13 @@ export default class Environments extends BaseCommand<typeof Environments> {
             })?.name || '',
           ),
         };
-      }),
-      {
-        uid: {
-          minWidth: 7,
-          header: 'UID',
-        },
-        name: {
-          minWidth: 7,
-          header: 'Name',
-        },
-        frameworkPreset: {
-          minWidth: 7,
-          header: 'Framework',
-        },
-      },
-    );
+      });
+      const headers = [
+        { value: 'uid', },
+        { value: 'name',},
+        { value: 'frameworkPreset',},
+      ];
+      ux.table(headers, environmentsData);
+
   }
 }
