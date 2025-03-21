@@ -1,5 +1,5 @@
 import EventEmitter from 'events';
-import { ux } from '@contentstack/cli-utilities';
+import { cliux } from '@contentstack/cli-utilities';
 import { ApolloClient, ObservableQuery } from '@apollo/client/core';
 
 import { LogPollingInput, ConfigType } from '../types';
@@ -112,10 +112,10 @@ export default class LogPolling {
   ): void {
     let timestamp: number = 0;
     logsWatchQuery.subscribe(async({ data, errors, error }) => {
-      ux.action.start('Loading deployment logs...');
+      cliux.loader('Loading deployment logs...');
 
       if (error) {
-        ux.action.stop();
+        cliux.loader();
         this.$event.emit('deployment-logs', {
           message: error?.message,
           msgType: 'error',
@@ -127,7 +127,7 @@ export default class LogPolling {
         logsWatchQuery.stopPolling();
       }
       if (errors?.length && data === null) {
-        ux.action.stop();
+        cliux.loader();
         this.$event.emit('deployment-logs', {
           message: errors,
           msgType: 'error',
@@ -141,7 +141,7 @@ export default class LogPolling {
       if (this.deploymentStatus) {
         let logsData = data?.getLogs;
         if (logsData?.length) {
-          ux.action.stop();
+          cliux.loader();
           this.$event.emit('deployment-logs', {
             message: logsData,
             msgType: 'info',
@@ -211,13 +211,13 @@ export default class LogPolling {
     >,
   ): void {
     serverLogsWatchQuery.subscribe(({ data, errors, error }) => {
-      ux.action.start('Loading server logs...');
+      cliux.loader('Loading server logs...');
       if (error) {
-        ux.action.stop();
+        cliux.loader();
         this.$event.emit('server-logs', { message: error?.message, msgType: 'error' });
       }
       if (errors?.length && data === null) {
-        ux.action.stop();
+        cliux.loader();
         this.$event.emit('server-logs', { message: errors, msgType: 'error' });
         serverLogsWatchQuery.stopPolling();
       }
@@ -225,7 +225,7 @@ export default class LogPolling {
       let logsData = data?.getServerlessLogs?.logs;
       let logsLength = logsData?.length;
       if (logsLength > 0) {
-        ux.action.stop();
+        cliux.loader();
         this.$event.emit('server-logs', { message: logsData, msgType: 'info' });
         this.startTime = new Date(logsData[logsLength - 1].timestamp).getTime() + 1;
         this.endTime = this.startTime + 10 * 1000;

@@ -74,27 +74,23 @@ export default class PreCheck extends BaseClass {
           })?.name || '',
       };
 
+      const headers = [
+        { value: 'Project Name'},
+        { value: 'Project Type'},
+        { value: 'Environment'},
+        { value: 'Framework Preset'},
+      ];
+
       if (repository?.repositoryName) {
         detail['Repository'] = repository.repositoryName;
+        headers.push({ value: 'Repository' });
       }
 
-      ux.table([detail, {}], {
-        'Project Name': {
-          minWidth: 7,
-        },
-        'Project Type': {
-          minWidth: 7,
-        },
-        Environment: {
-          minWidth: 7,
-        },
-        Repository: {
-          minWidth: 7,
-        },
-        'Framework Preset': {
-          minWidth: 7,
-        },
-      });
+      if(!detail){
+        this.exit(1);
+      }
+
+      ux.table(headers, [detail]);
     }
   }
 

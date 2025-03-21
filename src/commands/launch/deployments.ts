@@ -73,23 +73,13 @@ export default class Deployments extends BaseCommand<typeof Deployments> {
   async showDeployments() {
     const environments = await this.getEnvironments();
 
-    ux.table(environments, {
-      environment: {
-        minWidth: 7,
-      },
-      deploymentUrl: {
-        minWidth: 7,
-        header: 'Deployment Url',
-      },
-      commitMessage: {
-        minWidth: 7,
-        header: 'Commit Message',
-      },
-      createdAt: {
-        minWidth: 7,
-        header: 'Created At',
-      },
-    });
+    const headers = [
+      { value: 'environment', },
+      { value: 'deploymentUrl',},
+      { value: 'commitMessage',},
+      { value: 'createdAt',  },
+    ];
+    ux.table(headers, environments);
   }
 
   /**
