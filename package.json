@@ -1,6 +1,6 @@
 {
   "name": "@contentstack/cli-launch",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Launch related operations",
   "author": "Contentstack CLI",
   "bin": {
@@ -34,7 +34,7 @@
     "@types/express-serve-static-core": "^4.17.34",
     "adm-zip": "^0.5.16",
     "chalk": "^4.1.2",
-    "cross-fetch": "^3.1.8",
+    "cross-fetch": "^4.1.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.1",
     "form-data": "^4.0.0",

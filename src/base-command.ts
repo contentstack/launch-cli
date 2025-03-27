@@ -20,7 +20,7 @@ import {
 import config from './config';
 import { GraphqlApiClient, Logger } from './util';
 import { getLaunchHubUrl } from './util/common-utility';
-import { ConfigType, LogFn, Providers } from './types';
+import { ConfigType, LogFn, Providers, GraphqlHeaders } from './types';
 
 export type Flags<T extends typeof Command> = Interfaces.InferredFlags<(typeof BaseCommand)['baseFlags'] & T['flags']>;
 export type Args<T extends typeof Command> = Interfaces.InferredArgs<T['args']>;
@@ -198,20 +198,27 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
    * @memberof BaseCommand
    */
   async prepareApiClients(): Promise<void> {
+    let headers: GraphqlHeaders = {
+      'X-CS-CLI': this.context.analyticsInfo
+    } 
+
+    const { uid, organizationUid } = this.sharedConfig.currentConfig;
+
+    if (uid) {
+      headers['x-project-uid'] = uid;
+    }
+
+    if (organizationUid) {
+      headers['organization_uid'] = organizationUid;
+    }
+
     this.apolloClient = await new GraphqlApiClient({
-      headers: {
-        'X-CS-CLI': this.context.analyticsInfo,
-        'x-project-uid': this.sharedConfig.currentConfig.uid,
-        organization_uid: this.sharedConfig.currentConfig.organizationUid,
-      },
+      headers,
       baseUrl: this.sharedConfig.manageApiBaseUrl,
     }).apolloClient;
+
     this.apolloLogsClient = await new GraphqlApiClient({
-      headers: {
-        'X-CS-CLI': this.context.analyticsInfo,
-        'x-project-uid': this.sharedConfig.currentConfig.uid,
-        organization_uid: this.sharedConfig.currentConfig.organizationUid,
-      },
+      headers,
       baseUrl: this.sharedConfig.logsApiBaseUrl,
     }).apolloClient;
   }

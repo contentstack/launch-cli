@@ -26,6 +26,7 @@ import {
   fileFrameworkQuery,
   createDeploymentMutation,
   cmsEnvironmentVariablesQuery,
+  environmentsQuery
 } from '../graphql';
 import {
   LogFn,
@@ -36,6 +37,7 @@ import {
   EmitMessage,
   DeploymentLogResp,
   ServerLogResp,
+  Environment,
 } from '../types';
 
 export default class BaseClass {
@@ -85,14 +87,14 @@ export default class BaseClass {
    * @return {*}  {Promise<void>}
    * @memberof GitHub
    */
-  async createNewDeployment(skipGitData = false, uploadUid?: string): Promise<void> {
+  async createNewDeployment(skipGitData = false, environmentUid:string, uploadUid?: string): Promise<void> {
     const deployment: Record<string, any> = {
-      environment: (first(this.config.currentConfig.environments) as Record<string, any>)?.uid,
+      environment: environmentUid
     };
 
     if (uploadUid) {
       deployment.uploadUid = uploadUid;
-    }
+    } 
 
     await this.apolloClient
       .mutate({
@@ -394,7 +396,7 @@ export default class BaseClass {
       data.project = this.config.currentConfig;
     }
 
-    writeFileSync(this.config.config, JSON.stringify(data), {
+    writeFileSync(this.config.config, JSON.stringify(data, null, 2), {
       encoding: 'utf8',
       flag: 'w',
     });
@@ -675,7 +677,7 @@ export default class BaseClass {
       },
       baseUrl: this.config.manageApiBaseUrl,
     }).apolloClient;
-    this.config.environment = (last(this.config.currentConfig.environments) as Record<string, any>)?.uid;
+    this.config.environment = (await this.getEnvironment()).uid;
     this.config.deployment = (last(this.config.currentConfig.deployments) as Record<string, any>)?.uid;
     const logs = new LogPolling({
       config: this.config,
@@ -742,6 +744,42 @@ export default class BaseClass {
       this.log(error, 'error');
     }
     this.exit(1);
+  }
+
+  async getEnvironment(): Promise<Environment> | never {
+    const environmentFlagInput = this.config['environment'];
+
+    if (!environmentFlagInput) {
+      const defaultEnvironment = (first(this.config.currentConfig.environments) as Environment);
+      this.setEnvironmentOnConfig(defaultEnvironment as Environment);
+      return defaultEnvironment;
+    }
+    const environmentList = await this.fetchEnvironments();
+    let environment = environmentList.find((env: Environment) => env.name === environmentFlagInput || env.uid === environmentFlagInput);
+    
+    if (!environment) {
+      this.log(`Environment "${environmentFlagInput}" not found in this project. Please provide a valid environment name or UID.`, 'error');
+      this.exit(1);
+    }
+    
+    environment = environment as Environment;
+    this.setEnvironmentOnConfig(environment);
+    return environment;
+  }
+
+  async setEnvironmentOnConfig(environment: Environment): Promise<void> {
+    this.config.environment = environment.uid;
+  }
+
+  async fetchEnvironments(): Promise<Environment[]> | never {
+    try {
+        const { data } = await this.apolloClient.query({ query: environmentsQuery });
+        const environments = map(data.Environments.edges, 'node');
+        return environments;
+      } catch (error: unknown) {
+        this.log(error instanceof Error ? error.message : String(error), 'error');
+        process.exit(1);
+      }
   }
 
   /**
