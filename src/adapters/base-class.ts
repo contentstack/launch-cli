@@ -318,7 +318,7 @@ export default class BaseClass {
         })
         .then((name) => find(listOfDeliveryTokens, { name }) as Record<string, any>);
     }
-    this.config.environment = this.config.deliveryToken?.scope[0]?.environments[0]?.name;
+    this.config.stackEnvironment = this.config.deliveryToken?.scope[0]?.environments[0]?.name;
   }
 
   /**
@@ -599,7 +599,7 @@ export default class BaseClass {
     print([
       { message: '?', color: 'green' },
       { message: 'Stack Environment', bold: true },
-      { message: this.config.environment || '', color: 'cyan' },
+      { message: this.config.stackEnvironment || '', color: 'cyan' },
     ]);
     await this.getCmsEnvironmentVariables();
 
@@ -613,7 +613,7 @@ export default class BaseClass {
           }
           break;
         case 'CONTENTSTACK_ENVIRONMENT':
-          variable.value = this.config.environment;
+          variable.value = this.config.stackEnvironment;
           break;
         case 'CONTENTSTACK_API_KEY':
           variable.value = this.config.selectedStack.api_key;

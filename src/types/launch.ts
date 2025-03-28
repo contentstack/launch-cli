@@ -42,6 +42,7 @@ type ConfigType = {
   authtoken?: string;
   deployment?: string;
   environment?: string;
+  stackEnvironment?: string;
   provider?: Providers;
   fileUploadMethod?: FileUploadMethod;
   authorization?: string;
