@@ -37,7 +37,8 @@ const config = {
   variablePreparationTypeOptions: [
     'Import variables from a stack',
     'Manually add custom variables to the list',
-    'Import variables from the local env file',
+    'Import variables from the .env.local file',
+    'Skip adding environment variables',
   ],
   variableType: '',
   supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX'],
