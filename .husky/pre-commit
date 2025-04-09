@@ -1,0 +1,1 @@
+npm run prepack && npm run lint-staged
