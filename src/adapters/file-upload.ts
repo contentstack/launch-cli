@@ -7,7 +7,7 @@ import filter from 'lodash/filter';
 import includes from 'lodash/includes';
 import isEmpty from 'lodash/isEmpty';
 import { basename, resolve } from 'path';
-import { cliux, configHandler, HttpClient, ux } from '@contentstack/cli-utilities';
+import { cliux, configHandler, HttpClient } from '@contentstack/cli-utilities';
 import { createReadStream, existsSync, PathLike, statSync, readFileSync } from 'fs';
 
 import { print } from '../util';
@@ -262,7 +262,7 @@ export default class FileUpload extends BaseClass {
    * @memberof FileUpload
    */
   async archive() {
-    ux.action.start('Preparing zip file');
+    cliux.loader('Preparing zip file');
     const projectName = basename(this.config.projectBasePath);
     const zipName = `${Date.now()}_${projectName}.zip`;
     const zipPath = resolve(this.config.projectBasePath, zipName);
@@ -296,7 +296,7 @@ export default class FileUpload extends BaseClass {
       this.exit(1);
     }
 
-    ux.action.stop();
+    cliux.loader();
     return { zipName, zipPath, projectName };
   }
 
@@ -347,7 +347,7 @@ export default class FileUpload extends BaseClass {
   }
 
   private async submitFormData(formData: FormData, uploadUrl: string): Promise<void> {
-    ux.action.start('Starting file upload...');
+    cliux.loader('Starting file upload...');
     try {
       await new Promise<void>((resolve, reject) => {
         formData.submit(uploadUrl, (error, res) => {
@@ -359,9 +359,9 @@ export default class FileUpload extends BaseClass {
         });
       });
 
-      ux.action.stop();
+      cliux.loader();
     } catch (error) {
-      ux.action.stop('File upload failed!');
+      cliux.loader('File upload failed!');
       this.log('File upload failed. Please try again.', 'error');
       if (error instanceof Error) {
         this.log(error.message, 'error');
@@ -375,7 +375,7 @@ export default class FileUpload extends BaseClass {
     uploadUrl: string,
     headers: Array<{ key: string; value: string }>,
   ): Promise<void> {
-    ux.action.start('Starting file upload...');
+    cliux.loader('Starting file upload...');
     const httpClient = new HttpClient();
     const file = readFileSync(filePath);
 
@@ -392,15 +392,15 @@ export default class FileUpload extends BaseClass {
       const { status } = response;
 
       if (status >= 200 && status < 300) {
-        ux.action.stop();
+        cliux.loader();
       } else {
-        ux.action.stop('File upload failed!');
+        cliux.loader('File upload failed!');
         this.log('File upload failed. Please try again.', 'error');
         this.log(`Error: ${status}, ${response?.statusText}`, 'error');
         this.exit(1);
       }
     } catch (error) {
-      ux.action.stop('File upload failed!');
+      cliux.loader('File upload failed!');
       this.log('File upload failed. Please try again.', 'error');
       if (error instanceof Error) {
         this.log(`Error: ${error.message}`, 'error');
