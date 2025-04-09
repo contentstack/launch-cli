@@ -16,3 +16,4 @@ dependabot.yml
 /bkp
 .editorconfig
 /functions
+coverage/
