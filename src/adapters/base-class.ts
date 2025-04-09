@@ -633,25 +633,20 @@ export default class BaseClass {
    * @memberof BaseClass
    */
   printAllVariables(): void {
-    ux.table(
-      [
-        ...(this.config.flags['show-variables']
-          ? this.envVariables
-          : this.envVariables.map(({ key, value }) => ({
-              key,
-              value: replace(value, /./g, '*'),
-            }))),
-        { key: '', value: '' },
-      ],
-      {
-        key: {
-          minWidth: 7,
-        },
-        value: {
-          minWidth: 7,
-        },
-      },
-    );
+    const envVariablesData = [
+      ...(this.config.flags['show-variables']
+        ? this.envVariables
+        : this.envVariables.map(({ key, value }) => ({
+            key,
+            value: replace(value, /./g, '*'),
+          }))),
+    ];
+
+    const headers = [
+        { value: 'key', },
+        { value: 'value',},
+    ]
+    ux.table(headers, envVariablesData);
   }
 
   /**

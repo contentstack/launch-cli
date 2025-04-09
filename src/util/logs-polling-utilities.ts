@@ -1,6 +1,7 @@
 import EventEmitter from 'events';
-import { ux } from '@contentstack/cli-utilities';
+import { cliux } from '@contentstack/cli-utilities';
 import { ApolloClient, ObservableQuery } from '@apollo/client/core';
+import { Ora } from 'ora';
 
 import { LogPollingInput, ConfigType } from '../types';
 import { deploymentQuery, deploymentLogsQuery, serverlessLogsQuery } from '../graphql';
@@ -14,6 +15,7 @@ export default class LogPolling {
   public deploymentStatus!: string;
   public startTime!: number;
   public endTime!: number;
+  public loader!: Ora | void;
 
   constructor(params: LogPollingInput) {
     const { apolloLogsClient, apolloManageClient, config, $event } = params;
@@ -112,10 +114,11 @@ export default class LogPolling {
   ): void {
     let timestamp: number = 0;
     logsWatchQuery.subscribe(async({ data, errors, error }) => {
-      ux.action.start('Loading deployment logs...');
-
+      if(!this.loader){
+        this.loader = cliux.loaderV2('Loading deployment logs...');
+      }
       if (error) {
-        ux.action.stop();
+        this.loader=cliux.loaderV2('done', this.loader);
         this.$event.emit('deployment-logs', {
           message: error?.message,
           msgType: 'error',
@@ -127,7 +130,7 @@ export default class LogPolling {
         logsWatchQuery.stopPolling();
       }
       if (errors?.length && data === null) {
-        ux.action.stop();
+        this.loader=cliux.loaderV2('done', this.loader);
         this.$event.emit('deployment-logs', {
           message: errors,
           msgType: 'error',
@@ -141,7 +144,7 @@ export default class LogPolling {
       if (this.deploymentStatus) {
         let logsData = data?.getLogs;
         if (logsData?.length) {
-          ux.action.stop();
+          this.loader=cliux.loaderV2('done', this.loader);
           this.$event.emit('deployment-logs', {
             message: logsData,
             msgType: 'info',
@@ -160,7 +163,10 @@ export default class LogPolling {
             message: 'DONE',
             msgType: 'debug',
           });
+          if(this.loader){
+          this.loader=cliux.loaderV2('done', this.loader);
         }
+      }
       }
     });
   }
@@ -211,13 +217,15 @@ export default class LogPolling {
     >,
   ): void {
     serverLogsWatchQuery.subscribe(({ data, errors, error }) => {
-      ux.action.start('Loading server logs...');
+      if(!this.loader){
+        this.loader = cliux.loaderV2('Loading server logs...');
+      }
       if (error) {
-        ux.action.stop();
+        this.loader=cliux.loaderV2('done', this.loader);
         this.$event.emit('server-logs', { message: error?.message, msgType: 'error' });
       }
       if (errors?.length && data === null) {
-        ux.action.stop();
+        this.loader=cliux.loaderV2('done', this.loader);
         this.$event.emit('server-logs', { message: errors, msgType: 'error' });
         serverLogsWatchQuery.stopPolling();
       }
@@ -225,7 +233,7 @@ export default class LogPolling {
       let logsData = data?.getServerlessLogs?.logs;
       let logsLength = logsData?.length;
       if (logsLength > 0) {
-        ux.action.stop();
+        this.loader=cliux.loaderV2('done', this.loader);
         this.$event.emit('server-logs', { message: logsData, msgType: 'info' });
         this.startTime = new Date(logsData[logsLength - 1].timestamp).getTime() + 1;
         this.endTime = this.startTime + 10 * 1000;
