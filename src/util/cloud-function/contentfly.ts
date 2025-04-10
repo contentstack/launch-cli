@@ -1,6 +1,6 @@
-import { isAbsolute, join, normalize } from "path";
+import { isAbsolute, join, normalize } from 'path';
 
-import { CloudFunctions } from "./cloud-functions";
+import { CloudFunctions } from './cloud-functions';
 
 export class Contentfly {
   private pathToSourceCode: string;
@@ -10,9 +10,9 @@ export class Contentfly {
     this.pathToSourceCode = isAbsolute(dirPath)
       ? dirPath
       : normalize(join(process.cwd(), dirPath)).replace(
-          /^(\.\.(\/|\\|$))+/,
-          ""
-        );
+        /^(\.\.(\/|\\|$))+/,
+        ''
+      );
     this.cloudFunctions = new CloudFunctions(this.pathToSourceCode);
   }
 
