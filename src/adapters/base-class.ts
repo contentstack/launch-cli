@@ -264,6 +264,11 @@ export default class BaseClass {
           this.log(error, 'error');
           this.exit(1);
         })) || [];
+    
+    if(listOfStacks.length === 0) {
+      this.log('No stacks were found in your organization, or you do not have access to any. Please create a stack in the organization to proceed in the organization.', 'error');
+      this.exit(1);
+    }
 
     if (this.config.selectedStack) {
       this.config.selectedStack = find(listOfStacks, { api_key: this.config.selectedStack });
@@ -305,6 +310,11 @@ export default class BaseClass {
           this.log(error, 'error');
           this.exit(1);
         })) || [];
+
+    if (listOfDeliveryTokens.length === 0) {
+      this.log('No delivery tokens were found in the selected stack. Please create a delivery token in the stack to continue', 'error');
+      this.exit(1);
+    }
 
     if (this.config.deliveryToken) {
       this.config.deliveryToken = find(listOfDeliveryTokens, { token: this.config.deliveryToken });
@@ -526,21 +536,31 @@ export default class BaseClass {
         // validate: this.inquireRequireValidation,
       }));
 
+    if (variablePreparationType.length === 0) {
+      this.log('Please select at least one option by pressing <space>, then press <enter> to proceed.', 'error');
+      this.exit(1);
+    }
+    if (includes(variablePreparationType, 'Skip adding environment variables') && variablePreparationType.length > 1) {
+      this.log("The 'Skip adding environment variables' option cannot be combined with other environment variable options. Please choose either 'Skip adding environment variables' or one or more of the other available options.", 'error');
+      this.exit(1);
+    }
     if (includes(variablePreparationType, 'Import variables from a stack')) {
       await this.importEnvFromStack();
     }
     if (includes(variablePreparationType, 'Manually add custom variables to the list')) {
       await this.promptForEnvValues();
     }
-    if (includes(variablePreparationType, 'Import variables from the local env file')) {
+    if (includes(variablePreparationType, 'Import variables from the .env.local file')) {
       await this.importVariableFromLocalConfig();
+    }
+    if (includes(variablePreparationType, 'Skip adding environment variables')) {
+      this.envVariables = [];
     }
 
     if (this.envVariables.length) {
       this.printAllVariables();
     } else {
-      this.log('Please provide env file!', 'error');
-      this.exit(1);
+      this.log('Skipped adding environment variables.', 'info');
     }
   }
 
@@ -559,6 +579,10 @@ export default class BaseClass {
         path: this.config.projectBasePath,
       }).parsed;
 
+    if (isEmpty(localEnv)) {
+      this.log('No .env.local file found.', 'error');
+      this.exit(1);
+    }
     if (!isEmpty(localEnv)) {
       let envKeys: Record<string, any> = keys(localEnv);
       const existingEnvKeys = map(this.envVariables, 'key');
