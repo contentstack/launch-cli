@@ -39,7 +39,8 @@ export default class Logs extends BaseCommand<typeof Logs> {
       default: 's',
       multiple: false,
       options: ['d', 's'],
-      description: 'Type of flags to show logs. By default, these are server logs. Options [d - deployment logs, s - server logs]',
+      description:
+        'Type of flags to show logs. By default, these are server logs. Options [d - deployment logs, s - server logs]',
     }),
     org: Flags.string({
       description: '[Optional] Provide the organization UID',
@@ -67,7 +68,7 @@ export default class Logs extends BaseCommand<typeof Logs> {
 
     await this.checkAndSetProjectDetails();
 
-    let logPolling = new LogPolling({
+    const logPolling = new LogPolling({
       apolloLogsClient: this.apolloLogsClient,
       apolloManageClient: this.apolloClient,
       config: this.sharedConfig,
@@ -87,7 +88,8 @@ export default class Logs extends BaseCommand<typeof Logs> {
   }
 
   /**
-   * @method checkAndSetProjectDetails - validate and set project details like organizationUid, uid, environment, deployment
+   * @method checkAndSetProjectDetails
+   * validate and set project details like organizationUid, uid, environment, deployment
    *
    * @return {*}  {Promise<void>}
    * @memberof Logs
@@ -146,7 +148,9 @@ export default class Logs extends BaseCommand<typeof Logs> {
   }
 
   /**
-   * @method validateAndSelectEnvironment - check whether environment is validate or not. If not then option to select environment
+   * @method validateAndSelectEnvironment
+   * check whether environment is validate or not. 
+   * If not then option to select environment
    *
    * @return {*}  {Promise<void>}
    * @memberof Logs
@@ -206,7 +210,7 @@ export default class Logs extends BaseCommand<typeof Logs> {
     const { message, msgType } = event;
     if (msgType === 'info') {
       forEach(message, (log: DeploymentLogResp | ServerLogResp) => {
-        let formattedLogTimestamp = new Date(log.timestamp).toISOString()?.slice(0, 23)?.replace('T', ' ');
+        const formattedLogTimestamp = new Date(log.timestamp).toISOString()?.slice(0, 23)?.replace('T', ' ');
         this.log(`${formattedLogTimestamp}:  ${log.message}`, msgType);
       });
     } else if (msgType === 'error') {
@@ -231,7 +235,7 @@ export default class Logs extends BaseCommand<typeof Logs> {
       this.log('Deployment not found!', 'error');
       process.exit(1);
     } else {
-      let lastDeploymentDetails = this.sharedConfig.currentConfig.deployments[0];
+      const lastDeploymentDetails = this.sharedConfig.currentConfig.deployments[0];
       if (lastDeploymentDetails?.node?.uid) {
         this.sharedConfig.deployment = lastDeploymentDetails.node.uid;
       } else {

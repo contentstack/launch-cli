@@ -62,7 +62,7 @@ export default class Launch extends BaseCommand<typeof Launch> {
     'variable-type': Flags.string({
       options: [...config.variablePreparationTypeOptions],
       description:
-        '[optional] Provide a variable type. <options: Import variables from a stack|Manually add custom variables to the list|Import variables from the local env file>',
+        '[optional] Provide a variable type. <options: Import variables from a stack|Manually add custom variables to the list|Import variables from the .env.local file|Skip adding environment variables>',
     }),
     'show-variables': Flags.boolean({
       hidden: true,

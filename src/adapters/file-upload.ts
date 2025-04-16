@@ -277,12 +277,12 @@ export default class FileUpload extends BaseClass {
       const state = statSync(entryPath);
 
       switch (true) {
-        case state.isDirectory(): // NOTE folder
-          zip.addLocalFolder(entryPath, entry);
-          break;
-        case state.isFile(): // NOTE check is file
-          zip.addLocalFile(entryPath);
-          break;
+      case state.isDirectory(): // NOTE folder
+        zip.addLocalFolder(entryPath, entry);
+        break;
+      case state.isFile(): // NOTE check is file
+        zip.addLocalFile(entryPath);
+        break;
       }
     }
 
@@ -350,7 +350,7 @@ export default class FileUpload extends BaseClass {
     cliux.loader('Starting file upload...');
     try {
       await new Promise<void>((resolve, reject) => {
-        formData.submit(uploadUrl, (error, res) => {
+        formData.submit(uploadUrl, (error) => {
           if (error) {
             reject(error);
           } else {
@@ -373,7 +373,7 @@ export default class FileUpload extends BaseClass {
   private async uploadWithHttpClient(
     filePath: PathLike,
     uploadUrl: string,
-    headers: Array<{ key: string; value: string }>,
+    headers: { key: string; value: string }[],
   ): Promise<void> {
     cliux.loader('Starting file upload...');
     const httpClient = new HttpClient();

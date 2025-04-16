@@ -1,2 +1,2 @@
-import {Contentfly} from "./contentfly";
+import {Contentfly} from './contentfly';
 export default Contentfly;

@@ -1,3 +1,5 @@
+import { VariablePreparationTypeOptions } from "../types";
+
 const config = {
   maxRetryCount: 3,
   configName: '.cs-launch.json',
@@ -35,9 +37,10 @@ const config = {
   deploymentStatus: ['LIVE', 'FAILED', 'SKIPPED', 'DEPLOYED'],
   pollingInterval: 1000,
   variablePreparationTypeOptions: [
-    'Import variables from a stack',
-    'Manually add custom variables to the list',
-    'Import variables from the local env file',
+    VariablePreparationTypeOptions.IMPORT_FROM_STACK,
+    VariablePreparationTypeOptions.ADD_MANUALLY,
+    VariablePreparationTypeOptions.IMPORT_FROM_LOCAL_FILE,
+    VariablePreparationTypeOptions.SKIP_SETUP,
   ],
   variableType: '',
   supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX'],

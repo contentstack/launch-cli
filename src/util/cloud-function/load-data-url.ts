@@ -1,3 +1,3 @@
 export function loadDataURL(dataURL: string) {
-    return import(dataURL);
+  return import(dataURL);
 }

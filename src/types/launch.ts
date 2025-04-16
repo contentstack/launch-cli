@@ -100,6 +100,13 @@ export enum DeploymentStatus {
   CANCELLED = 'CANCELLED',
 }
 
+export enum VariablePreparationTypeOptions {
+  IMPORT_FROM_STACK = 'Import variables from a stack',
+  ADD_MANUALLY = 'Manually add custom variables to the list',
+  IMPORT_FROM_LOCAL_FILE = 'Import variables from the .env.local file',
+  SKIP_SETUP = 'Skip adding environment variables',
+}
+
 export {
   LogFn,
   ExitFn,

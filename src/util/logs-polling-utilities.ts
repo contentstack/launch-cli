@@ -5,7 +5,7 @@ import { Ora } from 'ora';
 
 import { LogPollingInput, ConfigType } from '../types';
 import { deploymentQuery, deploymentLogsQuery, serverlessLogsQuery } from '../graphql';
-import { setTimeout as sleep } from "timers/promises";
+import { setTimeout as sleep } from 'timers/promises';
 
 export default class LogPolling {
   private config: ConfigType;
@@ -42,7 +42,7 @@ export default class LogPolling {
         environment: string | undefined;
       };
     }
-  > {
+    > {
     const statusWatchQuery = this.apolloManageClient.watchQuery({
       fetchPolicy: 'network-only',
       query: deploymentQuery,
@@ -65,7 +65,7 @@ export default class LogPolling {
    * @memberof LogPolling
    */
   async deploymentLogs(): Promise<void> {
-    let statusWatchQuery = this.getDeploymentStatus();
+    const statusWatchQuery = this.getDeploymentStatus();
     statusWatchQuery.subscribe(({ data, errors, error }) => {
       if (error) {
         this.$event.emit('deployment-logs', {
@@ -142,7 +142,7 @@ export default class LogPolling {
         logsWatchQuery.stopPolling();
       }
       if (this.deploymentStatus) {
-        let logsData = data?.getLogs;
+        const logsData = data?.getLogs;
         if (logsData?.length) {
           this.loader=cliux.loaderV2('done', this.loader);
           this.$event.emit('deployment-logs', {
@@ -164,9 +164,9 @@ export default class LogPolling {
             msgType: 'debug',
           });
           if(this.loader){
-          this.loader=cliux.loaderV2('done', this.loader);
+            this.loader=cliux.loaderV2('done', this.loader);
+          }
         }
-      }
       }
     });
   }
@@ -230,8 +230,8 @@ export default class LogPolling {
         serverLogsWatchQuery.stopPolling();
       }
 
-      let logsData = data?.getServerlessLogs?.logs;
-      let logsLength = logsData?.length;
+      const logsData = data?.getServerlessLogs?.logs;
+      const logsLength = logsData?.length;
       if (logsLength > 0) {
         this.loader=cliux.loaderV2('done', this.loader);
         this.$event.emit('server-logs', { message: logsData, msgType: 'info' });

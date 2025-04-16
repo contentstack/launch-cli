@@ -1,4 +1,4 @@
-import { gql, DocumentNode } from "@apollo/client/core";
+import { gql, DocumentNode } from '@apollo/client/core';
 
 const createDeploymentMutation: DocumentNode = gql`
   mutation CreateDeployment(

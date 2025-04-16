@@ -50,13 +50,22 @@ jobs:
         run: ls -R
       - name: Release
         id: release-plugin
-        uses: JS-DevTools/npm-publish@v2.2.0
+        uses: JS-DevTools/npm-publish@v3
         with:
           token: "${{ secrets.NPM_TOKEN }}"
           access: public
       - name: get-npm-version
         id: package-version
         uses: martinbeentjes/npm-get-version-action@v1.3.1
+      - uses: actions/checkout@v4
+        if: ${{ steps.release-plugin.conclusion == 'success'  }}
+        with:
+          ref: 'prod-qa-pipeline'
+      - uses: EndBug/add-and-commit@v9
+        if: ${{ steps.release-plugin.conclusion == 'success' }}
+        with:
+          message: "Released version ${{ steps.package-version.outputs.current-version }}"
+          push: true
       - name: github-release
         id: github-release
         env:

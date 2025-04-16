@@ -1,0 +1,7 @@
+npm run prepack && npm run lint-staged
+
+echo "\n\n Running Talisman secret scan..."
+talisman --githook pre-commit
+
+echo "\n\n Running Snyk vulnerability scan..."
+snyk test --all-projects --fail-on=all
