@@ -1,0 +1,8 @@
+# Snyk (https://snyk.io) policy file, patches or ignores known vulnerabilities.
+version: v1.25.1
+ignore:
+  'snyk:lic:npm:npm:Artistic-2.0':
+    - '*':
+        reason: oclif package is the core dependency for the CLI
+        created: 2025-04-16T11:52:49.708Z
+patch: {}
