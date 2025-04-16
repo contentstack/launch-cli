@@ -1,1 +1,4 @@
 npm run prepack && npm run lint-staged
+
+echo "\n\n Running Talisman secret scan... \n\n"
+talisman --githook pre-commit
