@@ -4,4 +4,4 @@ echo "\n\n Running Talisman secret scan..."
 talisman --githook pre-commit
 
 echo "\n\n Running Snyk vulnerability scan..."
-snyk test --all-projects
+snyk test --all-projects --fail-on=all
