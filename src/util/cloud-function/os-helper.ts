@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { join, normalize } from "path";
+import { join, normalize } from 'path';
 
 export async function* walkFileSystem(directory: string): any {
   const fileSystemIterator = await fs.promises.opendir(directory);
@@ -7,7 +7,7 @@ export async function* walkFileSystem(directory: string): any {
   for await (const fileSystemElement of fileSystemIterator) {
     const filePath = normalize(join(directory, fileSystemElement.name)).replace(
       /^(\.\.(\/|\\|$))+/,
-      ""
+      ''
     );
 
     if (fileSystemElement.isDirectory()) {

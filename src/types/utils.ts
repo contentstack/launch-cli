@@ -1,10 +1,10 @@
-import { Color } from "chalk";
-import EventEmitter from "events";
-import { ApolloClient } from "@apollo/client/core";
+import { Color } from 'chalk';
+import EventEmitter from 'events';
+import { ApolloClient } from '@apollo/client/core';
 
 import { ConfigType, ExitFn } from './launch';
 
-export type LoggerType = "info" | "warn" | "error" | "debug";
+export type LoggerType = 'info' | 'warn' | 'error' | 'debug';
 export type PrintType = {
   message: string;
   bold?: boolean;

@@ -1,19 +1,19 @@
-import fetch from "cross-fetch";
+import fetch from 'cross-fetch';
 import merge from 'lodash/merge';
-import entries from "lodash/entries";
-import isArray from "lodash/isArray";
-import includes from "lodash/includes";
-import isObject from "lodash/isObject";
-import { onError } from "@apollo/client/link/error";
-import { RetryLink } from "@apollo/client/link/retry";
-import { setContext } from "@apollo/client/link/context";
+import entries from 'lodash/entries';
+import isArray from 'lodash/isArray';
+import includes from 'lodash/includes';
+import isObject from 'lodash/isObject';
+import { onError } from '@apollo/client/link/error';
+import { RetryLink } from '@apollo/client/link/retry';
+import { setContext } from '@apollo/client/link/context';
 import {
   from,
   HttpLink,
   Operation,
   ApolloClient,
   InMemoryCache,
-} from "@apollo/client/core";
+} from '@apollo/client/core';
 import { cliux as ux, authHandler, configHandler } from '@contentstack/cli-utilities';
 
 import config from '../config';
@@ -29,7 +29,7 @@ export default class GraphqlApiClient {
   constructor(params: GraphqlApiClientInput) {
     this.params = params;
     this.cmaHost = params.cmaHost;
-    this.authType = configHandler.get("authorisationType");
+    this.authType = configHandler.get('authorisationType');
 
     this.client = this.createGraphqlApiClient();
   }
@@ -53,14 +53,14 @@ export default class GraphqlApiClient {
    */
   refreshToken(operation: Operation): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
-      if (this.authType === "BASIC") {
+      if (this.authType === 'BASIC') {
         // NOTE Handle basic auth 401 here
         resolve(false);
-        ux.print("Session timed out, please login to proceed", {
-          color: "yellow",
+        ux.print('Session timed out, please login to proceed', {
+          color: 'yellow',
         });
         process.exit();
-      } else if (this.authType === "OAUTH") {
+      } else if (this.authType === 'OAUTH') {
         authHandler.host = this.cmaHost;
         // NOTE Handle OAuth refresh token
         authHandler
@@ -82,8 +82,8 @@ export default class GraphqlApiClient {
       } else {
         resolve(false);
         ux.print(
-          "You do not have the permissions to perform this action, please login to proceed",
-          { color: "yellow" }
+          'You do not have the permissions to perform this action, please login to proceed',
+          { color: 'yellow' }
         );
         process.exit();
       }
@@ -100,26 +100,26 @@ export default class GraphqlApiClient {
     const authHeaders: Record<string, undefined | string> = {};
 
     switch (this.authType) {
-      case "BASIC":
-        authHeaders.authtoken =
-          this.params.headers?.authtoken || configHandler.get("authtoken");
-        break;
-      case "OAUTH":
-        await authHandler.compareOAuthExpiry();
-        authHeaders.authorization = `Bearer ${configHandler.get(
-          "oauthAccessToken"
-        )}`;
-        break;
-      default:
-        if (configHandler.get("authtoken")) {
-          authHeaders.authtoken = configHandler.get("authtoken");
-        } else {
-          ux.print("Session timed out, please login to proceed", {
-            color: "yellow",
-          });
-          process.exit(1);
-        }
-        break;
+    case 'BASIC':
+      authHeaders.authtoken =
+          this.params.headers?.authtoken || configHandler.get('authtoken');
+      break;
+    case 'OAUTH':
+      await authHandler.compareOAuthExpiry();
+      authHeaders.authorization = `Bearer ${configHandler.get(
+        'oauthAccessToken'
+      )}`;
+      break;
+    default:
+      if (configHandler.get('authtoken')) {
+        authHeaders.authtoken = configHandler.get('authtoken');
+      } else {
+        ux.print('Session timed out, please login to proceed', {
+          color: 'yellow',
+        });
+        process.exit(1);
+      }
+      break;
     }
 
     return setContext((_, { headers }) => {
@@ -146,15 +146,15 @@ export default class GraphqlApiClient {
         )
       ) {
         if (!isArray(graphQLErrors) && isObject(graphQLErrors)) {
-          for (let [location, errors] of entries(graphQLErrors)) {
+          for (const [location, errors] of entries(graphQLErrors)) {
             for (const error of errors as any) {
-              ux.print(`${location} ${error}`, { color: "red" });
+              ux.print(`${location} ${error}`, { color: 'red' });
             }
           }
         } // else if (isArray(graphQLErrors) && graphQLErrors.length) ux.print(JSON.stringify(graphQLErrors));
 
         if (networkError) {
-          ux.print(`\n[Network error]: ${networkError}\n`, { color: "red" });
+          ux.print(`\n[Network error]: ${networkError}\n`, { color: 'red' });
         }
       }
     });
@@ -178,15 +178,15 @@ export default class GraphqlApiClient {
         retryIf: (error, operation) => {
           if (error.response && error.response.status) {
             switch (error.response.status) {
-              case 401:
-                // NOTE Refresh the token if the type is OAuth.
-                return this.refreshToken(operation);
-              case 429:
-              case 408:
-                return true;
+            case 401:
+              // NOTE Refresh the token if the type is OAuth.
+              return this.refreshToken(operation);
+            case 429:
+            case 408:
+              return true;
 
-              default:
-                return false;
+            default:
+              return false;
             }
           }
 

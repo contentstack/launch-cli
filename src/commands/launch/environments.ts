@@ -112,7 +112,9 @@ export default class Environments extends BaseCommand<typeof Environments> {
   }
 
   /**
-   * @method validateAndSelectEnvironment - check whether environment is validate or not. If not then option to select environment
+   * @method validateAndSelectEnvironment
+   * check whether environment is validate or not. 
+   * If not then option to select environment
    *
    * @return {*}  {Promise<void>}
    * @memberof Logs
@@ -126,23 +128,23 @@ export default class Environments extends BaseCommand<typeof Environments> {
         process.exit(1);
       });
 
-      const environmentsData = map(environments, ({ uid, name, frameworkPreset }) => {
-        return {
-          uid: chalk.green(uid),
-          name: chalk.green(name),
-          frameworkPreset: chalk.green(
-            find(this.sharedConfig.listOfFrameWorks, {
-              value: frameworkPreset,
-            })?.name || '',
-          ),
-        };
-      });
-      const headers = [
-        { value: 'uid', },
-        { value: 'name',},
-        { value: 'frameworkPreset',},
-      ];
-      ux.table(headers, environmentsData);
+    const environmentsData = map(environments, ({ uid, name, frameworkPreset }) => {
+      return {
+        uid: chalk.green(uid),
+        name: chalk.green(name),
+        frameworkPreset: chalk.green(
+          find(this.sharedConfig.listOfFrameWorks, {
+            value: frameworkPreset,
+          })?.name || '',
+        ),
+      };
+    });
+    const headers = [
+      { value: 'uid', },
+      { value: 'name',},
+      { value: 'frameworkPreset',},
+    ];
+    ux.table(headers, environmentsData);
 
   }
 }

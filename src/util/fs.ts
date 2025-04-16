@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from "fs";
+import { existsSync, readdirSync } from 'fs';
 
 export function getDirectories(source: string): string[] | [] {
   if (!existsSync(source)) return [];
@@ -19,7 +19,7 @@ export async function getFileList(
 
   for (const item of items) {
     if (item.isDirectory() && !rootFiles) {
-      /* eslint-disable no-await-in-loop */
+       
       files = [...files, ...(await getFileList(`${dirName}/${item.name}`))];
     } else {
       files.push(onlyName ? item.name : `${dirName}/${item.name}`);
