@@ -4,7 +4,6 @@ import omit from 'lodash/omit';
 import find from 'lodash/find';
 import split from 'lodash/split';
 import { exec } from 'child_process';
-import replace from 'lodash/replace';
 import includes from 'lodash/includes';
 import { configHandler, cliux as ux } from '@contentstack/cli-utilities';
 
@@ -267,6 +266,23 @@ export default class GitHub extends BaseClass {
     return this.config.userConnection;
   }
 
+  private extractRepoFullNameFromGithubRemoteURL(url: string) {
+    let match;
+  
+    // HTTPS format: https://github.com/owner/repo.git
+    match = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)(\.git)?$/);
+    if (match) {
+      return `${match[1]}/${match[2].replace(/\.git$/, '')}`;
+    }
+  
+    // SSH format: git@github.com:owner/repo.git
+    match = url.match(/^git@github\.com:([^/]+)\/([^/]+)(\.git)?$/);
+    if (match) {
+      return `${match[1]}/${match[2].replace(/\.git$/, '')}`;
+    }
+  }
+  
+
   /**
    * @method checkGitRemoteAvailableAndValid - GitHub repository verification
    *
@@ -274,11 +290,14 @@ export default class GitHub extends BaseClass {
    * @memberof GitHub
    */
   async checkGitRemoteAvailableAndValid(): Promise<boolean | void> {
-    const localRemoteUrl = (await getRemoteUrls(resolve(this.config.projectBasePath, '.git/config')))?.origin || '';
+    const gitConfigFilePath = resolve(this.config.projectBasePath, '.git/config');
+    const remoteUrls = await getRemoteUrls(gitConfigFilePath);
+    const localRemoteUrl = remoteUrls?.origin || '';
 
     if (!localRemoteUrl) {
       this.log('GitHub project not identified!', 'error');
       await this.connectToAdapterOnUi();
+      this.exit(1);
     }
 
     const repositories = await this.apolloClient
@@ -286,8 +305,10 @@ export default class GitHub extends BaseClass {
       .then(({ data: { repositories } }) => repositories)
       .catch((error) => this.log(error, 'error'));
 
+    const repoFullName = this.extractRepoFullNameFromGithubRemoteURL(localRemoteUrl);
+
     this.config.repository = find(repositories, {
-      url: replace(localRemoteUrl, '.git', ''),
+      fullName: repoFullName,
     });
 
     if (!this.config.repository) {
@@ -306,6 +327,7 @@ export default class GitHub extends BaseClass {
    */
   async checkUserGitHubAccess(): Promise<boolean> {
     return new Promise<boolean>((resolve, reject) => {
+      // eslint-disable-next-line @typescript-eslint/no-this-alias
       const self = this;
       const defaultBranch = this.config.repository?.defaultBranch;
       if (!defaultBranch) return reject('Branch not found');
