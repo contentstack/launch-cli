@@ -1,10 +1,10 @@
 import map from 'lodash/map';
-import { FlagInput, Flags } from '@contentstack/cli-utilities';
 
 import config from '../../config';
 import { BaseCommand } from '../../base-command';
-import { AdapterConstructorInputs } from '../../types';
+import { AdapterConstructorInputs, Providers } from '../../types';
 import { FileUpload, GitHub, PreCheck } from '../../adapters';
+import { FlagInput, Flags, cliux } from '@contentstack/cli-utilities';
 
 export default class Launch extends BaseCommand<typeof Launch> {
   public preCheck!: PreCheck;
@@ -102,6 +102,9 @@ export default class Launch extends BaseCommand<typeof Launch> {
 
     // NOTE pre-check: manage flow and set the provider value
     await this.preCheckAndInitConfig();
+    if (!this.sharedConfig.isExistingProject) {
+      await this.selectProjectType();
+    }
     await this.manageFlowBasedOnProvider();
   }
 
@@ -123,15 +126,15 @@ export default class Launch extends BaseCommand<typeof Launch> {
     };
 
     switch (this.sharedConfig.provider) {
-      case 'GitHub':
-        await new GitHub(adapterConstructorInputs).run();
-        break;
-      case 'FileUpload':
-        await new FileUpload(adapterConstructorInputs).run();
-        break;
-      default:
-        await this.preCheck.connectToAdapterOnUi();
-        break;
+    case 'GitHub':
+      await new GitHub(adapterConstructorInputs).run();
+      break;
+    case 'FileUpload':
+      await new FileUpload(adapterConstructorInputs).run();
+      break;
+    default:
+      await this.preCheck.connectToAdapterOnUi();
+      break;
     }
   }
 
@@ -151,7 +154,32 @@ export default class Launch extends BaseCommand<typeof Launch> {
       managementSdk: this.managementSdk,
       analyticsInfo: this.context.analyticsInfo,
     });
-        
-    await this.preCheck.run(!this.flags.type);
+
+    await this.preCheck.run();
+  }
+
+  /**
+   * @method selectProjectType - select project type/provider/adapter
+   *
+   * @return {*}  {Promise<void>}
+   * @memberof BaseClass
+   */
+  private async selectProjectType(): Promise<void> {
+    const choices = [
+      ...map(config.supportedAdapters, (provider) => ({
+        value: provider,
+        name: `Continue with ${provider}`,
+      })),
+      { value: 'FileUpload', name: 'Continue with FileUpload' },
+    ];
+
+    const selectedProvider: Providers = await cliux.inquire({
+      choices: choices,
+      type: 'search-list',
+      name: 'projectType',
+      message: 'Choose a project type to proceed',
+    });
+
+    this.sharedConfig.provider = selectedProvider;
   }
 }
