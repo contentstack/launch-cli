@@ -4,22 +4,22 @@ import express, {
   Response,
 } from 'express';
 import { Express } from 'express-serve-static-core';
-import path from "path";
+import path from 'path';
 
-import { CloudFunctionsValidator } from "./cloud-functions-validator";
+import { CloudFunctionsValidator } from './cloud-functions-validator';
 import {
   CLOUD_FUNCTIONS_DIRECTORY,
   CLOUD_FUNCTIONS_SUPPORTED_EXTENSION,
   ENV_FILE_NAME,
-} from "./constants";
-import { FunctionsDirectoryNotFoundError } from "./errors/cloud-function.errors";
-import { walkFileSystem, checkIfDirectoryExists } from "./os-helper";
-import { CloudFunctionResource } from "./types";
+} from './constants';
+import { FunctionsDirectoryNotFoundError } from './errors/cloud-function.errors';
+import { walkFileSystem, checkIfDirectoryExists } from './os-helper';
+import { CloudFunctionResource } from './types';
 
-import rollup from "rollup";
-import { nodeResolve } from "@rollup/plugin-node-resolve";
-import commonjs from "@rollup/plugin-commonjs";
-import json from "@rollup/plugin-json";
+import rollup from 'rollup';
+import { nodeResolve } from '@rollup/plugin-node-resolve';
+import commonjs from '@rollup/plugin-commonjs';
+import json from '@rollup/plugin-json';
 import { loadDataURL } from './load-data-url';
 
 export class CloudFunctions {
@@ -28,7 +28,7 @@ export class CloudFunctions {
 
   constructor(pathToSourceCode: string) {
     this.cloudFunctionsDirectoryPath = path.join(
-      pathToSourceCode.replace(/^(\.\.(\/|\\|$))+/, ""),
+      pathToSourceCode.replace(/^(\.\.(\/|\\|$))+/, ''),
       CLOUD_FUNCTIONS_DIRECTORY
     );
     this.pathToSourceCode = pathToSourceCode;
@@ -45,7 +45,7 @@ export class CloudFunctions {
 
     const hasCloudFunctionResources = cloudFunctionResources.length;
     if (!hasCloudFunctionResources) {
-      console.log("No Serverless functions detected.");
+      console.log('No Serverless functions detected.');
       process.exit(0);
     }
 
@@ -111,7 +111,7 @@ export class CloudFunctions {
 
   private async parseCloudFunctionResources(): Promise<
     CloudFunctionResource[]
-  > {
+    > {
     const filePaths = await walkFileSystem(this.cloudFunctionsDirectoryPath);
 
     const cloudFunctionResources: CloudFunctionResource[] = [];
@@ -159,7 +159,7 @@ export class CloudFunctions {
     const dynamicRouteResources: CloudFunctionResource[] = [];
 
     if (cloudFunctionResources.length) {
-      console.log("Detected Serverless functions...");
+      console.log('Detected Serverless functions...');
     }
 
     cloudFunctionResources.forEach(
@@ -170,7 +170,7 @@ export class CloudFunctions {
         ) {
           const apiResourceURI = cloudFunctionResource.apiResourceURI.replace(
             matchDyanmicRouteRegex,
-            ":$1"
+            ':$1'
           );
 
           dynamicRouteResources.push({
@@ -195,14 +195,14 @@ export class CloudFunctions {
     });
   
     const { output } = await bundle.generate({
-      format: "esm",
+      format: 'esm',
       inlineDynamicImports: true,
     });
   
     const builtCode = output[0].code;
   
     const builtCodeInDataURLFormat =
-      "data:text/javascript;base64," + Buffer.from(builtCode).toString("base64");
+      'data:text/javascript;base64,' + Buffer.from(builtCode).toString('base64');
   
     const module = await loadDataURL(builtCodeInDataURLFormat);
     
@@ -210,10 +210,10 @@ export class CloudFunctions {
     const isDefaultExportESModuleFunction = typeof module.default === 'function';
     const isDefaultExportCommonjsFunction = typeof module.default?.default === 'function';
     if (isDefaultExportESModuleFunction) {
-        handler = module.default;
+      handler = module.default;
     }
     else if (isDefaultExportCommonjsFunction) {
-        handler = module.default.default;
+      handler = module.default.default;
     }
 
     return handler;
