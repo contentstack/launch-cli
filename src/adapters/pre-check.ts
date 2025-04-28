@@ -1,12 +1,9 @@
 import find from 'lodash/find';
-import { resolve } from 'path';
 import { existsSync } from 'fs';
 import isEmpty from 'lodash/isEmpty';
-import includes from 'lodash/includes';
 import { cliux as ux } from '@contentstack/cli-utilities';
 
 import BaseClass from './base-class';
-import { getRemoteUrls } from '../util';
 
 export default class PreCheck extends BaseClass {
   public projectBasePath: string = process.cwd();
@@ -17,12 +14,8 @@ export default class PreCheck extends BaseClass {
    * @return {*}  {Promise<void>}
    * @memberof PreCheck
    */
-  async run(identifyProject = true): Promise<void> {
+  async run(): Promise<void> {
     await this.performValidations();
-
-    if (identifyProject && !this.config.isExistingProject) {
-      await this.identifyWhatProjectItIs();
-    }
   }
 
   /**
@@ -107,31 +100,5 @@ export default class PreCheck extends BaseClass {
         this.exit(1);
       }
     } catch (error) {}
-  }
-
-  /**
-   * @method identifyWhatProjectItIs - identify if the project type (is GitHub, BitBucket, FileUpload etc.,)
-   *
-   * @return {*}  {Promise<void>}
-   * @memberof PreCheck
-   */
-  async identifyWhatProjectItIs(): Promise<void> {
-    const localRemoteUrl = (await getRemoteUrls(resolve(this.config.projectBasePath, '.git/config')))?.origin || '';
-
-    switch (true) {
-      case includes(localRemoteUrl, 'github.'):
-        this.config.provider = 'GitHub';
-        this.log('Git project identified', 'info');
-        break;
-      default:
-        if (existsSync(resolve(this.config.projectBasePath, '.git'))) {
-          this.log('Git config found but remote URL not found in the config!', {
-            color: 'yellow',
-            bold: true,
-          });
-        }
-        await this.connectToAdapterOnUi(false);
-        break;
-    }
   }
 }

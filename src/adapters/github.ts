@@ -4,7 +4,6 @@ import omit from 'lodash/omit';
 import find from 'lodash/find';
 import split from 'lodash/split';
 import { exec } from 'child_process';
-import replace from 'lodash/replace';
 import includes from 'lodash/includes';
 import { configHandler, cliux as ux } from '@contentstack/cli-utilities';
 
@@ -13,6 +12,7 @@ import BaseClass from './base-class';
 import { getRemoteUrls } from '../util/create-git-meta';
 import { repositoriesQuery, userConnectionsQuery, importProjectMutation } from '../graphql';
 import { DeploymentStatus } from '../types';
+import { existsSync } from 'fs';
 
 export default class GitHub extends BaseClass {
   /**
@@ -31,14 +31,14 @@ export default class GitHub extends BaseClass {
 
     this.prepareLaunchConfig();
     await this.showLogs();
-    if(this.config.currentDeploymentStatus === DeploymentStatus.FAILED) {
+    if (this.config.currentDeploymentStatus === DeploymentStatus.FAILED) {
       this.exit(1);
     }
     this.showDeploymentUrl();
     this.showSuggestion();
   }
 
-  private async handleExistingProject(environmentUid:string): Promise<void> {
+  private async handleExistingProject(environmentUid: string): Promise<void> {
     await this.initApolloClient();
 
     const redeployLastUpload = this.config['redeploy-last-upload'];
@@ -49,7 +49,7 @@ export default class GitHub extends BaseClass {
       this.exit(1);
     }
 
-    if(!redeployLatest && !redeployLastUpload){
+    if (!redeployLatest && !redeployLastUpload) {
       await this.confirmLatestRedeployment();
     }
 
@@ -260,11 +260,27 @@ export default class GitHub extends BaseClass {
       this.log('GitHub connection identified!', 'info');
       this.config.userConnection = userConnection;
     } else {
-      this.log('GitHub connection not found!', 'warn');
+      this.log('GitHub connection not found!', 'error');
       await this.connectToAdapterOnUi();
     }
 
     return this.config.userConnection;
+  }
+
+  private extractRepoFullNameFromGithubRemoteURL(url: string) {
+    let match;
+
+    // HTTPS format: https://github.com/owner/repo.git
+    match = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)(\.git)?$/);
+    if (match) {
+      return `${match[1]}/${match[2].replace(/\.git$/, '')}`;
+    }
+
+    // SSH format: git@github.com:owner/repo.git
+    match = url.match(/^git@github\.com:([^/]+)\/([^/]+)(\.git)?$/);
+    if (match) {
+      return `${match[1]}/${match[2].replace(/\.git$/, '')}`;
+    }
   }
 
   /**
@@ -274,24 +290,46 @@ export default class GitHub extends BaseClass {
    * @memberof GitHub
    */
   async checkGitRemoteAvailableAndValid(): Promise<boolean | void> {
-    const localRemoteUrl = (await getRemoteUrls(resolve(this.config.projectBasePath, '.git/config')))?.origin || '';
+    const gitConfigExists = this.checkGitConfigExists();
+    if (!gitConfigExists) {
+      this.log(`No Git repository configuration found at ${this.config.projectBasePath}.`, 'error');
+      this.log('Please initialize a Git repository and try again, or use the File Upload option.', 'error');
+      this.exit(1);
+    }
+    const gitConfigFilePath = resolve(this.config.projectBasePath, '.git/config');
+    const remoteUrls = await getRemoteUrls(gitConfigFilePath);
+    const localRemoteUrl = remoteUrls?.origin || '';
 
     if (!localRemoteUrl) {
-      this.log('GitHub project not identified!', 'error');
-      await this.connectToAdapterOnUi();
+      this.log(
+        `No Git remote origin URL found for the repository at ${this.config.projectBasePath}.
+        Please add a git remote origin url and try again`,
+        'error',
+      );
+      this.exit(1);
     }
 
-    const repositories = await this.apolloClient
-      .query({ query: repositoriesQuery })
-      .then(({ data: { repositories } }) => repositories)
-      .catch((error) => this.log(error, 'error'));
+    let repositories;
+    try {
+      const repositoriesQueryResponse = await this.apolloClient.query({ query: repositoriesQuery });
+      repositories = repositoriesQueryResponse.data.repositories;
+    } catch {
+      this.log('GitHub app uninstalled. Please reconnect the app and try again', 'error');
+      await this.connectToAdapterOnUi();
+      this.exit(1);
+    }
+
+    const repoFullName = this.extractRepoFullNameFromGithubRemoteURL(localRemoteUrl);
 
     this.config.repository = find(repositories, {
-      url: replace(localRemoteUrl, '.git', ''),
+      fullName: repoFullName,
     });
 
     if (!this.config.repository) {
-      this.log('Repository not found in the list!', 'error');
+      this.log(
+        'Repository not added to the GitHub app. Please add it to the app’s repository access list and try again.',
+        'error',
+      );
       this.exit(1);
     }
 
@@ -306,6 +344,7 @@ export default class GitHub extends BaseClass {
    */
   async checkUserGitHubAccess(): Promise<boolean> {
     return new Promise<boolean>((resolve, reject) => {
+      // eslint-disable-next-line @typescript-eslint/no-this-alias
       const self = this;
       const defaultBranch = this.config.repository?.defaultBranch;
       if (!defaultBranch) return reject('Branch not found');
@@ -330,5 +369,10 @@ export default class GitHub extends BaseClass {
         },
       );
     });
+  }
+
+  private checkGitConfigExists(): boolean {
+    const gitExists = existsSync(resolve(this.config.projectBasePath, '.git'));
+    return gitExists;
   }
 }

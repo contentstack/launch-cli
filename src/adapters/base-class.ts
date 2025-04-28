@@ -18,7 +18,6 @@ import { ApolloClient } from '@apollo/client/core';
 import { writeFileSync, existsSync, readFileSync } from 'fs';
 import { cliux as ux, ContentstackClient } from '@contentstack/cli-utilities';
 
-import config from '../config';
 import { print, GraphqlApiClient, LogPolling, getOrganizations } from '../util';
 import {
   branchesQuery,
@@ -31,7 +30,6 @@ import {
 import {
   LogFn,
   ExitFn,
-  Providers,
   ConfigType,
   AdapterConstructorInputs,
   EmitMessage,
@@ -146,31 +144,6 @@ export default class BaseClass {
 
     // NOTE re initialize apollo client once org selected
     await this.initApolloClient();
-  }
-
-  /**
-   * @method selectProjectType - select project type/provider/adapter
-   *
-   * @return {*}  {Promise<void>}
-   * @memberof BaseClass
-   */
-  async selectProjectType(): Promise<void> {
-    const choices = [
-      ...map(config.supportedAdapters, (provider) => ({
-        value: provider,
-        name: `Continue with ${provider}`,
-      })),
-      { value: 'FileUpload', name: 'Continue with FileUpload' },
-    ];
-
-    const selectedProvider: Providers = await ux.inquire({
-      choices: choices,
-      type: 'search-list',
-      name: 'projectType',
-      message: 'Choose a project type to proceed',
-    });
-
-    this.config.provider = selectedProvider;
   }
 
   /**
@@ -427,7 +400,6 @@ export default class BaseClass {
    * @memberof BaseClass
    */
   async connectToAdapterOnUi(emit = true): Promise<void> {
-    await this.selectProjectType();
 
     if (includes(this.config.supportedAdapters, this.config.provider)) {
       const baseUrl = this.config.host.startsWith('http') ? this.config.host : `https://${this.config.host}`;
