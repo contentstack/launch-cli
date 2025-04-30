@@ -2,4 +2,6 @@ fileignoreconfig:
 - filename: .github/workflows/secrets-scan.yml
   ignore_detectors:
     - filecontent
+- filename: src/commands/launch/index.test.ts
+  checksum: 9db6c02ad35a0367343cd753b916dd64db4a9efd24838201d2e1113ed19c9b62
 version: "1.0"
