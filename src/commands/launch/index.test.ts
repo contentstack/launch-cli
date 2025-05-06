@@ -3,9 +3,26 @@ import { BaseCommand } from '../../base-command';
 import { FileUpload, GitHub, PreCheck } from '../../adapters';
 import { cliux } from '@contentstack/cli-utilities';
 
-jest.mock('@contentstack/cli-utilities');
-
 jest.mock('../../base-command');
+
+jest.mock('@contentstack/cli-utilities', () => {
+  const actual = jest.requireActual('@contentstack/cli-utilities');
+  return {
+    ...actual,
+    configHandler: {
+      get: jest.fn((key) => {
+        if (key === 'authtoken') return 'dummy-token';
+        if (key === 'authorisationType') return 'OAuth';
+        if (key === 'oauthAccessToken') return 'dummy-oauth-token';
+        return undefined;
+      }),
+    },
+    cliux: {
+      ...actual.cliux,
+      inquire: jest.fn(), // mock `inquire` explicitly
+    },
+  };
+});
 
 describe('Run', () => {
   let launchCommandInstance: Launch;
@@ -88,5 +105,19 @@ describe('Run', () => {
       name: 'projectType',
       message: 'Choose a project type to proceed',
     });
+  });
+
+  it('should successfully run launch command when its a new project, and provider is passed as flag', async () => {
+    const githubRunMock = jest.spyOn(GitHub.prototype, 'run').mockResolvedValueOnce(undefined);
+    BaseCommand.prototype['sharedConfig'] = {isExistingProject: false} as any;
+    BaseCommand.prototype['flags'] = { init: false, type: 'GitHub' };
+    launchCommandInstance = new Launch([], {} as any);
+
+    await launchCommandInstance.run();
+
+    expect(prepareApiClientsMock).toHaveBeenCalled();
+    expect(preCheckRunMock).toHaveBeenCalled();
+    expect(githubRunMock).toHaveBeenCalled();
+    expect(cliux.inquire).not.toHaveBeenCalled();
   });
 });
