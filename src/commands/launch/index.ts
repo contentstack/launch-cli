@@ -1,10 +1,10 @@
 import map from 'lodash/map';
-import { FlagInput, Flags } from '@contentstack/cli-utilities';
 
 import config from '../../config';
 import { BaseCommand } from '../../base-command';
-import { AdapterConstructorInputs } from '../../types';
+import { AdapterConstructorInputs, Providers } from '../../types';
 import { FileUpload, GitHub, PreCheck } from '../../adapters';
+import { FlagInput, Flags, cliux } from '@contentstack/cli-utilities';
 
 export default class Launch extends BaseCommand<typeof Launch> {
   public preCheck!: PreCheck;
@@ -21,9 +21,13 @@ export default class Launch extends BaseCommand<typeof Launch> {
     '<%= config.bin %> <%= command.id %> --data-dir <path/of/current/working/dir> --redeploy-last-upload',
     '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload>',
     '<%= config.bin %> <%= command.id %> --environment=<value> --redeploy-latest',
+    // eslint-disable-next-line max-len
     '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload> --name=<value> --environment=<value> --branch=<value> --build-command=<value> --framework=<option> --org=<value> --out-dir=<value>',
+    // eslint-disable-next-line max-len
     '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload> --name=<value> --environment=<value> --branch=<value> --build-command=<value> --framework=<option> --org=<value> --out-dir=<value> --server-command=<value>',
+    // eslint-disable-next-line max-len
     '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload> --name=<value> --environment=<value> --branch=<value> --build-command=<value> --framework=<option> --org=<value> --out-dir=<value> --variable-type="Import variables from a stack" --alias=<value>',
+    // eslint-disable-next-line max-len
     '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload> --name=<value> --environment=<value> --branch=<value> --build-command=<value> --framework=<option> --org=<value> --out-dir=<value> --variable-type="Manually add custom variables to the list" --env-variables="APP_ENV:prod, TEST_ENV:testVal"',
   ];
 
@@ -62,6 +66,7 @@ export default class Launch extends BaseCommand<typeof Launch> {
     'variable-type': Flags.string({
       options: [...config.variablePreparationTypeOptions],
       description:
+        // eslint-disable-next-line max-len
         '[optional] Provide a variable type. <options: Import variables from a stack|Manually add custom variables to the list|Import variables from the .env.local file|Skip adding environment variables>',
     }),
     'show-variables': Flags.boolean({
@@ -79,6 +84,7 @@ export default class Launch extends BaseCommand<typeof Launch> {
     }),
     'env-variables': Flags.string({
       description:
+        // eslint-disable-next-line max-len
         '[optional] Provide the environment variables in the key:value format, separated by comma. For example: APP_ENV:prod, TEST_ENV:testVal.',
     }),
     'redeploy-latest': Flags.boolean({
@@ -102,6 +108,9 @@ export default class Launch extends BaseCommand<typeof Launch> {
 
     // NOTE pre-check: manage flow and set the provider value
     await this.preCheckAndInitConfig();
+    if (!this.sharedConfig.isExistingProject) {
+      await this.setProviderType();
+    }
     await this.manageFlowBasedOnProvider();
   }
 
@@ -123,15 +132,15 @@ export default class Launch extends BaseCommand<typeof Launch> {
     };
 
     switch (this.sharedConfig.provider) {
-      case 'GitHub':
-        await new GitHub(adapterConstructorInputs).run();
-        break;
-      case 'FileUpload':
-        await new FileUpload(adapterConstructorInputs).run();
-        break;
-      default:
-        await this.preCheck.connectToAdapterOnUi();
-        break;
+    case 'GitHub':
+      await new GitHub(adapterConstructorInputs).run();
+      break;
+    case 'FileUpload':
+      await new FileUpload(adapterConstructorInputs).run();
+      break;
+    default:
+      await this.preCheck.connectToAdapterOnUi();
+      break;
     }
   }
 
@@ -151,7 +160,42 @@ export default class Launch extends BaseCommand<typeof Launch> {
       managementSdk: this.managementSdk,
       analyticsInfo: this.context.analyticsInfo,
     });
-        
-    await this.preCheck.run(!this.flags.type);
+
+    await this.preCheck.run();
+  }
+
+  /**
+   * @method selectProjectType - select project type/provider/adapter
+   *
+   * @return {*}  {Promise<void>}
+   * @memberof BaseClass
+   */
+  private async selectProjectType(): Promise<void> {
+    const choices = [
+      ...map(config.supportedAdapters, (provider) => ({
+        value: provider,
+        name: `Continue with ${provider}`,
+      })),
+      { value: 'FileUpload', name: 'Continue with FileUpload' },
+    ];
+
+    const selectedProvider: Providers = await cliux.inquire({
+      choices: choices,
+      type: 'search-list',
+      name: 'projectType',
+      message: 'Choose a project type to proceed',
+    });
+
+    this.sharedConfig.provider = selectedProvider;
+  }
+
+  private async setProviderType(): Promise<void> {
+    const providerTypeFlag = this.flags.type;
+
+    if (providerTypeFlag) {
+      this.sharedConfig.provider = providerTypeFlag as Providers;
+      return;
+    }
+    await this.selectProjectType();
   }
 }

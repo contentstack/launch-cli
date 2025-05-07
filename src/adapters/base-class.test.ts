@@ -1,7 +1,6 @@
 import BaseClass from './base-class';
 import { cliux as ux, ContentstackClient } from '@contentstack/cli-utilities';
 import config from '../config';
-import exp from 'constants';
 
 jest.mock('@contentstack/cli-utilities', () => ({
   cliux: {
