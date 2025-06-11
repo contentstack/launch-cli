@@ -1,4 +1,4 @@
-import { VariablePreparationTypeOptions } from "../types";
+import { VariablePreparationTypeOptions } from '../types';
 
 const config = {
   maxRetryCount: 3,
@@ -7,7 +7,7 @@ const config = {
   manageApiEndpoint: 'manage/graphql',
   projectCreationRetryMaxCount: 3,
   fileUploadConfig: {
-    exclude: ['logs', '.next', 'node_modules', '.cs-launch.json'],
+    exclude: ['logs', '.next', 'node_modules', '.cs-launch.json', '.git', '.env', '.env.local', '.vscode'],
   },
   outputDirectories: {
     GATSBY: './public',
