@@ -4,4 +4,6 @@ fileignoreconfig:
     - filecontent
 - filename: src/commands/launch/index.test.ts
   checksum: 9db6c02ad35a0367343cd753b916dd64db4a9efd24838201d2e1113ed19c9b62
+- filename: package-lock.json
+  checksum: 819b63e090423a6c74b3de58555d6d8d40a6eda781a8376c876a549547f70790
 version: "1.0"
