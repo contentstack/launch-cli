@@ -17,6 +17,7 @@ const config = {
     ANGULAR: './dist',
     NUXT: './.output',
     VUEJS: './dist',
+    REMIX: './build',
     OTHER: './',
   },
   listOfFrameWorks: [
@@ -27,6 +28,7 @@ const config = {
     { name: 'Angular', value: 'ANGULAR' },
     { name: 'Nuxt', value: 'NUXT' },
     { name: 'VueJs', value: 'VUEJS' },
+    { name: 'Remix', value: 'REMIX' },
     { name: 'Other', value: 'OTHER' },
   ],
   providerMapper: {
