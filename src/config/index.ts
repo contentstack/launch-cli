@@ -15,7 +15,9 @@ const config = {
     CRA: './build',
     CSR: './',
     ANGULAR: './dist',
+    NUXT: './.output',
     VUEJS: './dist',
+    REMIX: './build',
     OTHER: './',
   },
   listOfFrameWorks: [
@@ -24,7 +26,9 @@ const config = {
     { name: 'CRA (Create React App)', value: 'CRA' },
     { name: 'CSR (Client-Side Rendered)', value: 'CSR' },
     { name: 'Angular', value: 'ANGULAR' },
+    { name: 'Nuxt', value: 'NUXT' },
     { name: 'VueJs', value: 'VUEJS' },
+    { name: 'Remix', value: 'REMIX' },
     { name: 'Other', value: 'OTHER' },
   ],
   providerMapper: {
@@ -43,7 +47,7 @@ const config = {
     VariablePreparationTypeOptions.SKIP_SETUP,
   ],
   variableType: '',
-  supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX'],
+  supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
   supportedFileUploadMethods: ['last file upload', 'new file']
 
 };
