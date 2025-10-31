@@ -504,7 +504,7 @@ export default class BaseClass {
    * @memberof BaseClass
    */
   async handleEnvImportFlow(): Promise<void> {
-    const variablePreparationType =
+    let variablePreparationType: string | string[] =
       this.config.variableType ||
       (await ux.inquire({
         type: 'checkbox',
@@ -513,6 +513,10 @@ export default class BaseClass {
         choices: this.config.variablePreparationTypeOptions,
         message: 'Import variables from a stack and/or manually add custom variables to the list',
       }));
+
+    if (typeof variablePreparationType === 'string') {
+      variablePreparationType = [variablePreparationType];
+    }
 
     if (variablePreparationType.length === 0) {
       this.log('Please select at least one option by pressing <space>, then press <enter> to proceed.', 'error');
