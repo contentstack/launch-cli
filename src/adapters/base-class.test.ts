@@ -32,6 +32,99 @@ describe('BaseClass', () => {
         config: config.variablePreparationTypeOptions,
       } as any);
     });
+
+    it('should handle string variableType by converting to array - Import variables from a stack', async () => {
+      baseClass = new BaseClass({
+        log: logMock,
+        exit: exitMock,
+        config: {
+          variableType: 'Import variables from a stack',
+          variablePreparationTypeOptions: config.variablePreparationTypeOptions,
+        },
+      } as any);
+
+      const importEnvFromStackMock = jest.spyOn(baseClass, 'importEnvFromStack').mockResolvedValueOnce();
+
+      await baseClass.handleEnvImportFlow();
+
+      expect(importEnvFromStackMock).toHaveBeenCalled();
+      expect(exitMock).not.toHaveBeenCalled();
+    });
+
+    it('should handle string variableType by converting to array - Manually add custom variables to the list', async () => {
+      baseClass = new BaseClass({
+        log: logMock,
+        exit: exitMock,
+        config: {
+          variableType: 'Manually add custom variables to the list',
+          variablePreparationTypeOptions: config.variablePreparationTypeOptions,
+        },
+      } as any);
+
+      const promptForEnvValuesMock = jest.spyOn(baseClass, 'promptForEnvValues').mockResolvedValueOnce();
+
+      await baseClass.handleEnvImportFlow();
+
+      expect(promptForEnvValuesMock).toHaveBeenCalled();
+      expect(exitMock).not.toHaveBeenCalled();
+    });
+
+    it('should handle string variableType by converting to array - Import variables from the .env.local file', async () => {
+      baseClass = new BaseClass({
+        log: logMock,
+        exit: exitMock,
+        config: {
+          variableType: 'Import variables from the .env.local file',
+          variablePreparationTypeOptions: config.variablePreparationTypeOptions,
+        },
+      } as any);
+
+      const importVariableFromLocalConfigMock = jest
+        .spyOn(baseClass, 'importVariableFromLocalConfig')
+        .mockResolvedValueOnce();
+
+      await baseClass.handleEnvImportFlow();
+
+      expect(importVariableFromLocalConfigMock).toHaveBeenCalled();
+      expect(exitMock).not.toHaveBeenCalled();
+    });
+
+    it('should handle string variableType by converting to array - Skip adding environment variables', async () => {
+      baseClass = new BaseClass({
+        log: logMock,
+        exit: exitMock,
+        config: {
+          variableType: 'Skip adding environment variables',
+          variablePreparationTypeOptions: config.variablePreparationTypeOptions,
+        },
+      } as any);
+
+      await baseClass.handleEnvImportFlow();
+
+      expect(baseClass.envVariables).toEqual([]);
+      expect(logMock).toHaveBeenCalledWith('Skipped adding environment variables.', 'info');
+      expect(exitMock).not.toHaveBeenCalled();
+    });
+
+    it('should fail if string to array conversion is removed', async () => {
+      baseClass = new BaseClass({
+        log: logMock,
+        exit: exitMock,
+        config: {
+          variableType: 'Skip adding environment variables',
+          variablePreparationTypeOptions: config.variablePreparationTypeOptions,
+        },
+      } as any);
+
+      await baseClass.handleEnvImportFlow();
+
+      expect(exitMock).not.toHaveBeenCalled();
+      expect(logMock).not.toHaveBeenCalledWith(
+        "The 'Skip adding environment variables' option cannot be combined with other environment variable options. Please choose either 'Skip adding environment variables' or one or more of the other available options.",
+        'error',
+      );
+    });
+
     it('should exit if no options are selected', async () => {
       (ux.inquire as jest.Mock).mockResolvedValueOnce([]);
 
@@ -162,7 +255,7 @@ describe('BaseClass', () => {
         'Import variables from the .env.local file',
       ]);
 
-      await baseClass.handleEnvImportFlow(); 
+      await baseClass.handleEnvImportFlow();
 
       expect(importEnvFromStackMock).toHaveBeenCalled();
       expect(promptForEnvValuesMock).toHaveBeenCalled();
