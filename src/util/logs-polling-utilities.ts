@@ -6,6 +6,7 @@ import { Ora } from 'ora';
 import { LogPollingInput, ConfigType } from '../types';
 import { deploymentQuery, deploymentLogsQuery, serverlessLogsQuery } from '../graphql';
 import { setTimeout as sleep } from 'timers/promises';
+import { isNotDevelopment } from './apollo-client';
 
 export default class LogPolling {
   private config: ConfigType;
@@ -26,6 +27,61 @@ export default class LogPolling {
   }
 
   /**
+   * @method withDeprecationsDisabled - Helper to disable Apollo Client deprecation warnings
+   *
+   * Wraps the provided function so that Apollo deprecation warnings are disabled
+   * only during its execution, and restored immediately after.
+   */
+  private withDeprecationsDisabled<T>(fn: () => T): T {
+   
+    if (!isNotDevelopment) {
+      return fn();
+    }
+    
+    let withDisabledDeprecations: any;
+    try {
+      withDisabledDeprecations = require('@apollo/client/utilities/deprecation').withDisabledDeprecations;
+    } catch {
+      return fn();
+    }
+
+    const handler = withDisabledDeprecations();
+    try {
+      return fn();
+    } finally {
+      this.disposeDeprecationHandler(handler);
+    }
+  }
+
+  private disposeDeprecationHandler(handler?: any): void {
+    if (!handler) return;
+    try {
+      const dispose = (handler as any)[(Symbol as any).dispose];
+      if (typeof dispose === 'function') {
+        dispose.call(handler);
+        return;
+      }
+    } catch {}
+    try {
+      const asyncDispose = (handler as any)[(Symbol as any).asyncDispose];
+      if (typeof asyncDispose === 'function') {
+        asyncDispose.call(handler);
+        return;
+      }
+    } catch {}
+    try {
+      const symbols = Object.getOwnPropertySymbols(handler);
+      for (const sym of symbols) {
+        const maybeDispose = (handler as any)[sym];
+        if (typeof maybeDispose === 'function') {
+          maybeDispose.call(handler);
+          break;
+        }
+      }
+    } catch {}
+  }
+
+  /**
    * @method getDeploymentStatus - deployment status polling
    *
    * @return {*}  {ObservableQuery<any, {query: {
@@ -43,7 +99,8 @@ export default class LogPolling {
       };
     }
     > {
-    const statusWatchQuery = this.apolloManageClient.watchQuery({
+    return this.withDeprecationsDisabled(() => {
+      const statusWatchQuery = this.apolloManageClient.watchQuery({
       fetchPolicy: 'network-only',
       query: deploymentQuery,
       variables: {
@@ -55,7 +112,8 @@ export default class LogPolling {
       pollInterval: this.config.pollingInterval,
       errorPolicy: 'all',
     });
-    return statusWatchQuery;
+      return statusWatchQuery;
+    });
   }
 
   /**
@@ -86,7 +144,8 @@ export default class LogPolling {
         statusWatchQuery.stopPolling();
       }
     });
-    const logsWatchQuery = this.apolloLogsClient.watchQuery({
+    const logsWatchQuery = this.withDeprecationsDisabled(() => {
+      return this.apolloLogsClient.watchQuery({
       fetchPolicy: 'network-only',
       query: deploymentLogsQuery,
       variables: {
@@ -94,6 +153,7 @@ export default class LogPolling {
       },
       pollInterval: this.config.pollingInterval,
       errorPolicy: 'all',
+    });
     });
     this.subscribeDeploymentLogs(logsWatchQuery);
   }
@@ -180,7 +240,9 @@ export default class LogPolling {
   async serverLogs(): Promise<void> {
     this.startTime = new Date().getTime() - 10 * 1000;
     this.endTime = new Date().getTime();
-    const serverLogsWatchQuery = this.apolloLogsClient.watchQuery({
+    
+    const serverLogsWatchQuery = this.withDeprecationsDisabled(() => {
+      return this.apolloLogsClient.watchQuery({
       fetchPolicy: 'network-only',
       query: serverlessLogsQuery,
       variables: {
@@ -193,6 +255,7 @@ export default class LogPolling {
       },
       pollInterval: this.config.pollingInterval,
       errorPolicy: 'all',
+    });
     });
     this.subscribeServerLogs(serverLogsWatchQuery);
   }
