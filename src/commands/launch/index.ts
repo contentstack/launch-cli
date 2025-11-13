@@ -29,6 +29,8 @@ export default class Launch extends BaseCommand<typeof Launch> {
     '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload> --name=<value> --environment=<value> --branch=<value> --build-command=<value> --framework=<option> --org=<value> --out-dir=<value> --variable-type="Import variables from a stack" --alias=<value>',
     // eslint-disable-next-line max-len
     '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload> --name=<value> --environment=<value> --branch=<value> --build-command=<value> --framework=<option> --org=<value> --out-dir=<value> --variable-type="Manually add custom variables to the list" --env-variables="APP_ENV:prod, TEST_ENV:testVal"',
+    // eslint-disable-next-line max-len
+    '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload> --name=<value> --environment=<value> --branch=<value> --build-command=<value> --framework=<option> --org=<value> --out-dir=<value> --variable-type="Import variables from a stack" --variable-type="Manually add custom variables to the list" --alias=<value>',
   ];
 
   static flags: FlagInput = {
@@ -64,10 +66,11 @@ export default class Launch extends BaseCommand<typeof Launch> {
       description: '[optional] Server Command.',
     }),
     'variable-type': Flags.string({
+      multiple: true,
       options: [...config.variablePreparationTypeOptions],
       description:
         // eslint-disable-next-line max-len
-        '[optional] Provide a variable type. <options: Import variables from a stack|Manually add custom variables to the list|Import variables from the .env.local file|Skip adding environment variables>',
+        '[optional] Provide a variable type (can specify multiple times). <options: Import variables from a stack|Manually add custom variables to the list|Import variables from the .env.local file|Skip adding environment variables>',
     }),
     'show-variables': Flags.boolean({
       hidden: true,
