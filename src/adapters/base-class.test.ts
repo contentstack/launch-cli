@@ -391,4 +391,36 @@ describe('BaseClass', () => {
       expect(exitMock).toHaveBeenCalledWith(1);
     });
   });
+
+  describe('handleEnvVariables', () => {
+    beforeEach(() => {
+      baseClass = new BaseClass({
+        log: logMock,
+        exit: exitMock,
+        config: {},
+      } as any);
+    });
+
+    afterEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should parse environment variables from config string with various value formats including URLs', async () => {
+      baseClass = new BaseClass({
+        log: logMock,
+        exit: exitMock,
+        config: {
+          envVariables: 'APP_ENV:prod, API_URL:https://api.example.com/v1, DB_URL:postgresql://localhost:5432/dbname',
+        },
+      } as any);
+
+      await baseClass.promptForEnvValues();
+
+      expect(baseClass.envVariables).toEqual([
+        { key: 'APP_ENV', value: 'prod' },
+        { key: 'API_URL', value: 'https://api.example.com/v1' },
+        { key: 'DB_URL', value: 'postgresql://localhost:5432/dbname' },
+      ]);
+    });
+  });
 });
