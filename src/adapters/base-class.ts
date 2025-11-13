@@ -312,6 +312,24 @@ export default class BaseClass {
   }
 
   /**
+   * @method parseEnvVariablesString - Parse environment variables string into key-value pairs
+   * Splits on first colon only to support values containing colons (e.g., URLs)
+   *
+   * @param {string} envString - Comma-separated string of key:value pairs
+   * @return {*}  {Array<{key: string, value: string}>}
+   * @memberof BaseClass
+   */
+  private parseEnvVariablesString(envString: string): Array<{ key: string; value: string }> {
+    return map(split(envString, ','), (pair) => {
+      const trimmedPair = (pair as string).trim();
+      const colonIndex = trimmedPair.indexOf(':');
+      const key = colonIndex !== -1 ? trimmedPair.substring(0, colonIndex).trim() : trimmedPair.trim();
+      const value = colonIndex !== -1 ? trimmedPair.substring(colonIndex + 1).trim() : '';
+      return { key, value };
+    }).filter(({ key }) => key);
+  }
+
+  /**
    * @method promptForEnvValues - Prompt and get manual entry of environment variables
    *
    * @return {*}  {Promise<void>}
@@ -330,15 +348,7 @@ export default class BaseClass {
             message:
               'Enter key and value with a colon between them, and use a comma(,) for the key-value pair. Format: <key1>:<value1>, <key2>:<value2> Ex: APP_ENV:prod, TEST_ENV:testVal',
           })
-          .then((variable) => {
-            return map(split(variable as string, ','), (variable) => {
-              let [key, value] = split(variable as string, ':');
-              value = (value || '').trim();
-              key = (key || '').trim();
-
-              return { key, value };
-            }).filter(({ key }) => key);
-          });
+          .then((variable) => this.parseEnvVariablesString(variable as string));
 
         envVariables.push(...variable);
 
@@ -356,13 +366,7 @@ export default class BaseClass {
       this.envVariables.push(...envVariables);
     } else {
       if (typeof this.config.envVariables === 'string') {
-        const variable = map(split(this.config.envVariables as string, ','), (variable) => {
-          let [key, value] = split(variable as string, ':');
-          value = (value || '').trim();
-          key = (key || '').trim();
-
-          return { key, value };
-        });
+        const variable = this.parseEnvVariablesString(this.config.envVariables);
         this.envVariables.push(...variable);
       }
     }
