@@ -125,6 +125,120 @@ describe('BaseClass', () => {
       );
     });
 
+    it('should handle two options: Import from stack and Manually add variables', async () => {
+      baseClass = new BaseClass({
+        log: logMock,
+        exit: exitMock,
+        config: {
+          variableType: ['Import variables from a stack', 'Manually add custom variables to the list'],
+          variablePreparationTypeOptions: config.variablePreparationTypeOptions,
+        },
+      } as any);
+
+      const importEnvFromStackMock = jest.spyOn(baseClass, 'importEnvFromStack').mockResolvedValueOnce();
+      const promptForEnvValuesMock = jest.spyOn(baseClass, 'promptForEnvValues').mockResolvedValueOnce();
+
+      await baseClass.handleEnvImportFlow();
+
+      expect(importEnvFromStackMock).toHaveBeenCalled();
+      expect(promptForEnvValuesMock).toHaveBeenCalled();
+      expect(exitMock).not.toHaveBeenCalled();
+    });
+
+    it('should handle two options: Import from stack and Import from .env.local', async () => {
+      baseClass = new BaseClass({
+        log: logMock,
+        exit: exitMock,
+        config: {
+          variableType: ['Import variables from a stack', 'Import variables from the .env.local file'],
+          variablePreparationTypeOptions: config.variablePreparationTypeOptions,
+        },
+      } as any);
+
+      const importEnvFromStackMock = jest.spyOn(baseClass, 'importEnvFromStack').mockResolvedValueOnce();
+      const importVariableFromLocalConfigMock = jest
+        .spyOn(baseClass, 'importVariableFromLocalConfig')
+        .mockResolvedValueOnce();
+
+      await baseClass.handleEnvImportFlow();
+
+      expect(importEnvFromStackMock).toHaveBeenCalled();
+      expect(importVariableFromLocalConfigMock).toHaveBeenCalled();
+      expect(exitMock).not.toHaveBeenCalled();
+    });
+
+    it('should handle two options: Manually add and Import from .env.local', async () => {
+      baseClass = new BaseClass({
+        log: logMock,
+        exit: exitMock,
+        config: {
+          variableType: ['Manually add custom variables to the list', 'Import variables from the .env.local file'],
+          variablePreparationTypeOptions: config.variablePreparationTypeOptions,
+        },
+      } as any);
+
+      const promptForEnvValuesMock = jest.spyOn(baseClass, 'promptForEnvValues').mockResolvedValueOnce();
+      const importVariableFromLocalConfigMock = jest
+        .spyOn(baseClass, 'importVariableFromLocalConfig')
+        .mockResolvedValueOnce();
+
+      await baseClass.handleEnvImportFlow();
+
+      expect(promptForEnvValuesMock).toHaveBeenCalled();
+      expect(importVariableFromLocalConfigMock).toHaveBeenCalled();
+      expect(exitMock).not.toHaveBeenCalled();
+    });
+
+    it('should handle all three options: Import from stack, Manually add, and Import from .env.local', async () => {
+      baseClass = new BaseClass({
+        log: logMock,
+        exit: exitMock,
+        config: {
+          variableType: [
+            'Import variables from a stack',
+            'Manually add custom variables to the list',
+            'Import variables from the .env.local file',
+          ],
+          variablePreparationTypeOptions: config.variablePreparationTypeOptions,
+        },
+      } as any);
+
+      const importEnvFromStackMock = jest.spyOn(baseClass, 'importEnvFromStack').mockResolvedValueOnce();
+      const promptForEnvValuesMock = jest.spyOn(baseClass, 'promptForEnvValues').mockResolvedValueOnce();
+      const importVariableFromLocalConfigMock = jest
+        .spyOn(baseClass, 'importVariableFromLocalConfig')
+        .mockResolvedValueOnce();
+
+      await baseClass.handleEnvImportFlow();
+
+      expect(importEnvFromStackMock).toHaveBeenCalled();
+      expect(promptForEnvValuesMock).toHaveBeenCalled();
+      expect(importVariableFromLocalConfigMock).toHaveBeenCalled();
+      expect(exitMock).not.toHaveBeenCalled();
+    });
+
+    it('should fail when Skip is combined with other options', async () => {
+      baseClass = new BaseClass({
+        log: logMock,
+        exit: exitMock,
+        config: {
+          variableType: ['Skip adding environment variables', 'Import variables from a stack'],
+          variablePreparationTypeOptions: config.variablePreparationTypeOptions,
+        },
+      } as any);
+
+      const importEnvFromStackMock = jest.spyOn(baseClass, 'importEnvFromStack').mockResolvedValueOnce(undefined);
+
+      await baseClass.handleEnvImportFlow();
+
+      expect(logMock).toHaveBeenCalledWith(
+        "The 'Skip adding environment variables' option cannot be combined with other environment variable options. Please choose either 'Skip adding environment variables' or one or more of the other available options.",
+        'error',
+      );
+      expect(exitMock).toHaveBeenCalledWith(1);
+      expect(importEnvFromStackMock).toHaveBeenCalled();
+    });
+
     it('should exit if no options are selected', async () => {
       (ux.inquire as jest.Mock).mockResolvedValueOnce([]);
 
@@ -138,21 +252,30 @@ describe('BaseClass', () => {
     });
 
     it('should exit if "Skip adding environment variables" is selected with other options', async () => {
+      const exitMockWithThrow = jest.fn().mockImplementation(() => {
+        throw new Error('Exit called');
+      });
+      baseClass = new BaseClass({
+        log: logMock,
+        exit: exitMockWithThrow,
+        config: config.variablePreparationTypeOptions,
+      } as any);
+      
       const importEnvFromStackMock = jest.spyOn(baseClass, 'importEnvFromStack').mockResolvedValueOnce();
       (ux.inquire as jest.Mock).mockResolvedValueOnce([
         'Skip adding environment variables',
         'Import variables from a stack',
       ]);
 
-      await baseClass.handleEnvImportFlow();
+      await expect(baseClass.handleEnvImportFlow()).rejects.toThrow('Exit called');
 
       expect(logMock).toHaveBeenCalledWith(
         "The 'Skip adding environment variables' option cannot be combined with other environment variable options. Please choose either 'Skip adding environment variables' or one or more of the other available options.",
         'error',
       );
 
-      expect(exitMock).toHaveBeenCalledWith(1);
-      expect(importEnvFromStackMock).toHaveBeenCalled();
+      expect(exitMockWithThrow).toHaveBeenCalledWith(1);
+      expect(importEnvFromStackMock).not.toHaveBeenCalled();
     });
 
     it('should call importEnvFromStack if "Import variables from a stack" is selected', async () => {
