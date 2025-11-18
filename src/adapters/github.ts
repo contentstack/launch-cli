@@ -123,7 +123,7 @@ export default class GitHub extends BaseClass {
               name: environmentName || 'Default',
               environmentVariables: map(this.envVariables, ({ key, value }) => ({ key, value })),
               buildCommand: buildCommand === undefined || buildCommand === null ? 'npm run build' : buildCommand,
-              serverCommand: serverCommand === undefined || serverCommand === null ? 'npm run start' : serverCommand,
+              ...(serverCommand && serverCommand.trim() !== '' ? { serverCommand } : {}),
             },
           },
         },
@@ -221,13 +221,18 @@ export default class GitHub extends BaseClass {
         default: (this.config.outputDirectories as Record<string, string>)[this.config?.framework || 'OTHER'],
       }));
     if (this.config.framework && this.config.supportedFrameworksForServerCommands.includes(this.config.framework)) {
-      this.config.serverCommand =
-        serverCommand ||
-        (await ux.inquire({
+      if (!serverCommand) {
+        const serverCommandInput = await ux.inquire({
           type: 'input',
           name: 'serverCommand',
           message: 'Server Command',
-        }));
+        });
+        if (serverCommandInput) {
+          this.config.serverCommand = serverCommandInput;
+        } 
+      } else {
+        this.config.serverCommand = serverCommand;
+      }
     }
     this.config.variableType = variableType as unknown as string;
     this.config.envVariables = envVariables;
