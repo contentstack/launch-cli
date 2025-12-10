@@ -129,7 +129,7 @@ export default class FileUpload extends BaseClass {
               name: environmentName || 'Default',
               environmentVariables: map(this.envVariables, ({ key, value }) => ({ key, value })),
               buildCommand: buildCommand === undefined || buildCommand === null ? 'npm run build' : buildCommand,
-              serverCommand: serverCommand === undefined || serverCommand === null ? 'npm run start' : serverCommand,
+              ...(serverCommand && serverCommand.trim() !== '' ? { serverCommand } : {}),
             },
           },
           skipGitData: true,
@@ -226,13 +226,18 @@ export default class FileUpload extends BaseClass {
         default: (this.config.outputDirectories as Record<string, string>)[this.config?.framework || 'OTHER'],
       }));
     if (this.config.framework && this.config.supportedFrameworksForServerCommands.includes(this.config.framework)) {
-      this.config.serverCommand =
-        serverCommand ||
-        (await cliux.inquire({
+      if (!serverCommand) {
+        const serverCommandInput = await cliux.inquire({
           type: 'input',
           name: 'serverCommand',
           message: 'Server Command',
-        }));
+        });
+        if (serverCommandInput) {
+          this.config.serverCommand = serverCommandInput;
+        }
+      } else {
+        this.config.serverCommand = serverCommand;
+      }
     }
     this.config.variableType = variableType as unknown as string;
     this.config.envVariables = envVariables;
