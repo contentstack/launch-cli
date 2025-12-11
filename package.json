@@ -1,6 +1,6 @@
 {
   "name": "@contentstack/cli-launch",
-  "version": "1.9.3",
+  "version": "1.9.4",
   "description": "Launch related operations",
   "author": "Contentstack CLI",
   "bin": {
@@ -20,7 +20,7 @@
     "/oclif.manifest.json"
   ],
   "dependencies": {
-    "@apollo/client": "^3.11.8",
+    "@apollo/client": "^3.14.0",
     "@contentstack/cli-command": "^1.4.0",
     "@contentstack/cli-utilities": "^1.12.0",
     "@oclif/core": "^4.2.7",
@@ -37,7 +37,7 @@
     "cross-fetch": "^4.1.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.1",
-    "form-data": "^4.0.0",
+    "form-data": "4.0.4",
     "graphql": "^16.9.0",
     "ini": "^3.0.1",
     "lodash": "^4.17.21",
@@ -105,6 +105,10 @@
     "test:jest": "jest",
     "test:jest:coverage": "jest --coverage",
     "prepare": "husky"
+  },
+  "overrides": {
+    "axios": "~1.10.0",
+    "form-data": "4.0.4"
   },
   "engines": {
     "node": ">=14.0.0"

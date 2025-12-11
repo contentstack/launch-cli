@@ -13,11 +13,49 @@ import {
   Operation,
   ApolloClient,
   InMemoryCache,
+  setLogVerbosity,
 } from '@apollo/client/core';
 import { cliux as ux, authHandler, configHandler } from '@contentstack/cli-utilities';
 
 import config from '../config';
 import { GraphqlApiClientInput } from '../types';
+
+export const isNotDevelopment = process.env.NODE_ENV !== 'development';
+
+function isApolloMessage(message: string): boolean {
+  return (
+    message.includes('go.apollo.dev/c/err') ||
+    message.includes('cache.diff') ||
+    message.includes('canonizeResults')
+  );
+}
+
+if (isNotDevelopment) {
+  try {
+    setLogVerbosity('silent');
+  } catch {}
+
+  const originalError = console.error;
+  const originalWarn = console.warn;
+  
+  console.error = (...args: any[]) => {
+    const message = args[0]?.toString() || '';
+
+    if (isApolloMessage(message)) {
+      return;
+    }
+    originalError.apply(console, args);
+  };
+  
+  console.warn = (...args: any[]) => {
+    const message = args[0]?.toString() || '';
+    
+    if (isApolloMessage(message)) {
+      return;
+    }
+    originalWarn.apply(console, args);
+  };
+}
 
 export default class GraphqlApiClient {
   private authType: string;
