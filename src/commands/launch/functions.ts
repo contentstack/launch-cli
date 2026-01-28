@@ -22,7 +22,6 @@ export default class Functions extends Command {
     }),
     'data-dir': Flags.string({
       char: 'd',
-      default: process.cwd(),
       description: 'Current working directory',
     }),
   };
@@ -34,7 +33,8 @@ export default class Functions extends Command {
 
   async init(): Promise<void> {
     const { flags } = await this.parse(Functions);
-    const projectBasePath = flags['data-dir'];
+    const currentWorkingDirectory = process.cwd();
+    const projectBasePath = flags['data-dir'] || currentWorkingDirectory;
     
     const logger = new Logger({ projectBasePath });
     this.log = logger.log.bind(logger);
