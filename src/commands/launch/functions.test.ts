@@ -40,6 +40,21 @@ describe('Functions Command', () => {
       });
     });
 
+    it('should fall back to process.cwd() when data-dir flag is not provided', async () => {
+      Functions.prototype['parse'] = jest
+        .fn()
+        .mockResolvedValueOnce({ flags: { 'data-dir': undefined, port: '3000' } });
+      const functionsCommand = new Functions([], {} as any);
+
+      await functionsCommand.init();
+
+      expect(Functions.prototype['parse']).toHaveBeenCalledWith(Functions);
+      expect(functionsCommand['sharedConfig']).toEqual({
+        projectBasePath: process.cwd(),
+        port: 3000,
+      });
+    });
+
     it.each([{ portFlagInput: 'invalidPortInput' }, { portFlagInput: '999999' }, { portFlagInput: '-200' }])(
       'should log an error and exit if the "port" flag input is invalid -> $portFlagInput',
       async ({ portFlagInput }) => {
