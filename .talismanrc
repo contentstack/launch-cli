@@ -5,5 +5,5 @@ fileignoreconfig:
 - filename: src/commands/launch/index.test.ts
   checksum: 9db6c02ad35a0367343cd753b916dd64db4a9efd24838201d2e1113ed19c9b62
 - filename: package-lock.json
-  checksum: 3e6b5fb796a5dc1d965869c41077da52c05635027d06b4705de2d5ee20efbb20
+  checksum: 2b9f5c9dd79f1bd5bc08451380e629a44a30765ab7e9d612f4b8fa8a0aece2a7
 version: "1.0"
