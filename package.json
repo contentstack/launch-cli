@@ -1,6 +1,6 @@
 {
   "name": "@contentstack/cli-launch",
-  "version": "1.9.5",
+  "version": "1.9.6",
   "description": "Launch related operations",
   "author": "Contentstack CLI",
   "bin": {
@@ -25,7 +25,6 @@
     "@contentstack/cli-utilities": "^1.17.0",
     "@oclif/core": "^4.2.7",
     "@oclif/plugin-help": "^6.2.25",
-    "@oclif/plugin-plugins": "^5.4.15",
     "@rollup/plugin-commonjs": "^28.0.2",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.0",
