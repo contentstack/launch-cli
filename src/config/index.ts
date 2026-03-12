@@ -16,6 +16,7 @@ const config = {
     CSR: './',
     ANGULAR: './dist',
     NUXT: './.output',
+    ASTRO: './dist',
     VUEJS: './dist',
     REMIX: './build',
     OTHER: './',
@@ -27,6 +28,7 @@ const config = {
     { name: 'CSR (Client-Side Rendered)', value: 'CSR' },
     { name: 'Angular', value: 'ANGULAR' },
     { name: 'Nuxt', value: 'NUXT' },
+    { name: 'Astro', value: 'ASTRO' },
     { name: 'VueJs', value: 'VUEJS' },
     { name: 'Remix', value: 'REMIX' },
     { name: 'Other', value: 'OTHER' },
@@ -47,7 +49,7 @@ const config = {
     VariablePreparationTypeOptions.SKIP_SETUP,
   ],
   variableType: '',
-  supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+  supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT', 'ASTRO'],
   supportedFileUploadMethods: ['last file upload', 'new file']
 
 };
