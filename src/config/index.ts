@@ -14,6 +14,7 @@ const config = {
     NEXTJS: './.next',
     CRA: './build',
     CSR: './',
+    ANALOG: './dist/analog/public',
     ANGULAR: './dist',
     NUXT: './.output',
     ASTRO: './dist',
@@ -26,6 +27,7 @@ const config = {
     { name: 'NextJs', value: 'NEXTJS' },
     { name: 'CRA (Create React App)', value: 'CRA' },
     { name: 'CSR (Client-Side Rendered)', value: 'CSR' },
+    { name: 'Analog', value: 'ANALOG' },
     { name: 'Angular', value: 'ANGULAR' },
     { name: 'Nuxt', value: 'NUXT' },
     { name: 'Astro', value: 'ASTRO' },
@@ -49,7 +51,7 @@ const config = {
     VariablePreparationTypeOptions.SKIP_SETUP,
   ],
   variableType: '',
-  supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT', 'ASTRO'],
+  supportedFrameworksForServerCommands: ['ANALOG', 'ANGULAR', 'OTHER', 'REMIX', 'NUXT', 'ASTRO'],
   supportedFileUploadMethods: ['last file upload', 'new file']
 
 };
