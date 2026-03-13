@@ -52,7 +52,7 @@
     "@types/jest": "^29.5.14",
     "@types/lodash": "^4.17.13",
     "@types/mocha": "^10.0.10",
-    "@types/node": "^16.18.121",
+    "@types/node": "^22.0.0",
     "@types/sinon": "^17.0.3",
     "chai": "^4.5.0",
     "eslint": "^9.24.0",
@@ -113,7 +113,7 @@
     "tmp": "^0.2.4"
   },
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=22.0.0"
   },
   "bugs": "https://github.com/contentstack/launch-cli/issues",
   "keywords": [
