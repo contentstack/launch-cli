@@ -1,4 +1,5 @@
 import EventEmitter from 'events';
+import { createRequire } from 'module';
 import { cliux } from '@contentstack/cli-utilities';
 import { ApolloClient, ObservableQuery } from '@apollo/client/core';
 import { Ora } from 'ora';
@@ -7,6 +8,8 @@ import { LogPollingInput, ConfigType } from '../types';
 import { deploymentQuery, deploymentLogsQuery, serverlessLogsQuery } from '../graphql';
 import { setTimeout as sleep } from 'timers/promises';
 import { isNotDevelopment } from './apollo-client';
+
+const requireApolloDeprecation = createRequire(__filename);
 
 export default class LogPolling {
   private config: ConfigType;
@@ -33,19 +36,25 @@ export default class LogPolling {
    * only during its execution, and restored immediately after.
    */
   private withDeprecationsDisabled<T>(fn: () => T): T {
-   
     if (!isNotDevelopment) {
       return fn();
     }
-    
-    let withDisabledDeprecations: any;
+
+    let withDisabledDeprecations: unknown;
     try {
-      withDisabledDeprecations = require('@apollo/client/utilities/deprecation').withDisabledDeprecations;
+      withDisabledDeprecations = requireApolloDeprecation(
+        '@apollo/client/utilities/deprecation',
+      ).withDisabledDeprecations;
     } catch {
       return fn();
     }
 
-    const handler = withDisabledDeprecations();
+    if (typeof withDisabledDeprecations !== 'function') {
+      return fn();
+    }
+
+    const handler = (withDisabledDeprecations as () => unknown)();
+
     try {
       return fn();
     } finally {
@@ -61,14 +70,18 @@ export default class LogPolling {
         dispose.call(handler);
         return;
       }
-    } catch {}
+    } catch {
+      void 0;
+    }
     try {
       const asyncDispose = (handler as any)[(Symbol as any).asyncDispose];
       if (typeof asyncDispose === 'function') {
         asyncDispose.call(handler);
         return;
       }
-    } catch {}
+    } catch {
+      void 0;
+    }
     try {
       const symbols = Object.getOwnPropertySymbols(handler);
       for (const sym of symbols) {
@@ -78,7 +91,9 @@ export default class LogPolling {
           break;
         }
       }
-    } catch {}
+    } catch {
+      void 0;
+    }
   }
 
   /**
@@ -101,17 +116,17 @@ export default class LogPolling {
     > {
     return this.withDeprecationsDisabled(() => {
       const statusWatchQuery = this.apolloManageClient.watchQuery({
-      fetchPolicy: 'network-only',
-      query: deploymentQuery,
-      variables: {
-        query: {
-          uid: this.config.deployment,
-          environment: this.config.environment,
+        fetchPolicy: 'network-only',
+        query: deploymentQuery,
+        variables: {
+          query: {
+            uid: this.config.deployment,
+            environment: this.config.environment,
+          },
         },
-      },
-      pollInterval: this.config.pollingInterval,
-      errorPolicy: 'all',
-    });
+        pollInterval: this.config.pollingInterval,
+        errorPolicy: 'all',
+      });
       return statusWatchQuery;
     });
   }
@@ -146,14 +161,14 @@ export default class LogPolling {
     });
     const logsWatchQuery = this.withDeprecationsDisabled(() => {
       return this.apolloLogsClient.watchQuery({
-      fetchPolicy: 'network-only',
-      query: deploymentLogsQuery,
-      variables: {
-        deploymentUid: this.config.deployment,
-      },
-      pollInterval: this.config.pollingInterval,
-      errorPolicy: 'all',
-    });
+        fetchPolicy: 'network-only',
+        query: deploymentLogsQuery,
+        variables: {
+          deploymentUid: this.config.deployment,
+        },
+        pollInterval: this.config.pollingInterval,
+        errorPolicy: 'all',
+      });
     });
     this.subscribeDeploymentLogs(logsWatchQuery);
   }
@@ -243,19 +258,19 @@ export default class LogPolling {
     
     const serverLogsWatchQuery = this.withDeprecationsDisabled(() => {
       return this.apolloLogsClient.watchQuery({
-      fetchPolicy: 'network-only',
-      query: serverlessLogsQuery,
-      variables: {
-        query: {
-          environmentUid: this.config.environment,
-          startTime: this.startTime,
-          endTime: this.endTime,
-          deploymentUid: this.config.deployment,
+        fetchPolicy: 'network-only',
+        query: serverlessLogsQuery,
+        variables: {
+          query: {
+            environmentUid: this.config.environment,
+            startTime: this.startTime,
+            endTime: this.endTime,
+            deploymentUid: this.config.deployment,
+          },
         },
-      },
-      pollInterval: this.config.pollingInterval,
-      errorPolicy: 'all',
-    });
+        pollInterval: this.config.pollingInterval,
+        errorPolicy: 'all',
+      });
     });
     this.subscribeServerLogs(serverLogsWatchQuery);
   }
