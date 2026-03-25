@@ -1,6 +1,6 @@
 {
   "name": "@contentstack/cli-launch",
-  "version": "1.9.6",
+  "version": "1.9.7",
   "description": "Launch related operations",
   "author": "Contentstack CLI",
   "bin": {
@@ -41,7 +41,7 @@
     "ini": "^3.0.1",
     "lodash": "^4.17.23",
     "open": "^8.4.2",
-    "rollup": "^4.34.6",
+    "rollup": "^4.59.0",
     "winston": "^3.17.0"
   },
   "devDependencies": {
@@ -52,7 +52,7 @@
     "@types/jest": "^29.5.14",
     "@types/lodash": "^4.17.13",
     "@types/mocha": "^10.0.10",
-    "@types/node": "^16.18.121",
+    "@types/node": "^22.0.0",
     "@types/sinon": "^17.0.3",
     "chai": "^4.5.0",
     "eslint": "^9.24.0",
@@ -106,11 +106,20 @@
     "prepare": "husky"
   },
   "overrides": {
-    "axios": "~1.12.0",
-    "form-data": "4.0.4"
+    "axios": "^1.13.5",
+    "form-data": "4.0.4",
+    "ajv": "^8.18.0",
+    "eslint": {
+      "ajv": "^6.12.6"
+    },
+    "@eslint/eslintrc": {
+      "ajv": "^6.12.6"
+    },
+    "qs": "^6.14.2",
+    "tmp": "^0.2.4"
   },
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=22.0.0"
   },
   "bugs": "https://github.com/contentstack/launch-cli/issues",
   "keywords": [
