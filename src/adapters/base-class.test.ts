@@ -1,6 +1,7 @@
 import BaseClass from './base-class';
 import { cliux as ux, ContentstackClient } from '@contentstack/cli-utilities';
 import config from '../config';
+import { FILE_UPLOAD_SIZE_LIMIT_USER_MESSAGE } from '../util/deployment-errors';
 
 jest.mock('@contentstack/cli-utilities', () => ({
   cliux: {
@@ -544,6 +545,148 @@ describe('BaseClass', () => {
         { key: 'API_URL', value: 'https://api.example.com/v1' },
         { key: 'DB_URL', value: 'postgresql://localhost:5432/dbname' },
       ]);
+    });
+  });
+
+  describe('createNewDeployment', () => {
+    let mutateMock: jest.Mock;
+
+    beforeEach(() => {
+      mutateMock = jest.fn();
+      baseClass = new BaseClass({
+        log: logMock,
+        exit: exitMock,
+        apolloClient: { mutate: mutateMock } as any,
+        config: {
+          currentConfig: { deployments: [] },
+        },
+      } as any);
+    });
+
+    it('should log success and append deployment when mutate succeeds', async () => {
+      const deployment = { uid: 'dep-1', status: 'PENDING' };
+      mutateMock.mockResolvedValueOnce({ data: { deployment } });
+
+      await baseClass.createNewDeployment(false, 'env-uid-1');
+
+      expect(mutateMock).toHaveBeenCalled();
+      expect(logMock).toHaveBeenCalledWith('Deployment process started.!', 'info');
+      expect(baseClass.config.currentConfig.deployments).toEqual([deployment]);
+      expect(exitMock).not.toHaveBeenCalled();
+    });
+
+    it('should log file size limit message and exit when mutate fails with deployment file size error', async () => {
+      const apolloError = {
+        graphQLErrors: [
+          {
+            extensions: {
+              exception: {
+                messages: ['launch.DEPLOYMENT.INVALID_FILE_SIZE'],
+              },
+            },
+          },
+        ],
+      };
+      mutateMock.mockRejectedValueOnce(apolloError);
+
+      await baseClass.createNewDeployment(true, 'env-uid-2', 'upload-uid-1');
+
+      expect(logMock).toHaveBeenCalledWith('Deployment process failed.!', 'error');
+      expect(logMock).toHaveBeenCalledWith(apolloError, 'debug');
+      expect(logMock).toHaveBeenCalledWith(FILE_UPLOAD_SIZE_LIMIT_USER_MESSAGE, 'error');
+      expect(exitMock).toHaveBeenCalledWith(1);
+      expect(logMock).not.toHaveBeenCalledWith(apolloError, 'error');
+    });
+
+    it('should log raw error and exit when mutate fails with a non file size error', async () => {
+      const otherError = new Error('GraphQL failure');
+      mutateMock.mockRejectedValueOnce(otherError);
+
+      await baseClass.createNewDeployment(false, 'env-uid-3');
+
+      expect(logMock).toHaveBeenCalledWith('Deployment process failed.!', 'error');
+      expect(logMock).toHaveBeenCalledWith(otherError, 'error');
+      expect(logMock).not.toHaveBeenCalledWith(FILE_UPLOAD_SIZE_LIMIT_USER_MESSAGE, 'error');
+      expect(exitMock).toHaveBeenCalledWith(1);
+    });
+  });
+
+  describe('handleNewProjectCreationError', () => {
+    beforeEach(() => {
+      baseClass = new BaseClass({
+        log: logMock,
+        exit: exitMock,
+        config: {
+          projectCreationRetryMaxCount: 3,
+        },
+      } as any);
+    });
+
+    it('should log file size limit message and exit when error is launch.DEPLOYMENT.INVALID_FILE_SIZE', async () => {
+      const apolloError = {
+        graphQLErrors: [
+          {
+            extensions: {
+              exception: {
+                messages: ['launch.DEPLOYMENT.INVALID_FILE_SIZE'],
+              },
+            },
+          },
+        ],
+      };
+
+      await baseClass.handleNewProjectCreationError(apolloError);
+
+      expect(logMock).toHaveBeenCalledWith('New project creation failed!', 'error');
+      expect(logMock).toHaveBeenCalledWith(apolloError, 'debug');
+      expect(logMock).toHaveBeenCalledWith(FILE_UPLOAD_SIZE_LIMIT_USER_MESSAGE, 'error');
+      expect(exitMock).toHaveBeenCalledWith(1);
+      expect(logMock).not.toHaveBeenCalledWith(apolloError, 'error');
+    });
+
+    it('should log file size limit message and exit when error is launch.DEPLOYMENT.FILE_UPLOAD_FAILED in errorObject', async () => {
+      const apolloError = {
+        graphQLErrors: [
+          {
+            extensions: {
+              exception: {
+                errorObject: {
+                  uploadUid: [{ code: 'launch.DEPLOYMENT.FILE_UPLOAD_FAILED' }],
+                },
+              },
+            },
+          },
+        ],
+      };
+
+      await baseClass.handleNewProjectCreationError(apolloError);
+
+      expect(logMock).toHaveBeenCalledWith('New project creation failed!', 'error');
+      expect(logMock).toHaveBeenCalledWith(apolloError, 'debug');
+      expect(logMock).toHaveBeenCalledWith(FILE_UPLOAD_SIZE_LIMIT_USER_MESSAGE, 'error');
+      expect(exitMock).toHaveBeenCalledWith(1);
+      expect(logMock).not.toHaveBeenCalledWith(apolloError, 'error');
+    });
+
+    it('should log raw error and exit when error is not a known handled case', async () => {
+      const apolloError = {
+        graphQLErrors: [
+          {
+            extensions: {
+              exception: {
+                messages: ['launch.PROJECTS.UPLOADED_FILE_NOT_FOUND_ERROR'],
+              },
+            },
+          },
+        ],
+      };
+
+      await baseClass.handleNewProjectCreationError(apolloError);
+
+      expect(logMock).toHaveBeenCalledWith('New project creation failed!', 'error');
+      expect(logMock).toHaveBeenCalledWith(apolloError, 'error');
+      expect(logMock).not.toHaveBeenCalledWith(FILE_UPLOAD_SIZE_LIMIT_USER_MESSAGE, 'error');
+      expect(exitMock).toHaveBeenCalledWith(1);
     });
   });
 });

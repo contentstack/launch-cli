@@ -19,6 +19,7 @@ import { writeFileSync, existsSync, readFileSync } from 'fs';
 import { cliux as ux, ContentstackClient } from '@contentstack/cli-utilities';
 
 import { print, GraphqlApiClient, LogPolling, getOrganizations } from '../util';
+import { FILE_UPLOAD_SIZE_LIMIT_USER_MESSAGE, isLaunchDeploymentFileSizeRelatedError } from '../util/deployment-errors';
 import {
   branchesQuery,
   frameworkQuery,
@@ -106,7 +107,12 @@ export default class BaseClass {
       })
       .catch((error) => {
         this.log('Deployment process failed.!', 'error');
-        this.log(error, 'error');
+        if (isLaunchDeploymentFileSizeRelatedError(error)) {
+          this.log(error, 'debug');
+          this.log(FILE_UPLOAD_SIZE_LIMIT_USER_MESSAGE, 'error');
+        } else {
+          this.log(error, 'error');
+        }
         this.exit(1);
       });
   }
@@ -748,6 +754,9 @@ export default class BaseClass {
       }
     } else if (includes(error?.graphQLErrors?.[0]?.extensions?.exception?.messages, 'launch.PROJECTS.LIMIT_REACHED')) {
       this.log('Launch project limit reached!', 'error');
+    } else if (isLaunchDeploymentFileSizeRelatedError(error)) {
+      this.log(error, 'debug');
+      this.log(FILE_UPLOAD_SIZE_LIMIT_USER_MESSAGE, 'error');
     } else {
       this.log(error, 'error');
     }
