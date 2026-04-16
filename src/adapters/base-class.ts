@@ -519,7 +519,6 @@ export default class BaseClass {
       (await ux.inquire({
         type: 'checkbox',
         name: 'variablePreparationType',
-        default: this.config.framework,
         choices: this.config.variablePreparationTypeOptions,
         message: 'Import variables from a stack and/or manually add custom variables to the list',
       }));
