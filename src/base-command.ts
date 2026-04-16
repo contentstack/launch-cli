@@ -62,6 +62,9 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
     this.args = args as Args<T>;
 
     ux.registerSearchPlugin();
+    if (process.stdin.isTTY && typeof process.stdin.setMaxListeners === 'function') {
+      process.stdin.setMaxListeners(20);
+    }
     this.$event = new EventEmitter();
 
     await this.prepareConfig();
