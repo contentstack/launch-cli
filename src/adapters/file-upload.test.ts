@@ -304,6 +304,241 @@ describe('FileUpload Adapter', () => {
       );
       expect(serverCommandCalls.length).toBe(0);
     });
+
+    it('should prompt Enable Streaming Responses after server command when response-mode omitted for OTHER preset',
+      async () => {
+        (cliux.inquire as jest.Mock).mockResolvedValueOnce('test-project');
+        (cliux.inquire as jest.Mock).mockResolvedValueOnce('Default');
+        (cliux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
+        (cliux.inquire as jest.Mock).mockResolvedValueOnce('./dist');
+        (cliux.inquire as jest.Mock).mockResolvedValueOnce('npm start');
+        (cliux.inquire as jest.Mock).mockResolvedValueOnce(true);
+
+        const createSignedUploadUrlMock = jest
+          .spyOn(FileUpload.prototype as any, 'createSignedUploadUrl')
+          .mockResolvedValue({ uploadUid: 'test-upload-uid' });
+        const archiveMock = jest
+          .spyOn(FileUpload.prototype as any, 'archive')
+          .mockResolvedValue({ zipName: 'test.zip', zipPath: '/path/to/test.zip', projectName: 'test-project' });
+        const uploadFileMock = jest
+          .spyOn(FileUpload.prototype as any, 'uploadFile')
+          .mockResolvedValue(undefined);
+
+        const fileUploadInstance = new FileUpload({
+          config: {
+            flags: {
+              'server-command': undefined,
+              'response-mode': undefined,
+            },
+            framework: 'OTHER',
+            supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+            outputDirectories: { OTHER: './dist' },
+          },
+          log: logMock,
+          exit: exitMock,
+        } as any);
+
+        await fileUploadInstance.prepareAndUploadNewProjectFile();
+
+        expect(cliux.inquire).toHaveBeenCalledWith({
+          type: 'confirm',
+          name: 'enableStreamingResponse',
+          message: 'Enable Streaming Responses',
+          default: false,
+        });
+        expect(fileUploadInstance.config.isStreamingEnabled).toBe(true);
+
+        createSignedUploadUrlMock.mockRestore();
+        archiveMock.mockRestore();
+        uploadFileMock.mockRestore();
+      });
+
+    it('should not prompt Enable Streaming Response when response-mode flag is streaming', async () => {
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('test-project');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('Default');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('./dist');
+
+      const createSignedUploadUrlMock = jest
+        .spyOn(FileUpload.prototype as any, 'createSignedUploadUrl')
+        .mockResolvedValue({ uploadUid: 'test-upload-uid' });
+      const archiveMock = jest
+        .spyOn(FileUpload.prototype as any, 'archive')
+        .mockResolvedValue({ zipName: 'test.zip', zipPath: '/path/to/test.zip', projectName: 'test-project' });
+      const uploadFileMock = jest
+        .spyOn(FileUpload.prototype as any, 'uploadFile')
+        .mockResolvedValue(undefined);
+
+      const fileUploadInstance = new FileUpload({
+        config: {
+          flags: {
+            'server-command': 'npm start',
+            'response-mode': 'streaming',
+          },
+          framework: 'OTHER',
+          supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+          outputDirectories: { OTHER: './dist' },
+        },
+        log: logMock,
+        exit: exitMock,
+      } as any);
+
+      await fileUploadInstance.prepareAndUploadNewProjectFile();
+
+      const enableStreamingCalls = (cliux.inquire as jest.Mock).mock.calls.filter(
+        (call) => call[0]?.name === 'enableStreamingResponse',
+      );
+      expect(enableStreamingCalls.length).toBe(0);
+      expect(fileUploadInstance.config.isStreamingEnabled).toBe(true);
+
+      createSignedUploadUrlMock.mockRestore();
+      archiveMock.mockRestore();
+      uploadFileMock.mockRestore();
+    });
+
+    it('should not prompt Enable Streaming Response when response-mode flag is buffered', async () => {
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('test-project');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('Default');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('./dist');
+
+      const createSignedUploadUrlMock = jest
+        .spyOn(FileUpload.prototype as any, 'createSignedUploadUrl')
+        .mockResolvedValue({ uploadUid: 'test-upload-uid' });
+      const archiveMock = jest
+        .spyOn(FileUpload.prototype as any, 'archive')
+        .mockResolvedValue({ zipName: 'test.zip', zipPath: '/path/to/test.zip', projectName: 'test-project' });
+      const uploadFileMock = jest
+        .spyOn(FileUpload.prototype as any, 'uploadFile')
+        .mockResolvedValue(undefined);
+
+      const fileUploadInstance = new FileUpload({
+        config: {
+          flags: {
+            'server-command': 'npm start',
+            'response-mode': 'buffered',
+          },
+          framework: 'OTHER',
+          supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+          outputDirectories: { OTHER: './dist' },
+        },
+        log: logMock,
+        exit: exitMock,
+      } as any);
+
+      await fileUploadInstance.prepareAndUploadNewProjectFile();
+
+      const enableStreamingCalls = (cliux.inquire as jest.Mock).mock.calls.filter(
+        (call) => call[0]?.name === 'enableStreamingResponse',
+      );
+      expect(enableStreamingCalls.length).toBe(0);
+      expect(fileUploadInstance.config.isStreamingEnabled).toBe(false);
+
+      createSignedUploadUrlMock.mockRestore();
+      archiveMock.mockRestore();
+      uploadFileMock.mockRestore();
+    });
+
+    it('should prompt Enable Streaming Responses for Gatsby when flag is not provided', async () => {
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('test-project');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('Default');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('./public');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce(true);
+
+      const createSignedUploadUrlMock = jest
+        .spyOn(FileUpload.prototype as any, 'createSignedUploadUrl')
+        .mockResolvedValue({ uploadUid: 'test-upload-uid' });
+      const archiveMock = jest
+        .spyOn(FileUpload.prototype as any, 'archive')
+        .mockResolvedValue({ zipName: 'test.zip', zipPath: '/path/to/test.zip', projectName: 'test-project' });
+      const uploadFileMock = jest
+        .spyOn(FileUpload.prototype as any, 'uploadFile')
+        .mockResolvedValue(undefined);
+
+      const fileUploadInstance = new FileUpload({
+        config: {
+          flags: {
+            'response-mode': undefined,
+          },
+          framework: 'GATSBY',
+          supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+          outputDirectories: { GATSBY: './public' },
+        },
+        log: logMock,
+        exit: exitMock,
+      } as any);
+
+      const handleEnvImportFlowMock = jest
+        .spyOn(fileUploadInstance, 'handleEnvImportFlow' as any)
+        .mockResolvedValue(undefined);
+
+      await fileUploadInstance.prepareAndUploadNewProjectFile();
+
+      const serverCommandCalls = (cliux.inquire as jest.Mock).mock.calls.filter(
+        (call) => call[0]?.name === 'serverCommand',
+      );
+      expect(serverCommandCalls.length).toBe(0);
+      expect(cliux.inquire).toHaveBeenCalledWith({
+        type: 'confirm',
+        name: 'enableStreamingResponse',
+        message: 'Enable Streaming Responses',
+        default: false,
+      });
+      expect(fileUploadInstance.config.isStreamingEnabled).toBe(true);
+
+      createSignedUploadUrlMock.mockRestore();
+      archiveMock.mockRestore();
+      uploadFileMock.mockRestore();
+      handleEnvImportFlowMock.mockRestore();
+    });
+
+    it('should apply response-mode flag for Gatsby without prompt', async () => {
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('test-project');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('Default');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('./public');
+
+      const createSignedUploadUrlMock = jest
+        .spyOn(FileUpload.prototype as any, 'createSignedUploadUrl')
+        .mockResolvedValue({ uploadUid: 'test-upload-uid' });
+      const archiveMock = jest
+        .spyOn(FileUpload.prototype as any, 'archive')
+        .mockResolvedValue({ zipName: 'test.zip', zipPath: '/path/to/test.zip', projectName: 'test-project' });
+      const uploadFileMock = jest
+        .spyOn(FileUpload.prototype as any, 'uploadFile')
+        .mockResolvedValue(undefined);
+
+      const fileUploadInstance = new FileUpload({
+        config: {
+          flags: {
+            'response-mode': 'buffered',
+          },
+          framework: 'GATSBY',
+          supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+          outputDirectories: { GATSBY: './public' },
+        },
+        log: logMock,
+        exit: exitMock,
+      } as any);
+
+      const handleEnvImportFlowMock = jest
+        .spyOn(fileUploadInstance, 'handleEnvImportFlow' as any)
+        .mockResolvedValue(undefined);
+
+      await fileUploadInstance.prepareAndUploadNewProjectFile();
+
+      const enableStreamingCalls = (cliux.inquire as jest.Mock).mock.calls.filter(
+        (call) => call[0]?.name === 'enableStreamingResponse',
+      );
+      expect(enableStreamingCalls.length).toBe(0);
+      expect(fileUploadInstance.config.isStreamingEnabled).toBe(false);
+
+      createSignedUploadUrlMock.mockRestore();
+      archiveMock.mockRestore();
+      uploadFileMock.mockRestore();
+      handleEnvImportFlowMock.mockRestore();
+    });
   });
 });
 

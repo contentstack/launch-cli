@@ -52,7 +52,8 @@ const config = {
   ],
   variableType: '',
   supportedFrameworksForServerCommands: ['ANALOG', 'ANGULAR', 'OTHER', 'REMIX', 'NUXT', 'ASTRO'],
-  supportedFileUploadMethods: ['last file upload', 'new file']
+  supportedFileUploadMethods: ['last file upload', 'new file'],
+  responseModeOptions: ['buffered', 'streaming'],
 
 };
 

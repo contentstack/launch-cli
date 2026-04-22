@@ -26,6 +26,8 @@ export default class Launch extends BaseCommand<typeof Launch> {
     // eslint-disable-next-line max-len
     '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload> --name=<value> --environment=<value> --branch=<value> --build-command=<value> --framework=<option> --org=<value> --out-dir=<value> --server-command=<value>',
     // eslint-disable-next-line max-len
+    '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload> --name=<value> --environment=<value> --branch=<value> --build-command=<value> --framework=<option> --org=<value> --out-dir=<value> --server-command=<value> --response-mode=streaming',
+    // eslint-disable-next-line max-len
     '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload> --name=<value> --environment=<value> --branch=<value> --build-command=<value> --framework=<option> --org=<value> --out-dir=<value> --variable-type="Import variables from a stack" --alias=<value>',
     // eslint-disable-next-line max-len
     '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload> --name=<value> --environment=<value> --branch=<value> --build-command=<value> --framework=<option> --org=<value> --out-dir=<value> --variable-type="Manually add custom variables to the list" --env-variables="APP_ENV:prod, TEST_ENV:testVal"',
@@ -98,6 +100,10 @@ export default class Launch extends BaseCommand<typeof Launch> {
       description: '[optional] Redeploy with last file upload',
       default: false,
     }),
+    'response-mode': Flags.string({
+      options: [...config.responseModeOptions],
+      description: '[optional] Provide mode for response. <options: buffered|streaming'
+    })
   };
 
   async run(): Promise<void> {

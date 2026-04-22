@@ -564,5 +564,195 @@ describe('GitHub Adapter', () => {
       );
       expect(serverCommandCalls.length).toBe(0);
     });
+
+    it('should prompt Enable Streaming Responses after server command when response-mode omitted for OTHER preset',
+      async () => {
+        (ux.inquire as jest.Mock).mockResolvedValueOnce('test-project'); 
+        (ux.inquire as jest.Mock).mockResolvedValueOnce('Default'); 
+        (ux.inquire as jest.Mock).mockResolvedValueOnce('npm run build'); 
+        (ux.inquire as jest.Mock).mockResolvedValueOnce('./dist'); 
+        (ux.inquire as jest.Mock).mockResolvedValueOnce('npm start'); 
+        (ux.inquire as jest.Mock).mockResolvedValueOnce(true);
+
+        const githubInstance = new GitHub({
+          config: {
+            flags: {
+              'server-command': undefined,
+              'response-mode': undefined,
+            },
+            framework: 'OTHER',
+            repository: { fullName: 'test-user/repo', name: 'repo' },
+            supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+            outputDirectories: { OTHER: './dist' },
+          },
+          log: logMock,
+          exit: exitMock,
+        } as any);
+        
+        const handleEnvImportFlowMock = jest
+          .spyOn(githubInstance, 'handleEnvImportFlow' as any)
+          .mockResolvedValue(undefined);
+
+        await githubInstance.prepareForNewProjectCreation();
+
+        expect(ux.inquire).toHaveBeenCalledWith({
+          type: 'confirm',
+          name: 'enableStreamingResponse',
+          message: 'Enable Streaming Responses',
+          default: false,
+        });
+        expect(githubInstance.config.isStreamingEnabled).toBe(true);
+        
+        handleEnvImportFlowMock.mockRestore();
+      });
+
+    it('should not prompt Enable Streaming Response when response-mode flag is streaming', async () => {
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('test-project'); 
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('Default'); 
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('npm run build'); 
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('./dist'); 
+
+      const githubInstance = new GitHub({
+        config: {
+          flags: {
+            'server-command': 'npm start',
+            'response-mode': 'streaming',
+          },
+          framework: 'OTHER',
+          repository: { fullName: 'test-user/repo', name: 'repo' },
+          supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+          outputDirectories: { OTHER: './dist' },
+        },
+        log: logMock,
+        exit: exitMock,
+      } as any);
+      
+      const handleEnvImportFlowMock = jest
+        .spyOn(githubInstance, 'handleEnvImportFlow' as any)
+        .mockResolvedValue(undefined);
+
+      await githubInstance.prepareForNewProjectCreation();
+
+      const enableStreamingCalls = (ux.inquire as jest.Mock).mock.calls.filter(
+        (call) => call[0]?.name === 'enableStreamingResponse',
+      );
+      expect(enableStreamingCalls.length).toBe(0);
+      expect(githubInstance.config.isStreamingEnabled).toBe(true);
+      
+      handleEnvImportFlowMock.mockRestore();
+    });
+
+    it('should not prompt Enable Streaming Response when response-mode flag is buffered', async () => {
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('test-project'); 
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('Default'); 
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('npm run build'); 
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('./dist'); 
+
+      const githubInstance = new GitHub({
+        config: {
+          flags: {
+            'server-command': 'npm start',
+            'response-mode': 'buffered',
+          },
+          framework: 'OTHER',
+          repository: { fullName: 'test-user/repo', name: 'repo' },
+          supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+          outputDirectories: { OTHER: './dist' },
+        },
+        log: logMock,
+        exit: exitMock,
+      } as any);
+      
+      const handleEnvImportFlowMock = jest
+        .spyOn(githubInstance, 'handleEnvImportFlow' as any)
+        .mockResolvedValue(undefined);
+
+      await githubInstance.prepareForNewProjectCreation();
+
+      const enableStreamingCalls = (ux.inquire as jest.Mock).mock.calls.filter(
+        (call) => call[0]?.name === 'enableStreamingResponse',
+      );
+      expect(enableStreamingCalls.length).toBe(0);
+      expect(githubInstance.config.isStreamingEnabled).toBe(false);
+      
+      handleEnvImportFlowMock.mockRestore();
+    });
+
+    it('should prompt Enable Streaming Responses for Gatsby when flag is not provided', async () => {
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('test-project');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('Default');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('./public');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce(false);
+
+      const githubInstance = new GitHub({
+        config: {
+          flags: {
+            'response-mode': undefined,
+          },
+          framework: 'GATSBY',
+          repository: { fullName: 'test-user/repo', name: 'repo' },
+          supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+          outputDirectories: { GATSBY: './public' },
+        },
+        log: logMock,
+        exit: exitMock,
+      } as any);
+
+      const handleEnvImportFlowMock = jest
+        .spyOn(githubInstance, 'handleEnvImportFlow' as any)
+        .mockResolvedValue(undefined);
+
+      await githubInstance.prepareForNewProjectCreation();
+
+      const serverCommandCalls = (ux.inquire as jest.Mock).mock.calls.filter(
+        (call) => call[0]?.name === 'serverCommand',
+      );
+      expect(serverCommandCalls.length).toBe(0);
+      expect(ux.inquire).toHaveBeenCalledWith({
+        type: 'confirm',
+        name: 'enableStreamingResponse',
+        message: 'Enable Streaming Responses',
+        default: false,
+      });
+      expect(githubInstance.config.isStreamingEnabled).toBe(false);
+
+      handleEnvImportFlowMock.mockRestore();
+    });
+
+    it('should apply response-mode flag for Gatsby without prompt', async () => {
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('test-project');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('Default');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('./public');
+
+      const githubInstance = new GitHub({
+        config: {
+          flags: {
+            'response-mode': 'streaming',
+          },
+          framework: 'GATSBY',
+          repository: { fullName: 'test-user/repo', name: 'repo' },
+          supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+          outputDirectories: { GATSBY: './public' },
+        },
+        log: logMock,
+        exit: exitMock,
+      } as any);
+
+      const handleEnvImportFlowMock = jest
+        .spyOn(githubInstance, 'handleEnvImportFlow' as any)
+        .mockResolvedValue(undefined);
+
+      await githubInstance.prepareForNewProjectCreation();
+
+      const enableStreamingCalls = (ux.inquire as jest.Mock).mock.calls.filter(
+        (call) => call[0]?.name === 'enableStreamingResponse',
+      );
+      expect(enableStreamingCalls.length).toBe(0);
+      expect(githubInstance.config.isStreamingEnabled).toBe(true);
+
+      handleEnvImportFlowMock.mockRestore();
+    });
   });
 });
