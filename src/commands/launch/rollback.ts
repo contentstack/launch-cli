@@ -194,37 +194,37 @@ export default class Rollback extends BaseCommand<typeof Rollback> {
    */
   async resolveEnvironment(): Promise<any> {
     const environments = await this.apolloClient
-      .query({ query: environmentsQuery })
+      .query({
+        query: environmentsQuery,
+        variables: { skipRollbackData: false },
+      })
       .then(({ data: { Environments } }) => map(Environments.edges, 'node'))
       .catch((error) => {
         this.log(error?.message, 'error');
         process.exit(1);
       });
 
-    let environment = find(
-      environments,
-      ({ uid, name }) =>
-        uid === this.flags.environment ||
-        name === this.flags.environment ||
-        uid === this.sharedConfig.currentConfig?.environments?.[0]?.uid,
-    );
-
-    if (isEmpty(environment) && (this.flags.environment || this.sharedConfig.currentConfig?.environments?.[0]?.uid)) {
-      this.log('Environment(s) not found!', 'error');
-      process.exit(1);
-    } else if (isEmpty(environment)) {
-      environment = await ux
-        .inquire({
-          type: 'search-list',
-          name: 'Environment',
-          choices: map(environments, (row) => ({ ...row, value: row.name })),
-          message: 'Choose an environment',
-        })
-        .then((name: any) => find(environments, { name }) as Record<string, any>);
+    if (this.flags.environment) {
+      const environment = find(
+        environments,
+        ({ uid, name }) => uid === this.flags.environment || name === this.flags.environment,
+      );
+      if (isEmpty(environment)) {
+        this.log('Environment(s) not found!', 'error');
+        process.exit(1);
+      }
+      return environment;
     }
 
-    this.sharedConfig.environment = environment;
-    return environment;
+    // NOTE: rollback is destructive; never auto-select from saved config — always prompt.
+    return ux
+      .inquire({
+        type: 'search-list',
+        name: 'Environment',
+        choices: map(environments, (row) => ({ ...row, value: row.name })),
+        message: 'Choose an environment',
+      })
+      .then((name: any) => find(environments, { name }) as Record<string, any>);
   }
 
   /**
@@ -271,11 +271,15 @@ export default class Rollback extends BaseCommand<typeof Rollback> {
       return match;
     }
 
-    const choices = map(eligibleSorted, (d) => ({
-      ...d,
-      name: `#${d.deploymentNumber} | ${sourceLabel(d) || '—'} | ${d.createdAt}`,
-      value: d.uid,
-    }));
+    const choices = map(eligibleSorted, (d) => {
+      const message = (d.commitMessage || '').split('\n')[0].trim() || '—';
+      const truncated = message.length > 60 ? `${message.slice(0, 57)}…` : message;
+      return {
+        ...d,
+        name: `#${d.deploymentNumber} | ${sourceLabel(d) || '—'} | ${truncated} | ${d.createdAt}`,
+        value: d.uid,
+      };
+    });
 
     const selectedUid = await ux.inquire<string>({
       type: 'search-list',
@@ -387,8 +391,11 @@ function formatDeployment(deployment?: any): string {
   }
   const number = deployment.deploymentNumber ? `#${deployment.deploymentNumber}` : deployment.uid;
   const source = sourceLabel(deployment);
+  const message = ((deployment.commitMessage || '').split('\n')[0] || '').trim();
+  const truncated = message.length > 40 ? `${message.slice(0, 37)}…` : message;
   const createdAt = deployment.createdAt || '';
   const numberCol = chalk.green(number.padEnd(6));
-  const sourceCol = source ? chalk.cyan(source.padEnd(28)) : ''.padEnd(28);
-  return `${numberCol}  ${sourceCol}  ${chalk.dim(createdAt)}`;
+  const sourceCol = source ? chalk.cyan(source.padEnd(22)) : ''.padEnd(22);
+  const messageCol = truncated || chalk.dim('—');
+  return `${numberCol}  ${sourceCol}  ${messageCol}  ${chalk.dim(createdAt)}`;
 }
