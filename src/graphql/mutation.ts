@@ -76,8 +76,24 @@ const importProjectMutation: DocumentNode = gql`
   }
 `;
 
+const rollbackDeploymentMutation: DocumentNode = gql`
+  mutation RollbackDeployment($input: RollbackDeploymentInput!) {
+    deployment: rollbackDeployment(input: $input) {
+      uid
+      status
+      createdAt
+      updatedAt
+      commitHash
+      commitMessage
+      deploymentUrl
+      deploymentNumber
+    }
+  }
+`;
+
 export {
   importProjectMutation,
   createDeploymentMutation,
+  rollbackDeploymentMutation,
   createSignedUploadUrlMutation,
 };
