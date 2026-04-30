@@ -7,6 +7,7 @@ import { FlagInput, Flags, cliux as ux } from '@contentstack/cli-utilities';
 
 import { BaseCommand } from '../../base-command';
 import {
+  deploymentQuery,
   environmentsQuery,
   latestLiveDeploymentQuery,
   rollbackDeploymentMutation,
@@ -104,8 +105,9 @@ export default class Rollback extends BaseCommand<typeof Rollback> {
       return;
     }
 
-    await this.apolloClient
-      .mutate({
+    let rolledBack: any;
+    try {
+      const { data } = await this.apolloClient.mutate({
         mutation: rollbackDeploymentMutation,
         variables: {
           input: {
@@ -114,18 +116,75 @@ export default class Rollback extends BaseCommand<typeof Rollback> {
             ...(reason ? { reason } : {}),
           },
         },
-      })
-      .then(({ data: { deployment: rolledBack } }) => {
-        ux.print('');
-        ux.print(chalk.green('✔ Instant rollback to a previous deployment is successful.'));
-        ux.print(`  New deployment: ${chalk.cyan(rolledBack.uid)}  status: ${chalk.cyan(rolledBack.status)}`);
-        ux.print('');
-      })
-      .catch((error) => {
-        const code = error?.graphQLErrors?.[0]?.extensions?.exception?.name || error?.message;
-        this.log(`Rollback failed. Please try again. (${code})`, 'error');
-        process.exit(1);
       });
+      rolledBack = data?.deployment;
+    } catch (error: any) {
+      const code = error?.graphQLErrors?.[0]?.extensions?.exception?.name || error?.message;
+      this.log(`Rollback failed. Please try again. (${code})`, 'error');
+      process.exit(1);
+    }
+
+    ux.print('');
+    ux.print(
+      `Promoting deployment ${chalk.cyan(`#${rolledBack.deploymentNumber}`)} `
+        + chalk.dim(`(${rolledBack.uid})`) + '…',
+    );
+
+    const finalStatus = await this.pollDeploymentStatus(environment.uid, target.uid);
+
+    ux.print('');
+    if (finalStatus === 'LIVE') {
+      ux.print(chalk.green('✔ Instant rollback to a previous deployment is successful.'));
+      const label = `${chalk.cyan(`#${rolledBack.deploymentNumber}`)} ${chalk.dim(`(${rolledBack.uid})`)}`;
+      ux.print(`  Deployment ${label} is now ${chalk.green('LIVE')}.`);
+    } else if (finalStatus === 'FAILED' || finalStatus === 'CANCELLED') {
+      ux.print(chalk.red(`✘ Rollback ended with status: ${finalStatus}.`));
+      process.exit(1);
+    } else {
+      ux.print(chalk.yellow(`Rollback is still in progress (status: ${finalStatus}).`));
+      ux.print(chalk.dim('  Check the Launch dashboard for the final status.'));
+    }
+    ux.print('');
+  }
+
+  /**
+   * @method pollDeploymentStatus - poll the target deployment until it goes LIVE or terminal/timeout
+   *
+   * @memberof Rollback
+   */
+  async pollDeploymentStatus(environmentUid: string, deploymentUid: string): Promise<string> {
+    const intervalMs = 3000;
+    const timeoutMs = 90000;
+    const start = Date.now();
+    const terminal = new Set(['LIVE', 'FAILED', 'CANCELLED']);
+
+    while (Date.now() - start < timeoutMs) {
+      try {
+        const { data } = await this.apolloClient.query({
+          query: deploymentQuery,
+          variables: { query: { environment: environmentUid, uid: deploymentUid } },
+          fetchPolicy: 'no-cache',
+        });
+        const status = data?.Deployment?.status;
+        if (status && terminal.has(status)) {
+          return status;
+        }
+      } catch (error: any) {
+        this.log(`Failed to fetch deployment status: ${error?.message}`, 'warn');
+      }
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+
+    try {
+      const { data } = await this.apolloClient.query({
+        query: deploymentQuery,
+        variables: { query: { environment: environmentUid, uid: deploymentUid } },
+        fetchPolicy: 'no-cache',
+      });
+      return data?.Deployment?.status || 'UNKNOWN';
+    } catch {
+      return 'UNKNOWN';
+    }
   }
 
   /**
