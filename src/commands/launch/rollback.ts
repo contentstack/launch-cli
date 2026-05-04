@@ -44,15 +44,17 @@ export default class Rollback extends BaseCommand<typeof Rollback> {
     }),
   };
 
-  async run(): Promise<void> {
+  async init(): Promise<void> {
+    await super.init();
     this.logger = new Logger(this.sharedConfig);
     this.log = this.logger.log.bind(this.logger);
+    await this.prepareApiClients();
+  }
 
+  async run(): Promise<void> {
     if (!this.flags.environment) {
       await this.getConfig();
     }
-
-    await this.prepareApiClients();
 
     if (!this.sharedConfig.currentConfig?.uid) {
       await selectOrg({
@@ -82,7 +84,7 @@ export default class Rollback extends BaseCommand<typeof Rollback> {
   async rollbackDeployment(): Promise<void> {
     const environment = await this.resolveEnvironment();
     const currentLive = await this.fetchCurrentLiveDeployment(environment.uid);
-    const eligibleSorted = this.getEligibleSorted(environment, currentLive?.uid);
+    const eligibleSorted = this.getEligibleSortedDeployments(environment, currentLive?.uid);
 
     if (isEmpty(eligibleSorted)) {
       this.log('No rollback-eligible deployments are available for this environment.', 'error');
@@ -105,7 +107,7 @@ export default class Rollback extends BaseCommand<typeof Rollback> {
       return;
     }
 
-    let rolledBack: any;
+    let rolledBack: { deploymentNumber: number; uid: string };
     try {
       const { data } = await this.apolloClient.mutate({
         mutation: rollbackDeploymentMutation,
@@ -118,8 +120,9 @@ export default class Rollback extends BaseCommand<typeof Rollback> {
         },
       });
       rolledBack = data?.deployment;
-    } catch (error: any) {
-      const code = error?.graphQLErrors?.[0]?.extensions?.exception?.name || error?.message;
+    } catch (error: unknown) {
+      const err = error as { graphQLErrors?: { extensions?: { exception?: { name?: string } } }[]; message?: string };
+      const code = err?.graphQLErrors?.[0]?.extensions?.exception?.name || err?.message;
       this.log(`Rollback failed. Please try again. (${code})`, 'error');
       process.exit(1);
     }
@@ -243,11 +246,11 @@ export default class Rollback extends BaseCommand<typeof Rollback> {
   }
 
   /**
-   * @method getEligibleSorted - eligible deployments excluding current live, sorted by number desc
+   * @method getEligibleSortedDeployments - eligible deployments excluding current live, sorted by number desc
    *
    * @memberof Rollback
    */
-  getEligibleSorted(environment: any, currentLiveUid?: string): any[] {
+  getEligibleSortedDeployments(environment: any, currentLiveUid?: string): any[] {
     const deployments = map(environment?.deployments?.edges, 'node');
     const eligible = filter(
       deployments,
