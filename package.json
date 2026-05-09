@@ -20,7 +20,7 @@
     "/oclif.manifest.json"
   ],
   "dependencies": {
-    "@apollo/client": "^3.14.0",
+    "@apollo/client": "^4.1.7",
     "@contentstack/cli-command": "^1.8.1",
     "@contentstack/cli-utilities": "^1.18.2",
     "@oclif/core": "^4.2.7",
