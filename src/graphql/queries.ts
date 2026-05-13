@@ -145,17 +145,12 @@ const latestLiveDeploymentQuery: DocumentNode = gql`
       environment
       deploymentNumber
       deploymentUrl
-      status
-      gitBranch
-      commitHash
-      commitMessage
-      createdAt
     }
   }
 `;
 
 const environmentsQuery: DocumentNode = gql`
-  query Environments($skipRollbackData: Boolean = true) {
+  query Environments {
     Environments {
       edges {
         node {
@@ -166,14 +161,14 @@ const environmentsQuery: DocumentNode = gql`
             edges {
               node {
                 uid
+                status
+                gitBranch
+                commitHash
                 createdAt
                 commitMessage
                 deploymentUrl
                 deploymentNumber
-                status @skip(if: $skipRollbackData)
-                gitBranch @skip(if: $skipRollbackData)
-                commitHash @skip(if: $skipRollbackData)
-                isRollbackEligible @skip(if: $skipRollbackData)
+                isRollbackEligible
               }
             }
           }
