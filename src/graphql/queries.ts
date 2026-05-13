@@ -161,14 +161,10 @@ const environmentsQuery: DocumentNode = gql`
             edges {
               node {
                 uid
-                status
-                gitBranch
-                commitHash
                 createdAt
                 commitMessage
                 deploymentUrl
                 deploymentNumber
-                isRollbackEligible
               }
             }
           }
