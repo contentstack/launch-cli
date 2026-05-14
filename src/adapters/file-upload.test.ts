@@ -1,20 +1,10 @@
+import { fileUploadAdapter as cliUtilitiesJestMock } from '../test/mocks/cli-utilities';
 import FileUpload from './file-upload';
 import BaseClass from './base-class';
 import { cliux } from '@contentstack/cli-utilities';
 import { DeploymentStatus } from '../types/launch';
 
-jest.mock('@contentstack/cli-utilities', () => ({
-  ...jest.requireActual('@contentstack/cli-utilities'),
-  cliux: {
-    inquire: jest.fn(),
-    loader: jest.fn(),
-    print: jest.fn(),
-  },
-  configHandler: {
-    get: jest.fn(),
-  },
-  HttpClient: jest.fn(),
-}));
+jest.mock('@contentstack/cli-utilities', () => cliUtilitiesJestMock);
 
 describe('FileUpload Adapter', () => {
   let logMock: jest.Mock;
