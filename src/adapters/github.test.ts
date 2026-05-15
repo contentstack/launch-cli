@@ -1,3 +1,4 @@
+import { githubAdapter as cliUtilitiesJestMock } from '../test/mocks/cli-utilities';
 import GitHub from './github';
 import { getRemoteUrls } from '../util/create-git-meta';
 import { repositoriesQuery, userConnectionsQuery } from '../graphql';
@@ -6,16 +7,7 @@ import { existsSync } from 'fs';
 import { DeploymentStatus } from '../types';
 import { cliux as ux } from '@contentstack/cli-utilities';
 
-jest.mock('@contentstack/cli-utilities', () => ({
-  ...jest.requireActual('@contentstack/cli-utilities'),
-  cliux: {
-    inquire: jest.fn(),
-    print: jest.fn(),
-  },
-  configHandler: {
-    get: jest.fn(),
-  },
-}));
+jest.mock('@contentstack/cli-utilities', () => cliUtilitiesJestMock);
 
 jest.mock('../util/create-git-meta');
 jest.mock('fs', () => ({

@@ -1,14 +1,10 @@
+import { baseClassAdapter as cliUtilitiesJestMock } from '../test/mocks/cli-utilities';
 import BaseClass from './base-class';
 import { cliux as ux, ContentstackClient } from '@contentstack/cli-utilities';
 import config from '../config';
 import { FILE_UPLOAD_SIZE_LIMIT_USER_MESSAGE } from '../util/deployment-errors';
 
-jest.mock('@contentstack/cli-utilities', () => ({
-  cliux: {
-    inquire: jest.fn(),
-    table: jest.fn(),
-  },
-}));
+jest.mock('@contentstack/cli-utilities', () => cliUtilitiesJestMock);
 
 describe('BaseClass', () => {
   let baseClass: BaseClass;
@@ -121,7 +117,7 @@ describe('BaseClass', () => {
 
       expect(exitMock).not.toHaveBeenCalled();
       expect(logMock).not.toHaveBeenCalledWith(
-        "The 'Skip adding environment variables' option cannot be combined with other environment variable options. Please choose either 'Skip adding environment variables' or one or more of the other available options.",
+        'The \'Skip adding environment variables\' option cannot be combined with other environment variable options. Please choose either \'Skip adding environment variables\' or one or more of the other available options.',
         'error',
       );
     });
@@ -233,7 +229,7 @@ describe('BaseClass', () => {
       await baseClass.handleEnvImportFlow();
 
       expect(logMock).toHaveBeenCalledWith(
-        "The 'Skip adding environment variables' option cannot be combined with other environment variable options. Please choose either 'Skip adding environment variables' or one or more of the other available options.",
+        'The \'Skip adding environment variables\' option cannot be combined with other environment variable options. Please choose either \'Skip adding environment variables\' or one or more of the other available options.',
         'error',
       );
       expect(exitMock).toHaveBeenCalledWith(1);
@@ -271,7 +267,7 @@ describe('BaseClass', () => {
       await expect(baseClass.handleEnvImportFlow()).rejects.toThrow('Exit called');
 
       expect(logMock).toHaveBeenCalledWith(
-        "The 'Skip adding environment variables' option cannot be combined with other environment variable options. Please choose either 'Skip adding environment variables' or one or more of the other available options.",
+        'The \'Skip adding environment variables\' option cannot be combined with other environment variable options. Please choose either \'Skip adding environment variables\' or one or more of the other available options.',
         'error',
       );
 

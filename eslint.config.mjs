@@ -25,4 +25,10 @@ export default tseslint.config(
       ]
     },
   },
+  {
+    files: ['src/**/*.test.ts'],
+    rules: {
+      'max-len': 'off',
+    },
+  },
 );

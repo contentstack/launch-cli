@@ -1,28 +1,13 @@
+import { launchCommand as cliUtilitiesJestMock } from '../../test/mocks/cli-utilities';
 import Launch from './index';
 import { BaseCommand } from '../../base-command';
 import { FileUpload, GitHub, PreCheck } from '../../adapters';
-import { cliux } from '@contentstack/cli-utilities';
+import { cliux, configHandler } from '@contentstack/cli-utilities';
 
 jest.mock('../../base-command');
+jest.mock('@contentstack/cli-utilities', () => cliUtilitiesJestMock);
 
-jest.mock('@contentstack/cli-utilities', () => {
-  const actual = jest.requireActual('@contentstack/cli-utilities');
-  return {
-    ...actual,
-    configHandler: {
-      get: jest.fn((key) => {
-        if (key === 'authtoken') return 'dummy-token';
-        if (key === 'authorisationType') return 'OAuth';
-        if (key === 'oauthAccessToken') return 'dummy-oauth-token';
-        return undefined;
-      }),
-    },
-    cliux: {
-      ...actual.cliux,
-      inquire: jest.fn(), // mock `inquire` explicitly
-    },
-  };
-});
+const LaunchWithArgv = Launch as unknown as new (argv: string[], config: unknown) => Launch;
 
 describe('Run', () => {
   let launchCommandInstance: Launch;
@@ -30,6 +15,12 @@ describe('Run', () => {
   let preCheckRunMock: jest.SpyInstance;
 
   beforeEach(() => {
+    (configHandler.get as jest.Mock).mockImplementation((key: string) => {
+      if (key === 'authtoken') return 'dummy-token';
+      if (key === 'authorisationType') return 'OAuth';
+      if (key === 'oauthAccessToken') return 'dummy-oauth-token';
+      return undefined;
+    });
     prepareApiClientsMock = jest.spyOn(BaseCommand.prototype, 'prepareApiClients').mockResolvedValueOnce(undefined);
     // @ts-expect-error - Override readonly property context on BaseCommand for testing
     BaseCommand.prototype['context'] = { analyticsInfo: {} } as any;
@@ -45,7 +36,7 @@ describe('Run', () => {
     const githubRunMock = jest.spyOn(GitHub.prototype, 'run').mockResolvedValueOnce(undefined);
     BaseCommand.prototype['sharedConfig'] = { provider: 'GitHub', isExistingProject: true } as any;
     BaseCommand.prototype['flags'] = { init: false };
-    launchCommandInstance = new Launch([], {} as any);
+    launchCommandInstance = new LaunchWithArgv([], {} as any);
 
     await launchCommandInstance.run();
 
@@ -58,7 +49,7 @@ describe('Run', () => {
     const fileUploadRunMock = jest.spyOn(FileUpload.prototype, 'run').mockResolvedValueOnce(undefined);
     BaseCommand.prototype['sharedConfig'] = { provider: 'FileUpload', isExistingProject: true } as any;
     BaseCommand.prototype['flags'] = { init: false };
-    launchCommandInstance = new Launch([], {} as any);
+    launchCommandInstance = new LaunchWithArgv([], {} as any);
 
     await launchCommandInstance.run();
 
@@ -73,7 +64,7 @@ describe('Run', () => {
       .mockResolvedValueOnce(undefined);
     BaseCommand.prototype['sharedConfig'] = { provider: 'OtherProvider', isExistingProject: true } as any;
     BaseCommand.prototype['flags'] = { init: false };
-    launchCommandInstance = new Launch([], {} as any);
+    launchCommandInstance = new LaunchWithArgv([], {} as any);
 
     await launchCommandInstance.run();
 
@@ -89,7 +80,7 @@ describe('Run', () => {
     BaseCommand.prototype['sharedConfig'] = { provider: 'GitHub', isExistingProject: false } as any;
     BaseCommand.prototype['flags'] = { init: false };
     (cliux.inquire as jest.Mock).mockResolvedValueOnce('GitHub');
-    launchCommandInstance = new Launch([], {} as any);
+    launchCommandInstance = new LaunchWithArgv([], {} as any);
 
     await launchCommandInstance.run();
 
@@ -111,7 +102,7 @@ describe('Run', () => {
     const githubRunMock = jest.spyOn(GitHub.prototype, 'run').mockResolvedValueOnce(undefined);
     BaseCommand.prototype['sharedConfig'] = {isExistingProject: false} as any;
     BaseCommand.prototype['flags'] = { init: false, type: 'GitHub' };
-    launchCommandInstance = new Launch([], {} as any);
+    launchCommandInstance = new LaunchWithArgv([], {} as any);
 
     await launchCommandInstance.run();
 
