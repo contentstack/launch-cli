@@ -1,6 +1,9 @@
+import { functionsCommand as cliUtilitiesJestMock } from '../../test/mocks/cli-utilities';
 import Functions from './functions';
 import { Logger } from '../../util';
 import { Contentfly } from '../../util/cloud-function/contentfly';
+
+jest.mock('@contentstack/cli-utilities', () => cliUtilitiesJestMock);
 
 jest.mock('../../util');
 jest.mock('../../util/cloud-function/contentfly');
