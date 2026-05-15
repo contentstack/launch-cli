@@ -8,4 +8,6 @@ fileignoreconfig:
   checksum: 43c0eecc2192095c8fb5bc524b7dafa33a6141ddd3923d41ffb15ec025bea9a9
 - filename: src/commands/launch/rollback.test.ts
   checksum: 561d709dfaa046af3afaf73e8570211d1b63ca8fdf23d3a6ffec0fff7587eacd
+- filename: test/unit/commands/rollback.test.ts
+  checksum: d1f931f2d9a397131409399ad6463653e28b5a2224e870b641d9ba57c4418f18
 version: "1.0"
