@@ -1,4 +1,8 @@
+import { logPolling as cliUtilitiesJestMock } from '../test/mocks/cli-utilities';
+
 type LogPollingCtor = typeof import('./logs-polling-utilities').default;
+
+jest.mock('@contentstack/cli-utilities', () => cliUtilitiesJestMock);
 
 const CONFIG = {
   deployment: 'd1',
