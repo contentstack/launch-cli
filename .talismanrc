@@ -6,6 +6,4 @@ fileignoreconfig:
   checksum: 9db6c02ad35a0367343cd753b916dd64db4a9efd24838201d2e1113ed19c9b62
 - filename: package-lock.json
   checksum: 43c0eecc2192095c8fb5bc524b7dafa33a6141ddd3923d41ffb15ec025bea9a9
-- filename: src/commands/launch/rollback.test.ts
-  checksum: 561d709dfaa046af3afaf73e8570211d1b63ca8fdf23d3a6ffec0fff7587eacd
 version: "1.0"
