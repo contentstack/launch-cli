@@ -1,3 +1,4 @@
+import { launchCommand as cliUtilitiesJestMock } from '../../test/mocks/cli-utilities';
 import Rollback from './rollback';
 import { Logger } from '../../util';
 import { cliux } from '@contentstack/cli-utilities';
@@ -12,25 +13,7 @@ jest.mock('../../util', () => {
   };
 });
 
-jest.mock('@contentstack/cli-utilities', () => {
-  const actual = jest.requireActual('@contentstack/cli-utilities');
-  return {
-    ...actual,
-    configHandler: {
-      get: jest.fn((key) => {
-        if (key === 'authtoken') return 'dummy-token';
-        if (key === 'authorisationType') return 'OAuth';
-        if (key === 'oauthAccessToken') return 'dummy-oauth-token';
-        return undefined;
-      }),
-    },
-    cliux: {
-      ...actual.cliux,
-      inquire: jest.fn(),
-      print: jest.fn(),
-    },
-  };
-});
+jest.mock('@contentstack/cli-utilities', () => cliUtilitiesJestMock);
 
 const targetDeployment = {
   uid: 'target-uid',
