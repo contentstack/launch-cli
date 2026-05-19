@@ -1,6 +1,6 @@
 {
   "name": "@contentstack/cli-launch",
-  "version": "1.9.9",
+  "version": "1.10.0",
   "description": "Launch related operations",
   "author": "Contentstack CLI",
   "bin": {
@@ -115,7 +115,7 @@
     "@eslint/eslintrc": {
       "ajv": "^6.12.6"
     },
-    "qs": "^6.14.2",
+    "qs": "^6.15.2",
     "tmp": "^0.2.4"
   },
   "engines": {

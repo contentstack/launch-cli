@@ -1,6 +1,6 @@
 import EventEmitter from 'events';
 import { ApolloClient } from '@apollo/client/core';
-import { ContentstackClient, FlagInput, PrintOptions } from '@contentstack/cli-utilities';
+import { ContentstackClient, PrintOptions } from '@contentstack/cli-utilities';
 
 import config from '../config';
 import { LoggerType } from './utils';
@@ -31,13 +31,15 @@ type Partial<T> = {
   [P in keyof T]?: T[P];
 };
 
+type ParsedCliFlags = Record<string, string | boolean | string[] | undefined>;
+
 type ConfigType = {
   cwd?: string;
   host: string;
   branch?: string;
   config: string;
   authType: string;
-  flags: FlagInput;
+  flags: ParsedCliFlags;
   framework?: string;
   authtoken?: string;
   deployment?: string;
@@ -53,6 +55,7 @@ type ConfigType = {
   repository?: Record<string, any>;
   currentConfig: Record<string, any>;
   deliveryToken?: Record<string, any>;
+  isStreamingEnabled?: boolean;
 } & typeof config &
   Record<string, any>;
 
