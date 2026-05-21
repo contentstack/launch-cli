@@ -100,6 +100,7 @@ export default class GitHub extends BaseClass {
       environmentName,
       provider: gitProvider,
       serverCommand,
+      isStreamingEnabled,
     } = this.config;
     const username = split(repository?.fullName, '/')[0];
 
@@ -124,6 +125,7 @@ export default class GitHub extends BaseClass {
               environmentVariables: map(this.envVariables, ({ key, value }) => ({ key, value })),
               buildCommand: buildCommand === undefined || buildCommand === null ? 'npm run build' : buildCommand,
               ...(serverCommand && serverCommand.trim() !== '' ? { serverCommand } : {}),
+              isStreamingEnabled: isStreamingEnabled ?? false,
             },
           },
         },
@@ -160,6 +162,7 @@ export default class GitHub extends BaseClass {
       'variable-type': variableType,
       'env-variables': envVariables,
       'server-command': serverCommand,
+      'response-mode': responseMode,
       alias,
     } = this.config.flags;
     const { token, apiKey } = configHandler.get(`tokens.${alias}`) ?? {};
@@ -233,6 +236,16 @@ export default class GitHub extends BaseClass {
       } else {
         this.config.serverCommand = serverCommand;
       }
+    }
+    if (!responseMode) {
+      this.config.isStreamingEnabled = (await ux.inquire({
+        type: 'confirm',
+        name: 'enableStreamingResponse',
+        message: 'Enable Streaming Responses',
+        default: false,
+      })) as boolean;
+    } else {
+      this.config.isStreamingEnabled = responseMode === 'streaming';
     }
     this.config.variableType = variableType as unknown as string;
     this.config.envVariables = envVariables;
