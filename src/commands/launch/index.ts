@@ -4,6 +4,7 @@ import config from '../../config';
 import { BaseCommand } from '../../base-command';
 import { AdapterConstructorInputs, Providers } from '../../types';
 import { FileUpload, GitHub, PreCheck } from '../../adapters';
+import { getAnalyticsInfo } from '../../util/common-utility';
 import { FlagInput, Flags, cliux } from '@contentstack/cli-utilities';
 
 export default class Launch extends BaseCommand<typeof Launch> {
@@ -137,7 +138,7 @@ export default class Launch extends BaseCommand<typeof Launch> {
       config: this.sharedConfig,
       apolloClient: this.apolloClient,
       managementSdk: this.managementSdk,
-      analyticsInfo: this.context.analyticsInfo,
+      analyticsInfo: getAnalyticsInfo(this.context, this.config),
     };
 
     switch (this.sharedConfig.provider) {
@@ -167,7 +168,7 @@ export default class Launch extends BaseCommand<typeof Launch> {
       config: this.sharedConfig,
       apolloClient: this.apolloClient,
       managementSdk: this.managementSdk,
-      analyticsInfo: this.context.analyticsInfo,
+      analyticsInfo: getAnalyticsInfo(this.context, this.config),
     });
 
     await this.preCheck.run();
