@@ -19,7 +19,7 @@ import {
 
 import config from './config';
 import { GraphqlApiClient, Logger } from './util';
-import { getLaunchHubUrl } from './util/common-utility';
+import { getLaunchHubUrl, getAnalyticsInfo } from './util/common-utility';
 import { ConfigType, LogFn, Providers, GraphqlHeaders } from './types';
 
 export type Flags<T extends typeof Command> = Interfaces.InferredFlags<(typeof BaseCommand)['baseFlags'] & T['flags']>;
@@ -202,8 +202,8 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
    */
   async prepareApiClients(): Promise<void> {
     let headers: GraphqlHeaders = {
-      'X-CS-CLI': this.context.analyticsInfo
-    } 
+      'X-CS-CLI': getAnalyticsInfo(this.context, this.config),
+    };
 
     const { uid, organizationUid } = this.sharedConfig.currentConfig;
 
@@ -232,7 +232,7 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
    * @memberof BaseCommand
    */
   async initCmaSDK() {
-    managementSDKInitiator.init(this.context);
+    managementSDKInitiator.init({ ...this.context, analyticsInfo: getAnalyticsInfo(this.context, this.config) });
     this.managementSdk = await managementSDKClient({
       host: this.sharedConfig.host,
     });

@@ -312,7 +312,7 @@ describe('FileUpload Adapter', () => {
         (cliux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
         (cliux.inquire as jest.Mock).mockResolvedValueOnce('./dist');
         (cliux.inquire as jest.Mock).mockResolvedValueOnce('npm start');
-        (cliux.inquire as jest.Mock).mockResolvedValueOnce(true);
+        (cliux.inquire as jest.Mock).mockResolvedValueOnce('streaming');
 
         const createSignedUploadUrlMock = jest
           .spyOn(FileUpload.prototype as any, 'createSignedUploadUrl')
@@ -340,12 +340,15 @@ describe('FileUpload Adapter', () => {
 
         await fileUploadInstance.prepareAndUploadNewProjectFile();
 
-        expect(cliux.inquire).toHaveBeenCalledWith({
-          type: 'confirm',
-          name: 'enableStreamingResponse',
-          message: 'Enable Streaming Responses',
-          default: false,
-        });
+        expect(cliux.inquire).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'input',
+            name: 'responseMode',
+            message: 'Response Mode (s: streaming, b: buffered)',
+            default: 'buffered',
+            validate: expect.any(Function),
+          }),
+        );
         expect(fileUploadInstance.config.isStreamingEnabled).toBe(true);
 
         createSignedUploadUrlMock.mockRestore();
@@ -386,7 +389,7 @@ describe('FileUpload Adapter', () => {
       await fileUploadInstance.prepareAndUploadNewProjectFile();
 
       const enableStreamingCalls = (cliux.inquire as jest.Mock).mock.calls.filter(
-        (call) => call[0]?.name === 'enableStreamingResponse',
+        (call) => call[0]?.name === 'responseMode',
       );
       expect(enableStreamingCalls.length).toBe(0);
       expect(fileUploadInstance.config.isStreamingEnabled).toBe(true);
@@ -429,7 +432,7 @@ describe('FileUpload Adapter', () => {
       await fileUploadInstance.prepareAndUploadNewProjectFile();
 
       const enableStreamingCalls = (cliux.inquire as jest.Mock).mock.calls.filter(
-        (call) => call[0]?.name === 'enableStreamingResponse',
+        (call) => call[0]?.name === 'responseMode',
       );
       expect(enableStreamingCalls.length).toBe(0);
       expect(fileUploadInstance.config.isStreamingEnabled).toBe(false);
@@ -444,7 +447,7 @@ describe('FileUpload Adapter', () => {
       (cliux.inquire as jest.Mock).mockResolvedValueOnce('Default');
       (cliux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
       (cliux.inquire as jest.Mock).mockResolvedValueOnce('./public');
-      (cliux.inquire as jest.Mock).mockResolvedValueOnce(true);
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('streaming');
 
       const createSignedUploadUrlMock = jest
         .spyOn(FileUpload.prototype as any, 'createSignedUploadUrl')
@@ -479,12 +482,15 @@ describe('FileUpload Adapter', () => {
         (call) => call[0]?.name === 'serverCommand',
       );
       expect(serverCommandCalls.length).toBe(0);
-      expect(cliux.inquire).toHaveBeenCalledWith({
-        type: 'confirm',
-        name: 'enableStreamingResponse',
-        message: 'Enable Streaming Responses',
-        default: false,
-      });
+      expect(cliux.inquire).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'input',
+          name: 'responseMode',
+          message: 'Response Mode (s: streaming, b: buffered)',
+          default: 'buffered',
+          validate: expect.any(Function),
+        }),
+      );
       expect(fileUploadInstance.config.isStreamingEnabled).toBe(true);
 
       createSignedUploadUrlMock.mockRestore();
@@ -529,10 +535,118 @@ describe('FileUpload Adapter', () => {
       await fileUploadInstance.prepareAndUploadNewProjectFile();
 
       const enableStreamingCalls = (cliux.inquire as jest.Mock).mock.calls.filter(
-        (call) => call[0]?.name === 'enableStreamingResponse',
+        (call) => call[0]?.name === 'responseMode',
       );
       expect(enableStreamingCalls.length).toBe(0);
       expect(fileUploadInstance.config.isStreamingEnabled).toBe(false);
+
+      createSignedUploadUrlMock.mockRestore();
+      archiveMock.mockRestore();
+      uploadFileMock.mockRestore();
+      handleEnvImportFlowMock.mockRestore();
+    });
+
+    it.each([
+      ['s', true],
+      ['streaming', true],
+      ['STREAMING', true],
+      ['  Streaming  ', true],
+      ['b', false],
+      ['buffered', false],
+      ['BUFFERED', false],
+      ['  Buffered  ', false],
+    ])('should map Response Mode input "%s" to isStreamingEnabled %s', async (input, expected) => {
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('test-project');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('Default');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('./public');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce(input);
+
+      const createSignedUploadUrlMock = jest
+        .spyOn(FileUpload.prototype as any, 'createSignedUploadUrl')
+        .mockResolvedValue({ uploadUid: 'test-upload-uid' });
+      const archiveMock = jest
+        .spyOn(FileUpload.prototype as any, 'archive')
+        .mockResolvedValue({ zipName: 'test.zip', zipPath: '/path/to/test.zip', projectName: 'test-project' });
+      const uploadFileMock = jest
+        .spyOn(FileUpload.prototype as any, 'uploadFile')
+        .mockResolvedValue(undefined);
+
+      const fileUploadInstance = new FileUpload({
+        config: {
+          flags: {
+            'response-mode': undefined,
+          },
+          framework: 'GATSBY',
+          supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+          outputDirectories: { GATSBY: './public' },
+        },
+        log: logMock,
+        exit: exitMock,
+      } as any);
+
+      const handleEnvImportFlowMock = jest
+        .spyOn(fileUploadInstance, 'handleEnvImportFlow' as any)
+        .mockResolvedValue(undefined);
+
+      await fileUploadInstance.prepareAndUploadNewProjectFile();
+
+      expect(fileUploadInstance.config.isStreamingEnabled).toBe(expected);
+
+      createSignedUploadUrlMock.mockRestore();
+      archiveMock.mockRestore();
+      uploadFileMock.mockRestore();
+      handleEnvImportFlowMock.mockRestore();
+    });
+
+    it('Response Mode validate should accept s/b/streaming/buffered and reject anything else', async () => {
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('test-project');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('Default');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('./public');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('streaming');
+
+      const createSignedUploadUrlMock = jest
+        .spyOn(FileUpload.prototype as any, 'createSignedUploadUrl')
+        .mockResolvedValue({ uploadUid: 'test-upload-uid' });
+      const archiveMock = jest
+        .spyOn(FileUpload.prototype as any, 'archive')
+        .mockResolvedValue({ zipName: 'test.zip', zipPath: '/path/to/test.zip', projectName: 'test-project' });
+      const uploadFileMock = jest
+        .spyOn(FileUpload.prototype as any, 'uploadFile')
+        .mockResolvedValue(undefined);
+
+      const fileUploadInstance = new FileUpload({
+        config: {
+          flags: {
+            'response-mode': undefined,
+          },
+          framework: 'GATSBY',
+          supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+          outputDirectories: { GATSBY: './public' },
+        },
+        log: logMock,
+        exit: exitMock,
+      } as any);
+
+      const handleEnvImportFlowMock = jest
+        .spyOn(fileUploadInstance, 'handleEnvImportFlow' as any)
+        .mockResolvedValue(undefined);
+
+      await fileUploadInstance.prepareAndUploadNewProjectFile();
+
+      const responseModeCall = (cliux.inquire as jest.Mock).mock.calls.find(
+        (call) => call[0]?.name === 'responseMode',
+      );
+      const { validate } = responseModeCall[0];
+
+      expect(validate('s')).toBe(true);
+      expect(validate('streaming')).toBe(true);
+      expect(validate('b')).toBe(true);
+      expect(validate('buffered')).toBe(true);
+      expect(validate('  STREAMING  ')).toBe(true);
+      expect(validate('')).toBe('Please enter "s"/"streaming" or "b"/"buffered".');
+      expect(validate('yes')).toBe('Please enter "s"/"streaming" or "b"/"buffered".');
 
       createSignedUploadUrlMock.mockRestore();
       archiveMock.mockRestore();
