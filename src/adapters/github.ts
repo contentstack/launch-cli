@@ -238,21 +238,17 @@ export default class GitHub extends BaseClass {
       }
     }
     if (!responseMode) {
-      const responseModeInput = (await ux.inquire({
-        type: 'input',
+      const selectedResponseMode = (await ux.inquire({
+        type: 'list',
         name: 'responseMode',
-        message: 'Response Mode (s: streaming, b: buffered)',
+        message: 'Choose a response mode',
         default: 'buffered',
-        validate: (input: string) => {
-          const value = String(input).trim().toLowerCase();
-          if (['s', 'streaming', 'b', 'buffered'].includes(value)) {
-            return true;
-          }
-          return 'Please enter "s"/"streaming" or "b"/"buffered".';
-        },
+        choices: [
+          { name: 'Buffered', value: 'buffered' },
+          { name: 'Streaming', value: 'streaming' },
+        ],
       })) as string;
-      const normalizedResponseMode = String(responseModeInput ?? '').trim().toLowerCase();
-      this.config.isStreamingEnabled = normalizedResponseMode === 's' || normalizedResponseMode === 'streaming';
+      this.config.isStreamingEnabled = selectedResponseMode === 'streaming';
     } else {
       this.config.isStreamingEnabled = responseMode === 'streaming';
     }
