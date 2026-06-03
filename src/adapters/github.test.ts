@@ -597,10 +597,9 @@ describe('GitHub Adapter', () => {
 
         expect(ux.inquire).toHaveBeenCalledWith(
           expect.objectContaining({
-            type: 'list',
+            type: 'search-list',
             name: 'responseMode',
-            message: 'Choose a response mode',
-            default: 'buffered',
+            message: 'Response mode',
             choices: [
               { name: 'Buffered', value: 'buffered' },
               { name: 'Streaming', value: 'streaming' },
@@ -717,10 +716,9 @@ describe('GitHub Adapter', () => {
       expect(serverCommandCalls.length).toBe(0);
       expect(ux.inquire).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'list',
+          type: 'search-list',
           name: 'responseMode',
-          message: 'Choose a response mode',
-          default: 'buffered',
+          message: 'Response mode',
           choices: [
             { name: 'Buffered', value: 'buffered' },
             { name: 'Streaming', value: 'streaming' },
@@ -833,7 +831,7 @@ describe('GitHub Adapter', () => {
         (call) => call[0]?.name === 'responseMode',
       );
 
-      expect(responseModeCall[0].type).toBe('list');
+      expect(responseModeCall[0].type).toBe('search-list');
       expect(responseModeCall[0].choices).toEqual([
         { name: 'Buffered', value: 'buffered' },
         { name: 'Streaming', value: 'streaming' },

@@ -251,10 +251,9 @@ export default class FileUpload extends BaseClass {
     }
     if (!responseMode) {
       const selectedResponseMode = (await cliux.inquire({
-        type: 'list',
+        type: 'search-list',
         name: 'responseMode',
-        message: 'Choose a response mode',
-        default: 'buffered',
+        message: 'Response mode',
         choices: [
           { name: 'Buffered', value: 'buffered' },
           { name: 'Streaming', value: 'streaming' },
