@@ -597,11 +597,14 @@ describe('GitHub Adapter', () => {
 
         expect(ux.inquire).toHaveBeenCalledWith(
           expect.objectContaining({
-            type: 'input',
+            type: 'list',
             name: 'responseMode',
-            message: 'Response Mode (s: streaming, b: buffered)',
+            message: 'Choose a response mode',
             default: 'buffered',
-            validate: expect.any(Function),
+            choices: [
+              { name: 'Buffered', value: 'buffered' },
+              { name: 'Streaming', value: 'streaming' },
+            ],
           }),
         );
         expect(githubInstance.config.isStreamingEnabled).toBe(true);
@@ -714,11 +717,14 @@ describe('GitHub Adapter', () => {
       expect(serverCommandCalls.length).toBe(0);
       expect(ux.inquire).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'input',
+          type: 'list',
           name: 'responseMode',
-          message: 'Response Mode (s: streaming, b: buffered)',
+          message: 'Choose a response mode',
           default: 'buffered',
-          validate: expect.any(Function),
+          choices: [
+            { name: 'Buffered', value: 'buffered' },
+            { name: 'Streaming', value: 'streaming' },
+          ],
         }),
       );
       expect(githubInstance.config.isStreamingEnabled).toBe(false);
@@ -762,15 +768,9 @@ describe('GitHub Adapter', () => {
     });
 
     it.each([
-      ['s', true],
       ['streaming', true],
-      ['STREAMING', true],
-      ['  Streaming  ', true],
-      ['b', false],
       ['buffered', false],
-      ['BUFFERED', false],
-      ['  Buffered  ', false],
-    ])('should map Response Mode input "%s" to isStreamingEnabled %s', async (input, expected) => {
+    ])('should map Response Mode selection "%s" to isStreamingEnabled %s', async (input, expected) => {
       (ux.inquire as jest.Mock).mockResolvedValueOnce('test-project');
       (ux.inquire as jest.Mock).mockResolvedValueOnce('Default');
       (ux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
@@ -802,7 +802,7 @@ describe('GitHub Adapter', () => {
       handleEnvImportFlowMock.mockRestore();
     });
 
-    it('Response Mode validate should accept s/b/streaming/buffered and reject anything else', async () => {
+    it('Response Mode prompt should offer buffered and streaming choices', async () => {
       (ux.inquire as jest.Mock).mockResolvedValueOnce('test-project');
       (ux.inquire as jest.Mock).mockResolvedValueOnce('Default');
       (ux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
@@ -832,15 +832,12 @@ describe('GitHub Adapter', () => {
       const responseModeCall = (ux.inquire as jest.Mock).mock.calls.find(
         (call) => call[0]?.name === 'responseMode',
       );
-      const { validate } = responseModeCall[0];
 
-      expect(validate('s')).toBe(true);
-      expect(validate('streaming')).toBe(true);
-      expect(validate('b')).toBe(true);
-      expect(validate('buffered')).toBe(true);
-      expect(validate('  STREAMING  ')).toBe(true);
-      expect(validate('')).toBe('Please enter "s"/"streaming" or "b"/"buffered".');
-      expect(validate('yes')).toBe('Please enter "s"/"streaming" or "b"/"buffered".');
+      expect(responseModeCall[0].type).toBe('list');
+      expect(responseModeCall[0].choices).toEqual([
+        { name: 'Buffered', value: 'buffered' },
+        { name: 'Streaming', value: 'streaming' },
+      ]);
 
       handleEnvImportFlowMock.mockRestore();
     });
