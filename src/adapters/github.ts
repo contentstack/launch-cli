@@ -239,10 +239,9 @@ export default class GitHub extends BaseClass {
     }
     if (!responseMode) {
       const selectedResponseMode = (await ux.inquire({
-        type: 'list',
+        type: 'search-list',
         name: 'responseMode',
-        message: 'Choose a response mode',
-        default: 'buffered',
+        message: 'Response mode',
         choices: [
           { name: 'Buffered', value: 'buffered' },
           { name: 'Streaming', value: 'streaming' },
