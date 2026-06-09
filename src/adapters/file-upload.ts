@@ -250,12 +250,16 @@ export default class FileUpload extends BaseClass {
       }
     }
     if (!responseMode) {
-      this.config.isStreamingEnabled = (await cliux.inquire({
-        type: 'confirm',
-        name: 'enableStreamingResponse',
-        message: 'Enable Streaming Responses',
-        default: false,
-      })) as boolean;
+      const selectedResponseMode = (await cliux.inquire({
+        type: 'search-list',
+        name: 'responseMode',
+        message: 'Response mode',
+        choices: [
+          { name: 'Buffered', value: 'buffered' },
+          { name: 'Streaming', value: 'streaming' },
+        ],
+      })) as string;
+      this.config.isStreamingEnabled = selectedResponseMode === 'streaming';
     } else {
       this.config.isStreamingEnabled = responseMode === 'streaming';
     }

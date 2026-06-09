@@ -238,12 +238,16 @@ export default class GitHub extends BaseClass {
       }
     }
     if (!responseMode) {
-      this.config.isStreamingEnabled = (await ux.inquire({
-        type: 'confirm',
-        name: 'enableStreamingResponse',
-        message: 'Enable Streaming Responses',
-        default: false,
-      })) as boolean;
+      const selectedResponseMode = (await ux.inquire({
+        type: 'search-list',
+        name: 'responseMode',
+        message: 'Response mode',
+        choices: [
+          { name: 'Buffered', value: 'buffered' },
+          { name: 'Streaming', value: 'streaming' },
+        ],
+      })) as string;
+      this.config.isStreamingEnabled = selectedResponseMode === 'streaming';
     } else {
       this.config.isStreamingEnabled = responseMode === 'streaming';
     }

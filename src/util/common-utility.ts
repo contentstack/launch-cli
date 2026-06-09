@@ -133,6 +133,27 @@ async function selectProject(options: {
   }
 }
 
+/**
+ * Resolve the `X-CS-CLI` header value. oclif reloads the Config after the init hook, so
+ * `context.analyticsInfo` is often undefined at command runtime; reconstruct it from the
+ * Config and the persisted config store (clientId/sessionId) when that happens.
+ */
+function getAnalyticsInfo(context?: Record<string, any>, config?: Record<string, any>): string {
+  const fromContext = context?.analyticsInfo;
+  if (typeof fromContext === 'string' && fromContext.length > 0) {
+    return fromContext;
+  }
+
+  const platform = config?.platform && config?.arch ? `${config.platform}-${config.arch}` : 'none';
+  const nodeVersion = process.versions.node ? `v${process.versions.node}` : process.version;
+  const cliVersion = config?.version || 'none';
+  const clientId = configHandler.get('clientId') || 'none';
+  const sessionId = configHandler.get('sessionId') || 'none';
+  const command = configHandler.get('currentCommandId') || 'launch';
+
+  return [platform, nodeVersion, cliVersion, clientId, sessionId, command].join(';');
+}
+
 function getLaunchHubUrl(): string {
   const { cma } = configHandler.get('region') || {};
   if (!cma) {
@@ -151,4 +172,4 @@ function getLaunchHubUrl(): string {
   return `https://${launchHubBaseUrl}`;
 }
 
-export { getOrganizations, selectOrg, selectProject, getLaunchHubUrl };
+export { getOrganizations, selectOrg, selectProject, getLaunchHubUrl, getAnalyticsInfo };
