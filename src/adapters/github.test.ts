@@ -1,5 +1,5 @@
 import { githubAdapter as cliUtilitiesJestMock } from '../test/mocks/cli-utilities';
-import GitHub from './github';
+import GitHub, { MAX_REPOSITORY_PAGES } from './github';
 import { getRemoteUrls } from '../util/create-git-meta';
 import { repositoriesQuery, userConnectionsQuery } from '../graphql';
 import BaseClass from './base-class';
@@ -109,7 +109,15 @@ describe('GitHub Adapter', () => {
   });
 
   describe('checkGitRemoteAvailableAndValid', () => {
-    const repositoriesResponse = { data: { repositories } };
+    const repositoriesResponse = {
+      data: {
+        repositories: {
+          edges: repositories.map((node) => ({ node })),
+          pageData: { page: 1 },
+          pageInfo: { hasNextPage: false },
+        },
+      },
+    };
 
     it(`should successfully check if the git remote is available and valid
        when the github remote URL is HTTPS based`, async () => {
@@ -129,7 +137,37 @@ describe('GitHub Adapter', () => {
 
       expect(existsSync).toHaveBeenCalledWith('/home/project1/.git');
       expect(getRemoteUrls as jest.Mock).toHaveBeenCalledWith('/home/project1/.git/config');
-      expect(apolloClient.query).toHaveBeenCalledWith({ query: repositoriesQuery });
+      expect(apolloClient.query).toHaveBeenCalledWith({
+        query: repositoriesQuery,
+        variables: { page: 1, first: 100 },
+      });
+      expect(githubAdapterInstance.config.repository).toEqual({
+        __typename: 'GitRepository',
+        id: '647250661',
+        url: 'https://github.com/test-user/eleventy-sample',
+        name: 'eleventy-sample',
+        fullName: 'test-user/eleventy-sample',
+        defaultBranch: 'main',
+      });
+      expect(result).toBe(true);
+    });
+
+    it(`should successfully check if the git remote is available and valid
+       when the github remote URL embeds userinfo (https://user@github.com/...)`, async () => {
+      (existsSync as jest.Mock).mockReturnValueOnce(true);
+      (getRemoteUrls as jest.Mock).mockResolvedValueOnce({
+        origin: 'https://test-user@github.com/test-user/eleventy-sample.git',
+      });
+      const apolloClient = {
+        query: jest.fn().mockResolvedValueOnce(repositoriesResponse),
+      } as any;
+      const githubAdapterInstance = new GitHub({
+        config: { projectBasePath: '/home/project1' },
+        apolloClient: apolloClient,
+      } as any);
+
+      const result = await githubAdapterInstance.checkGitRemoteAvailableAndValid();
+
       expect(githubAdapterInstance.config.repository).toEqual({
         __typename: 'GitRepository',
         id: '647250661',
@@ -159,7 +197,10 @@ describe('GitHub Adapter', () => {
 
       expect(existsSync).toHaveBeenCalledWith('/home/project1/.git');
       expect(getRemoteUrls as jest.Mock).toHaveBeenCalledWith('/home/project1/.git/config');
-      expect(apolloClient.query).toHaveBeenCalledWith({ query: repositoriesQuery });
+      expect(apolloClient.query).toHaveBeenCalledWith({
+        query: repositoriesQuery,
+        variables: { page: 1, first: 100 },
+      });
       expect(githubAdapterInstance.config.repository).toEqual({
         __typename: 'GitRepository',
         id: '647250661',
@@ -281,7 +322,10 @@ describe('GitHub Adapter', () => {
 
       expect(existsSync).toHaveBeenCalledWith('/home/project1/.git');
       expect(getRemoteUrls as jest.Mock).toHaveBeenCalledWith('/home/project1/.git/config');
-      expect(apolloClient.query).toHaveBeenCalledWith({ query: repositoriesQuery });
+      expect(apolloClient.query).toHaveBeenCalledWith({
+        query: repositoriesQuery,
+        variables: { page: 1, first: 100 },
+      });
       expect(logMock).toHaveBeenCalledWith(
         'Repository not added to the GitHub app. Please add it to the app’s repository access list and try again.',
         'error',
@@ -289,6 +333,136 @@ describe('GitHub Adapter', () => {
       expect(exitMock).toHaveBeenCalledWith(1);
       expect(err).toEqual(new Error('1'));
       expect(githubAdapterInstance.config.repository).toBeUndefined();
+    });
+
+    it('should log an error and exit if the remote URL format is unsupported', async () => {
+      (existsSync as jest.Mock).mockReturnValueOnce(true);
+      (getRemoteUrls as jest.Mock).mockResolvedValueOnce({
+        origin: 'https://gitlab.com/test-user/some-repo.git',
+      });
+      const apolloClient = {
+        query: jest.fn().mockResolvedValueOnce(repositoriesResponse),
+      } as any;
+      const githubAdapterInstance = new GitHub({
+        config: { projectBasePath: '/home/project1' },
+        log: logMock,
+        exit: exitMock,
+        apolloClient: apolloClient,
+      } as any);
+      let err;
+
+      try {
+        await githubAdapterInstance.checkGitRemoteAvailableAndValid();
+      } catch (error: any) {
+        err = error;
+      }
+
+      expect(logMock).toHaveBeenCalledWith(
+        'Unsupported Git remote URL format: https://gitlab.com/test-user/some-repo.git. Please use a standard GitHub HTTPS or SSH remote URL.',
+        'error',
+      );
+      expect(exitMock).toHaveBeenCalledWith(1);
+      expect(err).toEqual(new Error('1'));
+      expect(githubAdapterInstance.config.repository).toBeUndefined();
+    });
+
+    it('should paginate beyond the first page to find a repository on a later page', async () => {
+      (existsSync as jest.Mock).mockReturnValueOnce(true);
+      (getRemoteUrls as jest.Mock).mockResolvedValueOnce({
+        origin: 'https://github.com/test-user/repo-301.git',
+      });
+
+      const PER_PAGE = 100;
+      const FULL_PAGES = 3; // target sits on the 4th (partial) page, well within the cap
+      const targetRepo = {
+        __typename: 'GitRepository',
+        id: '301',
+        url: 'https://github.com/test-user/repo-301',
+        name: 'repo-301',
+        fullName: 'test-user/repo-301',
+        defaultBranch: 'main',
+      };
+
+      const apolloClient = {
+        query: jest.fn().mockImplementation(({ variables }) => {
+          const { page } = variables;
+          const edges =
+            page <= FULL_PAGES
+              ? Array.from({ length: PER_PAGE }, (_, i) => ({
+                node: {
+                  __typename: 'GitRepository',
+                  id: `${(page - 1) * PER_PAGE + i}`,
+                  url: `https://github.com/test-user/repo-${(page - 1) * PER_PAGE + i}`,
+                  name: `repo-${(page - 1) * PER_PAGE + i}`,
+                  fullName: `test-user/repo-${(page - 1) * PER_PAGE + i}`,
+                  defaultBranch: 'main',
+                },
+              }))
+              : [{ node: targetRepo }];
+          return Promise.resolve({ data: { repositories: { edges, pageData: { page }, pageInfo: { hasNextPage: false } } } });
+        }),
+      } as any;
+      const githubAdapterInstance = new GitHub({
+        config: { projectBasePath: '/home/project1' },
+        apolloClient: apolloClient,
+      } as any);
+
+      const result = await githubAdapterInstance.checkGitRemoteAvailableAndValid();
+
+      // 3 full pages + 1 partial page = 4 requests.
+      expect(apolloClient.query).toHaveBeenCalledTimes(FULL_PAGES + 1);
+      expect(githubAdapterInstance.config.repository).toEqual(targetRepo);
+      expect(result).toBe(true);
+    });
+
+    it(`should cap pagination at ${MAX_REPOSITORY_PAGES} pages (1000 repositories) for consistency with the management service`, async () => {
+      (existsSync as jest.Mock).mockReturnValueOnce(true);
+      (getRemoteUrls as jest.Mock).mockResolvedValueOnce({
+        origin: 'https://github.com/test-user/missing-repo.git',
+      });
+
+      // Every page is full, so without a cap the loop would never stop on its own.
+      const apolloClient = {
+        query: jest.fn().mockImplementation(({ variables }) => {
+          const { page, first } = variables;
+          const edges = Array.from({ length: first }, (_, i) => ({
+            node: {
+              __typename: 'GitRepository',
+              id: `${(page - 1) * first + i}`,
+              url: `https://github.com/test-user/repo-${(page - 1) * first + i}`,
+              name: `repo-${(page - 1) * first + i}`,
+              fullName: `test-user/repo-${(page - 1) * first + i}`,
+              defaultBranch: 'main',
+            },
+          }));
+          return Promise.resolve({ data: { repositories: { edges, pageData: { page }, pageInfo: { hasNextPage: true } } } });
+        }),
+      } as any;
+      const githubAdapterInstance = new GitHub({
+        config: { projectBasePath: '/home/project1' },
+        log: logMock,
+        exit: exitMock,
+        apolloClient: apolloClient,
+      } as any);
+      let err;
+
+      try {
+        await githubAdapterInstance.checkGitRemoteAvailableAndValid();
+      } catch (error: any) {
+        err = error;
+      }
+
+      expect(apolloClient.query).toHaveBeenCalledTimes(MAX_REPOSITORY_PAGES);
+      expect(logMock).toHaveBeenCalledWith(
+        expect.stringContaining('beyond the first 1000 repositories the GitHub App can access'),
+        'error',
+      );
+      expect(logMock).not.toHaveBeenCalledWith(
+        'Repository not added to the GitHub app. Please add it to the app’s repository access list and try again.',
+        'error',
+      );
+      expect(exitMock).toHaveBeenCalledWith(1);
+      expect(err).toEqual(new Error('1'));
     });
   });
 

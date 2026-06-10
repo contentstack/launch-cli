@@ -12,15 +12,28 @@ const userConnectionsQuery: DocumentNode = gql`
 `;
 
 const repositoriesQuery: DocumentNode = gql`
-  query Repositories(
-    $repositoriesInput: RepositoriesInput! = { provider: "GitHub" }
+  query GitRepositories(
+    $first: Float = 100
+    $page: Float = 1
+    $query: RepositoriesInput! = { provider: "GitHub" }
   ) {
-    repositories: Repositories(query: $repositoriesInput) {
-      id
-      url
-      name
-      fullName
-      defaultBranch
+    repositories: GitRepositories(query: $query, first: $first, page: $page) {
+      edges {
+        node {
+          id
+          url
+          name
+          fullName
+          defaultBranch
+        }
+        cursor
+      }
+      pageData {
+        page
+      }
+      pageInfo {
+        hasNextPage
+      }
     }
   }
 `;
