@@ -92,6 +92,14 @@ export type Environment = {
   frameworkPreset: string;
 };
 
+export type Repository = {
+  id: string;
+  url: string;
+  name: string;
+  fullName: string;
+  defaultBranch: string;
+};
+
 export enum DeploymentStatus {
   QUEUED = 'QUEUED',
   LIVE = 'LIVE',
