@@ -11,8 +11,11 @@ import { print } from '../util';
 import BaseClass from './base-class';
 import { getRemoteUrls } from '../util/create-git-meta';
 import { repositoriesQuery, userConnectionsQuery, importProjectMutation } from '../graphql';
-import { DeploymentStatus } from '../types';
+import { DeploymentStatus, Repository } from '../types';
 import { existsSync } from 'fs';
+
+export const MAX_REPOSITORY_PAGES = 10;
+export const REPOSITORY_PAGE_SIZE = 100;
 
 export default class GitHub extends BaseClass {
   /**
@@ -71,10 +74,12 @@ export default class GitHub extends BaseClass {
   private async handleNewProject(): Promise<void> {
     // NOTE Step 1: Check is Github connected
     if (await this.checkGitHubConnected()) {
-      // NOTE Step 2: check is the git remote available in the user's repo list
+      // NOTE Step 2: Select org first; the GitRepositories query is org-scoped (guarded).
+      await this.selectOrg();
+      // NOTE Step 3: check is the git remote available in the user's repo list
       if (await this.checkGitRemoteAvailableAndValid()) {
         if (await this.checkUserGitHubAccess()) {
-          // NOTE Step 3: check is the user has proper git access
+          // NOTE Step 4: check is the user has proper git access
           await this.prepareForNewProjectCreation();
         }
       }
@@ -168,7 +173,6 @@ export default class GitHub extends BaseClass {
     const { token, apiKey } = configHandler.get(`tokens.${alias}`) ?? {};
     this.config.selectedStack = apiKey;
     this.config.deliveryToken = token;
-    await this.selectOrg();
     print([
       { message: '?', color: 'green' },
       { message: 'Repository', bold: true },
@@ -292,16 +296,16 @@ export default class GitHub extends BaseClass {
   private extractRepoFullNameFromGithubRemoteURL(url: string) {
     let match;
 
-    // HTTPS format: https://github.com/owner/repo.git
-    match = url.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)(\.git)?$/);
+    // HTTPS format: https://[user[:token]@]github.com/owner/repo(.git)(/)
+    match = url.match(/^https:\/\/(?:[^@/]+@)?github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/);
     if (match) {
-      return `${match[1]}/${match[2].replace(/\.git$/, '')}`;
+      return `${match[1]}/${match[2]}`;
     }
 
-    // SSH format: git@github.com:owner/repo.git
-    match = url.match(/^git@github\.com:([^/]+)\/([^/]+)(\.git)?$/);
+    // SSH format: git@github.com:owner/repo(.git)  or  ssh://git@github.com/owner/repo(.git)
+    match = url.match(/^(?:ssh:\/\/)?git@github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?\/?$/);
     if (match) {
-      return `${match[1]}/${match[2].replace(/\.git$/, '')}`;
+      return `${match[1]}/${match[2]}`;
     }
   }
 
@@ -331,10 +335,9 @@ export default class GitHub extends BaseClass {
       this.exit(1);
     }
 
-    let repositories;
+    let repositories: Repository[] = [];
     try {
-      const repositoriesQueryResponse = await this.apolloClient.query({ query: repositoriesQuery });
-      repositories = repositoriesQueryResponse.data.repositories;
+      repositories = await this.queryRepositories({ page: 1, first: REPOSITORY_PAGE_SIZE });
     } catch {
       this.log('GitHub app uninstalled. Please reconnect the app and try again', 'error');
       await this.connectToAdapterOnUi();
@@ -343,11 +346,30 @@ export default class GitHub extends BaseClass {
 
     const repoFullName = this.extractRepoFullNameFromGithubRemoteURL(localRemoteUrl);
 
+    if (!repoFullName) {
+      this.log(
+        `Unsupported Git remote URL format: ${localRemoteUrl}. Please use a standard GitHub HTTPS or SSH remote URL.`,
+        'error',
+      );
+      this.exit(1);
+    }
+
     this.config.repository = find(repositories, {
       fullName: repoFullName,
     });
 
     if (!this.config.repository) {
+      const checkedCount = MAX_REPOSITORY_PAGES * REPOSITORY_PAGE_SIZE;
+      if (repositories.length >= checkedCount) {
+        this.log(
+          `"${repoFullName}" is beyond the first ${checkedCount} repositories the GitHub App can access. ` +
+          'In your GitHub App\'s installation settings, under "Repository access", select ' +
+          '"Only select repositories" and add the repository you want to deploy. Then re-run the command.',
+          'error',
+        );
+        this.exit(1);
+      }
+
       this.log(
         'Repository not added to the GitHub app. Please add it to the app’s repository access list and try again.',
         'error',
@@ -356,6 +378,37 @@ export default class GitHub extends BaseClass {
     }
 
     return true;
+  }
+
+  /**
+   * @method queryRepositories - Recursively fetch each page of repositories
+   * accessible to the GitHub app, up to MAX_REPOSITORY_PAGES.
+   *
+   * @param {Record<string, any>} variables
+   * @param {any[]} [repositoriesRes=[]]
+   * @return {*}  {Promise<any[]>}
+   * @memberof GitHub
+   */
+  async queryRepositories(
+    variables: Record<string, any> = {},
+    repositoriesRes: Repository[] = [],
+  ): Promise<Repository[]> {
+    const first = typeof variables.first === 'number' ? variables.first : REPOSITORY_PAGE_SIZE;
+    const page = typeof variables.page === 'number' ? variables.page : 1;
+
+    const { data: { repositories } } = await this.apolloClient.query({
+      query: repositoriesQuery,
+      variables: { ...variables, first, page },
+    });
+
+    const edges = repositories?.edges ?? [];
+    repositoriesRes.push(...map(edges, 'node'));
+
+    if (edges.length === first && page < MAX_REPOSITORY_PAGES) {
+      return this.queryRepositories({ ...variables, first, page: page + 1 }, repositoriesRes);
+    }
+
+    return repositoriesRes;
   }
 
   /**
