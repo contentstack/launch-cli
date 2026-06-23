@@ -41,6 +41,7 @@ describe('GitHub', () => {
       checkUserGitHubAccessStub,
       prepareForNewProjectCreationStub,
       createNewProjectStub,
+      selectOrgStub,
       prepareLaunchConfigStub,
       showLogsStub,
       showDeploymentUrlStub,
@@ -65,6 +66,7 @@ describe('GitHub', () => {
       checkUserGitHubAccessStub = stub(GitHub.prototype, 'checkUserGitHubAccess').resolves(true);
       prepareForNewProjectCreationStub = stub(GitHub.prototype, 'prepareForNewProjectCreation').resolves();
       createNewProjectStub = stub(GitHub.prototype, 'createNewProject').resolves();
+      selectOrgStub = stub(BaseClass.prototype, 'selectOrg').resolves();
       prepareLaunchConfigStub = stub(BaseClass.prototype, 'prepareLaunchConfig').resolves();
       showLogsStub = stub(BaseClass.prototype, 'showLogs').resolves();
       showDeploymentUrlStub = stub(BaseClass.prototype, 'showDeploymentUrl').resolves();
@@ -81,6 +83,7 @@ describe('GitHub', () => {
       checkUserGitHubAccessStub.restore();
       prepareForNewProjectCreationStub.restore();
       createNewProjectStub.restore();
+      selectOrgStub.restore();
       prepareLaunchConfigStub.restore();
       showLogsStub.restore();
       showDeploymentUrlStub.restore();
@@ -108,7 +111,7 @@ describe('GitHub', () => {
 
       it('should successfully run github flow for existing project when flag redeploy-latest is passed', async () => {
         getEnvironmentStub.resolves(defaultEnvironment);
-        let adapterConstructorOptions = {
+        const adapterConstructorOptions = {
           config: {
             isExistingProject: true,
             'redeploy-latest': true,
@@ -133,7 +136,7 @@ describe('GitHub', () => {
       it('should successfully run github flow for existing project when flag redeploy-latest and environment is passed ', async () => {
         getEnvironmentStub.resolves(environmentMatchedByEnvironmentFlagInput);
 
-        let adapterConstructorOptions = {
+        const adapterConstructorOptions = {
           config: {
             isExistingProject: true,
             'redeploy-latest': true,
@@ -158,7 +161,7 @@ describe('GitHub', () => {
 
       it('should exit with non zero status code if deployment fails', async () => {
         getEnvironmentStub.resolves(defaultEnvironment);
-        let adapterConstructorOptions = {
+        const adapterConstructorOptions = {
           config: {
             isExistingProject: true,
             'redeploy-latest': true,
@@ -370,7 +373,7 @@ describe('GitHub', () => {
     });
 
     describe('Deploy new project', () => {
-      let adapterConstructorOptions = {
+      const adapterConstructorOptions = {
         config: {
           isExistingProject: false,
         },
@@ -440,7 +443,7 @@ describe('GitHub', () => {
     });
 
     it('should log "New project created successfully" and update the currentConfig if the mutation succeeds', async () => {
-      let adapterConstructorOptions = {
+      const adapterConstructorOptions = {
         config: {
           branch: 'main',
           provider: 'GitHub',
@@ -497,7 +500,7 @@ describe('GitHub', () => {
 
   describe('prepareForNewProjectCreation', () => {
     let selectOrgStub, selectBranchStub, detectFrameworkStub, handleEnvImportFlowStub;
-    let adapterConstructorOptions = {
+    const adapterConstructorOptions = {
       config: {
         flags: {
           name: 'Test project',
@@ -536,7 +539,7 @@ describe('GitHub', () => {
 
   describe('checkGitHubConnected', () => {
     let sandbox;
-    let adapterConstructorOptions = {
+    const adapterConstructorOptions = {
       config: {
         provider: 'GitHub',
         userConnection: null,
