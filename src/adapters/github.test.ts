@@ -1013,5 +1013,149 @@ describe('GitHub Adapter', () => {
 
       handleEnvImportFlowMock.mockRestore();
     });
+
+    it('should prompt Enable Contentstack Authentication (default enabled) when disable-cs-auth flag is not provided', async () => {
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('test-project');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('Default');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('./public');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce(true);
+
+      const githubInstance = new GitHub({
+        config: {
+          flags: {
+            'response-mode': 'buffered',
+          },
+          framework: 'GATSBY',
+          repository: { fullName: 'test-user/repo', name: 'repo' },
+          supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+          outputDirectories: { GATSBY: './public' },
+        },
+        log: logMock,
+        exit: exitMock,
+      } as any);
+
+      const handleEnvImportFlowMock = jest
+        .spyOn(githubInstance, 'handleEnvImportFlow' as any)
+        .mockResolvedValue(undefined);
+
+      await githubInstance.prepareForNewProjectCreation();
+
+      expect(ux.inquire).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'confirm',
+          name: 'contentstackAuth',
+          default: true,
+        }),
+      );
+      expect(githubInstance.config.isContentstackAuthenticationEnabled).toBe(true);
+
+      handleEnvImportFlowMock.mockRestore();
+    });
+
+    it('should map a "no" answer at the prompt to disabled Contentstack Authentication', async () => {
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('test-project');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('Default');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('./public');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce(false);
+
+      const githubInstance = new GitHub({
+        config: {
+          flags: {
+            'response-mode': 'buffered',
+          },
+          framework: 'GATSBY',
+          repository: { fullName: 'test-user/repo', name: 'repo' },
+          supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+          outputDirectories: { GATSBY: './public' },
+        },
+        log: logMock,
+        exit: exitMock,
+      } as any);
+
+      const handleEnvImportFlowMock = jest
+        .spyOn(githubInstance, 'handleEnvImportFlow' as any)
+        .mockResolvedValue(undefined);
+
+      await githubInstance.prepareForNewProjectCreation();
+
+      expect(githubInstance.config.isContentstackAuthenticationEnabled).toBe(false);
+
+      handleEnvImportFlowMock.mockRestore();
+    });
+
+
+    it('should disable Contentstack Authentication without prompt when --disable-cs-auth is passed', async () => {
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('test-project');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('Default');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('./public');
+
+      const githubInstance = new GitHub({
+        config: {
+          flags: {
+            'response-mode': 'buffered',
+            'disable-cs-auth': true,
+          },
+          framework: 'GATSBY',
+          repository: { fullName: 'test-user/repo', name: 'repo' },
+          supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+          outputDirectories: { GATSBY: './public' },
+        },
+        log: logMock,
+        exit: exitMock,
+      } as any);
+
+      const handleEnvImportFlowMock = jest
+        .spyOn(githubInstance, 'handleEnvImportFlow' as any)
+        .mockResolvedValue(undefined);
+
+      await githubInstance.prepareForNewProjectCreation();
+
+      const contentstackAuthCalls = (ux.inquire as jest.Mock).mock.calls.filter(
+        (call) => call[0]?.name === 'contentstackAuth',
+      );
+      expect(contentstackAuthCalls.length).toBe(0);
+      expect(githubInstance.config.isContentstackAuthenticationEnabled).toBe(false);
+
+      handleEnvImportFlowMock.mockRestore();
+    });
+
+    it('should enable Contentstack Authentication without prompt when --enable-cs-auth is passed', async () => {
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('test-project');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('Default');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('./public');
+
+      const githubInstance = new GitHub({
+        config: {
+          flags: {
+            'response-mode': 'buffered',
+            'enable-cs-auth': true,
+          },
+          framework: 'GATSBY',
+          repository: { fullName: 'test-user/repo', name: 'repo' },
+          supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+          outputDirectories: { GATSBY: './public' },
+        },
+        log: logMock,
+        exit: exitMock,
+      } as any);
+
+      const handleEnvImportFlowMock = jest
+        .spyOn(githubInstance, 'handleEnvImportFlow' as any)
+        .mockResolvedValue(undefined);
+
+      await githubInstance.prepareForNewProjectCreation();
+
+      const contentstackAuthCalls = (ux.inquire as jest.Mock).mock.calls.filter(
+        (call) => call[0]?.name === 'contentstackAuth',
+      );
+      expect(contentstackAuthCalls.length).toBe(0);
+      expect(githubInstance.config.isContentstackAuthenticationEnabled).toBe(true);
+
+      handleEnvImportFlowMock.mockRestore();
+    });
   });
 });
