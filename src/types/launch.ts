@@ -56,6 +56,7 @@ type ConfigType = {
   currentConfig: Record<string, any>;
   deliveryToken?: Record<string, any>;
   isStreamingEnabled?: boolean;
+  isContentstackAuthenticationEnabled?: boolean;
 } & typeof config &
   Record<string, any>;
 

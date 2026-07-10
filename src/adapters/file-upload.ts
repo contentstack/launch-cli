@@ -114,14 +114,15 @@ export default class FileUpload extends BaseClass {
    * @memberof FileUpload
    */
   async createNewProject(uploadUid: string): Promise<void> {
-    const { 
-      framework, 
-      projectName, 
-      buildCommand, 
-      outputDirectory, 
-      environmentName, 
-      serverCommand, 
-      isStreamingEnabled 
+    const {
+      framework,
+      projectName,
+      buildCommand,
+      outputDirectory,
+      environmentName,
+      serverCommand,
+      isStreamingEnabled,
+      isContentstackAuthenticationEnabled,
     } = this.config;
     await this.apolloClient
       .mutate({
@@ -139,6 +140,7 @@ export default class FileUpload extends BaseClass {
               buildCommand: buildCommand === undefined || buildCommand === null ? 'npm run build' : buildCommand,
               ...(serverCommand && serverCommand.trim() !== '' ? { serverCommand } : {}),
               isStreamingEnabled: isStreamingEnabled ?? false,
+              isContentstackAuthenticationEnabled: isContentstackAuthenticationEnabled ?? true,
             },
           },
           skipGitData: true,
@@ -177,6 +179,8 @@ export default class FileUpload extends BaseClass {
       'env-variables': envVariables,
       'server-command': serverCommand,
       'response-mode': responseMode,
+      'enable-cs-auth': enableCsAuth,
+      'disable-cs-auth': disableCsAuth,
       alias,
     } = this.config.flags;
     const { token, apiKey } = configHandler.get(`tokens.${alias}`) ?? {};
@@ -262,6 +266,20 @@ export default class FileUpload extends BaseClass {
       this.config.isStreamingEnabled = selectedResponseMode === 'streaming';
     } else {
       this.config.isStreamingEnabled = responseMode === 'streaming';
+    }
+    if (enableCsAuth) {
+      this.config.isContentstackAuthenticationEnabled = true;
+    } else if (disableCsAuth) {
+      this.config.isContentstackAuthenticationEnabled = false;
+    } else {
+      this.config.isContentstackAuthenticationEnabled = (await cliux.inquire({
+        type: 'confirm',
+        name: 'contentstackAuth',
+        message:
+          // eslint-disable-next-line max-len
+          'Enable Contentstack Authentication? Restricts access to this environment to members of your Contentstack organization.',
+        default: true,
+      })) as boolean;
     }
     this.config.variableType = variableType as unknown as string;
     this.config.envVariables = envVariables;
