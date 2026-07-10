@@ -648,6 +648,160 @@ describe('FileUpload Adapter', () => {
       uploadFileMock.mockRestore();
       handleEnvImportFlowMock.mockRestore();
     });
+
+    it.each([
+      ['a "yes" answer maps to enabled', true, true],
+      ['a "no" answer maps to disabled', false, false],
+    ])(
+      'should prompt Enable Contentstack Authentication (default enabled) when disable-cs-auth is not provided — %s',
+      async (_label, answer, expected) => {
+        (cliux.inquire as jest.Mock).mockResolvedValueOnce('test-project');
+        (cliux.inquire as jest.Mock).mockResolvedValueOnce('Default');
+        (cliux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
+        (cliux.inquire as jest.Mock).mockResolvedValueOnce('./public');
+        (cliux.inquire as jest.Mock).mockResolvedValueOnce(answer);
+
+        const createSignedUploadUrlMock = jest
+          .spyOn(FileUpload.prototype as any, 'createSignedUploadUrl')
+          .mockResolvedValue({ uploadUid: 'test-upload-uid' });
+        const archiveMock = jest
+          .spyOn(FileUpload.prototype as any, 'archive')
+          .mockResolvedValue({ zipName: 'test.zip', zipPath: '/path/to/test.zip', projectName: 'test-project' });
+        const uploadFileMock = jest
+          .spyOn(FileUpload.prototype as any, 'uploadFile')
+          .mockResolvedValue(undefined);
+
+        const fileUploadInstance = new FileUpload({
+          config: {
+            flags: {
+              'response-mode': 'buffered',
+            },
+            framework: 'GATSBY',
+            supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+            outputDirectories: { GATSBY: './public' },
+          },
+          log: logMock,
+          exit: exitMock,
+        } as any);
+
+        const handleEnvImportFlowMock = jest
+          .spyOn(fileUploadInstance, 'handleEnvImportFlow' as any)
+          .mockResolvedValue(undefined);
+
+        await fileUploadInstance.prepareAndUploadNewProjectFile();
+
+        expect(cliux.inquire).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'confirm',
+            name: 'contentstackAuth',
+            default: true,
+          }),
+        );
+        expect(fileUploadInstance.config.isContentstackAuthenticationEnabled).toBe(expected);
+
+        createSignedUploadUrlMock.mockRestore();
+        archiveMock.mockRestore();
+        uploadFileMock.mockRestore();
+        handleEnvImportFlowMock.mockRestore();
+      },
+    );
+
+
+    it('should disable Contentstack Authentication without prompt when --disable-cs-auth is passed', async () => {
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('test-project');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('Default');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('./public');
+
+      const createSignedUploadUrlMock = jest
+        .spyOn(FileUpload.prototype as any, 'createSignedUploadUrl')
+        .mockResolvedValue({ uploadUid: 'test-upload-uid' });
+      const archiveMock = jest
+        .spyOn(FileUpload.prototype as any, 'archive')
+        .mockResolvedValue({ zipName: 'test.zip', zipPath: '/path/to/test.zip', projectName: 'test-project' });
+      const uploadFileMock = jest
+        .spyOn(FileUpload.prototype as any, 'uploadFile')
+        .mockResolvedValue(undefined);
+
+      const fileUploadInstance = new FileUpload({
+        config: {
+          flags: {
+            'response-mode': 'buffered',
+            'disable-cs-auth': true,
+          },
+          framework: 'GATSBY',
+          supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+          outputDirectories: { GATSBY: './public' },
+        },
+        log: logMock,
+        exit: exitMock,
+      } as any);
+
+      const handleEnvImportFlowMock = jest
+        .spyOn(fileUploadInstance, 'handleEnvImportFlow' as any)
+        .mockResolvedValue(undefined);
+
+      await fileUploadInstance.prepareAndUploadNewProjectFile();
+
+      const contentstackAuthCalls = (cliux.inquire as jest.Mock).mock.calls.filter(
+        (call) => call[0]?.name === 'contentstackAuth',
+      );
+      expect(contentstackAuthCalls.length).toBe(0);
+      expect(fileUploadInstance.config.isContentstackAuthenticationEnabled).toBe(false);
+
+      createSignedUploadUrlMock.mockRestore();
+      archiveMock.mockRestore();
+      uploadFileMock.mockRestore();
+      handleEnvImportFlowMock.mockRestore();
+    });
+
+    it('should enable Contentstack Authentication without prompt when --enable-cs-auth is passed', async () => {
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('test-project');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('Default');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
+      (cliux.inquire as jest.Mock).mockResolvedValueOnce('./public');
+
+      const createSignedUploadUrlMock = jest
+        .spyOn(FileUpload.prototype as any, 'createSignedUploadUrl')
+        .mockResolvedValue({ uploadUid: 'test-upload-uid' });
+      const archiveMock = jest
+        .spyOn(FileUpload.prototype as any, 'archive')
+        .mockResolvedValue({ zipName: 'test.zip', zipPath: '/path/to/test.zip', projectName: 'test-project' });
+      const uploadFileMock = jest
+        .spyOn(FileUpload.prototype as any, 'uploadFile')
+        .mockResolvedValue(undefined);
+
+      const fileUploadInstance = new FileUpload({
+        config: {
+          flags: {
+            'response-mode': 'buffered',
+            'enable-cs-auth': true,
+          },
+          framework: 'GATSBY',
+          supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+          outputDirectories: { GATSBY: './public' },
+        },
+        log: logMock,
+        exit: exitMock,
+      } as any);
+
+      const handleEnvImportFlowMock = jest
+        .spyOn(fileUploadInstance, 'handleEnvImportFlow' as any)
+        .mockResolvedValue(undefined);
+
+      await fileUploadInstance.prepareAndUploadNewProjectFile();
+
+      const contentstackAuthCalls = (cliux.inquire as jest.Mock).mock.calls.filter(
+        (call) => call[0]?.name === 'contentstackAuth',
+      );
+      expect(contentstackAuthCalls.length).toBe(0);
+      expect(fileUploadInstance.config.isContentstackAuthenticationEnabled).toBe(true);
+
+      createSignedUploadUrlMock.mockRestore();
+      archiveMock.mockRestore();
+      uploadFileMock.mockRestore();
+      handleEnvImportFlowMock.mockRestore();
+    });
   });
 });
 

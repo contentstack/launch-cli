@@ -106,6 +106,7 @@ export default class GitHub extends BaseClass {
       provider: gitProvider,
       serverCommand,
       isStreamingEnabled,
+      isContentstackAuthenticationEnabled,
     } = this.config;
     const username = split(repository?.fullName, '/')[0];
 
@@ -131,6 +132,7 @@ export default class GitHub extends BaseClass {
               buildCommand: buildCommand === undefined || buildCommand === null ? 'npm run build' : buildCommand,
               ...(serverCommand && serverCommand.trim() !== '' ? { serverCommand } : {}),
               isStreamingEnabled: isStreamingEnabled ?? false,
+              isContentstackAuthenticationEnabled: isContentstackAuthenticationEnabled ?? true,
             },
           },
         },
@@ -168,6 +170,8 @@ export default class GitHub extends BaseClass {
       'env-variables': envVariables,
       'server-command': serverCommand,
       'response-mode': responseMode,
+      'enable-cs-auth': enableCsAuth,
+      'disable-cs-auth': disableCsAuth,
       alias,
     } = this.config.flags;
     const { token, apiKey } = configHandler.get(`tokens.${alias}`) ?? {};
@@ -254,6 +258,20 @@ export default class GitHub extends BaseClass {
       this.config.isStreamingEnabled = selectedResponseMode === 'streaming';
     } else {
       this.config.isStreamingEnabled = responseMode === 'streaming';
+    }
+    if (enableCsAuth) {
+      this.config.isContentstackAuthenticationEnabled = true;
+    } else if (disableCsAuth) {
+      this.config.isContentstackAuthenticationEnabled = false;
+    } else {
+      this.config.isContentstackAuthenticationEnabled = (await ux.inquire({
+        type: 'confirm',
+        name: 'contentstackAuth',
+        message:
+          // eslint-disable-next-line max-len
+          'Enable Contentstack Authentication? Restricts access to this environment to members of your Contentstack organization.',
+        default: true,
+      })) as boolean;
     }
     this.config.variableType = variableType as unknown as string;
     this.config.envVariables = envVariables;
