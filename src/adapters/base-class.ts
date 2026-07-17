@@ -160,6 +160,7 @@ export default class BaseClass {
    */
   async detectFramework(): Promise<void> {
     const { fullName, defaultBranch } = this.config.repository || {};
+    const namespace = this.config.userConnection?.namespace;
     const query = this.config.provider === 'FileUpload' ? fileFrameworkQuery : frameworkQuery;
     const variables =
       this.config.provider === 'FileUpload'
@@ -171,6 +172,7 @@ export default class BaseClass {
               provider: this.config.provider,
               repoName: fullName,
               branchName: defaultBranch,
+              ...(namespace ? { namespace } : {}),
             },
           };
     this.config.framework = (await this.apolloClient
@@ -464,12 +466,14 @@ export default class BaseClass {
    * @memberof BaseClass
    */
   async selectBranch(): Promise<void> {
+    const namespace = this.config.userConnection?.namespace;
     const variables = {
       page: 1,
       first: 100,
       query: {
         provider: this.config.provider,
         repoName: this.config.repository?.fullName,
+        ...(namespace ? { namespace } : {}),
       },
     };
 

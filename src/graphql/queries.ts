@@ -7,6 +7,7 @@ const userConnectionsQuery: DocumentNode = gql`
     userConnections: UserConnections(query: $query) {
       userUid
       provider
+      namespace
     }
   }
 `;
@@ -108,7 +109,6 @@ const projectsQuery: DocumentNode = gql`
             username
             gitProviderMetadata {
               ... on GitHubMetadata {
-                connectionUid
                 gitProvider
               }
             }

@@ -3,6 +3,7 @@ import { resolve } from 'path';
 import omit from 'lodash/omit';
 import find from 'lodash/find';
 import split from 'lodash/split';
+import filter from 'lodash/filter';
 import { exec } from 'child_process';
 import includes from 'lodash/includes';
 import { configHandler, cliux as ux } from '@contentstack/cli-utilities';
@@ -240,7 +241,7 @@ export default class GitHub extends BaseClass {
         });
         if (serverCommandInput) {
           this.config.serverCommand = serverCommandInput;
-        } 
+        }
       } else {
         this.config.serverCommand = serverCommand;
       }
@@ -296,9 +297,32 @@ export default class GitHub extends BaseClass {
       .then(({ data: { userConnections } }) => userConnections)
       .catch((error) => this.log(error, 'error'));
 
-    const userConnection = find(userConnections, {
+    const matchingConnections = filter(userConnections, {
       provider: this.config.provider,
     });
+
+    const namespaceFlag = this.config.flags?.namespace;
+    let userConnection;
+    if (namespaceFlag) {
+      userConnection = find(matchingConnections, { namespace: namespaceFlag });
+      if (!userConnection) {
+        this.log('GitHub connection namespace not found!', 'error');
+        this.exit(1);
+      }
+    } else if (matchingConnections.length > 1) {
+      const selectedNamespace = await ux.inquire({
+        type: 'search-list',
+        name: 'userConnection',
+        message: 'Choose a GitHub Namespace',
+        choices: map(matchingConnections, (connection) => connection.namespace || connection.userUid),
+      });
+      userConnection = find(
+        matchingConnections,
+        (connection) => (connection.namespace || connection.userUid) === selectedNamespace,
+      );
+    } else {
+      userConnection = matchingConnections[0];
+    }
 
     if (userConnection) {
       this.log('GitHub connection identified!', 'info');
@@ -353,11 +377,20 @@ export default class GitHub extends BaseClass {
       this.exit(1);
     }
 
+    const namespace = this.config.userConnection?.namespace;
     let repositories: Repository[] = [];
     try {
-      repositories = await this.queryRepositories({ page: 1, first: REPOSITORY_PAGE_SIZE });
+      repositories = await this.queryRepositories({
+        page: 1,
+        first: REPOSITORY_PAGE_SIZE,
+        ...(namespace ? { query: { provider: this.config.provider, namespace } } : {}),
+      });
     } catch {
-      this.log('GitHub app uninstalled. Please reconnect the app and try again', 'error');
+      this.log(
+        `GitHub app uninstalled${namespace ? ` for the "${namespace}" connection` : ''}. ` +
+        'Please reconnect the app and try again',
+        'error',
+      );
       await this.connectToAdapterOnUi();
       this.exit(1);
     }
@@ -379,9 +412,12 @@ export default class GitHub extends BaseClass {
     if (!this.config.repository) {
       const checkedCount = MAX_REPOSITORY_PAGES * REPOSITORY_PAGE_SIZE;
       if (repositories.length >= checkedCount) {
+        const installationSettingsLocation = namespace
+          ? `In the GitHub App installation settings for the "${namespace}" connection`
+          : 'In your GitHub App\'s installation settings';
         this.log(
           `"${repoFullName}" is beyond the first ${checkedCount} repositories the GitHub App can access. ` +
-          'In your GitHub App\'s installation settings, under "Repository access", select ' +
+          `${installationSettingsLocation}, under "Repository access", select ` +
           '"Only select repositories" and add the repository you want to deploy. Then re-run the command.',
           'error',
         );

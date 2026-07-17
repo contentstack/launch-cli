@@ -685,4 +685,71 @@ describe('BaseClass', () => {
       expect(exitMock).toHaveBeenCalledWith(1);
     });
   });
+
+  describe('detectFramework', () => {
+    it('should scope the framework query to the selected GitHub connection namespace', async () => {
+      const apolloClient = {
+        query: jest.fn().mockResolvedValueOnce({ data: { framework: { framework: 'GATSBY' } } }),
+      } as any;
+      baseClass = new BaseClass({
+        log: logMock,
+        exit: exitMock,
+        apolloClient,
+        config: {
+          provider: 'GitHub',
+          listOfFrameWorks: [],
+          repository: { fullName: 'test-user/eleventy-sample', defaultBranch: 'main' },
+          userConnection: { provider: 'GitHub', namespace: 'org-account' },
+        },
+      } as any);
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('GATSBY');
+
+      await baseClass.detectFramework();
+
+      expect(apolloClient.query).toHaveBeenCalledWith({
+        query: expect.anything(),
+        variables: {
+          query: {
+            provider: 'GitHub',
+            repoName: 'test-user/eleventy-sample',
+            branchName: 'main',
+            namespace: 'org-account',
+          },
+        },
+      });
+    });
+  });
+
+  describe('selectBranch', () => {
+    it('should scope the branches query to the selected GitHub connection namespace', async () => {
+      const apolloClient = {
+        query: jest.fn().mockResolvedValueOnce({
+          data: { branches: { edges: [], pageData: { page: 1 }, pageInfo: { hasNextPage: false } } },
+        }),
+      } as any;
+      baseClass = new BaseClass({
+        log: logMock,
+        exit: exitMock,
+        apolloClient,
+        config: {
+          provider: 'GitHub',
+          flags: {},
+          repository: { fullName: 'test-user/eleventy-sample' },
+          userConnection: { provider: 'GitHub', namespace: 'org-account' },
+        },
+      } as any);
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('main');
+
+      await baseClass.selectBranch();
+
+      expect(apolloClient.query).toHaveBeenCalledWith({
+        query: expect.anything(),
+        variables: {
+          page: 1,
+          first: 100,
+          query: { provider: 'GitHub', repoName: 'test-user/eleventy-sample', namespace: 'org-account' },
+        },
+      });
+    });
+  });
 });
