@@ -61,6 +61,10 @@ export default class Launch extends BaseCommand<typeof Launch> {
     branch: Flags.string({
       description: '[optional] GitHub branch name.',
     }),
+    namespace: Flags.string({
+      description:
+        '[optional] GitHub connection namespace, to select among multiple connected GitHub accounts/organizations.',
+    }),
     'build-command': Flags.string({
       description: '[optional] Build Command.',
     }),
