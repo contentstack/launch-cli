@@ -416,7 +416,7 @@ export default class BaseClass {
     if (includes(this.config.supportedAdapters, this.config.provider)) {
       const baseUrl = this.config.host.startsWith('http') ? this.config.host : `https://${this.config.host}`;
 
-      const gitHubConnectUrl = `${baseUrl.replace('api', 'app').replace('io', 'com')}/#!/launch`;
+      const gitHubConnectUrl = `${baseUrl.replace('api', 'app').replace('io', 'com')}/#!/launch/settings/connected-accounts`;
       this.log(`You can connect your ${this.config.provider} account to the UI using the following URL:`, 'info');
       this.log(gitHubConnectUrl, { color: 'green' });
       open(gitHubConnectUrl);
