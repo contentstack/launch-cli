@@ -34,7 +34,10 @@ export default class FileUpload extends BaseClass {
 
     this.prepareLaunchConfig();
     await this.showLogs();
-    if(this.config.currentDeploymentStatus === DeploymentStatus.FAILED) {
+    if (
+      this.config.currentDeploymentStatus === DeploymentStatus.FAILED ||
+      this.config.currentDeploymentStatus === DeploymentStatus.CANCELLED
+    ) {
       this.exit(1);
     }
     this.showDeploymentUrl();

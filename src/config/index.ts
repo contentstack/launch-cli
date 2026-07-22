@@ -42,7 +42,7 @@ const config = {
   launchHubUrls: '',
   launchBaseUrl: '',
   supportedAdapters: ['GitHub'],
-  deploymentStatus: ['LIVE', 'FAILED', 'SKIPPED', 'DEPLOYED'],
+  deploymentStatus: ['LIVE', 'FAILED', 'SKIPPED', 'DEPLOYED', 'CANCELLED'],
   pollingInterval: 1000,
   variablePreparationTypeOptions: [
     VariablePreparationTypeOptions.IMPORT_FROM_STACK,
