@@ -29,6 +29,8 @@ export default class Launch extends BaseCommand<typeof Launch> {
     // eslint-disable-next-line max-len
     '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload> --name=<value> --environment=<value> --branch=<value> --build-command=<value> --framework=<option> --org=<value> --out-dir=<value> --server-command=<value> --response-mode=streaming',
     // eslint-disable-next-line max-len
+    '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload> --name=<value> --environment=<value> --branch=<value> --build-command=<value> --framework=<option> --org=<value> --out-dir=<value> --disable-cs-auth',
+    // eslint-disable-next-line max-len
     '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload> --name=<value> --environment=<value> --branch=<value> --build-command=<value> --framework=<option> --org=<value> --out-dir=<value> --variable-type="Import variables from a stack" --alias=<value>',
     // eslint-disable-next-line max-len
     '<%= config.bin %> <%= command.id %> --config <path/to/launch/config/file> --type <options: GitHub|FileUpload> --name=<value> --environment=<value> --branch=<value> --build-command=<value> --framework=<option> --org=<value> --out-dir=<value> --variable-type="Manually add custom variables to the list" --env-variables="APP_ENV:prod, TEST_ENV:testVal"',
@@ -58,6 +60,10 @@ export default class Launch extends BaseCommand<typeof Launch> {
     }),
     branch: Flags.string({
       description: '[optional] GitHub branch name.',
+    }),
+    namespace: Flags.string({
+      description:
+        '[optional] GitHub connection namespace, to select among multiple connected GitHub accounts/organizations.',
     }),
     'build-command': Flags.string({
       description: '[optional] Build Command.',
@@ -103,8 +109,22 @@ export default class Launch extends BaseCommand<typeof Launch> {
     }),
     'response-mode': Flags.string({
       options: [...config.responseModeOptions],
-      description: '[optional] Provide mode for response. <options: buffered|streaming'
-    })
+      description: '[optional] Provide mode for response. <options: buffered|streaming>'
+    }),
+    'enable-cs-auth': Flags.boolean({
+      default: false,
+      exclusive: ['disable-cs-auth'],
+      description:
+        // eslint-disable-next-line max-len
+        '[optional] Enable Contentstack Authentication, restricting access to this environment to members of your Contentstack organization.',
+    }),
+    'disable-cs-auth': Flags.boolean({
+      default: false,
+      exclusive: ['enable-cs-auth'],
+      description:
+        // eslint-disable-next-line max-len
+        '[optional] Disable Contentstack Authentication, making this environment publicly accessible to anyone with its URL.',
+    }),
   };
 
   async run(): Promise<void> {
