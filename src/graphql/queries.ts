@@ -140,8 +140,8 @@ const deploymentLogsQuery: DocumentNode = gql`
 `;
 
 const serverlessLogsQuery: DocumentNode = gql`
-  query GetServerlessLogs($query: QueryLogMessagesInputType!) {
-    getServerlessLogs(query: $query) {
+  query GetServerlessLogsV2($query: QueryLogMessagesV2InputType!) {
+    getServerlessLogsV2(query: $query) {
       logs {
         source
         message
