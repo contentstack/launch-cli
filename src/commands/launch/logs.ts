@@ -136,15 +136,15 @@ export default class Logs extends BaseCommand<typeof Logs> {
       uid,
       deployments,
     }));
-    this.sharedConfig.environment = await ux
-      .inquire({
-        type: 'search-list',
-        name: 'Environment',
-        choices: environments,
-        message: 'Choose an environment',
-      })
-      .then((name: any) => (find(environments, { name }) as Record<string, any>)?.uid);
-    this.sharedConfig.currentConfig.deployments = environments[0]?.deployments?.edges;
+    const selectedName = await ux.inquire({
+      type: 'search-list',
+      name: 'Environment',
+      choices: environments,
+      message: 'Choose an environment',
+    });
+    const selectedEnvironment = find(environments, { name: selectedName }) as Record<string, any> | undefined;
+    this.sharedConfig.environment = selectedEnvironment?.uid;
+    this.sharedConfig.currentConfig.deployments = selectedEnvironment?.deployments?.edges;
   }
 
   /**
