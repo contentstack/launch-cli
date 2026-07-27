@@ -54,6 +54,8 @@ export default class Rollback extends BaseCommand<typeof Rollback> {
     if (!this.flags.environment) {
       await this.getConfig();
     }
+    
+    await this.prepareApiClients();
 
     if (!this.sharedConfig.currentConfig?.uid) {
       await selectOrg({
