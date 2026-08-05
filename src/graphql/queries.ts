@@ -128,6 +128,9 @@ const deploymentQuery: DocumentNode = gql`
   }
 `;
 
+// Legacy timestamp-paged deployment logs. Retained only as the fallback for
+// regions whose logs service predates getDeploymentLogsV2 — see
+// LogPolling.deploymentLogs.
 const deploymentLogsQuery: DocumentNode = gql`
   query GetLogs($deploymentUid: ID!, $timestamp: String) {
     getLogs(deploymentUid: $deploymentUid, timestamp: $timestamp) {
@@ -135,6 +138,26 @@ const deploymentLogsQuery: DocumentNode = gql`
       message
       stage
       timestamp
+    }
+  }
+`;
+
+// Cursor-paged deployment logs. The cursor is search_after over
+// [timestampMs, _id], so paging can't skip or duplicate logs that share a
+// millisecond — which timestamp paging cannot express.
+const deploymentLogsV2Query: DocumentNode = gql`
+  query GetDeploymentLogsV2($query: DeploymentLogsV2QueryInput!) {
+    getDeploymentLogsV2(query: $query) {
+      logs {
+        deploymentUid
+        message
+        stage
+        timestamp
+      }
+      pageInfo {
+        hasNewer
+        newestCursor
+      }
     }
   }
 `;
@@ -206,6 +229,7 @@ export {
   cmsEnvironmentVariablesQuery,
   deploymentQuery,
   deploymentLogsQuery,
+  deploymentLogsV2Query,
   serverlessLogsQuery,
   latestLiveDeploymentQuery,
   environmentsQuery,
