@@ -162,7 +162,7 @@ describe('LogPolling', () => {
       const serverLogsWatchQuery = {
         subscribe: sandbox.stub().callsFake((callback) => {
           const logsData = {
-            getServerlessLogs: {
+            getServerlessLogsV2: {
               logs: [{ timestamp: '2023-05-26T10:00:00Z' }, { timestamp: '2023-05-26T10:00:01Z' }],
             },
           };

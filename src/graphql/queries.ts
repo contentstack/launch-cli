@@ -7,6 +7,7 @@ const userConnectionsQuery: DocumentNode = gql`
     userConnections: UserConnections(query: $query) {
       userUid
       provider
+      namespace
     }
   }
 `;
@@ -108,7 +109,6 @@ const projectsQuery: DocumentNode = gql`
             username
             gitProviderMetadata {
               ... on GitHubMetadata {
-                connectionUid
                 gitProvider
               }
             }
@@ -140,8 +140,8 @@ const deploymentLogsQuery: DocumentNode = gql`
 `;
 
 const serverlessLogsQuery: DocumentNode = gql`
-  query GetServerlessLogs($query: QueryLogMessagesInputType!) {
-    getServerlessLogs(query: $query) {
+  query GetServerlessLogsV2($query: QueryLogMessagesV2InputType!) {
+    getServerlessLogsV2(query: $query) {
       logs {
         source
         message

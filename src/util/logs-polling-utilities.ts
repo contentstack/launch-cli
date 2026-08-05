@@ -308,7 +308,7 @@ export default class LogPolling {
         serverLogsWatchQuery.stopPolling();
       }
 
-      const logsData = data?.getServerlessLogs?.logs;
+      const logsData = data?.getServerlessLogsV2?.logs;
       const logsLength = logsData?.length;
       if (logsLength > 0) {
         this.loader=cliux.loaderV2('done', this.loader);

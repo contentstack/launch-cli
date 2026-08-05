@@ -106,6 +106,83 @@ describe('GitHub Adapter', () => {
       expect(connectToAdapterOnUiMock).toHaveBeenCalled();
       expect(githubAdapterInstance.config.userConnection).toEqual(undefined);
     });
+
+    it('should prompt the user to select a connection when multiple GitHub connections exist', async () => {
+      const multipleUserConnections = [
+        { __typename: 'UserConnection', userUid: 'testuser1', provider: 'GitHub', namespace: 'personal-account' },
+        { __typename: 'UserConnection', userUid: 'testuser1', provider: 'GitHub', namespace: 'org-account' },
+      ];
+      const userConnectionResponse = { data: { userConnections: multipleUserConnections } };
+      const apolloClient = {
+        query: jest.fn().mockResolvedValueOnce(userConnectionResponse),
+      } as any;
+      const githubAdapterInstance = new GitHub({
+        config: { projectBasePath: '/home/project1', provider: 'GitHub' },
+        apolloClient: apolloClient,
+        log: logMock,
+      } as any);
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('org-account');
+
+      await githubAdapterInstance.checkGitHubConnected();
+
+      expect(ux.inquire).toHaveBeenCalledWith({
+        type: 'search-list',
+        name: 'userConnection',
+        message: 'Choose a GitHub Namespace',
+        choices: ['personal-account', 'org-account'],
+      });
+      expect(githubAdapterInstance.config.userConnection).toEqual(multipleUserConnections[1]);
+    });
+
+    it('should use the --namespace flag to select a connection without prompting', async () => {
+      const multipleUserConnections = [
+        { __typename: 'UserConnection', userUid: 'testuser1', provider: 'GitHub', namespace: 'personal-account' },
+        { __typename: 'UserConnection', userUid: 'testuser1', provider: 'GitHub', namespace: 'org-account' },
+      ];
+      const userConnectionResponse = { data: { userConnections: multipleUserConnections } };
+      const apolloClient = {
+        query: jest.fn().mockResolvedValueOnce(userConnectionResponse),
+      } as any;
+      const githubAdapterInstance = new GitHub({
+        config: { projectBasePath: '/home/project1', provider: 'GitHub', flags: { namespace: 'org-account' } },
+        apolloClient: apolloClient,
+        log: logMock,
+      } as any);
+
+      await githubAdapterInstance.checkGitHubConnected();
+
+      expect(ux.inquire).not.toHaveBeenCalled();
+      expect(githubAdapterInstance.config.userConnection).toEqual(multipleUserConnections[1]);
+    });
+
+    it('should log an error and exit if the --namespace flag does not match any connection', async () => {
+      const multipleUserConnections = [
+        { __typename: 'UserConnection', userUid: 'testuser1', provider: 'GitHub', namespace: 'personal-account' },
+        { __typename: 'UserConnection', userUid: 'testuser1', provider: 'GitHub', namespace: 'org-account' },
+      ];
+      const userConnectionResponse = { data: { userConnections: multipleUserConnections } };
+      const apolloClient = {
+        query: jest.fn().mockResolvedValueOnce(userConnectionResponse),
+      } as any;
+      const githubAdapterInstance = new GitHub({
+        config: { projectBasePath: '/home/project1', provider: 'GitHub', flags: { namespace: 'unknown-account' } },
+        apolloClient: apolloClient,
+        log: logMock,
+        exit: exitMock,
+      } as any);
+
+      let err;
+      try {
+        await githubAdapterInstance.checkGitHubConnected();
+      } catch (error: any) {
+        err = error;
+      }
+
+      expect(ux.inquire).not.toHaveBeenCalled();
+      expect(logMock).toHaveBeenCalledWith('GitHub connection namespace not found!', 'error');
+      expect(exitMock).toHaveBeenCalledWith(1);
+      expect(err).toEqual(new Error('1'));
+    });
   });
 
   describe('checkGitRemoteAvailableAndValid', () => {
@@ -212,6 +289,31 @@ describe('GitHub Adapter', () => {
       expect(result).toBe(true);
     });
 
+    it('should scope the repositories query to the selected GitHub connection namespace', async () => {
+      (existsSync as jest.Mock).mockReturnValueOnce(true);
+      (getRemoteUrls as jest.Mock).mockResolvedValueOnce({
+        origin: 'https://github.com/test-user/eleventy-sample.git',
+      });
+      const apolloClient = {
+        query: jest.fn().mockResolvedValueOnce(repositoriesResponse),
+      } as any;
+      const githubAdapterInstance = new GitHub({
+        config: {
+          projectBasePath: '/home/project1',
+          provider: 'GitHub',
+          userConnection: { provider: 'GitHub', namespace: 'org-account' },
+        },
+        apolloClient: apolloClient,
+      } as any);
+
+      await githubAdapterInstance.checkGitRemoteAvailableAndValid();
+
+      expect(apolloClient.query).toHaveBeenCalledWith({
+        query: repositoriesQuery,
+        variables: { page: 1, first: 100, query: { provider: 'GitHub', namespace: 'org-account' } },
+      });
+    });
+
     it('should log an error and exit if git config file does not exists', async () => {
       (existsSync as jest.Mock).mockReturnValueOnce(false);
       const githubAdapterInstance = new GitHub({
@@ -296,6 +398,37 @@ describe('GitHub Adapter', () => {
       expect(logMock).toHaveBeenCalledWith('GitHub app uninstalled. Please reconnect the app and try again', 'error');
       expect(exitMock).toHaveBeenCalledWith(1);
       expect(err).toEqual(new Error('1'));
+    });
+
+    it('should reference the selected connection namespace when the GitHub app is uninstalled', async () => {
+      (existsSync as jest.Mock).mockReturnValueOnce(true);
+      (getRemoteUrls as jest.Mock).mockResolvedValueOnce({
+        origin: 'https://github.com/test-user/eleventy-sample.git',
+      });
+      const apolloClient = {
+        query: jest.fn().mockRejectedValue(new Error('GitHub app error')),
+      } as any;
+      jest.spyOn(BaseClass.prototype, 'connectToAdapterOnUi').mockResolvedValueOnce();
+      const githubAdapterInstance = new GitHub({
+        config: {
+          projectBasePath: '/home/project1',
+          userConnection: { provider: 'GitHub', namespace: 'org-account' },
+        },
+        apolloClient: apolloClient,
+        log: logMock,
+        exit: exitMock,
+      } as any);
+
+      try {
+        await githubAdapterInstance.checkGitRemoteAvailableAndValid();
+      } catch {
+        // exitMock throws to halt the flow under test, same as sibling tests in this file
+      }
+
+      expect(logMock).toHaveBeenCalledWith(
+        'GitHub app uninstalled for the "org-account" connection. Please reconnect the app and try again',
+        'error',
+      );
     });
 
     it('should log an error and exit if repository is not found in the list of available repositories', async () => {
@@ -463,6 +596,46 @@ describe('GitHub Adapter', () => {
       );
       expect(exitMock).toHaveBeenCalledWith(1);
       expect(err).toEqual(new Error('1'));
+    });
+
+    it('should reference the selected connection namespace when the repository is beyond the checked pages', async () => {
+      (existsSync as jest.Mock).mockReturnValueOnce(true);
+      (getRemoteUrls as jest.Mock).mockResolvedValueOnce({
+        origin: 'https://github.com/test-user/missing-repo.git',
+      });
+      const apolloClient = {
+        query: jest.fn().mockImplementation(({ variables }) => {
+          const { page, first } = variables;
+          const edges = Array.from({ length: first }, (_, i) => ({
+            node: {
+              __typename: 'GitRepository',
+              id: `${(page - 1) * first + i}`,
+              url: `https://github.com/test-user/repo-${(page - 1) * first + i}`,
+              name: `repo-${(page - 1) * first + i}`,
+              fullName: `test-user/repo-${(page - 1) * first + i}`,
+              defaultBranch: 'main',
+            },
+          }));
+          return Promise.resolve({ data: { repositories: { edges, pageData: { page }, pageInfo: { hasNextPage: true } } } });
+        }),
+      } as any;
+      const githubAdapterInstance = new GitHub({
+        config: {
+          projectBasePath: '/home/project1',
+          userConnection: { provider: 'GitHub', namespace: 'org-account' },
+        },
+        log: logMock,
+        exit: exitMock,
+        apolloClient: apolloClient,
+      } as any);
+
+      try {
+        await githubAdapterInstance.checkGitRemoteAvailableAndValid();
+      } catch {
+        // exitMock throws to halt the flow under test, same as sibling tests in this file
+      }
+
+      expect(logMock).toHaveBeenCalledWith(expect.stringContaining('the "org-account" connection'), 'error');
     });
   });
 
@@ -1010,6 +1183,150 @@ describe('GitHub Adapter', () => {
         { name: 'Buffered', value: 'buffered' },
         { name: 'Streaming', value: 'streaming' },
       ]);
+
+      handleEnvImportFlowMock.mockRestore();
+    });
+
+    it('should prompt Enable Contentstack Authentication (default enabled) when disable-cs-auth flag is not provided', async () => {
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('test-project');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('Default');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('./public');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce(true);
+
+      const githubInstance = new GitHub({
+        config: {
+          flags: {
+            'response-mode': 'buffered',
+          },
+          framework: 'GATSBY',
+          repository: { fullName: 'test-user/repo', name: 'repo' },
+          supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+          outputDirectories: { GATSBY: './public' },
+        },
+        log: logMock,
+        exit: exitMock,
+      } as any);
+
+      const handleEnvImportFlowMock = jest
+        .spyOn(githubInstance, 'handleEnvImportFlow' as any)
+        .mockResolvedValue(undefined);
+
+      await githubInstance.prepareForNewProjectCreation();
+
+      expect(ux.inquire).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'confirm',
+          name: 'contentstackAuth',
+          default: true,
+        }),
+      );
+      expect(githubInstance.config.isContentstackAuthenticationEnabled).toBe(true);
+
+      handleEnvImportFlowMock.mockRestore();
+    });
+
+    it('should map a "no" answer at the prompt to disabled Contentstack Authentication', async () => {
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('test-project');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('Default');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('./public');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce(false);
+
+      const githubInstance = new GitHub({
+        config: {
+          flags: {
+            'response-mode': 'buffered',
+          },
+          framework: 'GATSBY',
+          repository: { fullName: 'test-user/repo', name: 'repo' },
+          supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+          outputDirectories: { GATSBY: './public' },
+        },
+        log: logMock,
+        exit: exitMock,
+      } as any);
+
+      const handleEnvImportFlowMock = jest
+        .spyOn(githubInstance, 'handleEnvImportFlow' as any)
+        .mockResolvedValue(undefined);
+
+      await githubInstance.prepareForNewProjectCreation();
+
+      expect(githubInstance.config.isContentstackAuthenticationEnabled).toBe(false);
+
+      handleEnvImportFlowMock.mockRestore();
+    });
+
+
+    it('should disable Contentstack Authentication without prompt when --disable-cs-auth is passed', async () => {
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('test-project');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('Default');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('./public');
+
+      const githubInstance = new GitHub({
+        config: {
+          flags: {
+            'response-mode': 'buffered',
+            'disable-cs-auth': true,
+          },
+          framework: 'GATSBY',
+          repository: { fullName: 'test-user/repo', name: 'repo' },
+          supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+          outputDirectories: { GATSBY: './public' },
+        },
+        log: logMock,
+        exit: exitMock,
+      } as any);
+
+      const handleEnvImportFlowMock = jest
+        .spyOn(githubInstance, 'handleEnvImportFlow' as any)
+        .mockResolvedValue(undefined);
+
+      await githubInstance.prepareForNewProjectCreation();
+
+      const contentstackAuthCalls = (ux.inquire as jest.Mock).mock.calls.filter(
+        (call) => call[0]?.name === 'contentstackAuth',
+      );
+      expect(contentstackAuthCalls.length).toBe(0);
+      expect(githubInstance.config.isContentstackAuthenticationEnabled).toBe(false);
+
+      handleEnvImportFlowMock.mockRestore();
+    });
+
+    it('should enable Contentstack Authentication without prompt when --enable-cs-auth is passed', async () => {
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('test-project');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('Default');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('npm run build');
+      (ux.inquire as jest.Mock).mockResolvedValueOnce('./public');
+
+      const githubInstance = new GitHub({
+        config: {
+          flags: {
+            'response-mode': 'buffered',
+            'enable-cs-auth': true,
+          },
+          framework: 'GATSBY',
+          repository: { fullName: 'test-user/repo', name: 'repo' },
+          supportedFrameworksForServerCommands: ['ANGULAR', 'OTHER', 'REMIX', 'NUXT'],
+          outputDirectories: { GATSBY: './public' },
+        },
+        log: logMock,
+        exit: exitMock,
+      } as any);
+
+      const handleEnvImportFlowMock = jest
+        .spyOn(githubInstance, 'handleEnvImportFlow' as any)
+        .mockResolvedValue(undefined);
+
+      await githubInstance.prepareForNewProjectCreation();
+
+      const contentstackAuthCalls = (ux.inquire as jest.Mock).mock.calls.filter(
+        (call) => call[0]?.name === 'contentstackAuth',
+      );
+      expect(contentstackAuthCalls.length).toBe(0);
+      expect(githubInstance.config.isContentstackAuthenticationEnabled).toBe(true);
 
       handleEnvImportFlowMock.mockRestore();
     });
