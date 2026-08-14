@@ -1,6 +1,6 @@
 {
   "name": "@contentstack/cli-launch",
-  "version": "1.11.2",
+  "version": "1.11.3",
   "description": "Launch related operations",
   "author": "Contentstack CLI",
   "bin": {
@@ -116,7 +116,18 @@
       "ajv": "^6.12.6"
     },
     "qs": "^6.15.2",
-    "tmp": "^0.2.4"
+    "tmp": "^0.2.4",
+    "fast-uri": "^3.1.5",
+    "js-yaml": "^4.3.1",
+    "minimatch@10.2.5": {
+      "brace-expansion": "^5.0.9"
+    },
+    "minimatch@9.0.9": {
+      "brace-expansion": "^2.1.4"
+    },
+    "minimatch@5.1.9": {
+      "brace-expansion": "^2.1.4"
+    }
   },
   "engines": {
     "node": ">=22.0.0"

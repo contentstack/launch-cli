@@ -723,6 +723,30 @@ describe('GitHub Adapter', () => {
       expect(showSuggestionMock).not.toHaveBeenCalled();
     });
 
+    it('should exit with code 1 when deployment status is CANCELLED for new project', async () => {
+      const githubInstance = new GitHub({
+        config: {
+          isExistingProject: false,
+          currentDeploymentStatus: DeploymentStatus.CANCELLED,
+        },
+        log: logMock,
+        exit: exitMock,
+      } as any);
+
+      try {
+        await githubInstance.run();
+      } catch (error: any) {
+        expect(error.message).toBe('1');
+      }
+
+      expect(handleNewProjectMock).toHaveBeenCalled();
+      expect(prepareLaunchConfigMock).toHaveBeenCalled();
+      expect(showLogsMock).toHaveBeenCalled();
+      expect(exitMock).toHaveBeenCalledWith(1);
+      expect(showDeploymentUrlMock).not.toHaveBeenCalled();
+      expect(showSuggestionMock).not.toHaveBeenCalled();
+    });
+
     it('should continue normally when deployment status is not FAILED', async () => {
       const githubInstance = new GitHub({
         config: {
