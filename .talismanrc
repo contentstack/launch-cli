@@ -9,7 +9,7 @@ fileignoreconfig:
 - filename: test/unit/commands/rollback.test.ts
   checksum: d1f931f2d9a397131409399ad6463653e28b5a2224e870b641d9ba57c4418f18
 - filename: package-lock.json
-  checksum: a713321dbdd291f8087846c9c45793588787eb8adc76faf4f74968964e502d3e
+  checksum: f57d78f85c1dbe6f1cd1cf4d48f9c8c0d327f26022643fa8cf47b8e706dff210
 - filename: src/adapters/github.test.ts
   checksum: b3d3d3a3c14adde103152d2ac4e1c4b7121a5f7533a87c3cc600f6d25fb59d1b
 - filename: src/adapters/file-upload.test.ts
