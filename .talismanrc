@@ -2,6 +2,8 @@ fileignoreconfig:
 - filename: .github/workflows/secrets-scan.yml
   ignore_detectors:
     - filecontent
+- filename: .husky/secrets-scan.sh
+  checksum: 5a44edca8d209ca4b7f6eefc4ce2caab838679f8916ef6136ad68584c0705cb6
 - filename: src/commands/launch/index.test.ts
   checksum: 9db6c02ad35a0367343cd753b916dd64db4a9efd24838201d2e1113ed19c9b62
 - filename: src/commands/launch/rollback.test.ts
