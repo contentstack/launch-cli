@@ -24,6 +24,6 @@ fileignoreconfig:
     - "formData\\.append\\(formFieldKey, formFieldValue\\)"
     - "headers: \\{ key: string; value: string \\}\\[\\]"
     - "headers\\?\\.reduce\\(\\(acc, \\{ key, value \\}\\)"
-    - "environmentVariables: map\\(this\\.envVariables"
+    - "\\(\\{ key, value \\}\\) => \\(\\{ key, value \\}\\)\\)"
     - "const \\{ token, apiKey \\} = configHandler\\.get"
 version: "1.0"
