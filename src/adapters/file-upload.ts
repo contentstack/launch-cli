@@ -336,12 +336,12 @@ export default class FileUpload extends BaseClass {
       }
     }
 
-    const status = await zip.writeZipPromise(zipPath).catch(() => {
-      this.log('Zipping project process failed! Please try again.');
-      this.exit(1);
+    let zipped = true;
+    await zip.writeZipPromise(zipPath).catch(() => {
+      zipped = false;
     });
 
-    if (!status) {
+    if (!zipped) {
       this.log('Zipping project process failed! Please try again.');
       this.exit(1);
     }
