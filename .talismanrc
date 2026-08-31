@@ -17,4 +17,6 @@ fileignoreconfig:
   checksum: b3d3d3a3c14adde103152d2ac4e1c4b7121a5f7533a87c3cc600f6d25fb59d1b
 - filename: src/adapters/file-upload.test.ts
   checksum: 962fd8b45578914926d20857ddc3d1bc2fa19e8b192c6dfdc03d214ae1898b59
+- filename: src/adapters/file-upload.ts
+  checksum: 09cb04f6b9174eaccad6771142a0afd2c55b96ee8ea9c7e5fae30640ef27dc82
 version: "1.0"
