@@ -18,5 +18,9 @@ fileignoreconfig:
 - filename: src/adapters/file-upload.test.ts
   checksum: 962fd8b45578914926d20857ddc3d1bc2fa19e8b192c6dfdc03d214ae1898b59
 - filename: src/adapters/file-upload.ts
-  checksum: 09cb04f6b9174eaccad6771142a0afd2c55b96ee8ea9c7e5fae30640ef27dc82
+  allowed_patterns:
+    - "const \\{ formFieldKey, formFieldValue \\} of fields"
+    - "formData\\.append\\(formFieldKey, formFieldValue\\)"
+    - "headers: \\{ key: string; value: string \\}\\[\\]"
+    - "headers\\?\\.reduce\\(\\(acc, \\{ key, value \\}\\)"
 version: "1.0"

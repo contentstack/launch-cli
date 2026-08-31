@@ -1,10 +1,26 @@
+import AdmZip from 'adm-zip';
 import { fileUploadAdapter as cliUtilitiesJestMock } from '../test/mocks/cli-utilities';
 import FileUpload from './file-upload';
 import BaseClass from './base-class';
 import { cliux } from '@contentstack/cli-utilities';
 import { DeploymentStatus } from '../types/launch';
+import { getFileList } from '../util/fs';
 
 jest.mock('@contentstack/cli-utilities', () => cliUtilitiesJestMock);
+jest.mock('../util/fs', () => ({ getFileList: jest.fn() }));
+
+// adm-zip defines its methods as own properties on each instance, not on the prototype,
+// so the constructor is mocked rather than spied on. esModuleInterop resolves the source's
+// default import to `.default`, hence the __esModule shape.
+const writeZipPromiseMock = jest.fn();
+jest.mock('adm-zip', () => ({
+  __esModule: true,
+  default: jest.fn().mockImplementation(() => ({
+    addLocalFile: jest.fn(),
+    addLocalFolder: jest.fn(),
+    writeZipPromise: writeZipPromiseMock,
+  })),
+}));
 
 describe('FileUpload Adapter', () => {
   let logMock: jest.Mock;
@@ -825,6 +841,52 @@ describe('FileUpload Adapter', () => {
       archiveMock.mockRestore();
       uploadFileMock.mockRestore();
       handleEnvImportFlowMock.mockRestore();
+    });
+  });
+
+  describe('archive', () => {
+    const createInstance = () =>
+      new FileUpload({
+        config: {
+          projectBasePath: '/tmp/launch-project',
+          fileUploadConfig: { exclude: [] },
+        },
+        log: logMock,
+        exit: exitMock,
+      } as any);
+
+    beforeEach(() => {
+      (getFileList as jest.Mock).mockResolvedValue([]);
+      // the suite-wide afterEach calls jest.resetAllMocks(), which strips the
+      // constructor implementation registered in the jest.mock factory above.
+      (AdmZip as unknown as jest.Mock).mockImplementation(() => ({
+        addLocalFile: jest.fn(),
+        addLocalFolder: jest.fn(),
+        writeZipPromise: writeZipPromiseMock,
+      }));
+    });
+
+    it('should log the failure once and exit when zipping rejects', async () => {
+      writeZipPromiseMock.mockRejectedValue(new Error('disk full'));
+      const fileUploadInstance = createInstance();
+
+      await expect(fileUploadInstance.archive()).rejects.toThrow('1');
+
+      expect(logMock).toHaveBeenCalledTimes(1);
+      expect(logMock).toHaveBeenCalledWith('Zipping project process failed! Please try again.');
+      expect(exitMock).toHaveBeenCalledWith(1);
+    });
+
+    it('should return the zip details and not exit when zipping resolves', async () => {
+      writeZipPromiseMock.mockResolvedValue(undefined);
+      const fileUploadInstance = createInstance();
+
+      const result = await fileUploadInstance.archive();
+
+      expect(result.projectName).toBe('launch-project');
+      expect(result.zipName).toMatch(/^\d+_launch-project\.zip$/);
+      expect(exitMock).not.toHaveBeenCalled();
+      expect(logMock).not.toHaveBeenCalled();
     });
   });
 });
