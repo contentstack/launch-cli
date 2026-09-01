@@ -16,4 +16,7 @@ jobs:
           registry-url: https://registry.npmjs.org/
           cache: 'npm'
       - run: npm ci
-      - run: npm publish
+      - name: Update npm
+        run: npm install -g npm@latest
+      - name: Release
+        run: npm publish --access public
