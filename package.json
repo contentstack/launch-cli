@@ -91,7 +91,7 @@
     "lint-staged": "lint-staged",
     "postpack": "shx rm -f oclif.manifest.json",
     "prepack-bkp": "npm run build && oclif manifest && oclif readme",
-    "test": "mocha --forbid-only \"test/**/*.test.ts\" && npm run test:jest",
+    "test": "mocha --forbid-only \"test/unit/**/*.test.ts\" && npm run test:jest && npm run test:integration",
     "version": "oclif readme && git add README.md",
     "build": "npm run clean && npm run compile",
     "clean": "rm -rf ./dist tsconfig.build.tsbuildinfo",
@@ -101,6 +101,8 @@
     "test:unit": "mocha --forbid-only \"test/unit/**/*.test.ts\" && npm run test:jest",
     "test:unit:report": "nyc --extension .ts mocha --forbid-only \"test/unit/**/*.test.ts\" && npm run test:jest:coverage",
     "test:jest": "jest",
+    "test:integration": "jest --config jest.integration.config.js",
+    "test:integration:coverage": "jest --config jest.integration.config.js --coverage",
     "test:jest:coverage": "jest --coverage",
     "prepare": "husky"
   },

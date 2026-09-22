@@ -26,4 +26,16 @@ fileignoreconfig:
     - "headers\\?\\.reduce\\(\\(acc, \\{ key, value \\}\\)"
     - "\\(\\{ key, value \\}\\) => \\(\\{ key, value \\}\\)\\)"
     - "const \\{ token, apiKey \\} = configHandler\\.get"
+- filename: test/integration/specs/environments.test.ts
+  checksum: f02e76dc6f4dfac2bc21d53357d70fc2b93c6473b9e71ab08300670f2c5649c1
+- filename: test/integration/jest.setup-env.ts
+  checksum: e82558593f4614fc62127f01ea8beb95231c95826b65071eb3971f9c45332344
+- filename: test/integration/harness/launch-api.ts
+  checksum: a4549b87c896744422e71ab5395a1d6d2dfa372678d2488aecc4247ee9738f87
+- filename: test/integration/harness/session.ts
+  checksum: 74dc637304710b1df882bea6a1c52b8779f1bd416dbeeab93a9026c68edb3f9e
+- filename: test/integration/specs/launch-github.test.ts
+  checksum: 4ea1ae16627383530d7590374ba2b37fde87b5c111cc6c38c5125456aa9b51c8
+- filename: test/integration/harness/fixtures.ts
+  checksum: b3133a65f3f4b3f3a32caf0cc0bf65b0c71187f96e044a3331ddcce3adea88c1
 version: "1.0"
