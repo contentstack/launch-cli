@@ -40,6 +40,21 @@ export default tseslint.config(
       // test files use @ts-nocheck and scaffolding vars that aren't all referenced
       '@typescript-eslint/ban-ts-comment': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
+      // harness mirrors untyped CLI payloads, and jest.mock factories must use require()
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+  {
+    files: ['*.config.js'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: {
+        module: 'writable',
+        require: 'readonly',
+        process: 'readonly',
+        __dirname: 'readonly',
+      },
     },
   },
 );
