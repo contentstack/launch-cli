@@ -152,9 +152,9 @@ gone; do not reintroduce them, and do not "simplify" the loader back to a bare `
 
 `test/integration/compiled-load-data-url.test.ts` guards this: it compiles the loader with the
 project's own `compilerOptions` and runs the emitted CommonJS in a child `node` process against a
-real `data:` URL. It has to be a child process — jest's VM cannot service a native dynamic import
-without `--experimental-vm-modules` — and it deliberately lives outside `src/util/cloud-function/`,
-which `jest.config.js` excludes from coverage collection.
+real `data:` URL. It has to be a child process, because jest's own VM cannot service a native
+dynamic import even with `--experimental-vm-modules`: the flag lets the suite run, but a compiled
+`require()` regression would still have to be caught outside it.
 
 ## Commits
 
