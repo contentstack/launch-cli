@@ -19,6 +19,10 @@ export class MissingInputError extends UsageError {
   }
 }
 
+function isAbsent(value: unknown): boolean {
+  return value === undefined || value === null;
+}
+
 export interface ResolveArgs {
   parsed: Partial<Record<FlagKey, unknown>>;
   projectConfig: Record<string, unknown>;
@@ -36,24 +40,28 @@ export async function resolveInputs<K extends FlagKey>(
     const rule = resolution[key];
     let value = args.parsed[key];
 
-    if (value === undefined && rule.configPath) {
+    if (isAbsent(value) && rule.configPath) {
       value = getByPath(args.projectConfig, rule.configPath);
     }
 
-    if (value === undefined && rule.prompt && args.services.isTTY) {
+    if (isAbsent(value) && rule.prompt && args.services.isTTY) {
       value = await rule.prompt({ services: args.services, resolved });
     }
 
-    if (value === undefined && rule.default !== undefined) {
+    if (isAbsent(value) && rule.default !== undefined) {
       value = rule.default;
     }
 
-    if (value !== undefined && rule.normalize) {
+    if (!isAbsent(value) && rule.normalize) {
       value = await rule.normalize(value, { services: args.services, resolved });
     }
 
-    if (value === undefined && spec[key].required) {
-      throw new MissingInputError(key);
+    if (isAbsent(value)) {
+      if (spec[key].required) {
+        throw new MissingInputError(key);
+      }
+
+      value = undefined;
     }
 
     resolved[key] = value;

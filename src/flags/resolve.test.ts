@@ -195,6 +195,48 @@ describe('resolveInputs', () => {
     expect(resolved.project).toBe(PROJECT_UID);
   });
 
+  it('treats a null organizationUid in the config file as absent and reports the missing input', async () => {
+    const promise = resolveInputs(inputs({ org: { required: true } }), {
+      parsed: {},
+      projectConfig: { organizationUid: null },
+      services: services(),
+    });
+
+    await expect(promise).rejects.toBeInstanceOf(MissingInputError);
+    await expect(promise).rejects.toThrow('Missing required value for --org.');
+  });
+
+  it('prompts when the config file holds a null value rather than accepting it', async () => {
+    const resolved = await resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
+      parsed: { org: 'org1' },
+      projectConfig: { uid: null },
+      services: services({ isTTY: true, answer: PROJECT_UID }),
+    });
+
+    expect(resolved.project).toBe(PROJECT_UID);
+  });
+
+  it('falls through to the default when the flag value is null', async () => {
+    const resolved = await resolveInputs(inputs({ limit: {}, skip: {} }), {
+      parsed: { limit: null, skip: null },
+      projectConfig: {},
+      services: services(),
+    });
+
+    expect(resolved).toEqual({ limit: 50, skip: 0 });
+  });
+
+  it('leaves an optional input resolved from a null config value undefined rather than null', async () => {
+    const resolved = await resolveInputs(inputs({ project: {} }), {
+      parsed: {},
+      projectConfig: { uid: null },
+      services: services(),
+    });
+
+    expect(resolved.project).toBeUndefined();
+    expect(resolved.project).not.toBeNull();
+  });
+
   it('does not normalise a project input that resolved to nothing', async () => {
     const resolved = await resolveInputs(inputs({ org: { required: true }, project: {} }), {
       parsed: { org: 'org1' },

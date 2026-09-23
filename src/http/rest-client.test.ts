@@ -101,6 +101,23 @@ describe('RestApiClient', () => {
     });
   });
 
+  it.each([[null], [0], ['']])('sends a falsy body %p rather than treating it as absent', async (body) => {
+    const http = fakeHttpClient([{ status: 200, data: {} }]);
+
+    await buildClient(http).request({ method: 'POST', path: '/projects', body });
+
+    expect(http.calls).toHaveLength(1);
+    expect(http.calls[0].body).toBe(body);
+  });
+
+  it('omits the payload only when the body is undefined', async () => {
+    const http = fakeHttpClient([{ status: 200, data: {} }]);
+
+    await buildClient(http).request({ method: 'POST', path: '/projects', body: undefined });
+
+    expect(http.calls[0].body).toBeUndefined();
+  });
+
   it('refreshes auth once on 401 and retries', async () => {
     const http = fakeHttpClient([
       { status: 401, data: {} },
