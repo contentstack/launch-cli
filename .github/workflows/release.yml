@@ -48,12 +48,22 @@ jobs:
           path: dist
       - name: Display dirs
         run: ls -R
+      - name: Determine npm dist-tag
+        id: dist-tag
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          case "$version" in
+            *-alpha*|*-beta*|*-rc*) tag=beta ;;
+            *) tag=latest ;;
+          esac
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
       - name: Release
         id: release-plugin
         uses: JS-DevTools/npm-publish@v3
         with:
           token: "${{ secrets.NPM_TOKEN }}"
           access: public
+          tag: ${{ steps.dist-tag.outputs.tag }}
       - name: get-npm-version
         id: package-version
         uses: martinbeentjes/npm-get-version-action@v1.3.1
