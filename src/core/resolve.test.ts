@@ -198,7 +198,7 @@ describe('resolveInputs', () => {
 
   it('reads the project uid straight out of the config block', async () => {
     const resolved = await resolveInputs(inputs({ org: {}, project: { required: true } }), {
-      parsed: {},
+      parsed: { org: 'org1' },
       projectConfig: { uid: PROJECT_UID },
       services: services(),
     });
@@ -549,6 +549,60 @@ describe('resolveInputs dependency ordering', () => {
 
     await expect(promise).rejects.toBeInstanceOf(InputDependencyError);
     await expect(promise).rejects.toThrow('--org -> --project -> --org is a dependency cycle.');
+  });
+
+  it('refuses to normalise a value whose declared dependency resolved to nothing', async () => {
+    const seen: unknown[] = [];
+
+    const promise = resolveInputs(inputs({ org: {}, project: {} }), {
+      parsed: { project: 'Project One' },
+      projectConfig: {},
+      services: recordingServices(seen),
+    });
+
+    await expect(promise).rejects.toBeInstanceOf(MissingInputError);
+    await expect(promise).rejects.toThrow('Missing required value for --org.');
+    expect(seen).toEqual([]);
+  });
+
+  it('refuses to prompt for a value whose declared dependency resolved to nothing', async () => {
+    const seen: unknown[] = [];
+
+    const promise = resolveInputs(inputs({ org: {}, project: {} }), {
+      parsed: {},
+      projectConfig: {},
+      services: { ...recordingServices(seen), isTTY: true },
+    });
+
+    await expect(promise).rejects.toBeInstanceOf(MissingInputError);
+    await expect(promise).rejects.toThrow('Missing required value for --org.');
+    expect(seen).toEqual([]);
+  });
+
+  it('leaves both inputs undefined when neither the dependency nor the dependent was supplied', async () => {
+    const seen: unknown[] = [];
+
+    const resolved = await resolveInputs(inputs({ org: {}, project: {} }), {
+      parsed: {},
+      projectConfig: {},
+      services: { ...recordingServices(seen), isTTY: false },
+    });
+
+    expect(resolved).toEqual({ org: undefined, project: undefined });
+    expect(seen).toEqual([]);
+  });
+
+  it('normalises as usual once the declared dependency resolved to a value', async () => {
+    const seen: unknown[] = [];
+
+    const resolved = await resolveInputs(inputs({ org: {}, project: {} }), {
+      parsed: { org: 'org1', project: 'Project One' },
+      projectConfig: {},
+      services: recordingServices(seen),
+    });
+
+    expect(resolved).toEqual({ org: 'org1', project: PROJECT_UID });
+    expect(seen).toEqual(['org1']);
   });
 
   it('restores the catalog order for inputs that declare no dependency at all', async () => {
