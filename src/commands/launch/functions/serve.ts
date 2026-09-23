@@ -1,4 +1,3 @@
-import { FlagInput } from '@contentstack/cli-utilities';
 import { Command } from '@oclif/core';
 
 import Contentfly from '../../../functions';
@@ -15,7 +14,7 @@ export default class Functions extends Command {
     '$ csdx launch:functions:serve --data-dir <path/of/current/working/dir> -p <port-number>',
   ];
 
-  static flags: FlagInput = serveFlags as unknown as FlagInput;
+  static flags = serveFlags;
 
   async init(): Promise<void> {
     const { flags } = await this.parse(Functions);
