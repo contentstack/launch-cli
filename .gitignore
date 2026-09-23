@@ -18,3 +18,6 @@ dependabot.yml
 /functions
 coverage/
 .compiled-loader-*/
+
+# Holds a registry auth token. Never commit it.
+.npmrc
