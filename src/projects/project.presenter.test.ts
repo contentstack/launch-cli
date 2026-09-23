@@ -1,4 +1,10 @@
-import { projectDeleteQuestion, projectDeletedLine, projectUpdatedLines } from './project.presenter';
+import {
+  deploymentFailureMessage,
+  projectCreatedFields,
+  projectDeleteQuestion,
+  projectDeletedLine,
+  projectUpdatedLines,
+} from './project.presenter';
 
 describe('projectDeleteQuestion', () => {
   it('names the project it is about to delete and says the change is permanent', () => {
@@ -51,5 +57,73 @@ describe('projectUpdatedLines', () => {
 
   it('prints nothing when no field was requested', () => {
     expect(projectUpdatedLines({}, { uid: 'p1', name: 'Renamed Site' })).toEqual([]);
+  });
+});
+
+describe('project create presentation', () => {
+  it('reports uid, name, type and the site url of a created project', () => {
+    expect(
+      projectCreatedFields(
+        { uid: 'p1', name: 'My Site', projectType: 'GITPROVIDER' },
+        'https://my-site.example.test',
+      ),
+    ).toEqual([
+      ['uid', 'p1'],
+      ['name', 'My Site'],
+      ['type', 'GITPROVIDER'],
+      ['url', 'https://my-site.example.test'],
+    ]);
+  });
+
+  it('falls back to an empty cell for every field the API left out, including the url', () => {
+    expect(projectCreatedFields({ uid: 'p1' } as never)).toEqual([
+      ['uid', 'p1'],
+      ['name', ''],
+      ['type', ''],
+      ['url', ''],
+    ]);
+  });
+
+  it('falls back to an empty cell when even the uid is missing', () => {
+    expect(projectCreatedFields({} as never, undefined)).toEqual([
+      ['uid', ''],
+      ['name', ''],
+      ['type', ''],
+      ['url', ''],
+    ]);
+  });
+
+  it('says the project and environment survived a failed deployment and how to retry and inspect it', () => {
+    const message = deploymentFailureMessage({
+      org: 'org1',
+      projectName: 'My Site',
+      projectUid: 'p1',
+      environmentName: 'Default',
+      environmentUid: 'e1',
+      deploymentUid: 'd1',
+      status: 'FAILED',
+    });
+
+    expect(message).toBe(
+      'The deployment did not succeed; its last status was FAILED. ' +
+        'The project "My Site" (p1) and its environment "Default" were created and have not been rolled back. ' +
+        'Run csdx launch:deployments:create --org org1 --project p1 --environment e1 to try the deployment again, ' +
+        'or csdx launch:logs:get --org org1 --project p1 --environment e1 --deployment d1 ' +
+        'to see why it did not succeed.',
+    );
+  });
+
+  it('leaves out the scope it does not have rather than naming an undefined one', () => {
+    const message = deploymentFailureMessage({
+      org: 'org1',
+      projectName: 'My Site',
+      projectUid: 'p1',
+      environmentName: 'Default',
+      status: 'NONE',
+    });
+
+    expect(message).not.toContain('undefined');
+    expect(message).toContain('Run csdx launch:deployments:create --org org1 --project p1 to try the deployment again');
+    expect(message).toContain('or csdx launch:logs:get --org org1 --project p1 to see why it did not succeed.');
   });
 });

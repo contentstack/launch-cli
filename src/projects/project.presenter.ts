@@ -25,6 +25,39 @@ export function projectDeletedLine(project: Project, reference: string): string 
   return `\u2714 Project "${project.name || reference}" deleted.`;
 }
 
+export interface PartialCreateFailure {
+  projectName: string;
+  projectUid: string;
+  environmentName: string;
+  status: string;
+  org: string;
+  environmentUid?: string;
+  deploymentUid?: string;
+}
+
+export function projectCreatedFields(project: Project, siteUrl?: string): [string, string][] {
+  return [
+    ['uid', project.uid ?? ''],
+    ['name', project.name ?? ''],
+    ['type', project.projectType ?? ''],
+    ['url', siteUrl ?? ''],
+  ];
+}
+
+export function deploymentFailureMessage(failure: PartialCreateFailure): string {
+  const scope = `--org ${failure.org} --project ${failure.projectUid}`;
+  const environment = failure.environmentUid === undefined ? '' : ` --environment ${failure.environmentUid}`;
+  const deployment = failure.deploymentUid === undefined ? '' : ` --deployment ${failure.deploymentUid}`;
+
+  return (
+    `The deployment did not succeed; its last status was ${failure.status}. ` +
+    `The project "${failure.projectName}" (${failure.projectUid}) and its environment ` +
+    `"${failure.environmentName}" were created and have not been rolled back. ` +
+    `Run csdx launch:deployments:create ${scope}${environment} to try the deployment again, ` +
+    `or csdx launch:logs:get ${scope}${environment}${deployment} to see why it did not succeed.`
+  );
+}
+
 export const PROJECT_UPDATABLE_FIELDS: (keyof ProjectUpdate)[] = ['name', 'description'];
 
 export function projectUpdatedLines(requested: ProjectUpdate, updated: Project): string[] {

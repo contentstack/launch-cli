@@ -3,7 +3,15 @@ import { UsageError } from '../core/errors';
 import { LaunchApiError } from '../transport/errors';
 import { RestApiClient, RestRequest } from '../transport/rest-client';
 import { PROJECT_ERROR_MESSAGES } from './project.errors';
-import { Project, ProjectResponse, ProjectUpdate, ProjectsPage } from './types';
+import {
+  CreateProjectInput,
+  DetectedFramework,
+  Project,
+  ProjectResponse,
+  ProjectUpdate,
+  ProjectsPage,
+  SignedUploadUrl,
+} from './types';
 
 export * from './types';
 
@@ -38,6 +46,28 @@ export interface GetProjectParams {
 export interface DeleteProjectParams {
   org: string;
   project: string;
+}
+
+export interface CreateProjectParams {
+  org: string;
+  input: CreateProjectInput;
+}
+
+export interface SignedUploadUrlParams {
+  org: string;
+}
+
+export interface GitFrameworkParams {
+  org: string;
+  provider: string;
+  repoName: string;
+  branchName: string;
+  namespace?: string;
+}
+
+export interface FileFrameworkParams {
+  org: string;
+  uploadUid: string;
 }
 
 export interface UpdateProjectParams {
@@ -150,6 +180,68 @@ export class ProjectsApi {
     }
 
     return response.project as Project;
+  }
+
+  async create(params: CreateProjectParams): Promise<Project> {
+    const response = await this.request<ProjectResponse>({
+      method: 'POST',
+      path: '/projects',
+      orgUid: params.org,
+      body: params.input,
+    });
+
+    if (!isRecord(response) || !isRecord(response.project)) {
+      throw malformed('The Launch API returned a project response without a project.');
+    }
+
+    return response.project as Project;
+  }
+
+  async signedUploadUrl(params: SignedUploadUrlParams): Promise<SignedUploadUrl> {
+    const response = await this.request<SignedUploadUrl>({
+      method: 'GET',
+      path: '/projects/upload/signed_url',
+      orgUid: params.org,
+    });
+
+    if (!isRecord(response) || typeof response.uploadUrl !== 'string' || typeof response.uploadUid !== 'string') {
+      throw malformed('The Launch API returned an upload response without an upload URL and uid.');
+    }
+
+    return response as unknown as SignedUploadUrl;
+  }
+
+  gitFramework(params: GitFrameworkParams): Promise<DetectedFramework> {
+    return this.framework({
+      method: 'GET',
+      path: '/projects/framework',
+      orgUid: params.org,
+      query: {
+        provider: params.provider,
+        repoName: params.repoName,
+        branchName: params.branchName,
+        namespace: params.namespace,
+      },
+    });
+  }
+
+  fileFramework(params: FileFrameworkParams): Promise<DetectedFramework> {
+    return this.framework({
+      method: 'GET',
+      path: '/projects/file-framework',
+      orgUid: params.org,
+      query: { uploadUid: params.uploadUid },
+    });
+  }
+
+  private async framework(req: RestRequest): Promise<DetectedFramework> {
+    const response = await this.request<DetectedFramework>(req);
+
+    if (!isRecord(response)) {
+      throw malformed('The Launch API returned a framework response that was not an object.');
+    }
+
+    return response;
   }
 
   async delete(params: DeleteProjectParams): Promise<void> {

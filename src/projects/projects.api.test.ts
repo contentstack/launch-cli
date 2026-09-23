@@ -439,3 +439,119 @@ describe('ProjectsApi.update', () => {
     ).rejects.toBe(failure);
   });
 });
+
+describe('ProjectsApi create and detection endpoints', () => {
+  const CREATE_INPUT = {
+    name: 'sample-project',
+    projectType: 'FILEUPLOAD' as const,
+    environment: {
+      name: 'Default',
+      buildCommand: 'npm run build',
+      outputDirectory: './',
+      frameworkPreset: 'OTHER' as const,
+      environmentVariables: [],
+    },
+    fileUpload: { uploadUid: 'upload-uid' },
+  };
+
+  it('posts the create body to /projects and unwraps the project envelope', async () => {
+    const project = { uid: 'p1', name: 'sample-project', projectType: 'FILEUPLOAD' };
+    const { client, requests } = fakeRestClient({ project });
+
+    const result = await new ProjectsApi(client).create({ org: 'org1', input: CREATE_INPUT });
+
+    expect(result).toBe(project);
+    expect(requests[0]).toEqual({
+      method: 'POST',
+      path: '/projects',
+      orgUid: 'org1',
+      body: CREATE_INPUT,
+    });
+  });
+
+  it('raises a malformed-response error when create returns no project envelope', async () => {
+    const { client } = fakeRestClient({ uid: 'p1' });
+
+    await expect(new ProjectsApi(client).create({ org: 'org1', input: CREATE_INPUT })).rejects.toThrow(
+      'The Launch API returned a project response without a project.',
+    );
+  });
+
+  it('raises a malformed-response error when create returns nothing at all', async () => {
+    const { client } = fakeRestClient(undefined);
+
+    await expect(new ProjectsApi(client).create({ org: 'org1', input: CREATE_INPUT })).rejects.toThrow(
+      LaunchApiError,
+    );
+  });
+
+  it('asks for a signed upload url as an org-scoped GET', async () => {
+    const signed = { uploadUrl: 'https://uploads.example.test/x', uploadUid: 'upload-uid', method: 'PUT' };
+    const { client, requests } = fakeRestClient(signed);
+
+    const result = await new ProjectsApi(client).signedUploadUrl({ org: 'org1' });
+
+    expect(result).toBe(signed);
+    expect(requests[0]).toEqual({ method: 'GET', path: '/projects/upload/signed_url', orgUid: 'org1' });
+  });
+
+  it('raises a malformed-response error when the signed url response is unusable', async () => {
+    for (const body of [undefined, {}, { uploadUrl: 'https://x' }, { uploadUid: 'u' }, { uploadUrl: 1, uploadUid: 'u' }]) {
+      const { client } = fakeRestClient(body);
+
+      await expect(new ProjectsApi(client).signedUploadUrl({ org: 'org1' })).rejects.toThrow(
+        'The Launch API returned an upload response without an upload URL and uid.',
+      );
+    }
+  });
+
+  it('detects a framework from a git repository and branch', async () => {
+    const detected = { framework: 'NEXTJS', buildCommand: 'npm run build', outputDirectory: '.next' };
+    const { client, requests } = fakeRestClient(detected);
+
+    const result = await new ProjectsApi(client).gitFramework({
+      org: 'org1',
+      provider: 'GitHub',
+      repoName: 'my-org/my-repo',
+      branchName: 'main',
+      namespace: 'my-org',
+    });
+
+    expect(result).toBe(detected);
+    expect(requests[0]).toEqual({
+      method: 'GET',
+      path: '/projects/framework',
+      orgUid: 'org1',
+      query: { provider: 'GitHub', repoName: 'my-org/my-repo', branchName: 'main', namespace: 'my-org' },
+    });
+  });
+
+  it('detects a framework from an uploaded bundle', async () => {
+    const detected = { framework: 'OTHER' };
+    const { client, requests } = fakeRestClient(detected);
+
+    const result = await new ProjectsApi(client).fileFramework({ org: 'org1', uploadUid: 'upload-uid' });
+
+    expect(result).toBe(detected);
+    expect(requests[0]).toEqual({
+      method: 'GET',
+      path: '/projects/file-framework',
+      orgUid: 'org1',
+      query: { uploadUid: 'upload-uid' },
+    });
+  });
+
+  it('raises a malformed-response error when a framework response is not an object', async () => {
+    const { client } = fakeRestClient(null);
+
+    await expect(new ProjectsApi(client).fileFramework({ org: 'org1', uploadUid: 'u' })).rejects.toThrow(
+      'The Launch API returned a framework response that was not an object.',
+    );
+  });
+
+  it('accepts a framework response that names nothing it detected', async () => {
+    const { client } = fakeRestClient({});
+
+    await expect(new ProjectsApi(client).fileFramework({ org: 'org1', uploadUid: 'u' })).resolves.toEqual({});
+  });
+});

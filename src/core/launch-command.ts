@@ -27,6 +27,7 @@ export interface ResolveLaunchContextArgs<S extends AnyInputs> {
 export interface ResolveLaunchContextResult<S extends AnyInputs> {
   services: ServiceContext;
   resolved: Resolved<S>;
+  dataDir: string;
 }
 
 export async function resolveLaunchContext<S extends AnyInputs>(
@@ -50,7 +51,7 @@ export async function resolveLaunchContext<S extends AnyInputs>(
     rules: args.rules,
   });
 
-  return { services, resolved };
+  return { services, resolved, dataDir };
 }
 
 function stringFlag(value: unknown): string | undefined {
@@ -69,6 +70,7 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
 
   protected services!: ServiceContext;
   protected resolved!: Resolved<S>;
+  protected dataDir!: string;
   protected ux: UxLike = cliux as unknown as UxLike;
 
   protected get launchRegion(): RegionLike | undefined {
@@ -85,7 +87,7 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
       strict: true,
     });
 
-    const { services, resolved } = await resolveLaunchContext<S>({
+    const { services, resolved, dataDir } = await resolveLaunchContext<S>({
       flags: flags as Partial<Record<FlagKey, unknown>>,
       inputs: this.contract.inputs as S,
       rules: this.contract.rules,
@@ -97,6 +99,7 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
 
     this.services = services;
     this.resolved = resolved;
+    this.dataDir = dataDir;
   }
 
   protected async confirm(message: string): Promise<void> {

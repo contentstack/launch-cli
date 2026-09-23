@@ -1,4 +1,15 @@
+import { EXIT_RUNTIME } from '../core/constants';
+import { LaunchError } from '../core/errors';
 import type { ErrorMessages } from '../transport/errors';
+
+export class UploadFailedError extends LaunchError {
+  readonly exitCode = EXIT_RUNTIME;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'UploadFailedError';
+  }
+}
 
 export const PROJECT_ERROR_MESSAGES: ErrorMessages = {
   'launch.PROJECT.DUPLICATE_NAME': 'A project with that name already exists in this organization.',
