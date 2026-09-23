@@ -5,8 +5,8 @@ import { renderDetail } from '../../../output/render';
 
 export function projectDetailFields(project: Project): [string, string][] {
   return [
-    ['uid', project.uid],
-    ['name', project.name],
+    ['uid', project.uid ?? ''],
+    ['name', project.name ?? ''],
     ['description', project.description ?? ''],
     ['type', project.projectType ?? ''],
   ];

@@ -62,6 +62,14 @@ describe('launch:projects:get', () => {
     expect(lines).toEqual([`uid   ${'a'.repeat(24)}`, 'name  site']);
   });
 
+  it('renders nothing rather than crashing for a project carrying neither a uid nor a name', async () => {
+    const { command, lines } = commandUnderTest({});
+
+    await command.run();
+
+    expect(lines).toEqual([]);
+  });
+
   it('declares org and project as required', () => {
     expect(ProjectsGet.inputs).toEqual({ org: { required: true }, project: { required: true } });
     expect(Object.keys(ProjectsGet.flags).sort()).toEqual(['org', 'project']);

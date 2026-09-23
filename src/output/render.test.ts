@@ -65,6 +65,44 @@ describe('renderTable', () => {
 
     expect(lines).toEqual(['ID', 'very-long-id-value']);
   });
+
+  it('renders a blank cell rather than crashing when a column yields no value', () => {
+    const { ux, lines } = fakeUx();
+
+    renderTable(
+      ux,
+      [
+        { header: 'UID', value: (row: { uid?: string }) => row.uid as string },
+        { header: 'NAME', value: () => 'site' },
+      ],
+      [{}],
+    );
+
+    expect(lines).toEqual(['UID  NAME', '     site']);
+  });
+
+  it('pads a middle column to its widest cell and leaves the last column unpadded', () => {
+    const { ux, lines } = fakeUx();
+
+    renderTable(
+      ux,
+      [
+        { header: 'A', value: (row: { a: string; b: string; c: string }) => row.a },
+        { header: 'B', value: (row: { a: string; b: string; c: string }) => row.b },
+        { header: 'C', value: (row: { a: string; b: string; c: string }) => row.c },
+      ],
+      [
+        { a: 'a1', b: 'a-very-wide-middle-cell', c: 'c1' },
+        { a: 'a2', b: 'b2', c: 'c2' },
+      ],
+    );
+
+    expect(lines).toEqual([
+      'A   B                        C',
+      'a1  a-very-wide-middle-cell  c1',
+      'a2  b2                       c2',
+    ]);
+  });
 });
 
 describe('renderDetail', () => {
@@ -90,6 +128,17 @@ describe('renderDetail', () => {
     ]);
 
     expect(lines).toEqual([]);
+  });
+
+  it('skips a field whose value is absent rather than printing undefined', () => {
+    const { ux, lines } = fakeUx();
+
+    renderDetail(ux, [
+      ['uid', undefined as unknown as string],
+      ['name', 'site'],
+    ]);
+
+    expect(lines).toEqual(['name  site']);
   });
 
   it('aligns a single non-empty field', () => {

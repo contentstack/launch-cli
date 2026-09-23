@@ -4,8 +4,8 @@ import { flagsFor, inputs } from '../../../flags/inputs';
 import { TableColumn, renderPagination, renderTable } from '../../../output/render';
 
 export const PROJECT_COLUMNS: TableColumn<Project>[] = [
-  { header: 'UID', value: (project) => project.uid },
-  { header: 'NAME', value: (project) => project.name },
+  { header: 'UID', value: (project) => project.uid ?? '-' },
+  { header: 'NAME', value: (project) => project.name ?? '-' },
   { header: 'TYPE', value: (project) => project.projectType ?? '-' },
   { header: 'UPDATED', value: (project) => project.updatedAt ?? '-' },
 ];

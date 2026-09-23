@@ -18,7 +18,7 @@ export function renderTable<T>(ux: UxLike, columns: TableColumn<T>[], rows: T[])
     return;
   }
 
-  const cells = rows.map((row) => columns.map((column) => column.value(row)));
+  const cells = rows.map((row) => columns.map((column) => column.value(row) ?? ''));
   const widths = columns.map((column, index) =>
     Math.max(column.header.length, ...cells.map((rowCells) => rowCells[index].length)),
   );
@@ -35,7 +35,9 @@ export function renderTable<T>(ux: UxLike, columns: TableColumn<T>[], rows: T[])
 }
 
 export function renderDetail(ux: UxLike, fields: [string, string][]): void {
-  const present = fields.filter(([, value]) => value !== '');
+  const present = fields
+    .map(([label, value]) => [label, value ?? ''] as [string, string])
+    .filter(([, value]) => value !== '');
   const width = Math.max(0, ...present.map(([label]) => label.length));
 
   for (const [label, value] of present) {

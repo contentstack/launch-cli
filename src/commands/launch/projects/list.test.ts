@@ -58,6 +58,18 @@ describe('launch:projects:list', () => {
     expect(lines[1]).toBe('p1   site  -     -');
   });
 
+  it('renders a placeholder for a project row carrying neither a uid nor a name', async () => {
+    const { command, lines } = commandUnderTest({
+      pagination: { count: 1, limit: 50, skip: 0 },
+      projects: [{}],
+    });
+
+    await command.run();
+
+    expect(lines[0]).toBe('UID  NAME  TYPE  UPDATED');
+    expect(lines[1]).toBe('-    -     -     -');
+  });
+
   it('declares org as required and limit and skip as optional', () => {
     expect(ProjectsList.inputs).toEqual({ org: { required: true }, limit: {}, skip: {} });
     expect(Object.keys(ProjectsList.flags).sort()).toEqual(['limit', 'org', 'skip']);
