@@ -26,4 +26,16 @@ fileignoreconfig:
     - "headers\\?\\.reduce\\(\\(acc, \\{ key, value \\}\\)"
     - "\\(\\{ key, value \\}\\) => \\(\\{ key, value \\}\\)\\)"
     - "const \\{ token, apiKey \\} = configHandler\\.get"
+- filename: test/fixtures/project-get.json
+  ignore_detectors:
+    - filecontent
+- filename: test/fixtures/projects-list.json
+  ignore_detectors:
+    - filecontent
+- filename: test/integration/projects-get.test.ts
+  ignore_detectors:
+    - filecontent
+- filename: test/integration/projects-list.test.ts
+  ignore_detectors:
+    - filecontent
 version: "1.0"

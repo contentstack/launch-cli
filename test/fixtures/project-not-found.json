@@ -1,0 +1,9 @@
+{
+  "errors": [
+    {
+      "code": "launch.PROJECT.NOT_FOUND",
+      "message": "Project not found."
+    }
+  ],
+  "status": 404
+}

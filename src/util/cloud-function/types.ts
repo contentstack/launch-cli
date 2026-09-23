@@ -8,7 +8,7 @@ import {
 export type CloudFunctionResource = {
   cloudFunctionFilePath: string,
   apiResourceURI: string
-  handler: Function
+  handler: (...args: unknown[]) => unknown
 };
 
 export type CloudFunctionValidationError = TopLevelDynamicRouteError |

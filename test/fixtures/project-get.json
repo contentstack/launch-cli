@@ -1,0 +1,19 @@
+{
+  "project": {
+    "uid": "a1b2c3d4e5f60718293a4b5c",
+    "name": "sample-project",
+    "organizationUid": "blt4d9e2a7c1f6b3085",
+    "repository": {
+      "repositoryName": "octo-user/sample-project",
+      "username": "octo-user",
+      "repositoryUrl": "https://github.com/octo-user/sample-project"
+    },
+    "deletedAt": null,
+    "createdBy": "blt8c3f1b6d4a9e2075",
+    "updatedBy": "blt8c3f1b6d4a9e2075",
+    "deletedBy": null,
+    "createdAt": "2025-08-18T13:17:18.261Z",
+    "updatedAt": "2025-10-09T09:36:16.484Z",
+    "projectType": "GITPROVIDER"
+  }
+}

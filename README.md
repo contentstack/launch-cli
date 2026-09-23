@@ -2,6 +2,11 @@
 
 [![oclif](https://img.shields.io/badge/cli-oclif-brightgreen.svg)](https://oclif.io)
 
+> **This is the V2 line.** V2 ships as `@contentstack/cli-launch@2.x` from `feature/development-v2`
+> and carries only the `launch:<resource>:<verb>` taxonomy. V1 continues to ship as `1.x` from
+> `development` with its existing commands and flags, supported and un-deprecated (PRD G10).
+> The two are separate major versions of the same package; no V1 command name exists in V2.
+
 With Launch CLI, you can interact with the Contentstack Launch platform using the terminal to create, manage and deploy Launch projects.
 
 <!-- toc -->
@@ -29,13 +34,13 @@ $ csdx launch
 # Commands
 
 ```sh-session
-$ csdx launch
-start with launch flow <GitHub|FileUpload>
-$ csdx launch:logs
-To see server logs
-$ csdx launch:logs --type d
-To see deployment logs
-$ csdx launch:functions
+$ csdx launch:projects:list --org <org-uid>
+List the Launch projects in an organization
+
+$ csdx launch:projects:get --org <org-uid> --project <name-or-uid>
+Show a single project
+
+$ csdx launch:functions:serve
 Run cloud functions locally
 ```
 

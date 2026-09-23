@@ -7,6 +7,15 @@ export default tseslint.config(
   eslint.configs.recommended,
   tseslint.configs.recommended,
   {
+    files: ['jest.config.js'],
+    languageOptions: {
+      globals: {
+        module: 'writable',
+        require: 'writable',
+      },
+    },
+  },
+  {
     files: ['src/**/*.{js,ts}'],
     rules: {
       '@typescript-eslint/interface-name-prefix': 'off',
@@ -33,6 +42,13 @@ export default tseslint.config(
   },
   {
     files: ['test/**/*.{js,ts}'],
+    languageOptions: {
+      globals: {
+        module: 'writable',
+        require: 'writable',
+        Buffer: 'readonly',
+      },
+    },
     rules: {
       'max-len': 'off',
       // chai assertions (e.g. expect(x).to.be.true) read as unused expressions

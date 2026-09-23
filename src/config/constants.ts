@@ -1,0 +1,8 @@
+export const PROJECT_CONFIG_FILE = '.cs-launch.json';
+export const API_VERSION = '1.0';
+export const EXIT_OK = 0;
+export const EXIT_RUNTIME = 1;
+export const EXIT_USAGE = 2;
+export const EXIT_CANCELLED = 3;
+export const DEFAULT_LIMIT = 50;
+export const MAX_LIMIT = 100;
