@@ -1,10 +1,10 @@
-import { MAX_LIMIT, MAX_PAGES } from '../core/constants';
+import { EXIT_USAGE, MAX_LIMIT, MAX_PAGES } from '../core/constants';
 import { LaunchApiError, parseErrorEnvelope } from '../transport/errors';
 import { RestApiClient, RestRequest } from '../transport/rest-client';
 import { ProjectsPage } from './types';
 import { buildApi } from '../resources';
 import { PROJECT_ERROR_MESSAGES } from './project.errors';
-import { ProjectsApi } from './projects.api';
+import { ProjectScanLimitError, ProjectsApi } from './projects.api';
 
 function pagingRestClient(pages: { count: number; projects: { uid: string; name: string }[] }[]) {
   const requests: RestRequest[] = [];
@@ -206,16 +206,27 @@ describe('ProjectsApi', () => {
     expect(requests).toHaveLength(1);
   });
 
-  it('stops at the page ceiling when every page stays full and the count is never reached', async () => {
+  it('raises the page ceiling by name rather than reporting the scan as complete', async () => {
     const { client, requests } = pagingRestClient([
       { count: Number.NaN, projects: projectsOfSize(1, 'a') },
     ]);
 
-    const collected = await drain(new ProjectsApi(client).pages({ org: 'org1', pageSize: 1 }));
+    const rejection = await drain(new ProjectsApi(client).pages({ org: 'org1', pageSize: 1 })).catch(
+      (error: unknown) => error,
+    );
 
-    expect(collected).toHaveLength(MAX_PAGES);
+    expect(rejection).toBeInstanceOf(ProjectScanLimitError);
+    expect((rejection as Error).message).toBe(
+      `Stopped after scanning ${MAX_PAGES} pages of projects without reaching the end of the organization. ` +
+        'Pass --project with the project uid instead of its name.',
+    );
     expect(requests).toHaveLength(MAX_PAGES);
     expect(MAX_PAGES).toBe(100);
+  });
+
+  it('maps the page ceiling to the usage exit code because the caller must pass a uid instead', () => {
+    expect(new ProjectScanLimitError().exitCode).toBe(EXIT_USAGE);
+    expect(new ProjectScanLimitError().name).toBe('ProjectScanLimitError');
   });
 
   it('stops once the reported count is reached even though the last page was full', async () => {

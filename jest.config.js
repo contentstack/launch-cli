@@ -2,6 +2,7 @@
 const config = {
   preset: 'ts-jest',
   testEnvironment: 'node',
+  restoreMocks: true,
   testMatch: ['**/src/**/*.test.ts', '**/test/integration/**/*.test.ts'],
   setupFilesAfterEnv: ['<rootDir>/test/credential-guard.setup.ts'],
   moduleNameMapper: {

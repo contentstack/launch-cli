@@ -6,6 +6,7 @@ import {
   EXIT_RUNTIME,
   EXIT_USAGE,
   MAX_LIMIT,
+  MAX_PAGES,
   PROJECT_CONFIG_FILE,
 } from './constants';
 
@@ -19,5 +20,6 @@ describe('constants', () => {
     expect(EXIT_CANCELLED).toBe(3);
     expect(DEFAULT_LIMIT).toBe(50);
     expect(MAX_LIMIT).toBe(100);
+    expect(MAX_PAGES).toBe(100);
   });
 });

@@ -64,6 +64,17 @@
       "@oclif/plugin-plugins"
     ],
     "topicSeparator": ":",
+    "topics": {
+      "launch": {
+        "description": "Manage Contentstack Launch projects and cloud functions"
+      },
+      "launch:projects": {
+        "description": "Manage Launch projects"
+      },
+      "launch:functions": {
+        "description": "Run Launch cloud functions locally"
+      }
+    },
     "additionalHelpFlags": [
       "-h"
     ],

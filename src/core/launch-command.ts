@@ -33,7 +33,8 @@ export async function resolveLaunchContext<S extends AnyInputs>(
   args: ResolveLaunchContextArgs<S>,
 ): Promise<ResolveLaunchContextResult<S>> {
   const dataDir = stringFlag(args.flags['data-dir']) || process.cwd();
-  const configPath = stringFlag(args.flags.config) || resolvePath(dataDir, PROJECT_CONFIG_FILE);
+  const namedConfig = stringFlag(args.flags.config);
+  const configPath = namedConfig || resolvePath(dataDir, PROJECT_CONFIG_FILE);
 
   const services = buildServiceContext({
     launchHubUrl: args.launchHubUrl,
@@ -44,7 +45,7 @@ export async function resolveLaunchContext<S extends AnyInputs>(
 
   const resolved = await resolveInputs(args.inputs, {
     parsed: args.flags,
-    projectConfig: new ProjectConfigStore(configPath).load(),
+    projectConfig: new ProjectConfigStore(configPath, Boolean(namedConfig)).load(),
     services,
     rules: args.rules,
   });

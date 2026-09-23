@@ -51,7 +51,10 @@ function agreedBlock(entries: [string, unknown][]): Record<string, unknown> {
 }
 
 export class ProjectConfigStore {
-  constructor(readonly path: string) {}
+  constructor(
+    readonly path: string,
+    private readonly required = false,
+  ) {}
 
   load(): ProjectConfig {
     const entries = Object.entries(this.blocks());
@@ -88,19 +91,37 @@ export class ProjectConfigStore {
     writeFileSync(this.path, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
   }
 
+  private unusable(reason: string): Blocks {
+    if (this.required) {
+      throw new UsageError(reason);
+    }
+
+    return {};
+  }
+
   private blocks(): Blocks {
     if (!existsSync(this.path)) {
-      return {};
+      return this.unusable(`No config file found at '${this.path}'. Pass --config with a path that exists.`);
+    }
+
+    let contents: string;
+
+    try {
+      contents = readFileSync(this.path, 'utf8');
+    } catch {
+      return this.unusable(`Could not read the config file at '${this.path}'.`);
     }
 
     let parsed: unknown;
 
     try {
-      parsed = JSON.parse(readFileSync(this.path, 'utf8'));
+      parsed = JSON.parse(contents);
     } catch {
-      return {};
+      return this.unusable(`The config file at '${this.path}' is not valid JSON.`);
     }
 
-    return isBlock(parsed) ? parsed : {};
+    return isBlock(parsed)
+      ? parsed
+      : this.unusable(`The config file at '${this.path}' does not hold a project config.`);
   }
 }

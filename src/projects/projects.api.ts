@@ -1,4 +1,5 @@
 import { MAX_LIMIT, MAX_PAGES } from '../core/constants';
+import { UsageError } from '../core/errors';
 import { LaunchApiError } from '../transport/errors';
 import { RestApiClient, RestRequest } from '../transport/rest-client';
 import { PROJECT_ERROR_MESSAGES } from './project.errors';
@@ -30,6 +31,16 @@ export interface PageProjectsParams {
 export interface GetProjectParams {
   org: string;
   project: string;
+}
+
+export class ProjectScanLimitError extends UsageError {
+  constructor() {
+    super(
+      `Stopped after scanning ${MAX_PAGES} pages of projects without reaching the end of the organization. ` +
+        'Pass --project with the project uid instead of its name.',
+    );
+    this.name = 'ProjectScanLimitError';
+  }
 }
 
 export class ProjectsApi {
@@ -81,6 +92,8 @@ export class ProjectsApi {
         return;
       }
     }
+
+    throw new ProjectScanLimitError();
   }
 
   async get(params: GetProjectParams): Promise<Project> {

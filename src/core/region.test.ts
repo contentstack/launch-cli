@@ -46,6 +46,19 @@ describe('resolveLaunchHubUrl', () => {
     expect(resolveLaunchHubUrl({ cma: 'api.audio.io' })).toBe('https://launch-api.audio.com');
   });
 
+  it('rewrites the host of a cma url that carries a path, leaving the path where it was', () => {
+    expect(resolveLaunchHubUrl({ cma: 'https://api.contentstack.io/v3' })).toBe(
+      'https://launch-api.contentstack.com/v3',
+    );
+  });
+
+  it.each([['api.studio.io.example.com'], ['api.contentstackio'], ['api.iodine.com']])(
+    'leaves %s alone because its host does not end in a dot io label',
+    (cma) => {
+      expect(resolveLaunchHubUrl({ cma })).toBe(`https://${cma.replace('api', 'launch-api')}`);
+    },
+  );
+
   it('leaves a host that does not end in io alone', () => {
     expect(resolveLaunchHubUrl({ cma: 'api.csnonprod.com' })).toBe('https://launch-api.csnonprod.com');
   });

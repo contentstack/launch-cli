@@ -32,17 +32,13 @@ describe('resolution', () => {
     expect(Object.keys(table).sort()).toEqual(Object.keys(catalog).sort());
   });
 
-  it('does not silently pass when a catalog flag is missing a resolution entry', () => {
-    const incomplete = { ...table } as Record<string, unknown>;
-    delete incomplete.skip;
+  it.each(Object.keys(catalog))('carries a spec the resolver can run for the catalog flag %s', (flag) => {
+    const spec = table[flag as keyof typeof table];
 
-    expect(Object.keys(incomplete).sort()).not.toEqual(Object.keys(catalog).sort());
-  });
-
-  it('does not silently pass when resolution has an entry the catalog does not', () => {
-    const withExtra = { ...table, bogus: {} } as Record<string, unknown>;
-
-    expect(Object.keys(withExtra).sort()).not.toEqual(Object.keys(catalog).sort());
+    expect(spec).toBeDefined();
+    expect(typeof spec).toBe('object');
+    expect(['undefined', 'function']).toContain(typeof spec.prompt);
+    expect(['undefined', 'function']).toContain(typeof spec.normalize);
   });
 
   it('reads org from organizationUid and project from uid in the config file', () => {

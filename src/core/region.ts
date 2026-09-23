@@ -28,11 +28,10 @@ export function resolveLaunchHubUrl(region: RegionLike | undefined): string {
     host = host.replace('dev11', 'dev');
   }
 
-  if (host.endsWith('io')) {
-    host = `${host.slice(0, -2)}com`;
-  }
+  const [hostName, ...path] = host.split('/');
+  const onComDomain = hostName.endsWith('.io') ? `${hostName.slice(0, -'.io'.length)}.com` : hostName;
 
-  return `https://${host}`;
+  return `https://${[onComDomain, ...path].join('/')}`;
 }
 
 export function getManageApiBaseUrl(launchHubUrl: string): string {

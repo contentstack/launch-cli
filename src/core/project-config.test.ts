@@ -30,6 +30,56 @@ afterEach(() => {
   tempDirs.length = 0;
 });
 
+describe('ProjectConfigStore.load from a path the user named', () => {
+  it('refuses a path that does not exist rather than behaving as if the file were empty', () => {
+    const path = join(tempPath(), 'missing.json');
+    const store = new ProjectConfigStore(path, true);
+
+    expect(() => store.load()).toThrow(UsageError);
+    expect(() => store.load()).toThrow(`No config file found at '${path}'.`);
+  });
+
+  it('refuses a directory rather than swallowing the read failure', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'launch-cfg-dir-'));
+    tempDirs.push(dir);
+    const store = new ProjectConfigStore(dir, true);
+
+    expect(() => store.load()).toThrow(UsageError);
+    expect(() => store.load()).toThrow(`Could not read the config file at '${dir}'.`);
+  });
+
+  it('refuses a file that is not valid JSON', () => {
+    const path = tempPath();
+    writeFileSync(path, '{ not json');
+    const store = new ProjectConfigStore(path, true);
+
+    expect(() => store.load()).toThrow(UsageError);
+    expect(() => store.load()).toThrow(`The config file at '${path}' is not valid JSON.`);
+  });
+
+  it.each([['[]'], ['"text"'], ['7'], ['null']])('refuses the JSON %s because it holds no config blocks', (contents) => {
+    const path = tempPath();
+    writeFileSync(path, contents);
+    const store = new ProjectConfigStore(path, true);
+
+    expect(() => store.load()).toThrow(UsageError);
+    expect(() => store.load()).toThrow(`The config file at '${path}' does not hold a project config.`);
+  });
+
+  it('loads a usable file exactly as the implicit path would', () => {
+    const path = tempPath();
+    writeFileSync(path, JSON.stringify({ project: { uid: 'p1', organizationUid: 'org1' } }));
+
+    expect(new ProjectConfigStore(path, true).load()).toEqual({ uid: 'p1', organizationUid: 'org1' });
+  });
+
+  it.each([[false], [undefined]])('stays silent about an unusable file when required is %p', (required) => {
+    const path = join(tempPath(), 'missing.json');
+
+    expect(new ProjectConfigStore(path, required).load()).toEqual({});
+  });
+});
+
 describe('ProjectConfigStore.load', () => {
   it('returns the sole config block', () => {
     expect(storeFor({ project: { uid: 'p1', organizationUid: 'org1' } }).load()).toEqual({
