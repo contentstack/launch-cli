@@ -1,9 +1,9 @@
-import { HttpClient } from '@contentstack/cli-utilities';
-
 import { API_VERSION } from '../config/constants';
 import { parseErrorEnvelope } from './errors';
+import { HttpMethod, RetryPolicy } from './retry-policy';
+import { createUtilityHttpClient } from './utility-http-client';
 
-export type HttpMethod = 'GET' | 'HEAD' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+export type { HttpMethod } from './retry-policy';
 
 export interface RestRequest {
   method: HttpMethod;
@@ -34,16 +34,6 @@ export interface RestApiClientOptions {
   sleep?: (ms: number) => Promise<void>;
 }
 
-const IDEMPOTENT_METHODS = new Set<HttpMethod>(['GET', 'HEAD']);
-
-function isRetryable(status: number, method: HttpMethod): boolean {
-  if (status === 429) {
-    return true;
-  }
-
-  return status === 408 && IDEMPOTENT_METHODS.has(method);
-}
-
 function pruneUndefined(query: Record<string, string | number | undefined>): Record<string, string | number> {
   const pruned: Record<string, string | number> = {};
   for (const [key, value] of Object.entries(query)) {
@@ -58,8 +48,7 @@ export class RestApiClient {
   constructor(private readonly options: RestApiClientOptions) {}
 
   async request<T>(req: RestRequest): Promise<T> {
-    const maxRetries = this.options.maxRetries ?? 3;
-    const retryDelayMs = this.options.retryDelayMs ?? 1000;
+    const policy = new RetryPolicy(this.options);
     const sleep = this.options.sleep ?? ((ms: number) => new Promise<void>((done) => setTimeout(done, ms)));
     let refreshed = false;
     let attempt = 0;
@@ -77,9 +66,9 @@ export class RestApiClient {
         continue;
       }
 
-      if (isRetryable(response.status, req.method) && attempt < maxRetries) {
+      if (policy.shouldRetry(response.status, req.method, attempt)) {
         attempt += 1;
-        await sleep(retryDelayMs * attempt);
+        await sleep(policy.delayFor(attempt));
         continue;
       }
 
@@ -88,7 +77,7 @@ export class RestApiClient {
   }
 
   private async send(req: RestRequest): Promise<{ status: number; data: unknown }> {
-    const create = this.options.createHttpClient ?? (() => HttpClient.create() as unknown as HttpClientLike);
+    const create = this.options.createHttpClient ?? createUtilityHttpClient;
     const client = create();
 
     const headers: Record<string, string> = {

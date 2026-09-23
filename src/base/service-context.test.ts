@@ -22,6 +22,7 @@ function capturingHttpClient(statuses: number[], captured: CapturedCall[]) {
       call.baseUrl = url;
       return client;
     };
+    client.interceptors = { response: { use: () => 0 } };
     client.asJson = () => client;
     client.headers = (headers: Record<string, string>) => {
       call.headers = headers;
@@ -238,6 +239,7 @@ describe('buildServiceContext auth refresh', () => {
     const httpSpy = jest.spyOn(HttpClient, 'create').mockImplementation(() => {
       const client: Record<string, unknown> = {};
       client.baseUrl = () => client;
+      client.interceptors = { response: { use: () => 0 } };
       client.asJson = () => client;
       client.headers = () => client;
       client.queryParams = () => client;
@@ -273,6 +275,7 @@ describe('buildServiceContext auth refresh', () => {
     const httpSpy = jest.spyOn(HttpClient, 'create').mockImplementation(() => {
       const client: Record<string, unknown> = {};
       client.baseUrl = () => client;
+      client.interceptors = { response: { use: () => 0 } };
       client.asJson = () => client;
       client.headers = () => client;
       client.queryParams = () => client;

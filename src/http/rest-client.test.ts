@@ -453,7 +453,10 @@ describe('RestApiClient', () => {
   });
 
   it('creates a fresh HttpClient per request when none is injected', async () => {
-    const fakeClient: Record<string, unknown> = {};
+    const registered: unknown[] = [];
+    const fakeClient: Record<string, unknown> = {
+      interceptors: { response: { use: (...args: unknown[]) => registered.push(args) } },
+    };
     fakeClient.baseUrl = () => fakeClient;
     fakeClient.asJson = () => fakeClient;
     fakeClient.headers = () => fakeClient;
@@ -472,6 +475,10 @@ describe('RestApiClient', () => {
 
     await expect(client.request({ method: 'GET', path: '/projects' })).resolves.toEqual({ fromDefaultClient: true });
     expect(createSpy).toHaveBeenCalledTimes(1);
+    expect(registered).toEqual([]);
+
+    (fakeClient.interceptors as { response: { use: (...args: unknown[]) => unknown } }).response.use(null, () => 0);
+    expect(registered).toEqual([]);
 
     createSpy.mockRestore();
   });

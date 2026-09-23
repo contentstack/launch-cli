@@ -62,6 +62,7 @@ function fakeHttpClient(onBaseUrl: (url: string) => void, onHeaders: (headers: R
     onBaseUrl(url);
     return client;
   };
+  client.interceptors = { response: { use: () => 0 } };
   client.asJson = () => client;
   client.headers = (headers: Record<string, string>) => {
     onHeaders(headers);
