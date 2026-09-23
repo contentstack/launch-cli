@@ -47,6 +47,34 @@ describe('parseErrorEnvelope', () => {
     expect(error.errors).toEqual([{ code: 'launch.PROJECT.LIMIT_REACHED', message: 'too many' }]);
   });
 
+  it('falls back to the status message when the sole error entry carries no code or message', () => {
+    const error = parseErrorEnvelope(500, { errors: [{}] });
+
+    expect(error.message).toBe('Launch API request failed with status 500.');
+    expect(error.code).toBe('launch.UNKNOWN');
+    expect(error.status).toBe(500);
+    expect(error.errors).toEqual([{}]);
+  });
+
+  it.each([[{ errors: 'boom' }], [{ errors: {} }], [{ errors: null }]])(
+    'treats a non-array errors field %p as no errors at all',
+    (body) => {
+      const error = parseErrorEnvelope(400, body);
+
+      expect(error.errors).toEqual([]);
+      expect(error.code).toBe('launch.UNKNOWN');
+      expect(error.message).toBe('Launch API request failed with status 400.');
+    },
+  );
+
+  it('names the error LaunchApiError so it is recognisable once serialised', () => {
+    const error = parseErrorEnvelope(404, { errors: [{ code: 'launch.PROJECT.NOT_FOUND', message: 'x' }] });
+
+    expect(error.name).toBe('LaunchApiError');
+    expect(error).toBeInstanceOf(Error);
+    expect(new LaunchApiError(500, []).name).toBe('LaunchApiError');
+  });
+
   it('falls back to status when body is null or undefined', () => {
     const errorNull = parseErrorEnvelope(500, null);
     const errorUndefined = parseErrorEnvelope(500, undefined);
