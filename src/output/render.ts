@@ -51,5 +51,11 @@ export function renderPagination(ux: UxLike, pagination: Pagination): void {
   const skip = pagination.skip ?? 0;
   const first = skip + 1;
   const last = Math.min(skip + pagination.limit, pagination.count);
+
+  if (last < first) {
+    ux.print(`Showing 0 of ${pagination.count}`);
+    return;
+  }
+
   ux.print(`Showing ${first}-${last} of ${pagination.count}`);
 }

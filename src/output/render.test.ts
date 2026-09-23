@@ -152,6 +152,54 @@ describe('renderPagination', () => {
     expect(lines).toEqual(['Showing 1-2 of 11']);
   });
 
+  it('reports an empty window rather than an impossible range when skip is past the end', () => {
+    const { ux, lines } = fakeUx();
+
+    renderPagination(ux, { count: 50, limit: 50, skip: 200 });
+
+    expect(lines).toEqual(['Showing 0 of 50']);
+  });
+
+  it('reports an empty window rather than an impossible range when the limit is zero', () => {
+    const { ux, lines } = fakeUx();
+
+    renderPagination(ux, { count: 50, limit: 0, skip: 0 });
+
+    expect(lines).toEqual(['Showing 0 of 50']);
+  });
+
+  it('reports an empty window when skip equals the total count', () => {
+    const { ux, lines } = fakeUx();
+
+    renderPagination(ux, { count: 50, limit: 50, skip: 50 });
+
+    expect(lines).toEqual(['Showing 0 of 50']);
+  });
+
+  it('reports a single-record window when skip is one short of the total count', () => {
+    const { ux, lines } = fakeUx();
+
+    renderPagination(ux, { count: 50, limit: 50, skip: 49 });
+
+    expect(lines).toEqual(['Showing 50-50 of 50']);
+  });
+
+  it('clamps a limit larger than the total count to the count', () => {
+    const { ux, lines } = fakeUx();
+
+    renderPagination(ux, { count: 3, limit: 500, skip: 0 });
+
+    expect(lines).toEqual(['Showing 1-3 of 3']);
+  });
+
+  it('prints nothing when count is zero even with a limit and a skip past the end', () => {
+    const { ux, lines } = fakeUx();
+
+    renderPagination(ux, { count: 0, limit: 50, skip: 200 });
+
+    expect(lines).toEqual([]);
+  });
+
   it('composes with renderTable to produce a single line for an empty result', () => {
     const { ux, lines } = fakeUx();
 
