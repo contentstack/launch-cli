@@ -3,15 +3,14 @@ import { resolve as resolvePath } from 'node:path';
 import { Command } from '@contentstack/cli-command';
 import { FlagInput, cliux, configHandler, isAuthenticated } from '@contentstack/cli-utilities';
 
-import { EXIT_CANCELLED, EXIT_RUNTIME, EXIT_USAGE, PROJECT_CONFIG_FILE } from './constants';
+import { EXIT_RUNTIME, PROJECT_CONFIG_FILE } from './constants';
 import { readProjectConfig } from './project-config';
 import { RegionLike, resolveLaunchHubUrl } from './region';
-import { CancelledError, UsageError } from './errors';
+import { CancelledError, LaunchError, UsageError } from './errors';
 import { catalog, FlagKey } from '../resources';
 import { AnyInputs, Resolved } from './inputs';
 import { resolveInputs } from './resolve';
 import { Rule } from './rules';
-import { LaunchApiError } from '../transport/errors';
 import { UxLike } from './render';
 import { ServiceContext, buildServiceContext } from './service-context';
 
@@ -141,16 +140,8 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
   }
 
   protected async catch(err: Error & { exitCode?: number }): Promise<unknown> {
-    if (err instanceof UsageError) {
-      return this.error(err.message, { exit: EXIT_USAGE });
-    }
-
-    if (err instanceof CancelledError) {
-      return this.error(err.message, { exit: EXIT_CANCELLED });
-    }
-
-    if (err instanceof LaunchApiError) {
-      return this.error(err.message, { exit: EXIT_RUNTIME });
+    if (err instanceof LaunchError) {
+      return this.error(err.message, { exit: err.exitCode });
     }
 
     return super.catch(err);

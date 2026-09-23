@@ -1,6 +1,6 @@
 import { API_VERSION } from '../core/constants';
 import { AuthStrategy } from './auth-strategy';
-import { ErrorMessages, parseErrorEnvelope } from './errors';
+import { ErrorMessages, diagnoseTransportError, parseErrorEnvelope } from './errors';
 import { HttpMethod, RetryPolicy } from './retry-policy';
 import { createUtilityHttpClient } from './utility-http-client';
 
@@ -104,6 +104,10 @@ export class RestApiClient {
       client.payload(req.body);
     }
 
-    return client.send(req.method, req.path);
+    try {
+      return await client.send(req.method, req.path);
+    } catch (error) {
+      throw diagnoseTransportError(error);
+    }
   }
 }

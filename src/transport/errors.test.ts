@@ -1,4 +1,8 @@
-import { LaunchApiError, messageForCode, parseErrorEnvelope } from './errors';
+import { configHandler } from '@contentstack/cli-utilities';
+
+import { EXIT_RUNTIME } from '../core/constants';
+import { LaunchError } from '../core/errors';
+import { LaunchApiError, LaunchNetworkError, PROXY_ERROR_CODES, diagnoseTransportError, messageForCode, parseErrorEnvelope } from './errors';
 
 const MESSAGES = {
   'launch.RESOURCE.DUPLICATE_NAME': 'Something of that name already exists.',
@@ -104,5 +108,94 @@ describe('parseErrorEnvelope', () => {
     expect(errorUndefined.code).toBe('launch.UNKNOWN');
     expect(errorUndefined.status).toBe(500);
     expect(errorUndefined.errors).toEqual([]);
+  });
+});
+
+describe('LaunchApiError exit code', () => {
+  it('is a LaunchError that maps itself to the runtime exit code', () => {
+    const error = parseErrorEnvelope(500, { errors: [] });
+
+    expect(error).toBeInstanceOf(LaunchError);
+    expect(error.exitCode).toBe(EXIT_RUNTIME);
+  });
+});
+
+describe('diagnoseTransportError', () => {
+  const PROXY_ENV_KEYS = ['HTTPS_PROXY', 'HTTP_PROXY'];
+  let saved: Record<string, string | undefined>;
+
+  beforeEach(() => {
+    saved = {};
+    for (const key of PROXY_ENV_KEYS) {
+      saved[key] = process.env[key];
+      delete process.env[key];
+    }
+  });
+
+  afterEach(() => {
+    for (const key of PROXY_ENV_KEYS) {
+      if (saved[key] === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = saved[key];
+      }
+    }
+    jest.restoreAllMocks();
+  });
+
+  function withProxy(value: unknown) {
+    return jest.spyOn(configHandler, 'get').mockImplementation((key: string) => (key === 'proxy' ? value : undefined));
+  }
+
+  it.each(PROXY_ERROR_CODES.map((code) => [code]))(
+    'explains %s as a proxy failure when a proxy is configured',
+    (code) => {
+      withProxy({ protocol: 'http', host: 'corp.internal', port: 3128 });
+      const cause = Object.assign(new Error('connect ECONNREFUSED 10.0.0.1:3128'), { code });
+
+      const diagnosed = diagnoseTransportError(cause) as LaunchNetworkError;
+
+      expect(diagnosed).toBeInstanceOf(LaunchNetworkError);
+      expect(diagnosed).toBeInstanceOf(LaunchError);
+      expect(diagnosed.name).toBe('LaunchNetworkError');
+      expect(diagnosed.exitCode).toBe(EXIT_RUNTIME);
+      expect(diagnosed.cause).toBe(cause);
+      expect(diagnosed.message).toBe(
+        'Proxy error: Unable to connect to proxy server at http://corp.internal:3128. Please verify your proxy configuration.',
+      );
+    },
+  );
+
+  it('explains an ERR_BAD_RESPONSE message even when the error carries no code', () => {
+    withProxy(undefined);
+    process.env.HTTPS_PROXY = 'http://corp.internal:3128';
+    const cause = new Error('Request failed: ERR_BAD_RESPONSE');
+
+    const diagnosed = diagnoseTransportError(cause) as LaunchNetworkError;
+
+    expect(diagnosed).toBeInstanceOf(LaunchNetworkError);
+    expect(diagnosed.message).toBe(
+      'Proxy error: Unable to connect to proxy server at http://corp.internal:3128. Please verify your proxy configuration.',
+    );
+  });
+
+  it('returns the original error untouched when no proxy is configured', () => {
+    withProxy(undefined);
+    const cause = Object.assign(new Error('getaddrinfo ENOTFOUND launch-api.test'), { code: 'ENOTFOUND' });
+
+    expect(diagnoseTransportError(cause)).toBe(cause);
+  });
+
+  it('returns the original error untouched when the failure is not proxy shaped', () => {
+    withProxy({ protocol: 'http', host: 'corp.internal', port: 3128 });
+    const cause = Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' });
+
+    expect(diagnoseTransportError(cause)).toBe(cause);
+  });
+
+  it.each([[null], [undefined], ['boom'], [{ code: 404 }]])('passes a %p rejection through unchanged', (cause) => {
+    withProxy({ protocol: 'http', host: 'corp.internal', port: 3128 });
+
+    expect(diagnoseTransportError(cause)).toBe(cause);
   });
 });

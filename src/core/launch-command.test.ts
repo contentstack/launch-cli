@@ -7,8 +7,7 @@ import { HttpClient, authHandler, configHandler } from '@contentstack/cli-utilit
 import { EXIT_RUNTIME, PROJECT_CONFIG_FILE } from './constants';
 import * as projectConfigModule from './project-config';
 import { getManageApiBaseUrl } from './region';
-import { CancelledError, UsageError } from './errors';
-import { MissingInputError } from './resolve';
+import { CancelledError, MissingInputError, UsageError } from './errors';
 import { exactlyOneOf } from './rules';
 import { LaunchApiError } from '../transport/errors';
 import { UxLike } from './render';
@@ -109,6 +108,18 @@ describe('LaunchCommand.catch', () => {
     await instance['catch'](new LaunchApiError(404, [{ code: 'launch.SOMETHING.ELSE', message: 'the api said no' }]));
 
     expect(instance.error).toHaveBeenCalledWith('the api said no', { exit: 1 });
+  });
+
+  it('maps a cancelled confirmation, a usage failure and an api failure through one LaunchError branch', async () => {
+    const instance = probe();
+
+    await instance['catch'](new CancelledError());
+    await instance['catch'](new UsageError('Pass --org.'));
+    await instance['catch'](new LaunchApiError(500, []));
+
+    expect(instance.error).toHaveBeenNthCalledWith(1, 'Cancelled. Nothing was changed.', { exit: 3 });
+    expect(instance.error).toHaveBeenNthCalledWith(2, 'Pass --org.', { exit: 2 });
+    expect(instance.error).toHaveBeenNthCalledWith(3, 'Launch API request failed with status 500.', { exit: 1 });
   });
 
   it('delegates anything else to oclif, which sets process.exitCode before rethrowing', async () => {

@@ -1,30 +1,9 @@
 import { getByPath } from './project-config';
-import { UsageError } from './errors';
-import { PROJECT_CONFIG_FILE } from './constants';
+import { InputDependencyError, MissingInputError } from './errors';
 import { FlagKey, resolutionTable } from '../resources';
 import { AnyInputs, InputKeys, Resolved } from './inputs';
 import { ResolveServices } from './resolution';
 import { Rule } from './rules';
-
-export class MissingInputError extends UsageError {
-  readonly flag: string;
-
-  constructor(flag: string) {
-    super(
-      `Missing required value for --${flag}. Pass --${flag}, set it in ${PROJECT_CONFIG_FILE}, ` +
-        'or run in an interactive terminal.',
-    );
-    this.name = 'MissingInputError';
-    this.flag = flag;
-  }
-}
-
-export class InputDependencyError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'InputDependencyError';
-  }
-}
 
 function isAbsent(value: unknown): boolean {
   return value === undefined || value === null;

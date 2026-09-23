@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
-import { HttpClient } from '@contentstack/cli-utilities';
+import { HttpClient, configHandler } from '@contentstack/cli-utilities';
 
 import { API_VERSION } from '../core/constants';
-import { LaunchApiError } from './errors';
+import { LaunchApiError, LaunchNetworkError } from './errors';
 import { HttpClientLike, RestApiClient } from './rest-client';
 
 interface RecordedCall {
@@ -375,6 +375,11 @@ describe('RestApiClient', () => {
   });
 
   it('propagates a transport failure without retrying it', async () => {
+    const configSpy = jest.spyOn(configHandler, 'get').mockImplementation(() => undefined);
+    const savedHttps = process.env.HTTPS_PROXY;
+    const savedHttp = process.env.HTTP_PROXY;
+    delete process.env.HTTPS_PROXY;
+    delete process.env.HTTP_PROXY;
     const transportError = Object.assign(new Error('getaddrinfo ENOTFOUND launch-api.test'), { code: 'ENOTFOUND' });
     const http = fakeHttpClient([transportError]);
 
@@ -385,6 +390,30 @@ describe('RestApiClient', () => {
     expect(error).toBe(transportError);
     expect(http.calls).toHaveLength(1);
     expect(http.waits).toEqual([]);
+    if (savedHttps !== undefined) process.env.HTTPS_PROXY = savedHttps;
+    if (savedHttp !== undefined) process.env.HTTP_PROXY = savedHttp;
+    configSpy.mockRestore();
+  });
+
+  it('turns a refused connection behind a configured proxy into the proxy diagnostic', async () => {
+    const configSpy = jest
+      .spyOn(configHandler, 'get')
+      .mockImplementation((key: string) => (key === 'proxy' ? { protocol: 'http', host: 'corp.internal', port: 3128 } : undefined));
+    const transportError = Object.assign(new Error('connect ECONNREFUSED 10.0.0.1:3128'), { code: 'ECONNREFUSED' });
+    const http = fakeHttpClient([transportError]);
+
+    const error = (await buildClient(http, { retryDelayMs: 10 })
+      .request({ method: 'GET', path: '/projects' })
+      .catch((e) => e)) as LaunchNetworkError;
+
+    expect(error).toBeInstanceOf(LaunchNetworkError);
+    expect(error.message).toBe(
+      'Proxy error: Unable to connect to proxy server at http://corp.internal:3128. Please verify your proxy configuration.',
+    );
+    expect(error.cause).toBe(transportError);
+    expect(http.calls).toHaveLength(1);
+    expect(http.waits).toEqual([]);
+    configSpy.mockRestore();
   });
 
   it.each([200, 204, 299])('treats %i as a success and returns the payload', async (status) => {

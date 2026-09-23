@@ -1,11 +1,11 @@
 import { ApiSurface } from '../resources';
-import { UsageError } from './errors';
+import { InputDependencyError, MissingInputError, UsageError } from './errors';
 import { UxLike } from './render';
 import { FlagKey } from '../resources';
 import { InputsSpec, inputs } from './inputs';
 import * as resolutionModule from '../resources';
 import { AnyResolutionSpec } from './resolution';
-import { InputDependencyError, MissingInputError, resolveInputs } from './resolve';
+import { resolveInputs } from './resolve';
 import { exactlyOneOf } from './rules';
 
 function withResolution<T>(replacement: Record<string, AnyResolutionSpec>, run: () => Promise<T>): Promise<T> {
