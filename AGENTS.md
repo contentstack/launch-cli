@@ -14,7 +14,10 @@ the gate as a floor, never as evidence of correctness.
 
 1. **`=== undefined` is not "absent."** `null`, `false`, `0` and `''` are values. Any guard that
    means "was this supplied?" gets tested with all five. A `null` in `.cs-launch.json` once
-   defeated the required-input check entirely.
+   defeated the required-input check entirely, and `--org ''` once satisfied `required: true`
+   and then had its `x-organization-uid` header dropped by a truthiness check in the transport.
+   The rule the resolver now applies: a string that is empty or whitespace only is **absent**,
+   wherever it came from, and a value that reaches the transport is one the transport will send.
 2. **A fake that ignores its arguments proves nothing.** Fakes record what they were called with,
    and tests assert it. A `baseUrl()` fake that discarded its argument is why a wrong API base path
    reached a live 404 with every test green.
@@ -55,13 +58,19 @@ Two things make that reliable and both are load-bearing:
   the captured stdout, and `process.exitCode` is reset after each run because oclif sets it while
   handling a simulated CLI failure and would otherwise fail the whole jest run.
 
+Jest runs with `restoreMocks: true`, so a `jest.spyOn` does not layer a spy on a spy for
+the life of a file; `test/credential-guard.setup.ts` re-installs its guard each test.
+
 `projects-command-flows.test.ts` drives the flows that only exist end to end: the
 project-folder flow (no flags, `.cs-launch.json` supplying org and project), `--config` at
 an arbitrary path, an OAUTH session asserted on the wire including 401 -> refresh -> 200,
 and the interactive picker. The picker needs `process.stdin.isTTY` set for the duration of
 the run, because jest's stdin is not a terminal and `LaunchCommand` reads it to decide
-whether prompting is allowed; restore it afterwards. Fake the network with `nock`, never
-`RestApiClient`.
+whether prompting is allowed; restore it afterwards. Set it through a property descriptor,
+not by assignment: once another suite in the same process has turned stdin into a real
+stream, `process.stdin.isTTY = true` throws, and jest orders test files by their previous
+runtime, so that shows up as an intermittent failure rather than a stable one. Fake the
+network with `nock`, never `RestApiClient`.
 
 The confirm gate is the one part of `LaunchCommand` `runCommand` cannot reach yet: no shipped
 command declares `yes: {}`. It stays covered by `src/core/launch-command.test.ts` until one does.
@@ -85,11 +94,17 @@ src/
 
 `core` and `transport` never import a resource except through `resources.ts`, and they
 never import each other's wording. A resource imports `core` and `transport` freely.
+`src/core/layering.test.ts` asserts this rather than leaving it to review: it reads every
+non-test source in `core/` and `transport/` and fails on an import of a resource folder.
+That is why `Pagination` lives in `src/core/render.ts` beside `renderPagination` and
+`src/projects/types.ts` re-exports it, not the other way round.
 `resources.ts` is the only file every resource touches; everything else about projects
 lives under `src/projects/`.
 
 `src/commands/` mirrors the oclif topic path and nothing else: `launch:projects:list`
-is `src/commands/launch/projects/list.ts`, and that path is the public contract.
+is `src/commands/launch/projects/list.ts`, and that path is the public contract. Topic
+descriptions are declared in `package.json` under `oclif.topics`; without them oclif shows
+a leaf command's description for the whole topic on every `csdx --help`.
 
 ## Adding a resource (V2)
 
@@ -98,8 +113,14 @@ A new resource - environments, variables, deployments, logs, cache - is a folder
 
 1. **`src/<resource>/<resource>.api.ts`** - the repository. It takes a `RestApiClient`,
    returns typed data, and passes its own error wording to `client.request(req, MESSAGES)`.
-   No `ux`, no prompts, no `process.exit`. It re-exports its own `types.ts` so the DTOs
-   have one import path.
+   No `ux`, no prompts, no `process.exit` - a library module that calls `process.exit`
+   takes the exit code out of the CLI's hands, which `CloudFunctions.serve` used to do.
+   It re-exports its own `types.ts` so the DTOs have one import path.
+
+   A repository that cannot finish what it was asked says so rather than returning a
+   partial answer: paging past `MAX_PAGES` raises `ProjectScanLimitError`, because
+   returning quietly made the resolver report "No project named X found in this
+   organization" about a scan that never completed.
 2. **`src/<resource>/<resource>.errors.ts`** - a `Record<code, message>` of the
    `launch.<RESOURCE>.*` codes this resource rewords. The transport never knows a
    message; it parses a body into a status, a code and the API's own text, and the
@@ -170,6 +191,13 @@ exits 3 when the user declines. Never assume a yes yourself.
 | 2 | `EXIT_USAGE` | a usage error - `UsageError`, `MissingInputError`, a failing cross-flag rule |
 | 3 | `EXIT_CANCELLED` | the user declined a confirmation or chose nothing at a picker (`CancelledError`) |
 
+`launch:functions:serve` is deliberately a plain oclif `Command` rather than a
+`LaunchCommand`, because it talks to no API and needs no auth gate - but it is inside the
+same contract: a bad port is `this.error(..., { exit: EXIT_USAGE })` on stderr, and its
+`--port` flag declares `env: 'PORT'` so oclif applies the usual precedence (argv, then the
+environment, then the default) and shows it in `--help`. Never read `process.env` ahead of
+a parsed flag.
+
 A declined confirmation is a deliberate "no", not a failure, so it does not share code 1 with an
 API 500 - a CI log has to be able to tell those apart. 130 would claim the process was killed by
 SIGINT, which is not what happened.
@@ -180,26 +208,51 @@ a command wrongly stays a plain `Error` - `InputDependencyError` is the example 
 it is a bug report, not a CLI outcome.
 
 **Auth.** One `AuthStrategy` is chosen once per command, by a factory that reads
-`authorisationType` a single time: `BasicAuth` sends `authtoken` and cannot refresh,
-`OAuthAuth` sends a bearer token and refreshes with `compareOAuthExpiry(true)` on a 401.
+`authorisationType` a single time: `BasicAuth` sends `authtoken` and answers a refresh with
+`SessionExpiredError` ("Your session has timed out. Run csdx auth:login to continue."),
+`OAuthAuth` sends a bearer token and refreshes with `compareOAuthExpiry(true)`.
 Anything that is neither `BASIC` nor `OAUTH` is an `UnauthenticatedError`, which matches
 cli-utilities' own `isAuthenticated()`. Nothing else may read `authorisationType`.
 
+A refresh is triggered by an HTTP 401 **or** by a non-2xx body whose `error_message`
+contains `access token is invalid or expired`, which is the shape some Contentstack
+services answer with; either way it happens at most once per request.
+
+**Transport failures.** `createUtilityHttpClient` disarms the cli-utilities response
+interceptor, which carried four behaviours, so our layer owns all four. The proxy
+diagnostic and the body-triggered refresh above are reimplemented; the BASIC session
+wording is reimplemented as `SessionExpiredError`; the interceptor's **method-blind**
+one-shot retry is deliberately not, because it repeated POSTs. In its place
+`diagnoseTransportError` turns any transport failure into a `LaunchNetworkError` carrying
+CLI wording and a `retryable` flag, and `RetryPolicy.shouldRetryTransportError` retries one
+only on an idempotent method, on the same budget as a 429. `test/integration/transport-socket-hangup.test.ts`
+proves on a real socket that a POST is put on the wire exactly once.
+
 **The `.cs-launch.json` file.** `ProjectConfigStore` owns it. `load()` returns a typed
 `ProjectConfig`, applying the v1 rule that several branch blocks are usable only when they
-agree on one project. `save()` writes the keys it was given into every existing block, so it
-can never drop another branch's block, and refuses a file whose blocks disagree. A
-resolution spec addresses it by a key of `ProjectConfig`, never a dotted string.
+agree on one project. A resolution spec addresses it by a key of `ProjectConfig`, never a
+dotted string. There is no `save()` yet: it had no production caller, and its
+write-into-every-branch-block semantics are a design question the first command that needs
+to write the file should settle.
+
+The store's second constructor argument says whether the path was one the **user named**.
+At the implicit default path a missing or unreadable file is simply an empty config; at a
+path the user passed with `--config` it is a `UsageError` naming the path, because silence
+there produced "Missing required value for --org" for a typo, a directory and a corrupt
+file alike.
 
 **Cross-flag rules.** A rule that is pure flag-versus-flag and evaluable from argv alone belongs in
-oclif's native `exclusive` / `relationships` on the flag definition, where it also shows in `--help`.
-A rule that must read a *resolved* value (one that config, a prompt or a default may have supplied)
-belongs in `src/core/rules.ts` - `exactlyOneOf`, `dependsOnValue`, `requiresFrameworkIn` - declared
+oclif's native `exclusive` / `relationships` on the flag definition, where it also shows in `--help` -
+and a simple range does too: `limit` and `skip` carry oclif's own `min`/`max` rather than being
+checked later. A rule that must read a *resolved* value (one that config, a prompt or a default may
+have supplied) belongs in `src/core/rules.ts` - `exactlyOneOf` is the only one so far - declared
 as a `static rules = [...]` array on the command. `resolveInputs` evaluates them after resolution,
-and a failing rule is a usage error (exit 2).
+and a failing rule is a usage error (exit 2). Write the next rule when a command needs it; a rule
+kept alive only by its own test proves nothing.
 
-**Redaction.** Anything rendering an environment variable's value in a table or a detail block uses
-`src/core/redact.ts` (`REDACTED`, `redactedColumn`) from the resource's presenter. Confirmation text
+**Redaction.** `src/core/redact.ts` (`REDACTED`, `redactedColumn`) has no caller yet; it is kept
+ahead of its first use on purpose, so the easy path for the first presenter that renders an
+environment variable's value in a table or a detail block is the redacted one. Confirmation text
 and error text are not covered: nothing stops a future `variables:*` command from interpolating a
 value straight into `this.confirm(...)` or a thrown error's message. Building that guard needs a
 debug logger and an in-flight secret registry to redact against, neither of which exists yet - until
