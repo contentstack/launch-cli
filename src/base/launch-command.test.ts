@@ -56,14 +56,17 @@ function probe(): Probe & { error: jest.Mock } {
   return instance;
 }
 
-function fakeHttpClient(onBaseUrl: (url: string) => void) {
+function fakeHttpClient(onBaseUrl: (url: string) => void, onHeaders: (headers: Record<string, string>) => void = () => undefined) {
   const client: Record<string, unknown> = {};
   client.baseUrl = (url: string) => {
     onBaseUrl(url);
     return client;
   };
   client.asJson = () => client;
-  client.headers = () => client;
+  client.headers = (headers: Record<string, string>) => {
+    onHeaders(headers);
+    return client;
+  };
   client.queryParams = () => client;
   client.payload = () => client;
   client.send = async () => ({ status: 200, data: { projects: [], pagination: { count: 0, limit: 0, skip: 0 } } });
@@ -199,6 +202,15 @@ describe('LaunchCommand.confirm', () => {
       { exit: 2 },
     );
   });
+
+  it('does not accept a truthy non-boolean yes value as a confirmation', async () => {
+    const { instance, inquired } = gated('true' as unknown as boolean, false);
+
+    const rejection = await instance['confirm']('Delete project "marketing-site"?').catch((err: Error) => err);
+
+    expect(rejection).toBeInstanceOf(UsageError);
+    expect(inquired).toEqual([]);
+  });
 });
 
 describe('LaunchCommand.requireAuth', () => {
@@ -314,6 +326,83 @@ describe('LaunchCommand.init', () => {
     await instance.init();
 
     expect(instance['resolved']).toEqual({});
+    authSpy.mockRestore();
+  });
+});
+
+describe('LaunchCommand.init authentication gate', () => {
+  it('stops at the auth check, never parsing flags or building the service context', async () => {
+    const instance = new Probe([], {} as never) as Probe & { error: jest.Mock };
+    const failure = new Error('You are not logged in. Run csdx auth:login to continue.');
+    (instance as unknown as { error: unknown }).error = jest.fn(() => {
+      throw failure;
+    });
+    const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(false);
+    const parseMock = jest.fn().mockResolvedValue({ flags: {} });
+    (instance as unknown as { parse: jest.Mock }).parse = parseMock;
+    const createSpy = jest.spyOn(HttpClient, 'create');
+
+    await expect(instance.init()).rejects.toBe(failure);
+
+    expect(instance.error).toHaveBeenCalledWith('You are not logged in. Run csdx auth:login to continue.', {
+      exit: EXIT_RUNTIME,
+    });
+    expect(parseMock).not.toHaveBeenCalled();
+    expect(createSpy).not.toHaveBeenCalled();
+    expect(instance['services']).toBeUndefined();
+    expect(instance['resolved']).toBeUndefined();
+
+    createSpy.mockRestore();
+    authSpy.mockRestore();
+  });
+});
+
+describe('LaunchCommand.init terminal detection', () => {
+  it.each([[false], [undefined]])('resolves isTTY to false when process.stdin.isTTY is %p', async (isTTY) => {
+    const instance = probe();
+    const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
+    const originalIsTTY = process.stdin.isTTY;
+    Object.defineProperty(process.stdin, 'isTTY', { value: isTTY, configurable: true });
+    Object.defineProperty(instance, 'launchRegion', {
+      value: { launchHubUrl: 'https://launch-api.test' },
+      configurable: true,
+    });
+    Object.defineProperty(instance, 'config', { value: { userAgent: 'cli/2.0.0' }, configurable: true });
+    (instance as unknown as { parse: jest.Mock }).parse = jest.fn().mockResolvedValue({ flags: {} });
+
+    await instance.init();
+
+    expect(instance['services'].isTTY).toBe(false);
+
+    authSpy.mockRestore();
+    Object.defineProperty(process.stdin, 'isTTY', { value: originalIsTTY, configurable: true });
+  });
+
+  it('sends the oclif user agent as the analytics header on the requests the context makes', async () => {
+    const instance = probe();
+    const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
+    Object.defineProperty(instance, 'launchRegion', {
+      value: { launchHubUrl: 'https://launch-api.test' },
+      configurable: true,
+    });
+    Object.defineProperty(instance, 'config', { value: { userAgent: 'csdx-cli/2.0.0 darwin-arm64' }, configurable: true });
+    (instance as unknown as { parse: jest.Mock }).parse = jest.fn().mockResolvedValue({ flags: {} });
+    let capturedHeaders: Record<string, string> | undefined;
+    const createSpy = jest.spyOn(HttpClient, 'create').mockReturnValue(
+      fakeHttpClient(
+        () => undefined,
+        (headers) => {
+          capturedHeaders = headers;
+        },
+      ),
+    );
+
+    await instance.init();
+    await instance['services'].api.projects.list({ org: 'org1' });
+
+    expect(capturedHeaders?.['X-CS-CLI']).toBe('csdx-cli/2.0.0 darwin-arm64');
+
+    createSpy.mockRestore();
     authSpy.mockRestore();
   });
 });
