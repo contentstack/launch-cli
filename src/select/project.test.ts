@@ -1,5 +1,6 @@
 import { ApiSurface } from '../api';
 import { UsageError } from '../errors';
+import { LaunchApiError } from '../http/errors';
 import { UxLike } from '../output/render';
 import { promptForProject, resolveProjectUid } from './project';
 
@@ -29,6 +30,19 @@ function fakeDeps(
     },
   };
   return { deps: { api, ux }, inquired, printed, listCalls };
+}
+
+function failingDeps(failure: Error) {
+  const api = {
+    projects: {
+      list: async () => {
+        throw failure;
+      },
+    },
+  } as unknown as ApiSurface;
+  const ux: UxLike = { print: () => undefined, inquire: async () => undefined as never };
+
+  return { api, ux };
 }
 
 describe('resolveProjectUid', () => {
@@ -88,6 +102,45 @@ describe('resolveProjectUid', () => {
     await expect(resolveProjectUid(deps, 'org1', 'docs-site')).resolves.toBe('607f1f77bcf86cd799439022');
     expect(listCalls).toEqual([{ org: 'org1', limit: 100, skip: 0 }]);
   });
+
+  it('passes an uppercase hex uid straight through without calling the API', async () => {
+    const { deps, listCalls } = fakeDeps([]);
+
+    await expect(resolveProjectUid(deps, 'org1', '507F1F77BCF86CD799439011')).resolves.toBe(
+      '507F1F77BCF86CD799439011',
+    );
+    expect(listCalls).toEqual([]);
+  });
+
+  it.each([['0'.repeat(23)], ['0'.repeat(25)]])('treats the %s-character hex string as a name, not a uid', async (value) => {
+    const { deps, listCalls } = fakeDeps([{ uid: '507f1f77bcf86cd799439011', name: value }]);
+
+    await expect(resolveProjectUid(deps, 'org1', value)).resolves.toBe('507f1f77bcf86cd799439011');
+    expect(listCalls).toEqual([{ org: 'org1', limit: 100, skip: 0 }]);
+  });
+
+  it('returns a 24-character hex project name unchanged rather than looking it up', async () => {
+    const hexName = 'abcdef012345678901234567';
+    const { deps, listCalls } = fakeDeps([{ uid: '507f1f77bcf86cd799439011', name: hexName }]);
+
+    await expect(resolveProjectUid(deps, 'org1', hexName)).resolves.toBe(hexName);
+    expect(listCalls).toEqual([]);
+  });
+
+  it('matches a project name case-sensitively', async () => {
+    const { deps } = fakeDeps([{ uid: '507f1f77bcf86cd799439011', name: 'Marketing-Site' }]);
+
+    await expect(resolveProjectUid(deps, 'org1', 'Marketing-Site')).resolves.toBe('507f1f77bcf86cd799439011');
+    await expect(resolveProjectUid(deps, 'org1', 'marketing-site')).rejects.toThrow(
+      'No project named "marketing-site" found in this organization.',
+    );
+  });
+
+  it('propagates an api failure raised while listing the organization projects', async () => {
+    const failure = new LaunchApiError(403, [{ code: 'launch.FORBIDDEN', message: 'no access' }]);
+
+    await expect(resolveProjectUid(failingDeps(failure), 'org1', 'marketing-site')).rejects.toBe(failure);
+  });
 });
 
 describe('promptForProject', () => {
@@ -123,6 +176,19 @@ describe('promptForProject', () => {
       { org: 'org1', limit: 100, skip: 0 },
       { org: 'org1', limit: 100, skip: 0 },
     ]);
+  });
+
+  it('returns nothing when the user picks no project, leaving the input unresolved', async () => {
+    const { deps, inquired } = fakeDeps([{ uid: 'a'.repeat(24), name: 'one' }], undefined);
+
+    await expect(promptForProject(deps, 'org1')).resolves.toBeUndefined();
+    expect(inquired).toHaveLength(1);
+  });
+
+  it('propagates an api failure raised while listing the organization projects', async () => {
+    const failure = new LaunchApiError(403, [{ code: 'launch.FORBIDDEN', message: 'no access' }]);
+
+    await expect(promptForProject(failingDeps(failure), 'org1')).rejects.toBe(failure);
   });
 
   it('warns before prompting when the fetched page is a truncated view of the organization', async () => {

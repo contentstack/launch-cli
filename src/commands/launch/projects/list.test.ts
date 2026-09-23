@@ -1,7 +1,7 @@
 import { UxLike } from '../../../output/render';
 import ProjectsList from './list';
 
-function commandUnderTest(page: unknown) {
+function commandUnderTest(page: unknown, resolved: Record<string, unknown> = { org: 'org1', limit: 50, skip: 0 }) {
   const lines: string[] = [];
   const ux: UxLike = {
     print: (message: string) => {
@@ -14,7 +14,7 @@ function commandUnderTest(page: unknown) {
 
   Object.assign(command, {
     ux,
-    resolved: { org: 'org1', limit: 50, skip: 0 },
+    resolved,
     services: {
       ux,
       isTTY: false,
@@ -68,6 +68,53 @@ describe('launch:projects:list', () => {
 
     expect(lines[0]).toBe('UID  NAME  TYPE  UPDATED');
     expect(lines[1]).toBe('-    -     -     -');
+  });
+
+  it('prints only the empty-table placeholder and no pagination footer for an empty page', async () => {
+    const { command, lines } = commandUnderTest({
+      pagination: { count: 0, limit: 50, skip: 0 },
+      projects: [],
+    });
+
+    await command.run();
+
+    expect(lines).toEqual(['No records found.']);
+  });
+
+  it('pads every column to the widest row in the page', async () => {
+    const { command, lines } = commandUnderTest({
+      pagination: { count: 3, limit: 50, skip: 0 },
+      projects: [
+        { uid: 'a'.repeat(24), name: 'marketing-site', projectType: 'GITPROVIDER', updatedAt: '2026-09-01' },
+        { uid: 'b'.repeat(24), name: 'docs', projectType: 'FILEUPLOAD', updatedAt: '2026-09-02' },
+        { uid: 'c'.repeat(24), name: 'x', projectType: 'FILEUPLOAD', updatedAt: '2026-09-03' },
+      ],
+    });
+
+    await command.run();
+
+    expect(lines).toEqual([
+      `UID${' '.repeat(23)}NAME            TYPE         UPDATED`,
+      `${'a'.repeat(24)}  marketing-site  GITPROVIDER  2026-09-01`,
+      `${'b'.repeat(24)}  docs            FILEUPLOAD   2026-09-02`,
+      `${'c'.repeat(24)}  x               FILEUPLOAD   2026-09-03`,
+      'Showing 1-3 of 3',
+    ]);
+  });
+
+  it('passes a non-default limit and skip through to the api and reports that window', async () => {
+    const { command, lines, listed } = commandUnderTest(
+      {
+        pagination: { count: 120, limit: 10, skip: 20 },
+        projects: [{ uid: 'p1', name: 'site', projectType: 'FILEUPLOAD', updatedAt: '2026-09-01' }],
+      },
+      { org: 'org1', limit: 10, skip: 20 },
+    );
+
+    await command.run();
+
+    expect(listed).toEqual([{ org: 'org1', limit: 10, skip: 20 }]);
+    expect(lines[lines.length - 1]).toBe('Showing 21-30 of 120');
   });
 
   it('declares org as required and limit and skip as optional', () => {

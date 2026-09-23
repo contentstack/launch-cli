@@ -29,6 +29,21 @@ describe('ProjectsApi', () => {
     });
   });
 
+  it('sends limit and skip as undefined when the caller passes neither', async () => {
+    const page = { pagination: { count: 0, limit: 50, skip: 0 }, projects: [] };
+    const { client, requests } = fakeRestClient(page);
+
+    await new ProjectsApi(client).list({ org: 'org1' });
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toEqual({
+      method: 'GET',
+      path: '/projects',
+      orgUid: 'org1',
+      query: { limit: undefined, skip: undefined },
+    });
+  });
+
   it('gets a project by uid with both scoping identifiers', async () => {
     const project = { uid: 'p1', name: 'site', projectType: 'GITPROVIDER' };
     const { client, requests } = fakeRestClient({ project });
@@ -98,6 +113,18 @@ describe('ProjectsApi', () => {
     const { client } = fakeRestClient(body);
 
     await expect(new ProjectsApi(client).list({ org: 'org1' })).rejects.toBeInstanceOf(LaunchApiError);
+  });
+
+  it('propagates a LaunchApiError raised by the transport rather than masking it', async () => {
+    const failure = new LaunchApiError(404, [{ code: 'launch.PROJECT.NOT_FOUND', message: 'x' }]);
+    const client = {
+      request: async () => {
+        throw failure;
+      },
+    } as unknown as RestApiClient;
+
+    await expect(new ProjectsApi(client).get({ org: 'org1', project: 'p1' })).rejects.toBe(failure);
+    await expect(new ProjectsApi(client).list({ org: 'org1' })).rejects.toBe(failure);
   });
 
   it('buildApi exposes the projects resource', () => {
