@@ -13,6 +13,12 @@ describe('getManageApiBaseUrl', () => {
       'https://launch-api.contentstack.com/manage',
     );
   });
+
+  it.each([['//'], ['///']])('tolerates %s at the end of the hub url', (slashes) => {
+    expect(getManageApiBaseUrl(`https://launch-api.contentstack.com${slashes}`)).toBe(
+      'https://launch-api.contentstack.com/manage',
+    );
+  });
 });
 
 describe('resolveLaunchHubUrl', () => {
@@ -30,6 +36,18 @@ describe('resolveLaunchHubUrl', () => {
     expect(resolveLaunchHubUrl({ cma: 'https://eu-api.contentstack.com' })).toBe(
       'https://eu-launch-api.contentstack.com',
     );
+  });
+
+  it('rewrites a trailing io to com, because the launch hub is only served on the com domain', () => {
+    expect(resolveLaunchHubUrl({ cma: 'eu-api.contentstack.io' })).toBe('https://eu-launch-api.contentstack.com');
+  });
+
+  it('rewrites only a trailing io, leaving an io inside the host alone', () => {
+    expect(resolveLaunchHubUrl({ cma: 'api.audio.io' })).toBe('https://launch-api.audio.com');
+  });
+
+  it('leaves a host that does not end in io alone', () => {
+    expect(resolveLaunchHubUrl({ cma: 'api.csnonprod.com' })).toBe('https://launch-api.csnonprod.com');
   });
 
   it('rewrites a dev11 cma host to dev, which is where dev11 tokens are accepted', () => {

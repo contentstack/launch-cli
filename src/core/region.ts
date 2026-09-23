@@ -29,7 +29,7 @@ export function resolveLaunchHubUrl(region: RegionLike | undefined): string {
   }
 
   if (host.endsWith('io')) {
-    host = host.replace('io', 'com');
+    host = `${host.slice(0, -2)}com`;
   }
 
   return `https://${host}`;
