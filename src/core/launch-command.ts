@@ -4,7 +4,7 @@ import { Command } from '@contentstack/cli-command';
 import { FlagInput, cliux, configHandler, isAuthenticated } from '@contentstack/cli-utilities';
 
 import { EXIT_RUNTIME, PROJECT_CONFIG_FILE } from './constants';
-import { readProjectConfig } from './project-config';
+import { ProjectConfigStore } from './project-config';
 import { RegionLike, resolveLaunchHubUrl } from './region';
 import { CancelledError, LaunchError, UsageError } from './errors';
 import { catalog, FlagKey } from '../resources';
@@ -44,7 +44,7 @@ export async function resolveLaunchContext<S extends AnyInputs>(
 
   const resolved = await resolveInputs(args.inputs, {
     parsed: args.flags,
-    projectConfig: readProjectConfig(configPath),
+    projectConfig: new ProjectConfigStore(configPath).load(),
     services,
     rules: args.rules,
   });

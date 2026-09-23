@@ -1,4 +1,4 @@
-import { getByPath } from './project-config';
+import { ProjectConfig } from './project-config';
 import { InputDependencyError, MissingInputError } from './errors';
 import { FlagKey, resolutionTable } from '../resources';
 import { AnyInputs, InputKeys, Resolved } from './inputs';
@@ -51,7 +51,7 @@ export function resolutionOrder<K extends FlagKey>(keys: K[]): K[] {
 
 export interface ResolveArgs {
   parsed: Partial<Record<FlagKey, unknown>>;
-  projectConfig: Record<string, unknown>;
+  projectConfig: ProjectConfig;
   services: ResolveServices;
   rules?: Rule[];
 }
@@ -67,7 +67,7 @@ export async function resolveInputs<S extends AnyInputs>(spec: S, args: ResolveA
     let value = args.parsed[key];
 
     if (isAbsent(value) && rule.configPath) {
-      value = getByPath(args.projectConfig, rule.configPath);
+      value = args.projectConfig[rule.configPath];
     }
 
     if (isAbsent(value) && rule.prompt && args.services.isTTY) {

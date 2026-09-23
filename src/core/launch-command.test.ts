@@ -5,7 +5,7 @@ import { resolve as resolvePath, join } from 'node:path';
 import { HttpClient, authHandler, configHandler } from '@contentstack/cli-utilities';
 
 import { EXIT_RUNTIME, PROJECT_CONFIG_FILE } from './constants';
-import * as projectConfigModule from './project-config';
+import { ProjectConfigStore } from './project-config';
 import { getManageApiBaseUrl } from './region';
 import { CancelledError, MissingInputError, UsageError } from './errors';
 import { exactlyOneOf } from './rules';
@@ -469,7 +469,7 @@ describe('resolveLaunchContext', () => {
     tempDirs.push(dir);
     writeFileSync(join(dir, PROJECT_CONFIG_FILE), JSON.stringify({ project: { organizationUid: 'org-from-cwd' } }));
     const cwdSpy = jest.spyOn(process, 'cwd').mockReturnValue(dir);
-    const readSpy = jest.spyOn(projectConfigModule, 'readProjectConfig');
+    const loadSpy = jest.spyOn(ProjectConfigStore.prototype, 'load');
 
     const result = await resolveLaunchContext({
       flags: {},
@@ -480,11 +480,11 @@ describe('resolveLaunchContext', () => {
       isTTY: false,
     });
 
-    expect(readSpy).toHaveBeenCalledWith(resolvePath(dir, PROJECT_CONFIG_FILE));
+    expect((loadSpy.mock.instances[0] as ProjectConfigStore).path).toBe(resolvePath(dir, PROJECT_CONFIG_FILE));
     expect(result.resolved).toEqual({ org: 'org-from-cwd' });
     expect(result.services.isTTY).toBe(false);
     cwdSpy.mockRestore();
-    readSpy.mockRestore();
+    loadSpy.mockRestore();
   });
 
   it('reads the config file from the supplied data-dir using the default file name when no config flag is given', async () => {

@@ -1,8 +1,24 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
 import { UsageError } from './errors';
 
-export type ProjectConfigKey = 'organizationUid' | 'uid';
+export interface ProjectEnvironment {
+  uid?: string;
+  name?: string;
+}
+
+export interface ProjectConfig {
+  uid?: string | null;
+  organizationUid?: string | null;
+  name?: string | null;
+  environments?: ProjectEnvironment[] | null;
+}
+
+export type ProjectConfigKey = keyof ProjectConfig;
+
+export const DEFAULT_BLOCK_KEY = 'project';
+
+type Blocks = Record<string, unknown>;
 
 function isBlock(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -16,52 +32,75 @@ function identityOf(block: unknown): string | undefined {
   return `${String(block.organizationUid)}/${String(block.uid)}`;
 }
 
-function sharedBlock(entries: [string, unknown][]): Record<string, unknown> {
-  const identities = new Set(entries.map(([, block]) => identityOf(block)));
-
-  if (identities.size === 1 && !identities.has(undefined)) {
-    return entries[0][1] as Record<string, unknown>;
-  }
-
-  throw new UsageError(
+function disagreement(entries: [string, unknown][]): UsageError {
+  return new UsageError(
     `The project config holds branch blocks that do not agree on one project: ${entries
       .map(([branch]) => branch)
       .join(', ')}. Pass --org and --project explicitly.`,
   );
 }
 
-export function readProjectConfig(configPath: string): Record<string, unknown> {
-  if (!existsSync(configPath)) {
-    return {};
+function agreedBlock(entries: [string, unknown][]): Record<string, unknown> {
+  const identities = new Set(entries.map(([, block]) => identityOf(block)));
+
+  if (identities.size === 1 && !identities.has(undefined)) {
+    return entries[0][1] as Record<string, unknown>;
   }
 
-  let parsed: unknown;
-
-  try {
-    parsed = JSON.parse(readFileSync(configPath, 'utf8'));
-  } catch {
-    return {};
-  }
-
-  if (!isBlock(parsed)) {
-    return {};
-  }
-
-  const entries = Object.entries(parsed);
-
-  if (entries.length > 1) {
-    return sharedBlock(entries);
-  }
-
-  if (entries.length === 1 && isBlock(entries[0][1])) {
-    return entries[0][1];
-  }
-
-  return {};
+  throw disagreement(entries);
 }
 
-export function getByPath(source: unknown, path: string): unknown {
-  return path.split('.').reduce<unknown>((current, segment) => {
-    return current === undefined || current === null ? undefined : (current as Record<string, unknown>)[segment];
-  }, source);
+export class ProjectConfigStore {
+  constructor(readonly path: string) {}
+
+  load(): ProjectConfig {
+    const entries = Object.entries(this.blocks());
+
+    if (entries.length > 1) {
+      return agreedBlock(entries) as ProjectConfig;
+    }
+
+    if (entries.length === 1 && isBlock(entries[0][1])) {
+      return entries[0][1] as ProjectConfig;
+    }
+
+    return {};
+  }
+
+  save(config: ProjectConfig): void {
+    const blocks = this.blocks();
+    const entries = Object.entries(blocks);
+
+    if (entries.length > 1) {
+      agreedBlock(entries);
+    }
+
+    const next: Blocks = {};
+
+    if (entries.length === 0) {
+      next[DEFAULT_BLOCK_KEY] = config;
+    } else {
+      for (const [branch, block] of entries) {
+        next[branch] = { ...(isBlock(block) ? block : {}), ...config };
+      }
+    }
+
+    writeFileSync(this.path, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+  }
+
+  private blocks(): Blocks {
+    if (!existsSync(this.path)) {
+      return {};
+    }
+
+    let parsed: unknown;
+
+    try {
+      parsed = JSON.parse(readFileSync(this.path, 'utf8'));
+    } catch {
+      return {};
+    }
+
+    return isBlock(parsed) ? parsed : {};
+  }
 }

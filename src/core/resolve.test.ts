@@ -196,7 +196,7 @@ describe('resolveInputs', () => {
     await expect(promise).rejects.toMatchObject({ flag: 'org', name: 'MissingInputError' });
   });
 
-  it('reads a nested config path such as project uid', async () => {
+  it('reads the project uid straight out of the config block', async () => {
     const resolved = await resolveInputs(inputs({ org: {}, project: { required: true } }), {
       parsed: {},
       projectConfig: { uid: PROJECT_UID },

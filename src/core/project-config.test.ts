@@ -1,58 +1,65 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { UsageError } from './errors';
-import { getByPath, readProjectConfig } from './project-config';
+import { DEFAULT_BLOCK_KEY, ProjectConfigStore } from './project-config';
 
 const tempDirs: string[] = [];
 
-function writeConfig(contents: unknown): string {
+function tempPath(): string {
   const dir = mkdtempSync(join(tmpdir(), 'launch-cfg-'));
   tempDirs.push(dir);
-  const path = join(dir, '.cs-launch.json');
+  return join(dir, '.cs-launch.json');
+}
+
+function storeFor(contents: unknown): ProjectConfigStore {
+  const path = tempPath();
   writeFileSync(path, JSON.stringify(contents));
-  return path;
+  return new ProjectConfigStore(path);
+}
+
+function fileAt(store: ProjectConfigStore): unknown {
+  return JSON.parse(readFileSync(store.path, 'utf8'));
 }
 
 afterEach(() => {
-  tempDirs.forEach(dir => {
+  tempDirs.forEach((dir) => {
     rmSync(dir, { recursive: true, force: true });
   });
   tempDirs.length = 0;
 });
 
-describe('readProjectConfig', () => {
+describe('ProjectConfigStore.load', () => {
   it('returns the sole config block', () => {
-    const path = writeConfig({ project: { uid: 'p1', organizationUid: 'org1' } });
-
-    expect(readProjectConfig(path)).toEqual({ uid: 'p1', organizationUid: 'org1' });
+    expect(storeFor({ project: { uid: 'p1', organizationUid: 'org1' } }).load()).toEqual({
+      uid: 'p1',
+      organizationUid: 'org1',
+    });
   });
 
   it('returns an empty object when the file does not exist', () => {
-    expect(readProjectConfig('/nope/.cs-launch.json')).toEqual({});
+    expect(new ProjectConfigStore('/nope/.cs-launch.json').load()).toEqual({});
   });
 
   it('returns an empty object when the file is not valid JSON', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'launch-cfg-'));
-    tempDirs.push(dir);
-    const path = join(dir, '.cs-launch.json');
+    const path = tempPath();
     writeFileSync(path, 'not json');
 
-    expect(readProjectConfig(path)).toEqual({});
+    expect(new ProjectConfigStore(path).load()).toEqual({});
   });
 
   it('uses the shared block when several branch blocks name the same project', () => {
-    const path = writeConfig({
+    const store = storeFor({
       main: { uid: 'p1', organizationUid: 'org1' },
       staging: { uid: 'p1', organizationUid: 'org1' },
     });
 
-    expect(readProjectConfig(path)).toEqual({ uid: 'p1', organizationUid: 'org1' });
+    expect(store.load()).toEqual({ uid: 'p1', organizationUid: 'org1' });
   });
 
   it('uses the shared block for a realistic two-branch v1 config file', () => {
-    const path = writeConfig({
+    const store = storeFor({
       main: {
         uid: 'blt1111111111111111',
         organizationUid: 'blt2222222222222222',
@@ -67,132 +74,180 @@ describe('readProjectConfig', () => {
       },
     });
 
-    expect(getByPath(readProjectConfig(path), 'uid')).toBe('blt1111111111111111');
-    expect(getByPath(readProjectConfig(path), 'organizationUid')).toBe('blt2222222222222222');
+    expect(store.load().uid).toBe('blt1111111111111111');
+    expect(store.load().organizationUid).toBe('blt2222222222222222');
   });
 
   it('raises a usage error when the branch blocks name different projects', () => {
-    const path = writeConfig({
+    const store = storeFor({
       main: { uid: 'p1', organizationUid: 'org1' },
       staging: { uid: 'p2', organizationUid: 'org1' },
     });
 
-    expect(() => readProjectConfig(path)).toThrow(UsageError);
-    expect(() => readProjectConfig(path)).toThrow('--org');
-    expect(() => readProjectConfig(path)).toThrow('--project');
-    expect(() => readProjectConfig(path)).toThrow('main, staging');
+    expect(() => store.load()).toThrow(UsageError);
+    expect(() => store.load()).toThrow('--org');
+    expect(() => store.load()).toThrow('--project');
+    expect(() => store.load()).toThrow('main, staging');
   });
 
   it('raises a usage error when the branch blocks name different organizations', () => {
-    const path = writeConfig({
+    const store = storeFor({
       main: { uid: 'p1', organizationUid: 'org1' },
       staging: { uid: 'p1', organizationUid: 'org2' },
     });
 
-    expect(() => readProjectConfig(path)).toThrow(UsageError);
-    expect(() => readProjectConfig(path)).toThrow('main, staging');
+    expect(() => store.load()).toThrow(UsageError);
+    expect(() => store.load()).toThrow('main, staging');
   });
 
   it('raises a usage error when a branch block is not an object', () => {
-    const path = writeConfig({ main: { uid: 'p1', organizationUid: 'org1' }, staging: 'p1' });
+    const store = storeFor({ main: { uid: 'p1', organizationUid: 'org1' }, staging: 'p1' });
 
-    expect(() => readProjectConfig(path)).toThrow(UsageError);
-    expect(() => readProjectConfig(path)).toThrow('main, staging');
+    expect(() => store.load()).toThrow(UsageError);
+    expect(() => store.load()).toThrow('main, staging');
   });
 
   it('raises a usage error when a branch block is null', () => {
-    const path = writeConfig({ main: { uid: 'p1', organizationUid: 'org1' }, staging: null });
-
-    expect(() => readProjectConfig(path)).toThrow(UsageError);
+    expect(() => storeFor({ main: { uid: 'p1', organizationUid: 'org1' }, staging: null }).load()).toThrow(UsageError);
   });
 
   it('raises a usage error when every branch block is a primitive', () => {
-    const path = writeConfig({ main: 'p1', staging: 'p1' });
+    const store = storeFor({ main: 'p1', staging: 'p1' });
 
-    expect(() => readProjectConfig(path)).toThrow(UsageError);
-    expect(() => readProjectConfig(path)).toThrow('main, staging');
+    expect(() => store.load()).toThrow(UsageError);
+    expect(() => store.load()).toThrow('main, staging');
   });
 
   it('returns an empty object when the sole block holds a primitive instead of a project', () => {
-    const path = writeConfig({ main: 'x' });
-
-    expect(readProjectConfig(path)).toEqual({});
+    expect(storeFor({ main: 'x' }).load()).toEqual({});
   });
 
   it('returns an empty object when the sole block is an array', () => {
-    const path = writeConfig({ main: [{ uid: 'p1', organizationUid: 'org1' }] });
-
-    expect(readProjectConfig(path)).toEqual({});
+    expect(storeFor({ main: [{ uid: 'p1', organizationUid: 'org1' }] }).load()).toEqual({});
   });
 
   it('returns an empty object when the sole block is null', () => {
-    const path = writeConfig({ main: null });
-
-    expect(readProjectConfig(path)).toEqual({});
+    expect(storeFor({ main: null }).load()).toEqual({});
   });
 
   it('returns an empty object when the file root is an array', () => {
-    const path = writeConfig([{ uid: 'p1', organizationUid: 'org1' }]);
-
-    expect(readProjectConfig(path)).toEqual({});
+    expect(storeFor([{ uid: 'p1', organizationUid: 'org1' }]).load()).toEqual({});
   });
 
   it('returns an empty object when the file root is an empty array', () => {
-    const path = writeConfig([]);
-
-    expect(readProjectConfig(path)).toEqual({});
+    expect(storeFor([]).load()).toEqual({});
   });
 
   it('raises a usage error when every branch block is an array', () => {
-    const path = writeConfig({ main: [{ uid: 'p1' }], staging: [{ uid: 'p1' }] });
+    const store = storeFor({ main: [{ uid: 'p1' }], staging: [{ uid: 'p1' }] });
 
-    expect(() => readProjectConfig(path)).toThrow(UsageError);
-    expect(() => readProjectConfig(path)).toThrow('main, staging');
+    expect(() => store.load()).toThrow(UsageError);
+    expect(() => store.load()).toThrow('main, staging');
   });
 
   it('returns an empty object when the file holds no blocks at all', () => {
-    const path = writeConfig({});
-
-    expect(readProjectConfig(path)).toEqual({});
+    expect(storeFor({}).load()).toEqual({});
   });
 
-  it('returns an empty object when the file contains null', () => {
-    const path = writeConfig(null);
-
-    expect(readProjectConfig(path)).toEqual({});
-  });
-
-  it('returns an empty object when the file contains a non-object primitive', () => {
-    const path = writeConfig(42);
-
-    expect(readProjectConfig(path)).toEqual({});
-  });
-
-  it('returns an empty object when the file contains a string primitive', () => {
-    const path = writeConfig('string');
-
-    expect(readProjectConfig(path)).toEqual({});
+  it.each([[null], [42], ['string'], [true]])('returns an empty object when the file contains %p', (contents) => {
+    expect(storeFor(contents).load()).toEqual({});
   });
 });
 
-describe('getByPath', () => {
-  it('reads a nested value and returns undefined for a missing one', () => {
-    const source = { a: { b: 'value' } };
+describe('ProjectConfigStore.save', () => {
+  it('writes a single default block when the file does not exist yet', () => {
+    const store = new ProjectConfigStore(tempPath());
 
-    expect(getByPath(source, 'a.b')).toBe('value');
-    expect(getByPath(source, 'a.c')).toBeUndefined();
-    expect(getByPath(undefined, 'a')).toBeUndefined();
+    store.save({ uid: 'p1', organizationUid: 'org1' });
+
+    expect(fileAt(store)).toEqual({ [DEFAULT_BLOCK_KEY]: { uid: 'p1', organizationUid: 'org1' } });
+    expect(store.load()).toEqual({ uid: 'p1', organizationUid: 'org1' });
   });
 
-  it('returns undefined when traversing through a null intermediate', () => {
-    expect(getByPath({ a: null }, 'a.b')).toBeUndefined();
+  it('writes a single default block when the existing file holds no blocks', () => {
+    const store = storeFor({});
+
+    store.save({ uid: 'p1', organizationUid: 'org1' });
+
+    expect(fileAt(store)).toEqual({ [DEFAULT_BLOCK_KEY]: { uid: 'p1', organizationUid: 'org1' } });
   });
 
-  it('returns undefined when a path segment hits a primitive', () => {
-    expect(getByPath({ a: 5 }, 'a.b')).toBeUndefined();
+  it('writes a single default block when the existing file is not valid JSON', () => {
+    const path = tempPath();
+    writeFileSync(path, 'not json');
+    const store = new ProjectConfigStore(path);
+
+    store.save({ uid: 'p1', organizationUid: 'org1' });
+
+    expect(fileAt(store)).toEqual({ [DEFAULT_BLOCK_KEY]: { uid: 'p1', organizationUid: 'org1' } });
   });
 
-  it('returns undefined when the path is an empty string', () => {
-    expect(getByPath({ a: 'value' }, '')).toBeUndefined();
+  it('merges into the sole existing block rather than replacing it', () => {
+    const store = storeFor({ main: { uid: 'p1', organizationUid: 'org1', name: 'old-name' } });
+
+    store.save({ name: 'new-name' });
+
+    expect(fileAt(store)).toEqual({ main: { uid: 'p1', organizationUid: 'org1', name: 'new-name' } });
+  });
+
+  it('updates every branch block and discards none of them', () => {
+    const store = storeFor({
+      main: {
+        uid: 'p1',
+        organizationUid: 'org1',
+        name: 'my-site',
+        environments: [{ uid: 'e1', name: 'Default' }],
+      },
+      'feature/checkout': {
+        uid: 'p1',
+        organizationUid: 'org1',
+        name: 'my-site',
+        environments: [{ uid: 'e2', name: 'Preview' }],
+      },
+    });
+
+    store.save({ name: 'renamed' });
+
+    expect(fileAt(store)).toEqual({
+      main: { uid: 'p1', organizationUid: 'org1', name: 'renamed', environments: [{ uid: 'e1', name: 'Default' }] },
+      'feature/checkout': {
+        uid: 'p1',
+        organizationUid: 'org1',
+        name: 'renamed',
+        environments: [{ uid: 'e2', name: 'Preview' }],
+      },
+    });
+  });
+
+  it('refuses to write over branch blocks that do not agree on one project', () => {
+    const store = storeFor({
+      main: { uid: 'p1', organizationUid: 'org1' },
+      staging: { uid: 'p2', organizationUid: 'org1' },
+    });
+
+    expect(() => store.save({ name: 'renamed' })).toThrow(UsageError);
+    expect(() => store.save({ name: 'renamed' })).toThrow('main, staging');
+    expect(fileAt(store)).toEqual({
+      main: { uid: 'p1', organizationUid: 'org1' },
+      staging: { uid: 'p2', organizationUid: 'org1' },
+    });
+  });
+
+  it('replaces a sole non-object block rather than spreading a primitive into it', () => {
+    const store = storeFor({ main: 'x' });
+
+    store.save({ uid: 'p1', organizationUid: 'org1' });
+
+    expect(fileAt(store)).toEqual({ main: { uid: 'p1', organizationUid: 'org1' } });
+  });
+
+  it('writes the file so that a later load reads back exactly what was saved', () => {
+    const store = new ProjectConfigStore(tempPath());
+    const config = { uid: 'p1', organizationUid: 'org1', name: 'my-site', environments: [{ uid: 'e1', name: 'Default' }] };
+
+    store.save(config);
+
+    expect(store.load()).toEqual(config);
+    expect(readFileSync(store.path, 'utf8').endsWith('\n')).toBe(true);
   });
 });
