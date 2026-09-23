@@ -1,3 +1,5 @@
+import axios from 'axios';
+
 import { HttpClient } from '@contentstack/cli-utilities';
 
 import { createUtilityHttpClient, disarmResponseInterceptors } from './utility-http-client';
@@ -13,6 +15,28 @@ describe('disarmResponseInterceptors', () => {
     expect(registered).toBe(0);
     expect(handler).not.toHaveBeenCalled();
     expect((client.interceptors.response as unknown as { handlers: unknown[] }).handlers).toEqual([]);
+  });
+
+  it('leaves the shared axios default interceptors registering handlers as usual', () => {
+    const before = axios.interceptors.response.use;
+
+    disarmResponseInterceptors(HttpClient.create());
+    const registered = axios.interceptors.response.use(null, jest.fn());
+
+    expect(axios.interceptors.response.use).toBe(before);
+    expect(typeof registered).toBe('number');
+    expect((axios.interceptors.response as unknown as { handlers: unknown[] }).handlers).toHaveLength(1);
+    axios.interceptors.response.eject(registered);
+  });
+
+  it('leaves a second utility client built afterwards able to register its own handlers', () => {
+    disarmResponseInterceptors(HttpClient.create());
+    const untouched = HttpClient.create();
+
+    const registered = untouched.interceptors.response.use(null, jest.fn());
+
+    expect(typeof registered).toBe('number');
+    expect((untouched.interceptors.response as unknown as { handlers: unknown[] }).handlers).toHaveLength(1);
   });
 
   it('returns the same client it was given rather than a copy', () => {

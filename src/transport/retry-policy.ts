@@ -1,3 +1,5 @@
+import { LaunchNetworkError } from './errors';
+
 export type HttpMethod = 'GET' | 'HEAD' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 
 export const DEFAULT_MAX_RETRIES = 3;
@@ -26,6 +28,14 @@ export class RetryPolicy {
     }
 
     return IDEMPOTENT_ONLY_RETRYABLE_STATUSES.includes(status) && IDEMPOTENT_METHODS.includes(method);
+  }
+
+  isRetryableTransportError(error: unknown, method: HttpMethod): boolean {
+    return error instanceof LaunchNetworkError && error.retryable && IDEMPOTENT_METHODS.includes(method);
+  }
+
+  shouldRetryTransportError(error: unknown, method: HttpMethod, attemptsMade: number): boolean {
+    return attemptsMade < this.maxRetries && this.isRetryableTransportError(error, method);
   }
 
   shouldRetry(status: number, method: HttpMethod, attemptsMade: number): boolean {

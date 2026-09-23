@@ -33,6 +33,15 @@ export class UnauthenticatedError extends LaunchError {
   }
 }
 
+export class SessionExpiredError extends LaunchError {
+  readonly exitCode = EXIT_RUNTIME;
+
+  constructor() {
+    super('Your session has timed out. Run csdx auth:login to continue.');
+    this.name = 'SessionExpiredError';
+  }
+}
+
 export class MissingInputError extends UsageError {
   readonly flag: string;
 

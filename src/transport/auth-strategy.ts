@@ -1,6 +1,6 @@
 import { authHandler, configHandler } from '@contentstack/cli-utilities';
 
-import { UnauthenticatedError } from '../core/errors';
+import { SessionExpiredError, UnauthenticatedError } from '../core/errors';
 
 export const AUTHORISATION_TYPE_KEY = 'authorisationType';
 export const BASIC_AUTHORISATION = 'BASIC';
@@ -14,6 +14,10 @@ export interface AuthStrategy {
 export class BasicAuth implements AuthStrategy {
   async headers(): Promise<Record<string, string>> {
     return { authtoken: configHandler.get('authtoken') };
+  }
+
+  async refresh(): Promise<never> {
+    throw new SessionExpiredError();
   }
 }
 

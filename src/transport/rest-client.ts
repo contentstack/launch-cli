@@ -56,6 +56,18 @@ function scopeHeader(headers: Record<string, string>, name: string, value: strin
   headers[name] = value;
 }
 
+const EXPIRED_TOKEN_MESSAGE = 'access token is invalid or expired';
+
+function isAuthChallenge(status: number, data: unknown): boolean {
+  if (status === 401) {
+    return true;
+  }
+
+  const { error_message: errorMessage } = (data ?? {}) as { error_message?: unknown };
+
+  return typeof errorMessage === 'string' && errorMessage.includes(EXPIRED_TOKEN_MESSAGE);
+}
+
 export class RestApiClient {
   constructor(private readonly options: RestApiClientOptions) {}
 
@@ -66,13 +78,25 @@ export class RestApiClient {
     let attempt = 0;
 
     for (;;) {
-      const response = await this.send(req);
+      let response: { status: number; data: unknown };
+
+      try {
+        response = await this.send(req);
+      } catch (error) {
+        if (policy.shouldRetryTransportError(error, req.method, attempt)) {
+          attempt += 1;
+          await sleep(policy.delayFor(attempt));
+          continue;
+        }
+
+        throw error;
+      }
 
       if (response.status >= 200 && response.status < 300) {
         return response.data as T;
       }
 
-      if (response.status === 401 && !refreshed && this.options.auth.refresh) {
+      if (!refreshed && this.options.auth.refresh && isAuthChallenge(response.status, response.data)) {
         refreshed = true;
         await this.options.auth.refresh();
         continue;

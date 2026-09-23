@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { authHandler, configHandler } from '@contentstack/cli-utilities';
 
-import { UnauthenticatedError } from '../core/errors';
+import { SessionExpiredError, UnauthenticatedError } from '../core/errors';
 import { AuthStrategy, BasicAuth, OAuthAuth, selectAuthStrategy } from './auth-strategy';
 
 function configReturning(values: Record<string, unknown>) {
@@ -59,10 +59,13 @@ describe('BasicAuth', () => {
     expirySpy.mockRestore();
   });
 
-  it('declares no refresh, so a 401 is never retried on a token session', () => {
+  it('refuses to refresh a token session and names the expired session instead', async () => {
     const strategy: AuthStrategy = new BasicAuth();
 
-    expect(strategy.refresh).toBeUndefined();
+    await expect(strategy.refresh?.()).rejects.toBeInstanceOf(SessionExpiredError);
+    await expect(strategy.refresh?.()).rejects.toThrow(
+      'Your session has timed out. Run csdx auth:login to continue.',
+    );
   });
 });
 

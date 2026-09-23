@@ -3,8 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { HttpClient, authHandler, configHandler } from '@contentstack/cli-utilities';
 
 import { ProjectsApi } from '../projects/projects.api';
-import { LaunchApiError } from '../transport/errors';
-import { UnauthenticatedError } from './errors';
+import { SessionExpiredError, UnauthenticatedError } from './errors';
 import { UxLike } from './render';
 import { buildServiceContext } from './service-context';
 
@@ -102,15 +101,17 @@ describe('buildServiceContext request wiring', () => {
     configSpy.mockRestore();
   });
 
-  it('sends the authtoken and never refreshes on a BASIC session that gets a 401', async () => {
+  it('sends the authtoken and names the timed-out session on a BASIC session that gets a 401', async () => {
     const token = randomUUID();
     const expirySpy = jest.spyOn(authHandler, 'compareOAuthExpiry').mockResolvedValue(undefined);
     const configSpy = basicSession(token);
     const captured: CapturedCall[] = [];
     const httpSpy = capturingHttpClient([401], captured);
 
-    await expect(context().api.projects.list({ org: 'org1' })).rejects.toBeInstanceOf(LaunchApiError);
+    const rejection = context().api.projects.list({ org: 'org1' });
 
+    await expect(rejection).rejects.toBeInstanceOf(SessionExpiredError);
+    await expect(rejection).rejects.toThrow('Your session has timed out. Run csdx auth:login to continue.');
     expect(captured).toHaveLength(1);
     expect(captured[0].headers?.authtoken).toBe(token);
     expect(captured[0].headers?.authorization).toBeUndefined();

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import nock from 'nock';
 
+import { LaunchNetworkError } from '../../src/transport/errors';
 import { RestApiClient } from '../../src/transport/rest-client';
 
 const ORIGIN = 'https://launch-api.transport.test';
@@ -45,28 +46,34 @@ describe('integration: transport-level retries', () => {
     nock.restore();
   });
 
-  it('sends a timed-out POST exactly once and surfaces the failure to the caller', async () => {
+  it('sends a timed-out POST exactly once and explains the failure to the caller', async () => {
     const attempts = postAttempts(4);
 
     const rejection = await buildClient()
       .request({ method: 'POST', path: '/projects', body: { name: 'site' }, orgUid: ORG_UID })
       .catch((error: unknown) => error);
 
-    expect(rejection).toBeInstanceOf(Error);
+    expect(rejection).toBeInstanceOf(LaunchNetworkError);
+    expect((rejection as LaunchNetworkError).message).toBe(
+      'Could not reach the Launch API (ECONNABORTED). Check your network connection and try again.',
+    );
     expect(attempts.map((attempt) => attempt.isDone())).toEqual([true, false, false, false]);
   });
 
-  it('sends a timed-out GET exactly once because a transport failure is not a retryable status', async () => {
-    const attempts = Array.from({ length: 4 }, () =>
+  it('retries a timed-out GET up to the budget and then explains the failure', async () => {
+    const attempts = Array.from({ length: 5 }, () =>
       nock(ORIGIN).get(`${BASE_PATH}/projects`).replyWithError(TIMEOUT_ERROR),
     );
 
-    const rejection = await buildClient()
+    const rejection = await buildClient({ maxRetries: 3 })
       .request({ method: 'GET', path: '/projects', orgUid: ORG_UID })
       .catch((error: unknown) => error);
 
-    expect(rejection).toBeInstanceOf(Error);
-    expect(attempts.map((attempt) => attempt.isDone())).toEqual([true, false, false, false]);
+    expect(rejection).toBeInstanceOf(LaunchNetworkError);
+    expect((rejection as LaunchNetworkError).message).toBe(
+      'Could not reach the Launch API (ECONNABORTED). Check your network connection and try again.',
+    );
+    expect(attempts.map((attempt) => attempt.isDone())).toEqual([true, true, true, true, false]);
   });
 
   it('retries a throttled GET exactly maxRetries times and no more', async () => {

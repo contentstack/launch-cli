@@ -2,7 +2,7 @@ import { configHandler } from '@contentstack/cli-utilities';
 
 import { EXIT_RUNTIME } from '../core/constants';
 import { LaunchError } from '../core/errors';
-import { LaunchApiError, LaunchNetworkError, PROXY_ERROR_CODES, diagnoseTransportError, messageForCode, parseErrorEnvelope } from './errors';
+import { LaunchApiError, LaunchNetworkError, NETWORK_ERROR_CODES, PROXY_ERROR_CODES, diagnoseTransportError, messageForCode, parseErrorEnvelope } from './errors';
 
 const MESSAGES = {
   'launch.RESOURCE.DUPLICATE_NAME': 'Something of that name already exists.',
@@ -179,23 +179,77 @@ describe('diagnoseTransportError', () => {
     );
   });
 
-  it('returns the original error untouched when no proxy is configured', () => {
-    withProxy(undefined);
-    const cause = Object.assign(new Error('getaddrinfo ENOTFOUND launch-api.test'), { code: 'ENOTFOUND' });
+  it('marks a proxy diagnostic as not worth retrying', () => {
+    withProxy({ protocol: 'http', host: 'corp.internal', port: 3128 });
+    const cause = Object.assign(new Error('connect ECONNREFUSED 10.0.0.1:3128'), { code: 'ECONNREFUSED' });
 
-    expect(diagnoseTransportError(cause)).toBe(cause);
+    const diagnosed = diagnoseTransportError(cause) as LaunchNetworkError;
+
+    expect(diagnosed).toBeInstanceOf(LaunchNetworkError);
+    expect(diagnosed.retryable).toBe(false);
   });
 
-  it('returns the original error untouched when the failure is not proxy shaped', () => {
+  it.each(NETWORK_ERROR_CODES.map((code) => [code]))(
+    'explains %s as an unreachable API when no proxy is configured',
+    (code) => {
+      withProxy(undefined);
+      const cause = Object.assign(new Error('boom'), { code });
+
+      const diagnosed = diagnoseTransportError(cause) as LaunchNetworkError;
+
+      expect(diagnosed).toBeInstanceOf(LaunchNetworkError);
+      expect(diagnosed).toBeInstanceOf(LaunchError);
+      expect(diagnosed.name).toBe('LaunchNetworkError');
+      expect(diagnosed.exitCode).toBe(EXIT_RUNTIME);
+      expect(diagnosed.cause).toBe(cause);
+      expect(diagnosed.retryable).toBe(true);
+      expect(diagnosed.message).toBe(
+        `Could not reach the Launch API (${code}). Check your network connection and try again.`,
+      );
+    },
+  );
+
+  it.each([['socket hang up'], ['timeout of 2000ms exceeded'], ['Network Error'], ['getaddrinfo EAI_AGAIN host']])(
+    'explains the codeless failure %j by its message',
+    (message) => {
+      withProxy(undefined);
+      const cause = new Error(message);
+
+      const diagnosed = diagnoseTransportError(cause) as LaunchNetworkError;
+
+      expect(diagnosed).toBeInstanceOf(LaunchNetworkError);
+      expect(diagnosed.cause).toBe(cause);
+      expect(diagnosed.retryable).toBe(true);
+      expect(diagnosed.message).toBe('Could not reach the Launch API. Check your network connection and try again.');
+    },
+  );
+
+  it('explains a reset socket as unreachable even when a proxy is configured but the failure is not proxy shaped', () => {
     withProxy({ protocol: 'http', host: 'corp.internal', port: 3128 });
     const cause = Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' });
 
+    const diagnosed = diagnoseTransportError(cause) as LaunchNetworkError;
+
+    expect(diagnosed).toBeInstanceOf(LaunchNetworkError);
+    expect(diagnosed.retryable).toBe(true);
+    expect(diagnosed.message).toBe(
+      'Could not reach the Launch API (ECONNRESET). Check your network connection and try again.',
+    );
+  });
+
+  it('returns a Launch error it was handed rather than wrapping it twice', () => {
+    withProxy(undefined);
+    const cause = new LaunchNetworkError('already explained', new Error('root'), true);
+
     expect(diagnoseTransportError(cause)).toBe(cause);
   });
 
-  it.each([[null], [undefined], ['boom'], [{ code: 404 }]])('passes a %p rejection through unchanged', (cause) => {
-    withProxy({ protocol: 'http', host: 'corp.internal', port: 3128 });
+  it.each([[null], [undefined], ['boom'], [{ code: 404 }], [new Error('Unexpected token < in JSON')]])(
+    'passes a %p rejection through unchanged',
+    (cause) => {
+      withProxy({ protocol: 'http', host: 'corp.internal', port: 3128 });
 
-    expect(diagnoseTransportError(cause)).toBe(cause);
-  });
+      expect(diagnoseTransportError(cause)).toBe(cause);
+    },
+  );
 });

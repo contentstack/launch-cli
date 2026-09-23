@@ -74,6 +74,20 @@ function buildClient(http: ReturnType<typeof fakeHttpClient>, overrides = {}) {
   });
 }
 
+function withoutProxy(): () => void {
+  const configSpy = jest.spyOn(configHandler, 'get').mockImplementation(() => undefined);
+  const savedHttps = process.env.HTTPS_PROXY;
+  const savedHttp = process.env.HTTP_PROXY;
+  delete process.env.HTTPS_PROXY;
+  delete process.env.HTTP_PROXY;
+
+  return () => {
+    if (savedHttps !== undefined) process.env.HTTPS_PROXY = savedHttps;
+    if (savedHttp !== undefined) process.env.HTTP_PROXY = savedHttp;
+    configSpy.mockRestore();
+  };
+}
+
 describe('RestApiClient', () => {
   it('sends the declared method, path, query, body and headers and returns the payload', async () => {
     const http = fakeHttpClient([{ status: 200, data: { projects: [] } }]);
@@ -401,26 +415,131 @@ describe('RestApiClient', () => {
     expect(http.calls).toHaveLength(1);
   });
 
-  it('propagates a transport failure without retrying it', async () => {
-    const configSpy = jest.spyOn(configHandler, 'get').mockImplementation(() => undefined);
-    const savedHttps = process.env.HTTPS_PROXY;
-    const savedHttp = process.env.HTTP_PROXY;
-    delete process.env.HTTPS_PROXY;
-    delete process.env.HTTP_PROXY;
+  it('retries an idempotent request whose transport failed and returns the payload once it succeeds', async () => {
+    const restore = withoutProxy();
+    const http = fakeHttpClient([
+      Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }),
+      { status: 200, data: { ok: true } },
+    ]);
+
+    await expect(buildClient(http, { retryDelayMs: 10 }).request({ method: 'GET', path: '/projects' })).resolves.toEqual({
+      ok: true,
+    });
+    expect(http.calls).toHaveLength(2);
+    expect(http.waits).toEqual([10]);
+    restore();
+  });
+
+  it('gives an exhausted transport failure CLI wording rather than raw axios text', async () => {
+    const restore = withoutProxy();
     const transportError = Object.assign(new Error('getaddrinfo ENOTFOUND launch-api.test'), { code: 'ENOTFOUND' });
     const http = fakeHttpClient([transportError]);
+
+    const error = (await buildClient(http, { maxRetries: 2, retryDelayMs: 10 })
+      .request({ method: 'GET', path: '/projects' })
+      .catch((e) => e)) as LaunchNetworkError;
+
+    expect(error).toBeInstanceOf(LaunchNetworkError);
+    expect(error.message).toBe('Could not reach the Launch API (ENOTFOUND). Check your network connection and try again.');
+    expect(error.cause).toBe(transportError);
+    expect(http.calls).toHaveLength(3);
+    expect(http.waits).toEqual([10, 20]);
+    restore();
+  });
+
+  it.each(['POST', 'PUT', 'PATCH', 'DELETE'] as const)(
+    'sends a transport-failed %s exactly once rather than repeating a write',
+    async (method) => {
+      const restore = withoutProxy();
+      const transportError = Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' });
+      const http = fakeHttpClient([transportError]);
+
+      const error = (await buildClient(http, { maxRetries: 3, retryDelayMs: 10 })
+        .request({ method, path: '/deployments', body: { name: 'site' } })
+        .catch((e) => e)) as LaunchNetworkError;
+
+      expect(error).toBeInstanceOf(LaunchNetworkError);
+      expect(error.cause).toBe(transportError);
+      expect(http.calls).toHaveLength(1);
+      expect(http.waits).toEqual([]);
+      restore();
+    },
+  );
+
+  it('leaves a rejection that is not a transport failure untouched and does not retry it', async () => {
+    const restore = withoutProxy();
+    const failure = new Error('Unexpected token < in JSON at position 0');
+    const http = fakeHttpClient([failure]);
 
     const error = await buildClient(http, { retryDelayMs: 10 })
       .request({ method: 'GET', path: '/projects' })
       .catch((e) => e);
 
-    expect(error).toBe(transportError);
+    expect(error).toBe(failure);
     expect(http.calls).toHaveLength(1);
     expect(http.waits).toEqual([]);
-    if (savedHttps !== undefined) process.env.HTTPS_PROXY = savedHttps;
-    if (savedHttp !== undefined) process.env.HTTP_PROXY = savedHttp;
-    configSpy.mockRestore();
+    restore();
   });
+
+  it('refreshes once when a non-2xx body reports the access token invalid or expired', async () => {
+    const http = fakeHttpClient([
+      { status: 403, data: { error_message: 'access token is invalid or expired' } },
+      { status: 200, data: { ok: true } },
+    ]);
+    const refresh = jest.fn(async () => undefined);
+
+    const result = await buildClient(http, { auth: { headers: async () => ({ authtoken: 'tok' }), refresh } }).request({
+      method: 'GET',
+      path: '/projects',
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(http.calls).toHaveLength(2);
+  });
+
+  it('refreshes only once when the body keeps reporting the access token invalid or expired', async () => {
+    const http = fakeHttpClient([{ status: 403, data: { error_message: 'access token is invalid or expired' } }]);
+    const refresh = jest.fn(async () => undefined);
+
+    const error = (await buildClient(http, { auth: { headers: async () => ({ authtoken: 'tok' }), refresh } })
+      .request({ method: 'GET', path: '/projects' })
+      .catch((e) => e)) as LaunchApiError;
+
+    expect(error).toBeInstanceOf(LaunchApiError);
+    expect(error.status).toBe(403);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(http.calls).toHaveLength(2);
+  });
+
+  it('does not treat a successful body carrying that wording as an auth challenge', async () => {
+    const http = fakeHttpClient([{ status: 200, data: { error_message: 'access token is invalid or expired' } }]);
+    const refresh = jest.fn(async () => undefined);
+
+    const result = await buildClient(http, { auth: { headers: async () => ({ authtoken: 'tok' }), refresh } }).request({
+      method: 'GET',
+      path: '/projects',
+    });
+
+    expect(result).toEqual({ error_message: 'access token is invalid or expired' });
+    expect(refresh).not.toHaveBeenCalled();
+    expect(http.calls).toHaveLength(1);
+  });
+
+  it.each([[{ error_message: 'something else entirely' }], [{ error_message: 42 }], [null], ['text body']])(
+    'does not read %p as an auth challenge',
+    async (data) => {
+      const http = fakeHttpClient([{ status: 403, data }]);
+      const refresh = jest.fn(async () => undefined);
+
+      await buildClient(http, { auth: { headers: async () => ({ authtoken: 'tok' }), refresh } })
+        .request({ method: 'GET', path: '/projects' })
+        .catch(() => undefined);
+
+      expect(refresh).not.toHaveBeenCalled();
+      expect(http.calls).toHaveLength(1);
+    },
+  );
 
   it('turns a refused connection behind a configured proxy into the proxy diagnostic', async () => {
     const configSpy = jest

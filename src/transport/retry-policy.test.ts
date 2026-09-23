@@ -1,4 +1,13 @@
+import { LaunchNetworkError } from './errors';
 import { DEFAULT_MAX_RETRIES, DEFAULT_RETRY_DELAY_MS, HttpMethod, RetryPolicy } from './retry-policy';
+
+function retryable(): LaunchNetworkError {
+  return new LaunchNetworkError('Could not reach the Launch API.', new Error('socket hang up'), true);
+}
+
+function fatal(): LaunchNetworkError {
+  return new LaunchNetworkError('Proxy error.', new Error('connect ECONNREFUSED'), false);
+}
 
 const ALL_METHODS: HttpMethod[] = ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'PATCH'];
 
@@ -67,6 +76,37 @@ describe('RetryPolicy', () => {
 
   it('never retries anything when the budget is zero', () => {
     expect(new RetryPolicy({ maxRetries: 0 }).shouldRetry(429, 'GET', 0)).toBe(false);
+  });
+
+  it.each(['GET', 'HEAD'] as HttpMethod[])('treats a retryable transport failure on the idempotent %s as retryable', (method) => {
+    expect(new RetryPolicy().isRetryableTransportError(retryable(), method)).toBe(true);
+  });
+
+  it.each(['POST', 'PUT', 'DELETE', 'PATCH'] as HttpMethod[])(
+    'treats a retryable transport failure on the non-idempotent %s as not retryable',
+    (method) => {
+      expect(new RetryPolicy().isRetryableTransportError(retryable(), method)).toBe(false);
+    },
+  );
+
+  it.each(ALL_METHODS)('treats a transport failure marked fatal on %s as not retryable', (method) => {
+    expect(new RetryPolicy().isRetryableTransportError(fatal(), method)).toBe(false);
+  });
+
+  it.each([[null], [undefined], ['boom'], [new Error('plain')], [{ code: 'ECONNRESET' }]])(
+    'treats the undiagnosed rejection %p as not retryable',
+    (error) => {
+      expect(new RetryPolicy().isRetryableTransportError(error, 'GET')).toBe(false);
+    },
+  );
+
+  it('stops retrying a transport failure once the attempts made reach the budget', () => {
+    const policy = new RetryPolicy({ maxRetries: 2 });
+
+    expect(policy.shouldRetryTransportError(retryable(), 'GET', 0)).toBe(true);
+    expect(policy.shouldRetryTransportError(retryable(), 'GET', 1)).toBe(true);
+    expect(policy.shouldRetryTransportError(retryable(), 'GET', 2)).toBe(false);
+    expect(policy.shouldRetryTransportError(retryable(), 'POST', 0)).toBe(false);
   });
 
   it('backs off by the delay multiplied by the attempt number', () => {
