@@ -46,7 +46,7 @@ export function prepareUpload(target: SignedUploadUrl, archive: Buffer): Prepare
   const headers: Record<string, string> = {};
 
   for (const [key, value] of supplied) {
-    headers[key] = value;
+    headers[key.toLowerCase()] = value;
   }
 
   const fields = pairs(target.fields);

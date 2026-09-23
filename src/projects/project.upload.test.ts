@@ -1,4 +1,17 @@
 import { UPLOAD_CONTENT_TYPE, UPLOAD_FILE_NAME, prepareUpload } from './project.upload';
+import type { SignedUploadField } from './types';
+
+function pair(name: string, contents: string): SignedUploadField {
+  const field: SignedUploadField = { value: contents };
+  field.key = name;
+  return field;
+}
+
+function contentTypeNames(headers: Record<string, string>): string[] {
+  const names = Object.keys(headers);
+  return names.filter((header) => header.toLowerCase() === 'content-type');
+}
+
 
 const ARCHIVE = Buffer.from('PK\u0003\u0004zip-bytes');
 const UPLOAD_URL = 'https://uploads.example.test/bucket';
@@ -33,6 +46,54 @@ describe('signed upload preparation', () => {
     );
 
     expect(prepared.headers['content-type']).toBe('application/octet-stream');
+  });
+
+  it('keeps a content type the signed url supplied under a capitalised header name', () => {
+    const prepared = prepareUpload(
+      {
+        uploadUrl: UPLOAD_URL,
+        uploadUid: UPLOAD_UID,
+        headers: [pair('Content-Type', 'application/octet-stream')],
+      },
+      ARCHIVE,
+    );
+
+    expect(prepared.headers).toEqual({
+      'content-type': 'application/octet-stream',
+      'content-length': String(ARCHIVE.length),
+    });
+  });
+
+  it('folds every supplied header name to one canonical casing', () => {
+    const prepared = prepareUpload(
+      {
+        uploadUrl: UPLOAD_URL,
+        uploadUid: UPLOAD_UID,
+        headers: [pair('X-Ms-Blob-Type', 'BlockBlob'), pair('Content-Length', '9999')],
+      },
+      ARCHIVE,
+    );
+
+    expect(prepared.headers).toEqual({
+      'x-ms-blob-type': 'BlockBlob',
+      'content-type': UPLOAD_CONTENT_TYPE,
+      'content-length': String(ARCHIVE.length),
+    });
+  });
+
+  it('overrides a capitalised content type when the signed url carries form fields', () => {
+    const prepared = prepareUpload(
+      {
+        uploadUrl: UPLOAD_URL,
+        uploadUid: UPLOAD_UID,
+        headers: [pair('Content-Type', 'application/octet-stream')],
+        fields: [pair('acl', 'private')],
+      },
+      ARCHIVE,
+    );
+
+    expect(contentTypeNames(prepared.headers)).toEqual(['content-type']);
+    expect(prepared.headers['content-type']).toContain('multipart/form-data');
   });
 
   it('carries every header the signed url supplied', () => {
