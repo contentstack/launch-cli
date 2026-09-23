@@ -16,3 +16,11 @@ export function projectDetailFields(project: Project): [string, string][] {
     ['type', project.projectType ?? ''],
   ];
 }
+
+export function projectDeleteQuestion(reference: string): string {
+  return `Delete project "${reference}"? This cannot be undone.`;
+}
+
+export function projectDeletedLine(project: Project, reference: string): string {
+  return `\u2714 Project "${project.name || reference}" deleted.`;
+}

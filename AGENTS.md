@@ -72,8 +72,12 @@ stream, `process.stdin.isTTY = true` throws, and jest orders test files by their
 runtime, so that shows up as an intermittent failure rather than a stable one. Fake the
 network with `nock`, never `RestApiClient`.
 
-The confirm gate is the one part of `LaunchCommand` `runCommand` cannot reach yet: no shipped
-command declares `yes: {}`. It stays covered by `src/core/launch-command.test.ts` until one does.
+`projects-delete.test.ts` drives the confirm gate end to end - `launch:projects:delete` is the
+first shipped command declaring `yes: {}`, so exit 3 and the no-TTY refusal are now reachable
+through `runCommand`. Both refusal paths are proven **at the wire**: the test registers the lookup
+and delete interceptors, asserts neither was consumed, and listens on nock's `no match` emitter so
+an unexpected request is recorded rather than silently absorbed. A mock call count would not have
+caught a request the command made through a different client.
 
 ## Layout
 
@@ -196,6 +200,13 @@ nothing else.
 routes to its own command. `test/integration/retired-commands.test.ts` pins one case per retired
 name and pins that the child is still reachable; do not collapse those into one parametrised case
 that a rename could silently shrink.
+
+**`projects:delete` and the confirm order.** The gate runs **before any API call**, so declining or
+running without a TTY costs nothing on the wire. That is why the confirm question names the project
+by the **resolved reference** (a uid) rather than by its display name: fetching the name first would
+put a request on the wire on both refusal paths. The name is fetched only after the gate opens, and
+it is what the success line reports - `✔ Project "<name>" deleted.` - falling back to the
+reference when the API returns a project with no name.
 
 **Exit codes.** `src/core/constants.ts` owns them, every Launch error carries its own, and
 `LaunchCommand.catch()` is one branch that reads it:

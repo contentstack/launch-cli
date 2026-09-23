@@ -321,6 +321,37 @@ describe('PROJECT_ERROR_MESSAGES', () => {
       'launch.PROJECT.DUPLICATE_NAME': 'A project with that name already exists in this organization.',
       'launch.PROJECT.LIMIT_REACHED': 'This organization has reached its project limit.',
       'launch.PROJECT.NOT_FOUND': 'No project found with that name or UID.',
+      'launch.PROJECT.DELETE_FAILED': 'The Launch API could not delete that project.',
+      'launch.PROJECT.UPDATE_FAILED': 'The Launch API could not update that project.',
     });
+  });
+});
+
+describe('ProjectsApi.delete', () => {
+  it('deletes a project as a scoped DELETE carrying no body', async () => {
+    const { client, requests } = fakeRestClient(undefined);
+
+    await expect(new ProjectsApi(client).delete({ org: 'org1', project: 'p1' })).resolves.toBeUndefined();
+
+    expect(requests).toEqual([
+      { method: 'DELETE', path: '/projects/p1', orgUid: 'org1', projectUid: 'p1' },
+    ]);
+  });
+
+  it('resolves for a 204 that carried no response body at all', async () => {
+    const { client } = fakeRestClient('');
+
+    await expect(new ProjectsApi(client).delete({ org: 'org1', project: 'p1' })).resolves.toBeUndefined();
+  });
+
+  it('propagates the API failure rather than reporting a delete that did not happen', async () => {
+    const failure = new LaunchApiError(403, [{ code: 'launch.FORBIDDEN', message: 'no access' }]);
+    const client = {
+      request: async () => {
+        throw failure;
+      },
+    } as unknown as RestApiClient;
+
+    await expect(new ProjectsApi(client).delete({ org: 'org1', project: 'p1' })).rejects.toBe(failure);
   });
 });

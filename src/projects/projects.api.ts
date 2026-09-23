@@ -35,6 +35,11 @@ export interface GetProjectParams {
   project: string;
 }
 
+export interface DeleteProjectParams {
+  org: string;
+  project: string;
+}
+
 export class ProjectScanLimitError extends UsageError {
   constructor() {
     super(
@@ -111,5 +116,14 @@ export class ProjectsApi {
     }
 
     return response.project as Project;
+  }
+
+  async delete(params: DeleteProjectParams): Promise<void> {
+    await this.request<unknown>({
+      method: 'DELETE',
+      path: `/projects/${params.project}`,
+      orgUid: params.org,
+      projectUid: params.project,
+    });
   }
 }
