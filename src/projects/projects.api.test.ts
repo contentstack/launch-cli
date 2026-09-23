@@ -355,3 +355,87 @@ describe('ProjectsApi.delete', () => {
     await expect(new ProjectsApi(client).delete({ org: 'org1', project: 'p1' })).rejects.toBe(failure);
   });
 });
+
+describe('ProjectsApi.update', () => {
+  it('updates a project as a scoped PUT carrying only the fields supplied', async () => {
+    const { client, requests } = fakeRestClient({ project: { uid: 'p1', name: 'Renamed Site' } });
+
+    const result = await new ProjectsApi(client).update({
+      org: 'org1',
+      project: 'p1',
+      update: { name: 'Renamed Site' },
+    });
+
+    expect(result).toEqual({ uid: 'p1', name: 'Renamed Site' });
+    expect(requests).toEqual([
+      {
+        method: 'PUT',
+        path: '/projects/p1',
+        orgUid: 'org1',
+        projectUid: 'p1',
+        body: { name: 'Renamed Site' },
+      },
+    ]);
+  });
+
+  it('sends both updatable fields when both were supplied', async () => {
+    const { client, requests } = fakeRestClient({ project: { uid: 'p1', name: 'n', description: 'd' } });
+
+    await new ProjectsApi(client).update({
+      org: 'org1',
+      project: 'p1',
+      update: { name: 'n', description: 'd' },
+    });
+
+    expect(requests[0].body).toEqual({ name: 'n', description: 'd' });
+  });
+
+  it('leaves a field the caller did not supply out of the body rather than sending undefined', async () => {
+    const { client, requests } = fakeRestClient({ project: { uid: 'p1', name: 'n' } });
+
+    await new ProjectsApi(client).update({
+      org: 'org1',
+      project: 'p1',
+      update: { name: 'n', description: undefined },
+    });
+
+    expect(requests[0].body).toEqual({ name: 'n' });
+    expect(Object.keys(requests[0].body as object)).toEqual(['name']);
+  });
+
+  it('raises a malformed-response error when the PUT answers without a project envelope', async () => {
+    const { client } = fakeRestClient({ uid: 'p1', name: 'n' });
+
+    const error = (await new ProjectsApi(client)
+      .update({ org: 'org1', project: 'p1', update: { name: 'n' } })
+      .catch((thrown: unknown) => thrown)) as LaunchApiError;
+
+    expect(error).toBeInstanceOf(LaunchApiError);
+    expect(error.code).toBe('launch.RESPONSE.MALFORMED');
+    expect(error.message).toBe('The Launch API returned a project response without a project.');
+  });
+
+  it.each([[null], [undefined], ['text']])('raises a malformed-response error for the body %p', async (body) => {
+    const { client } = fakeRestClient(body);
+
+    const error = (await new ProjectsApi(client)
+      .update({ org: 'org1', project: 'p1', update: { name: 'n' } })
+      .catch((thrown: unknown) => thrown)) as LaunchApiError;
+
+    expect(error).toBeInstanceOf(LaunchApiError);
+    expect(error.code).toBe('launch.RESPONSE.MALFORMED');
+  });
+
+  it('propagates the API failure rather than reporting an update that did not happen', async () => {
+    const failure = new LaunchApiError(409, [{ code: 'launch.PROJECT.DUPLICATE_NAME', message: 'taken' }]);
+    const client = {
+      request: async () => {
+        throw failure;
+      },
+    } as unknown as RestApiClient;
+
+    await expect(
+      new ProjectsApi(client).update({ org: 'org1', project: 'p1', update: { name: 'n' } }),
+    ).rejects.toBe(failure);
+  });
+});

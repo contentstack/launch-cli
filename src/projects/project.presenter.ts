@@ -1,5 +1,5 @@
 import type { TableColumn } from '../core/render';
-import type { Project } from './types';
+import type { Project, ProjectUpdate } from './types';
 
 export const PROJECT_COLUMNS: TableColumn<Project>[] = [
   { header: 'UID', value: (project) => project.uid ?? '-' },
@@ -23,4 +23,12 @@ export function projectDeleteQuestion(reference: string): string {
 
 export function projectDeletedLine(project: Project, reference: string): string {
   return `\u2714 Project "${project.name || reference}" deleted.`;
+}
+
+export const PROJECT_UPDATABLE_FIELDS: (keyof ProjectUpdate)[] = ['name', 'description'];
+
+export function projectUpdatedLines(requested: ProjectUpdate, updated: Project): string[] {
+  return PROJECT_UPDATABLE_FIELDS.filter((field) => requested[field] !== undefined).map(
+    (field) => `\u2714 ${field} updated to "${updated[field] ?? requested[field]}"`,
+  );
 }

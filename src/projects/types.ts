@@ -27,6 +27,11 @@ export interface Project {
   deletedBy?: string | null;
 }
 
+export interface ProjectUpdate {
+  name?: string;
+  description?: string;
+}
+
 export interface ProjectResponse {
   project: Project;
 }

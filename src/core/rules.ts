@@ -25,3 +25,13 @@ export function exactlyOneOf(...keys: FlagKey[]): Rule {
     throw new UsageError(`Pass exactly one of ${list(keys)}; ${detail}`);
   };
 }
+
+export function atLeastOneOf(...keys: FlagKey[]): Rule {
+  return (resolved) => {
+    if (keys.some((key) => isSupplied(resolved[key]))) {
+      return;
+    }
+
+    throw new UsageError(`Pass at least one of ${list(keys)}; none was supplied.`);
+  };
+}

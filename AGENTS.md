@@ -208,6 +208,26 @@ put a request on the wire on both refusal paths. The name is fetched only after 
 it is what the success line reports - `✔ Project "<name>" deleted.` - falling back to the
 reference when the API returns a project with no name.
 
+**`projects:update` and client-side field limits.** The command sends `PUT /projects/:uid` with
+`{name?, description?}` - the only two fields `UpdateProjectInput` declares in
+`contentfly-management-service` (`src/projects/models/rest/project.input.ts`). Its limits are read
+from that DTO, not from a doc: `@MaxLength(200)` on `name` and `@MaxLength(255)` on `description`,
+mirrored as `PROJECT_NAME_MAX_LENGTH` / `PROJECT_DESCRIPTION_MAX_LENGTH` in
+`src/projects/project.inputs.ts` and enforced in each flag's `normalize`, so a value from config or
+a prompt is checked as well as one from argv.
+
+Supplying neither flag is a usage error raised by `atLeastOneOf('name', 'description')` in
+`src/core/rules.ts` - the API would answer `BODY_EMPTY`, and a round trip to be told that is worse
+than exit 2. Rules run after the resolution chain, so a `--project <name>` still costs its
+name-to-uid lookup before the rule fires; only the `PUT` is avoided. The success lines report the
+value the **API confirmed**, falling back to the requested value if the response omits the field, so
+a server-side normalisation is not reported as something it was not.
+
+`--name` and `--description` live in `src/projects/project.inputs.ts` because their limits are the
+project DTO's. When `environments:*` needs its own `--name`, the flat catalog key `name` is already
+taken and the two resources' limits may differ - settle that when the first one needs it rather than
+promoting these to `src/core/catalog.ts` now.
+
 **Exit codes.** `src/core/constants.ts` owns them, every Launch error carries its own, and
 `LaunchCommand.catch()` is one branch that reads it:
 

@@ -3,7 +3,7 @@ import { UsageError } from '../core/errors';
 import { LaunchApiError } from '../transport/errors';
 import { RestApiClient, RestRequest } from '../transport/rest-client';
 import { PROJECT_ERROR_MESSAGES } from './project.errors';
-import { Project, ProjectResponse, ProjectsPage } from './types';
+import { Project, ProjectResponse, ProjectUpdate, ProjectsPage } from './types';
 
 export * from './types';
 
@@ -38,6 +38,24 @@ export interface GetProjectParams {
 export interface DeleteProjectParams {
   org: string;
   project: string;
+}
+
+export interface UpdateProjectParams {
+  org: string;
+  project: string;
+  update: ProjectUpdate;
+}
+
+function suppliedFields(update: ProjectUpdate): ProjectUpdate {
+  const body: ProjectUpdate = {};
+
+  for (const [field, value] of Object.entries(update) as [keyof ProjectUpdate, string | undefined][]) {
+    if (value !== undefined) {
+      body[field] = value;
+    }
+  }
+
+  return body;
 }
 
 export class ProjectScanLimitError extends UsageError {
@@ -109,6 +127,22 @@ export class ProjectsApi {
       path: `/projects/${params.project}`,
       orgUid: params.org,
       projectUid: params.project,
+    });
+
+    if (!isRecord(response) || !isRecord(response.project)) {
+      throw malformed('The Launch API returned a project response without a project.');
+    }
+
+    return response.project as Project;
+  }
+
+  async update(params: UpdateProjectParams): Promise<Project> {
+    const response = await this.request<ProjectResponse>({
+      method: 'PUT',
+      path: `/projects/${params.project}`,
+      orgUid: params.org,
+      projectUid: params.project,
+      body: suppliedFields(params.update),
     });
 
     if (!isRecord(response) || !isRecord(response.project)) {
