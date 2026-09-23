@@ -1,5 +1,6 @@
 import { Command } from '@oclif/core';
 
+import { EXIT_USAGE } from '../../../core/constants';
 import Contentfly from '../../../functions';
 import { isValidPort, serveFlags } from '../../../functions/function.inputs';
 
@@ -21,15 +22,13 @@ export default class Functions extends Command {
     const currentWorkingDirectory = process.cwd();
     const projectBasePath = flags['data-dir'] || currentWorkingDirectory;
 
-    const port = process.env.PORT || flags.port;
-    if (!isValidPort(port)) {
-      this.log('Invalid port number. Please provide a valid port number between 0 and 65535.');
-      this.exit(1);
+    if (!isValidPort(flags.port)) {
+      this.error('Invalid port number. Please provide a valid port number between 0 and 65535.', { exit: EXIT_USAGE });
     }
 
     this.sharedConfig = {
       projectBasePath,
-      port: Number(port),
+      port: Number(flags.port),
     };
   }
 

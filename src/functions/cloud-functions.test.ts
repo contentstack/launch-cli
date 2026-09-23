@@ -160,7 +160,8 @@ describe('CloudFunctions serve directory handling', () => {
     await cloudFunctions.serve(await freePort());
 
     expect(loggedLines).toContain('No Serverless functions detected.');
-    expect(exitCodes).toEqual([0]);
+    expect(exitCodes).toEqual([]);
+    expect(startedServers).toHaveLength(0);
     expect(loggedLines).not.toContain('Detected Serverless functions...');
   });
 
@@ -173,7 +174,8 @@ describe('CloudFunctions serve directory handling', () => {
     await cloudFunctions.serve(await freePort());
 
     expect(loggedLines).toContain('No Serverless functions detected.');
-    expect(exitCodes).toEqual([0]);
+    expect(exitCodes).toEqual([]);
+    expect(startedServers).toHaveLength(0);
   });
 
   it('ignores a module whose default export is not a function', async () => {
@@ -184,7 +186,8 @@ describe('CloudFunctions serve directory handling', () => {
     await cloudFunctions.serve(await freePort());
 
     expect(loggedLines).toContain('No Serverless functions detected.');
-    expect(exitCodes).toEqual([0]);
+    expect(exitCodes).toEqual([]);
+    expect(startedServers).toHaveLength(0);
   });
 
   it('strips leading parent traversal from the functions directory path', async () => {

@@ -47,7 +47,7 @@ export class CloudFunctions {
     const hasCloudFunctionResources = cloudFunctionResources.length;
     if (!hasCloudFunctionResources) {
       console.log('No Serverless functions detected.');
-      process.exit(0);
+      return;
     }
 
     const cloudFunctionsValidator = new CloudFunctionsValidator(

@@ -6,6 +6,7 @@ export const serveFlags = {
   port: Flags.string({
     char: 'p',
     default: DEFAULT_SERVE_PORT,
+    env: 'PORT',
     description: 'Port number',
   }),
   'data-dir': Flags.string({
@@ -15,6 +16,10 @@ export const serveFlags = {
 };
 
 export function isValidPort(input: string): boolean {
+  if (typeof input !== 'string' || input.trim() === '') {
+    return false;
+  }
+
   const port = Number(input);
   return Number.isInteger(port) && port >= 0 && port <= 65535;
 }
