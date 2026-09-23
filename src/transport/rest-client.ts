@@ -1,5 +1,5 @@
 import { API_VERSION } from '../core/constants';
-import { parseErrorEnvelope } from './errors';
+import { ErrorMessages, parseErrorEnvelope } from './errors';
 import { HttpMethod, RetryPolicy } from './retry-policy';
 import { createUtilityHttpClient } from './utility-http-client';
 
@@ -47,7 +47,7 @@ function pruneUndefined(query: Record<string, string | number | undefined>): Rec
 export class RestApiClient {
   constructor(private readonly options: RestApiClientOptions) {}
 
-  async request<T>(req: RestRequest): Promise<T> {
+  async request<T>(req: RestRequest, errorMessages: ErrorMessages = {}): Promise<T> {
     const policy = new RetryPolicy(this.options);
     const sleep = this.options.sleep ?? ((ms: number) => new Promise<void>((done) => setTimeout(done, ms)));
     let refreshed = false;
@@ -72,7 +72,7 @@ export class RestApiClient {
         continue;
       }
 
-      throw parseErrorEnvelope(response.status, response.data);
+      throw parseErrorEnvelope(response.status, response.data, errorMessages);
     }
   }
 

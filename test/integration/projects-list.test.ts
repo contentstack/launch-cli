@@ -2,7 +2,7 @@ import nock from 'nock';
 
 import { buildApi } from '../../src/resources';
 import { ProjectsPage } from '../../src/projects/types';
-import { PROJECT_COLUMNS } from '../../src/commands/launch/projects/list';
+import { PROJECT_COLUMNS } from '../../src/projects/project.presenter';
 import { LaunchApiError } from '../../src/transport/errors';
 import { RestApiClient } from '../../src/transport/rest-client';
 import { UxLike, renderPagination, renderTable } from '../../src/core/render';

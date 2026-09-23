@@ -1,9 +1,9 @@
 import { getByPath } from './project-config';
 import { UsageError } from './errors';
 import { PROJECT_CONFIG_FILE } from './constants';
-import { FlagKey } from './catalog';
+import { FlagKey, resolutionTable } from '../resources';
 import { AnyInputs, InputKeys, Resolved } from './inputs';
-import { ResolveServices, resolutionTable } from './resolution';
+import { ResolveServices } from './resolution';
 import { Rule } from './rules';
 
 export class MissingInputError extends UsageError {

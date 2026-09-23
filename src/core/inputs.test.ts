@@ -1,4 +1,4 @@
-import { Catalog, catalog } from './catalog';
+import { Catalog, catalog } from '../resources';
 import { flagsFor, inputs } from './inputs';
 
 describe('inputs and flagsFor', () => {

@@ -1,9 +1,8 @@
-import type { ApiSurface } from '../resources';
+import type { ApiSurface, Catalog, FlagKey } from '../resources';
 import { DEFAULT_LIMIT } from './constants';
-import type { UxLike } from './render';
-import { promptForProject, resolveProjectUid } from '../projects/project.prompt';
-import type { Catalog, FlagKey } from './catalog';
 import type { ValueOf } from './inputs';
+import type { ProjectConfigKey } from './project-config';
+import type { UxLike } from './render';
 
 export interface ResolveServices {
   api: ApiSurface;
@@ -21,14 +20,8 @@ export interface LooseArgs {
   resolved: Partial<Record<FlagKey, unknown>>;
 }
 
-export const DEPENDENCIES = { project: ['org'] } as const satisfies Partial<Record<FlagKey, readonly FlagKey[]>>;
-
-export type DependenciesOf<K extends FlagKey> = K extends keyof typeof DEPENDENCIES
-  ? (typeof DEPENDENCIES)[K][number]
-  : never;
-
 export interface ResolutionSpec<T, D extends FlagKey = never> {
-  configPath?: string;
+  configPath?: ProjectConfigKey;
   dependsOn?: readonly D[];
   prompt?(args: PromptArgs<D>): Promise<T>;
   normalize?(value: T, args: PromptArgs<D>): Promise<T>;
@@ -36,28 +29,18 @@ export interface ResolutionSpec<T, D extends FlagKey = never> {
 }
 
 export interface AnyResolutionSpec {
-  configPath?: string;
+  configPath?: ProjectConfigKey;
   dependsOn?: readonly FlagKey[];
   prompt?(args: LooseArgs): Promise<unknown>;
   normalize?(value: unknown, args: LooseArgs): Promise<unknown>;
   default?: unknown;
 }
 
-export const resolution = {
+export const globalResolution = {
   org: { configPath: 'organizationUid' } satisfies ResolutionSpec<string>,
-  project: {
-    configPath: 'uid',
-    dependsOn: DEPENDENCIES.project,
-    prompt: ({ services, resolved }) => promptForProject(services, resolved.org),
-    normalize: (value, { services, resolved }) => resolveProjectUid(services, resolved.org, value),
-  } satisfies ResolutionSpec<string, 'org'>,
   limit: { default: DEFAULT_LIMIT } satisfies ResolutionSpec<number>,
   skip: { default: 0 } satisfies ResolutionSpec<number>,
   yes: { default: false } satisfies ResolutionSpec<boolean>,
   config: {} satisfies ResolutionSpec<string>,
   'data-dir': {} satisfies ResolutionSpec<string>,
-} satisfies Record<FlagKey, AnyResolutionSpec>;
-
-export type Resolution = typeof resolution;
-
-export const resolutionTable: Record<FlagKey, AnyResolutionSpec> = resolution;
+};

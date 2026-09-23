@@ -7,7 +7,7 @@ import { EXIT_CANCELLED, EXIT_RUNTIME, EXIT_USAGE, PROJECT_CONFIG_FILE } from '.
 import { readProjectConfig } from './project-config';
 import { RegionLike, resolveLaunchHubUrl } from './region';
 import { CancelledError, UsageError } from './errors';
-import { catalog, FlagKey } from './catalog';
+import { catalog, FlagKey } from '../resources';
 import { AnyInputs, Resolved } from './inputs';
 import { resolveInputs } from './resolve';
 import { Rule } from './rules';

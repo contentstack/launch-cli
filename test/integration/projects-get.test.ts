@@ -2,7 +2,7 @@ import nock from 'nock';
 
 import { buildApi } from '../../src/resources';
 import { Project } from '../../src/projects/types';
-import { projectDetailFields } from '../../src/commands/launch/projects/get';
+import { projectDetailFields } from '../../src/projects/project.presenter';
 import { LaunchApiError } from '../../src/transport/errors';
 import { RestApiClient } from '../../src/transport/rest-client';
 import { UxLike, renderDetail } from '../../src/core/render';

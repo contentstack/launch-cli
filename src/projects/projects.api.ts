@@ -1,7 +1,10 @@
 import { MAX_LIMIT, MAX_PAGES } from '../core/constants';
 import { LaunchApiError } from '../transport/errors';
-import { RestApiClient } from '../transport/rest-client';
+import { RestApiClient, RestRequest } from '../transport/rest-client';
+import { PROJECT_ERROR_MESSAGES } from './project.errors';
 import { Project, ProjectResponse, ProjectsPage } from './types';
+
+export * from './types';
 
 const MALFORMED_CODE = 'launch.RESPONSE.MALFORMED';
 
@@ -32,8 +35,12 @@ export interface GetProjectParams {
 export class ProjectsApi {
   constructor(private readonly client: RestApiClient) {}
 
+  private request<T>(req: RestRequest): Promise<T> {
+    return this.client.request<T>(req, PROJECT_ERROR_MESSAGES);
+  }
+
   async list(params: ListProjectsParams): Promise<ProjectsPage> {
-    const response = await this.client.request<ProjectsPage>({
+    const response = await this.request<ProjectsPage>({
       method: 'GET',
       path: '/projects',
       orgUid: params.org,
@@ -77,7 +84,7 @@ export class ProjectsApi {
   }
 
   async get(params: GetProjectParams): Promise<Project> {
-    const response = await this.client.request<ProjectResponse>({
+    const response = await this.request<ProjectResponse>({
       method: 'GET',
       path: `/projects/${params.project}`,
       orgUid: params.org,

@@ -1,16 +1,7 @@
-import { Project } from '../../../projects/types';
 import { LaunchCommand } from '../../../core/launch-command';
 import { flagsFor, inputs } from '../../../core/inputs';
 import { renderDetail } from '../../../core/render';
-
-export function projectDetailFields(project: Project): [string, string][] {
-  return [
-    ['uid', project.uid ?? ''],
-    ['name', project.name ?? ''],
-    ['description', project.description ?? ''],
-    ['type', project.projectType ?? ''],
-  ];
-}
+import { projectDetailFields } from '../../../projects/project.presenter';
 
 const getInputs = inputs({ org: { required: true }, project: { required: true } });
 

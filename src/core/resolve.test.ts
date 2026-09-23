@@ -1,9 +1,9 @@
 import { ApiSurface } from '../resources';
 import { UsageError } from './errors';
 import { UxLike } from './render';
-import { FlagKey } from './catalog';
+import { FlagKey } from '../resources';
 import { InputsSpec, inputs } from './inputs';
-import * as resolutionModule from './resolution';
+import * as resolutionModule from '../resources';
 import { AnyResolutionSpec } from './resolution';
 import { InputDependencyError, MissingInputError, resolveInputs } from './resolve';
 import { exactlyOneOf } from './rules';

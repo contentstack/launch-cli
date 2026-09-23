@@ -1,14 +1,7 @@
-import { Project } from '../../../projects/types';
 import { LaunchCommand } from '../../../core/launch-command';
 import { flagsFor, inputs } from '../../../core/inputs';
-import { TableColumn, renderPagination, renderTable } from '../../../core/render';
-
-export const PROJECT_COLUMNS: TableColumn<Project>[] = [
-  { header: 'UID', value: (project) => project.uid ?? '-' },
-  { header: 'NAME', value: (project) => project.name ?? '-' },
-  { header: 'TYPE', value: (project) => project.projectType ?? '-' },
-  { header: 'UPDATED', value: (project) => project.updatedAt ?? '-' },
-];
+import { renderPagination, renderTable } from '../../../core/render';
+import { PROJECT_COLUMNS } from '../../../projects/project.presenter';
 
 const listInputs = inputs({ org: { required: true }, limit: {}, skip: {} });
 

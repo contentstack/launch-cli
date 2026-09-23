@@ -1,6 +1,8 @@
 import { FlagInput } from '@contentstack/cli-utilities';
-import Contentfly from '../../../functions/index';
-import { Flags, Command } from '@oclif/core';
+import { Command } from '@oclif/core';
+
+import Contentfly from '../../../functions';
+import { isValidPort, serveFlags } from '../../../functions/function.inputs';
 
 export default class Functions extends Command {
   static description = 'Serve cloud functions';
@@ -13,22 +15,7 @@ export default class Functions extends Command {
     '$ csdx launch:functions:serve --data-dir <path/of/current/working/dir> -p <port-number>',
   ];
 
-  static flags: FlagInput = {
-    port: Flags.string({
-      char: 'p',
-      default: '3000',
-      description: 'Port number',
-    }),
-    'data-dir': Flags.string({
-      char: 'd',
-      description: 'Current working directory',
-    }),
-  };
-
-  private isValidPort(input: string): boolean {
-    const port = Number(input);
-    return Number.isInteger(port) && port >= 0 && port <= 65535;
-  }
+  static flags: FlagInput = serveFlags as unknown as FlagInput;
 
   async init(): Promise<void> {
     const { flags } = await this.parse(Functions);
@@ -36,7 +23,7 @@ export default class Functions extends Command {
     const projectBasePath = flags['data-dir'] || currentWorkingDirectory;
 
     const port = process.env.PORT || flags.port;
-    if (!this.isValidPort(port)) {
+    if (!isValidPort(port)) {
       this.log('Invalid port number. Please provide a valid port number between 0 and 65535.');
       this.exit(1);
     }

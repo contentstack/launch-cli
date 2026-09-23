@@ -1,8 +1,10 @@
 import { MAX_LIMIT, MAX_PAGES } from '../core/constants';
-import { LaunchApiError } from '../transport/errors';
+import { LaunchApiError, parseErrorEnvelope } from '../transport/errors';
 import { RestApiClient, RestRequest } from '../transport/rest-client';
 import { ProjectsPage } from './types';
-import { ProjectsApi, buildApi } from '../resources';
+import { buildApi } from '../resources';
+import { PROJECT_ERROR_MESSAGES } from './project.errors';
+import { ProjectsApi } from './projects.api';
 
 function pagingRestClient(pages: { count: number; projects: { uid: string; name: string }[] }[]) {
   const requests: RestRequest[] = [];
@@ -254,5 +256,59 @@ describe('ProjectsApi', () => {
     const { client } = fakeRestClient({});
 
     expect(buildApi(client).projects).toBeInstanceOf(ProjectsApi);
+  });
+});
+
+describe('ProjectsApi error wording', () => {
+  function failingClient(status: number, data: unknown) {
+    const seen: { messages: unknown }[] = [];
+    const client = {
+      request: async (_req: RestRequest, errorMessages?: Record<string, string>) => {
+        seen.push({ messages: errorMessages });
+        throw parseErrorEnvelope(status, data, errorMessages);
+      },
+    } as unknown as RestApiClient;
+
+    return { client, seen };
+  }
+
+  it('turns launch.PROJECT.NOT_FOUND on the wire into the project wording', async () => {
+    const { client, seen } = failingClient(404, { errors: [{ code: 'launch.PROJECT.NOT_FOUND', message: 'x' }] });
+
+    const error = (await new ProjectsApi(client).get({ org: 'org1', project: 'p1' }).catch((e) => e)) as LaunchApiError;
+
+    expect(error).toBeInstanceOf(LaunchApiError);
+    expect(error.message).toBe('No project found with that name or UID.');
+    expect(error.code).toBe('launch.PROJECT.NOT_FOUND');
+    expect(seen[0].messages).toBe(PROJECT_ERROR_MESSAGES);
+  });
+
+  it('hands the same project wording to the list request', async () => {
+    const { client, seen } = failingClient(429, { errors: [{ code: 'launch.PROJECT.LIMIT_REACHED', message: 'x' }] });
+
+    const error = (await new ProjectsApi(client).list({ org: 'org1' }).catch((e) => e)) as LaunchApiError;
+
+    expect(error.message).toBe('This organization has reached its project limit.');
+    expect(error.code).toBe('launch.PROJECT.LIMIT_REACHED');
+    expect(seen[0].messages).toBe(PROJECT_ERROR_MESSAGES);
+  });
+
+  it('leaves a code the project dictionary does not list with the wording the API sent', async () => {
+    const { client } = failingClient(400, { errors: [{ code: 'launch.SOMETHING.ELSE', message: 'bad input' }] });
+
+    const error = (await new ProjectsApi(client).get({ org: 'org1', project: 'p1' }).catch((e) => e)) as LaunchApiError;
+
+    expect(error.message).toBe('bad input');
+    expect(error.code).toBe('launch.SOMETHING.ELSE');
+  });
+});
+
+describe('PROJECT_ERROR_MESSAGES', () => {
+  it('maps every project code the CLI rewords and nothing else', () => {
+    expect(PROJECT_ERROR_MESSAGES).toEqual({
+      'launch.PROJECT.DUPLICATE_NAME': 'A project with that name already exists in this organization.',
+      'launch.PROJECT.LIMIT_REACHED': 'This organization has reached its project limit.',
+      'launch.PROJECT.NOT_FOUND': 'No project found with that name or UID.',
+    });
   });
 });

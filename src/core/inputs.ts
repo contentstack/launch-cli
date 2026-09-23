@@ -1,7 +1,6 @@
 import type { Interfaces } from '@oclif/core';
 
-import { Catalog, FlagKey, catalog } from './catalog';
-import type { DependenciesOf, Resolution } from './resolution';
+import { Catalog, DependenciesOf, FlagKey, Resolution, catalog } from '../resources';
 
 export interface InputSpec {
   required?: boolean;

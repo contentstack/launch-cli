@@ -106,9 +106,9 @@ describe('LaunchCommand.catch', () => {
   it('reports an API failure as a runtime error', async () => {
     const instance = probe();
 
-    await instance['catch'](new LaunchApiError(404, [{ code: 'launch.PROJECT.NOT_FOUND', message: 'x' }]));
+    await instance['catch'](new LaunchApiError(404, [{ code: 'launch.SOMETHING.ELSE', message: 'the api said no' }]));
 
-    expect(instance.error).toHaveBeenCalledWith('No project found with that name or UID.', { exit: 1 });
+    expect(instance.error).toHaveBeenCalledWith('the api said no', { exit: 1 });
   });
 
   it('delegates anything else to oclif, which sets process.exitCode before rethrowing', async () => {

@@ -1,8 +1,7 @@
 import { ApiSurface } from '../resources';
 import { UxLike } from './render';
 import * as select from '../projects/project.prompt';
-import { catalog } from './catalog';
-import { DEPENDENCIES, resolutionTable } from './resolution';
+import { DEPENDENCIES, catalog, resolutionTable } from '../resources';
 
 const table = resolutionTable;
 

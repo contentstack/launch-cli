@@ -255,21 +255,32 @@ describe('RestApiClient', () => {
   });
 
   it('throws immediately on a non-retryable failure', async () => {
-    const http = fakeHttpClient([{ status: 404, data: { errors: [{ code: 'launch.PROJECT.NOT_FOUND', message: 'x' }] } }]);
+    const http = fakeHttpClient([{ status: 404, data: { errors: [{ code: 'launch.RESOURCE.NOT_FOUND', message: 'x' }] } }]);
 
-    await expect(buildClient(http).request({ method: 'GET', path: '/projects/p1' })).rejects.toThrow(
-      'No project found with that name or UID.',
-    );
+    await expect(buildClient(http).request({ method: 'GET', path: '/projects/p1' })).rejects.toThrow('x');
     expect(http.calls).toHaveLength(1);
 
-    const error = (await buildClient(fakeHttpClient([{ status: 404, data: { errors: [{ code: 'launch.PROJECT.NOT_FOUND', message: 'x' }] } }]))
+    const error = (await buildClient(fakeHttpClient([{ status: 404, data: { errors: [{ code: 'launch.RESOURCE.NOT_FOUND', message: 'x' }] } }]))
       .request({ method: 'GET', path: '/projects/p1' })
       .catch((e) => e)) as LaunchApiError;
 
     expect(error).toBeInstanceOf(LaunchApiError);
     expect(error.status).toBe(404);
-    expect(error.code).toBe('launch.PROJECT.NOT_FOUND');
-    expect(error.errors).toEqual([{ code: 'launch.PROJECT.NOT_FOUND', message: 'x' }]);
+    expect(error.code).toBe('launch.RESOURCE.NOT_FOUND');
+    expect(error.errors).toEqual([{ code: 'launch.RESOURCE.NOT_FOUND', message: 'x' }]);
+  });
+
+  it('applies the wording the caller supplied for the code the API returned', async () => {
+    const http = fakeHttpClient([{ status: 404, data: { errors: [{ code: 'launch.RESOURCE.NOT_FOUND', message: 'x' }] } }]);
+
+    const error = (await buildClient(http)
+      .request({ method: 'GET', path: '/projects/p1' }, { 'launch.RESOURCE.NOT_FOUND': 'Nothing of that name here.' })
+      .catch((e) => e)) as LaunchApiError;
+
+    expect(error).toBeInstanceOf(LaunchApiError);
+    expect(error.message).toBe('Nothing of that name here.');
+    expect(error.code).toBe('launch.RESOURCE.NOT_FOUND');
+    expect(error.errors).toEqual([{ code: 'launch.RESOURCE.NOT_FOUND', message: 'x' }]);
   });
 
   it('passes the configured base url to the http client on every attempt', async () => {

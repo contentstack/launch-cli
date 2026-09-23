@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { HttpClient, authHandler, configHandler } from '@contentstack/cli-utilities';
 
-import { ProjectsApi } from '../resources';
+import { ProjectsApi } from '../projects/projects.api';
 import { LaunchApiError } from '../transport/errors';
 import { UxLike } from './render';
 import { authHeaders, buildServiceContext } from './service-context';

@@ -1,5 +1,5 @@
 import { UsageError } from './errors';
-import { FlagKey } from './catalog';
+import { FlagKey } from '../resources';
 
 export type ResolvedValues = Record<string, unknown>;
 

@@ -2,6 +2,8 @@ import { existsSync, readFileSync } from 'node:fs';
 
 import { UsageError } from './errors';
 
+export type ProjectConfigKey = 'organizationUid' | 'uid';
+
 function isBlock(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
