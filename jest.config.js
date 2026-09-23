@@ -10,8 +10,6 @@ const config = {
   collectCoverageFrom: [
     'src/**/*.ts',
     '!src/**/*.test.ts',
-    '!src/util/cloud-function/**',
-    '!src/commands/launch/functions/**',
   ],
   coverageProvider: 'v8',
   coverageDirectory: 'coverage',
