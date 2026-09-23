@@ -47,6 +47,21 @@ function runLaunch(args: string[]) {
   return runCommand(args, config);
 }
 
+function pretendTerminal(): () => void {
+  const descriptor = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
+
+  Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true, writable: true });
+
+  return () => {
+    if (descriptor === undefined) {
+      delete (process.stdin as unknown as { isTTY?: boolean }).isTTY;
+      return;
+    }
+
+    Object.defineProperty(process.stdin, 'isTTY', descriptor);
+  };
+}
+
 describe('integration: end-to-end command flows', () => {
   beforeAll(async () => {
     const plugin = new Plugin({ ignoreManifest: true, isRoot: true, root: process.cwd() });
@@ -240,8 +255,7 @@ describe('integration: end-to-end command flows', () => {
 
   it('offers the interactive project picker on a terminal and fetches whatever was chosen', async () => {
     useSession(basicSession());
-    const previousIsTTY = process.stdin.isTTY;
-    process.stdin.isTTY = true;
+    const restoreTTY = pretendTerminal();
     const inquired: unknown[] = [];
     jest.spyOn(cliux, 'inquire').mockImplementation(async (payload: unknown) => {
       inquired.push(payload);
@@ -252,7 +266,7 @@ describe('integration: end-to-end command flows', () => {
 
     const { error, stdout } = await runLaunch(['launch:projects:get', '--org', ORG_UID, '--data-dir', tmpdir()]);
 
-    process.stdin.isTTY = previousIsTTY;
+    restoreTTY();
 
     expect(error).toBeUndefined();
     expect(picker.isDone()).toBe(true);
@@ -274,14 +288,13 @@ describe('integration: end-to-end command flows', () => {
 
   it('exits 3 when the picker comes back with nothing chosen', async () => {
     useSession(basicSession());
-    const previousIsTTY = process.stdin.isTTY;
-    process.stdin.isTTY = true;
+    const restoreTTY = pretendTerminal();
     jest.spyOn(cliux, 'inquire').mockResolvedValue(undefined as never);
     nock(LAUNCH_HUB_URL).get('/manage/projects').query({ limit: '100', skip: '0' }).reply(200, listFixture);
 
     const { error } = await runLaunch(['launch:projects:get', '--org', ORG_UID, '--data-dir', tmpdir()]);
 
-    process.stdin.isTTY = previousIsTTY;
+    restoreTTY();
 
     expect(error?.oclif?.exit).toBe(3);
     expect(error?.message).toBe('Cancelled. Nothing was changed.');
