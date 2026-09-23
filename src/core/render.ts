@@ -1,4 +1,8 @@
-import { Pagination } from '../projects/types';
+export interface Pagination {
+  count: number;
+  limit: number;
+  skip?: number | null;
+}
 
 export interface UxLike {
   print(message: string): void;

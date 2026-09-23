@@ -1,8 +1,6 @@
-export interface Pagination {
-  count: number;
-  limit: number;
-  skip?: number | null;
-}
+import type { Pagination } from '../core/render';
+
+export type { Pagination };
 
 export interface ProjectRepository {
   repositoryUrl?: string;
