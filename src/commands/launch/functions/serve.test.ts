@@ -1,7 +1,7 @@
-import Contentfly from '../../../util/cloud-function';
+import Contentfly from '../../../functions/index';
 import Functions from './serve';
 
-jest.mock('../../../util/cloud-function');
+jest.mock('../../../functions');
 
 const INVALID_PORT_MESSAGE = 'Invalid port number. Please provide a valid port number between 0 and 65535.';
 

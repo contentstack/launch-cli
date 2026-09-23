@@ -5,7 +5,7 @@ import { join, resolve as resolvePath } from 'node:path';
 import * as ts from 'typescript';
 
 const projectRoot = resolvePath(__dirname, '..', '..');
-const sourcePath = join(projectRoot, 'src', 'util', 'cloud-function', 'load-data-url.ts');
+const sourcePath = join(projectRoot, 'src', 'functions', 'load-data-url.ts');
 const tempDirs: string[] = [];
 
 function compileLoader(): string {

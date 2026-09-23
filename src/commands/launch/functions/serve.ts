@@ -1,5 +1,5 @@
 import { FlagInput } from '@contentstack/cli-utilities';
-import Contentfly from '../../../util/cloud-function';
+import Contentfly from '../../../functions/index';
 import { Flags, Command } from '@oclif/core';
 
 export default class Functions extends Command {

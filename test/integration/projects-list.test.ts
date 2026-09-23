@@ -1,11 +1,11 @@
 import nock from 'nock';
 
-import { buildApi } from '../../src/api';
-import { ProjectsPage } from '../../src/api/types';
+import { buildApi } from '../../src/resources';
+import { ProjectsPage } from '../../src/projects/types';
 import { PROJECT_COLUMNS } from '../../src/commands/launch/projects/list';
-import { LaunchApiError } from '../../src/http/errors';
-import { RestApiClient } from '../../src/http/rest-client';
-import { UxLike, renderPagination, renderTable } from '../../src/output/render';
+import { LaunchApiError } from '../../src/transport/errors';
+import { RestApiClient } from '../../src/transport/rest-client';
+import { UxLike, renderPagination, renderTable } from '../../src/core/render';
 import listFixture from '../fixtures/projects-list.json';
 
 const ORIGIN = 'https://launch-api.integration.test';

@@ -1,0 +1,258 @@
+import { MAX_LIMIT, MAX_PAGES } from '../core/constants';
+import { LaunchApiError } from '../transport/errors';
+import { RestApiClient, RestRequest } from '../transport/rest-client';
+import { ProjectsPage } from './types';
+import { ProjectsApi, buildApi } from '../resources';
+
+function pagingRestClient(pages: { count: number; projects: { uid: string; name: string }[] }[]) {
+  const requests: RestRequest[] = [];
+  let index = 0;
+  const client = {
+    request: async (req: RestRequest) => {
+      requests.push(req);
+      const page = pages[Math.min(index++, pages.length - 1)];
+      return { pagination: { count: page.count, limit: MAX_LIMIT, skip: null }, projects: page.projects };
+    },
+  } as unknown as RestApiClient;
+  return { client, requests };
+}
+
+async function drain(iterator: AsyncGenerator<ProjectsPage>): Promise<ProjectsPage[]> {
+  const collected: ProjectsPage[] = [];
+  for await (const page of iterator) {
+    collected.push(page);
+  }
+  return collected;
+}
+
+function projectsOfSize(size: number, prefix: string): { uid: string; name: string }[] {
+  return Array.from({ length: size }, (_, index) => ({ uid: `${prefix}${index}`, name: `${prefix}-${index}` }));
+}
+
+function fakeRestClient(result: unknown) {
+  const requests: RestRequest[] = [];
+  const client = {
+    request: async (req: RestRequest) => {
+      requests.push(req);
+      return result;
+    },
+  } as unknown as RestApiClient;
+  return { client, requests };
+}
+
+describe('ProjectsApi', () => {
+  it('lists projects as a scoped GET carrying limit and skip', async () => {
+    const page = { pagination: { count: 1, limit: 50, skip: 0 }, projects: [{ uid: 'p1', name: 'site' }] };
+    const { client, requests } = fakeRestClient(page);
+
+    const result = await new ProjectsApi(client).list({ org: 'org1', limit: 50, skip: 0 });
+
+    expect(result).toBe(page);
+    expect(requests[0]).toEqual({
+      method: 'GET',
+      path: '/projects',
+      orgUid: 'org1',
+      query: { limit: 50, skip: 0 },
+    });
+  });
+
+  it('sends limit and skip as undefined when the caller passes neither', async () => {
+    const page = { pagination: { count: 0, limit: 50, skip: 0 }, projects: [] };
+    const { client, requests } = fakeRestClient(page);
+
+    await new ProjectsApi(client).list({ org: 'org1' });
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toEqual({
+      method: 'GET',
+      path: '/projects',
+      orgUid: 'org1',
+      query: { limit: undefined, skip: undefined },
+    });
+  });
+
+  it('gets a project by uid with both scoping identifiers', async () => {
+    const project = { uid: 'p1', name: 'site', projectType: 'GITPROVIDER' };
+    const { client, requests } = fakeRestClient({ project });
+
+    const result = await new ProjectsApi(client).get({ org: 'org1', project: 'p1' });
+
+    expect(result).toBe(project);
+    expect(requests[0]).toEqual({
+      method: 'GET',
+      path: '/projects/p1',
+      orgUid: 'org1',
+      projectUid: 'p1',
+    });
+  });
+
+  it('unwraps the project envelope rather than returning the response body', async () => {
+    const project = { uid: 'p1', name: 'site' };
+    const { client } = fakeRestClient({ project });
+
+    const result = await new ProjectsApi(client).get({ org: 'org1', project: 'p1' });
+
+    expect(result).not.toHaveProperty('project');
+    expect(result.uid).toBe('p1');
+    expect(result.name).toBe('site');
+  });
+
+  it('raises a LaunchApiError instead of returning undefined when the project envelope is missing', async () => {
+    const { client } = fakeRestClient({ uid: 'p1', name: 'site' });
+
+    const error = (await new ProjectsApi(client)
+      .get({ org: 'org1', project: 'p1' })
+      .catch((e) => e)) as LaunchApiError;
+
+    expect(error).toBeInstanceOf(LaunchApiError);
+    expect(error.status).toBe(200);
+    expect(error.code).toBe('launch.RESPONSE.MALFORMED');
+    expect(error.message).toBe('The Launch API returned a project response without a project.');
+  });
+
+  it.each([[null], [undefined], [{ project: null }]])(
+    'raises a LaunchApiError when the get response body is %p',
+    async (body) => {
+      const { client } = fakeRestClient(body);
+
+      await expect(new ProjectsApi(client).get({ org: 'org1', project: 'p1' })).rejects.toBeInstanceOf(LaunchApiError);
+    },
+  );
+
+  it('raises a LaunchApiError when the list response carries no projects array', async () => {
+    const { client } = fakeRestClient({ pagination: { count: 0, limit: 50, skip: 0 } });
+
+    const error = (await new ProjectsApi(client).list({ org: 'org1' }).catch((e) => e)) as LaunchApiError;
+
+    expect(error).toBeInstanceOf(LaunchApiError);
+    expect(error.status).toBe(200);
+    expect(error.code).toBe('launch.RESPONSE.MALFORMED');
+    expect(error.message).toBe('The Launch API returned a project list without a projects array.');
+  });
+
+  it('raises a LaunchApiError when the list response carries no pagination block', async () => {
+    const { client } = fakeRestClient({ projects: [] });
+
+    await expect(new ProjectsApi(client).list({ org: 'org1' })).rejects.toBeInstanceOf(LaunchApiError);
+  });
+
+  it.each([[null], [undefined]])('raises a LaunchApiError when the list response body is %p', async (body) => {
+    const { client } = fakeRestClient(body);
+
+    await expect(new ProjectsApi(client).list({ org: 'org1' })).rejects.toBeInstanceOf(LaunchApiError);
+  });
+
+  it('propagates a LaunchApiError raised by the transport rather than masking it', async () => {
+    const failure = new LaunchApiError(404, [{ code: 'launch.PROJECT.NOT_FOUND', message: 'x' }]);
+    const client = {
+      request: async () => {
+        throw failure;
+      },
+    } as unknown as RestApiClient;
+
+    await expect(new ProjectsApi(client).get({ org: 'org1', project: 'p1' })).rejects.toBe(failure);
+    await expect(new ProjectsApi(client).list({ org: 'org1' })).rejects.toBe(failure);
+  });
+
+  it('pages the organization one MAX_LIMIT page at a time, advancing skip by the projects returned', async () => {
+    const { client, requests } = pagingRestClient([
+      { count: 150, projects: projectsOfSize(MAX_LIMIT, 'a') },
+      { count: 150, projects: projectsOfSize(50, 'b') },
+    ]);
+
+    const collected = await drain(new ProjectsApi(client).pages({ org: 'org1' }));
+
+    expect(collected).toHaveLength(2);
+    expect(collected[0].projects).toHaveLength(MAX_LIMIT);
+    expect(collected[1].projects).toHaveLength(50);
+    expect(requests).toEqual([
+      { method: 'GET', path: '/projects', orgUid: 'org1', query: { limit: MAX_LIMIT, skip: 0 } },
+      { method: 'GET', path: '/projects', orgUid: 'org1', query: { limit: MAX_LIMIT, skip: MAX_LIMIT } },
+    ]);
+  });
+
+  it('honours a caller supplied page size instead of the maximum', async () => {
+    const { client, requests } = pagingRestClient([
+      { count: 4, projects: projectsOfSize(2, 'a') },
+      { count: 4, projects: projectsOfSize(2, 'b') },
+      { count: 4, projects: [] },
+    ]);
+
+    await drain(new ProjectsApi(client).pages({ org: 'org1', pageSize: 2 }));
+
+    expect(requests.map((request) => request.query)).toEqual([
+      { limit: 2, skip: 0 },
+      { limit: 2, skip: 2 },
+    ]);
+  });
+
+  it('stops after a page shorter than the page size rather than asking for another', async () => {
+    const { client, requests } = pagingRestClient([{ count: 900, projects: projectsOfSize(3, 'a') }]);
+
+    const collected = await drain(new ProjectsApi(client).pages({ org: 'org1' }));
+
+    expect(collected).toHaveLength(1);
+    expect(requests).toHaveLength(1);
+  });
+
+  it('stops on an empty page rather than looping forever when the count is never satisfied', async () => {
+    const { client, requests } = pagingRestClient([{ count: 900, projects: [] }]);
+
+    const collected = await drain(new ProjectsApi(client).pages({ org: 'org1' }));
+
+    expect(collected).toEqual([]);
+    expect(requests).toHaveLength(1);
+  });
+
+  it('stops at the page ceiling when every page stays full and the count is never reached', async () => {
+    const { client, requests } = pagingRestClient([
+      { count: Number.NaN, projects: projectsOfSize(1, 'a') },
+    ]);
+
+    const collected = await drain(new ProjectsApi(client).pages({ org: 'org1', pageSize: 1 }));
+
+    expect(collected).toHaveLength(MAX_PAGES);
+    expect(requests).toHaveLength(MAX_PAGES);
+    expect(MAX_PAGES).toBe(100);
+  });
+
+  it('stops once the reported count is reached even though the last page was full', async () => {
+    const { client, requests } = pagingRestClient([{ count: 2, projects: projectsOfSize(2, 'a') }]);
+
+    const collected = await drain(new ProjectsApi(client).pages({ org: 'org1', pageSize: 2 }));
+
+    expect(collected).toHaveLength(1);
+    expect(requests).toHaveLength(1);
+  });
+
+  it('fetches no further page once the consumer stops reading', async () => {
+    const { client, requests } = pagingRestClient([
+      { count: 150, projects: projectsOfSize(MAX_LIMIT, 'a') },
+      { count: 150, projects: projectsOfSize(50, 'b') },
+    ]);
+
+    for await (const page of new ProjectsApi(client).pages({ org: 'org1' })) {
+      expect(page.projects).toHaveLength(MAX_LIMIT);
+      break;
+    }
+
+    expect(requests).toHaveLength(1);
+  });
+
+  it('propagates a malformed page instead of swallowing it mid-walk', async () => {
+    const failure = new LaunchApiError(403, [{ code: 'launch.FORBIDDEN', message: 'no access' }]);
+    const client = {
+      request: async () => {
+        throw failure;
+      },
+    } as unknown as RestApiClient;
+
+    await expect(drain(new ProjectsApi(client).pages({ org: 'org1' }))).rejects.toBe(failure);
+  });
+
+  it('buildApi exposes the projects resource', () => {
+    const { client } = fakeRestClient({});
+
+    expect(buildApi(client).projects).toBeInstanceOf(ProjectsApi);
+  });
+});

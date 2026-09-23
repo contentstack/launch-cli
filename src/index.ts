@@ -1,1 +1,1 @@
-export { LaunchCommand } from './base/launch-command';
+export { LaunchCommand } from './core/launch-command';

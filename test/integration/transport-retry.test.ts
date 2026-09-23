@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import nock from 'nock';
 
-import { RestApiClient } from '../../src/http/rest-client';
+import { RestApiClient } from '../../src/transport/rest-client';
 
 const ORIGIN = 'https://launch-api.transport.test';
 const BASE_PATH = '/manage';

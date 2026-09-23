@@ -1,7 +1,7 @@
-import { Project } from '../../../api/types';
-import { LaunchCommand } from '../../../base/launch-command';
-import { flagsFor, inputs } from '../../../flags/inputs';
-import { TableColumn, renderPagination, renderTable } from '../../../output/render';
+import { Project } from '../../../projects/types';
+import { LaunchCommand } from '../../../core/launch-command';
+import { flagsFor, inputs } from '../../../core/inputs';
+import { TableColumn, renderPagination, renderTable } from '../../../core/render';
 
 export const PROJECT_COLUMNS: TableColumn<Project>[] = [
   { header: 'UID', value: (project) => project.uid ?? '-' },

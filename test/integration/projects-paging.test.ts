@@ -2,12 +2,12 @@ import { randomBytes } from 'node:crypto';
 
 import nock from 'nock';
 
-import { buildApi } from '../../src/api';
-import { MAX_LIMIT } from '../../src/config/constants';
-import { UsageError } from '../../src/errors';
-import { RestApiClient } from '../../src/http/rest-client';
-import { UxLike } from '../../src/output/render';
-import { resolveProjectUid } from '../../src/select/project';
+import { buildApi } from '../../src/resources';
+import { MAX_LIMIT } from '../../src/core/constants';
+import { UsageError } from '../../src/core/errors';
+import { RestApiClient } from '../../src/transport/rest-client';
+import { UxLike } from '../../src/core/render';
+import { resolveProjectUid } from '../../src/projects/project.prompt';
 
 const ORIGIN = 'https://launch-api.paging.test';
 const BASE_PATH = '/manage';

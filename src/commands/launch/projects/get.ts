@@ -1,7 +1,7 @@
-import { Project } from '../../../api/types';
-import { LaunchCommand } from '../../../base/launch-command';
-import { flagsFor, inputs } from '../../../flags/inputs';
-import { renderDetail } from '../../../output/render';
+import { Project } from '../../../projects/types';
+import { LaunchCommand } from '../../../core/launch-command';
+import { flagsFor, inputs } from '../../../core/inputs';
+import { renderDetail } from '../../../core/render';
 
 export function projectDetailFields(project: Project): [string, string][] {
   return [

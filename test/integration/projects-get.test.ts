@@ -1,11 +1,11 @@
 import nock from 'nock';
 
-import { buildApi } from '../../src/api';
-import { Project } from '../../src/api/types';
+import { buildApi } from '../../src/resources';
+import { Project } from '../../src/projects/types';
 import { projectDetailFields } from '../../src/commands/launch/projects/get';
-import { LaunchApiError } from '../../src/http/errors';
-import { RestApiClient } from '../../src/http/rest-client';
-import { UxLike, renderDetail } from '../../src/output/render';
+import { LaunchApiError } from '../../src/transport/errors';
+import { RestApiClient } from '../../src/transport/rest-client';
+import { UxLike, renderDetail } from '../../src/core/render';
 import getFileUploadFixture from '../fixtures/project-get-fileupload.json';
 import getFixture from '../fixtures/project-get.json';
 import notFoundFixture from '../fixtures/project-not-found.json';
