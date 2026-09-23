@@ -8,6 +8,40 @@
 - Use only jest for writing test cases and refer existing unit test under the /src folder.
 - Do not create code comments for any changes.
 
+**What the tests must prove.** Every rule below exists because a defect shipped past a green suite
+at 100% coverage on all four metrics. Coverage counts lines executed, not assertions made — treat
+the gate as a floor, never as evidence of correctness.
+
+1. **`=== undefined` is not "absent."** `null`, `false`, `0` and `''` are values. Any guard that
+   means "was this supplied?" gets tested with all five. A `null` in `.cs-launch.json` once
+   defeated the required-input check entirely.
+2. **A fake that ignores its arguments proves nothing.** Fakes record what they were called with,
+   and tests assert it. A `baseUrl()` fake that discarded its argument is why a wrong API base path
+   reached a live 404 with every test green.
+3. **Every computed number gets boundary tests.** Pagination arithmetic, HTTP status edges
+   (204/299/300/304), retry counts. Two impossible ranges — `Showing 201-50 of 50` and
+   `Showing 1-0 of 50` — shipped because only the middle of the range was ever exercised.
+4. **Every rendered field gets a fallback and an absent-field test.** An API field you did not mark
+   optional will still arrive missing. A project with no name crashed `projects:list` outright.
+5. **Precedence tests assert the losers.** Proving the winner won cannot distinguish precedence
+   from luck — assert that the prompt was *not* called when a flag supplied the value.
+6. **Do not test the test.** A test that only exercises object spread, or that a fixture has the
+   shape the same test just gave it, asserts nothing about the code under test.
+7. **Every `await` on a command path gets a rejection test.** Errors thrown by `normalize`, by an
+   api module, or by a token refresh must be proven to propagate with the right type and exit code.
+8. **No coverage exclusions.** If a path is too awkward to test, that is a design signal. Fencing
+   it out of `collectCoverageFrom` makes the 100% gate report a number about a subset of the
+   source, which is worse than no gate.
+
+**Dynamic imports under Jest — read before adding a `loadDataURL` test.** `loadDataURL` uses
+`new Function('u', 'return import(u)')` so the dynamic import survives the commonjs build; a plain
+`import()` is rewritten by `tsc` into `require()`, which cannot load a `data:` URL and silently
+broke every cloud function in `dist`. The cost is that Jest's default VM cannot service that import,
+so the suite runs under `--experimental-vm-modules`, and **only one test file per process may
+trigger a sandboxed dynamic import — a second one hangs the run rather than failing it**. Every
+`loadDataURL` case therefore lives in `src/util/cloud-function/cloud-functions.test.ts`. Add new
+ones there. A hanging suite with no failing test is this constraint, not a flake.
+
 **Integration tests.** `test/integration/` drives real code with only the network faked by `nock`.
 `projects-list-command.test.ts` runs whole commands through `@oclif/test`'s `runCommand`, which
 covers `init()`, the resolution chain, rendering and the `catch()` exit-code mapping in one pass.
