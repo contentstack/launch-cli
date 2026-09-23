@@ -19,8 +19,55 @@ export class MissingInputError extends UsageError {
   }
 }
 
+export class InputDependencyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InputDependencyError';
+  }
+}
+
 function isAbsent(value: unknown): boolean {
   return value === undefined || value === null;
+}
+
+export function resolutionOrder<K extends FlagKey>(keys: K[]): K[] {
+  const ordered: K[] = [];
+  const settled = new Map<K, boolean>();
+
+  const visit = (key: K, trail: K[]): void => {
+    const state = settled.get(key);
+
+    if (state === true) {
+      return;
+    }
+
+    if (state === false) {
+      throw new InputDependencyError(
+        `${[...trail, key].map((step) => `--${step}`).join(' -> ')} is a dependency cycle.`,
+      );
+    }
+
+    settled.set(key, false);
+
+    for (const dependency of resolution[key].dependsOn ?? []) {
+      if (!keys.includes(dependency as K)) {
+        throw new InputDependencyError(
+          `--${key} cannot be resolved without --${dependency}: declare ${dependency} in the command inputs.`,
+        );
+      }
+
+      visit(dependency as K, [...trail, key]);
+    }
+
+    settled.set(key, true);
+    ordered.push(key);
+  };
+
+  for (const key of keys) {
+    visit(key, []);
+  }
+
+  return ordered;
 }
 
 export interface ResolveArgs {
@@ -36,7 +83,9 @@ export async function resolveInputs<K extends FlagKey>(
 ): Promise<Record<K, unknown>> {
   const resolved = {} as Record<K, unknown>;
 
-  for (const key of (Object.keys(resolution) as K[]).filter((candidate) => candidate in spec)) {
+  const declared = (Object.keys(resolution) as K[]).filter((candidate) => candidate in spec);
+
+  for (const key of resolutionOrder(declared)) {
     const rule = resolution[key];
     let value = args.parsed[key];
 

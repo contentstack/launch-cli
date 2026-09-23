@@ -2,7 +2,7 @@ import { ApiSurface } from '../api';
 import { UxLike } from '../output/render';
 import * as select from '../select/project';
 import { catalog } from './catalog';
-import { resolution } from './resolution';
+import { DEPENDENCIES, resolution } from './resolution';
 
 const PROJECT_UID = 'a'.repeat(24);
 
@@ -83,6 +83,20 @@ describe('resolution', () => {
 
     expect(spy).toHaveBeenCalledWith(services, 'org1', 'Project One');
     spy.mockRestore();
+  });
+
+  it('declares project as depending on org so the order of the literal cannot matter', () => {
+    expect(resolution.project.dependsOn).toEqual(['org']);
+    expect(resolution.project.dependsOn).toBe(DEPENDENCIES.project);
+  });
+
+  it('declares no dependency for any flag other than project', () => {
+    const withDependencies = Object.entries(resolution)
+      .filter(([, spec]) => spec.dependsOn !== undefined)
+      .map(([key]) => key);
+
+    expect(withDependencies).toEqual(['project']);
+    expect(Object.keys(DEPENDENCIES)).toEqual(['project']);
   });
 
   it('declares no prompt or normalize for org', () => {

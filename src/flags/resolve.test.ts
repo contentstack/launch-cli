@@ -1,9 +1,44 @@
 import { ApiSurface } from '../api';
 import { UsageError } from '../errors';
 import { UxLike } from '../output/render';
-import { inputs } from './inputs';
-import { MissingInputError, resolveInputs } from './resolve';
+import { FlagKey } from './catalog';
+import { InputsSpec, inputs } from './inputs';
+import * as resolutionModule from './resolution';
+import { ResolutionSpec } from './resolution';
+import { InputDependencyError, MissingInputError, resolveInputs } from './resolve';
 import { exactlyOneOf } from './rules';
+
+function withResolution<T>(replacement: Record<string, ResolutionSpec>, run: () => Promise<T>): Promise<T> {
+  const holder = resolutionModule as unknown as { resolution: Record<string, ResolutionSpec> };
+  const original = holder.resolution;
+  holder.resolution = replacement;
+
+  return run().finally(() => {
+    holder.resolution = original;
+  });
+}
+
+function reversedResolution(): Record<string, ResolutionSpec> {
+  return Object.fromEntries(Object.entries(resolutionModule.resolution).reverse());
+}
+
+function recordingServices(seen: unknown[]) {
+  const ux: UxLike = { print: () => undefined, inquire: async () => PROJECT_UID as never };
+  const api = {
+    projects: {
+      list: async (params: { org: string }) => {
+        seen.push(params.org);
+        return { pagination: { count: 1, limit: 1, skip: null }, projects: [{ uid: PROJECT_UID, name: 'Project One' }] };
+      },
+      pages: async function* (params: { org: string }) {
+        seen.push(params.org);
+        yield { pagination: { count: 1, limit: 1, skip: null }, projects: [{ uid: PROJECT_UID, name: 'Project One' }] };
+      },
+    },
+  } as unknown as ApiSurface;
+
+  return { api, ux, isTTY: true };
+}
 
 const PROJECT_UID = 'a'.repeat(24);
 
@@ -77,7 +112,7 @@ describe('resolveInputs', () => {
   });
 
   it('leaves an optional unresolved input undefined instead of throwing', async () => {
-    const resolved = await resolveInputs(inputs({ project: {} }), {
+    const resolved = await resolveInputs(inputs({ org: {}, project: {} }), {
       parsed: {},
       projectConfig: {},
       services: services(),
@@ -162,7 +197,7 @@ describe('resolveInputs', () => {
   });
 
   it('reads a nested config path such as project uid', async () => {
-    const resolved = await resolveInputs(inputs({ project: { required: true } }), {
+    const resolved = await resolveInputs(inputs({ org: {}, project: { required: true } }), {
       parsed: {},
       projectConfig: { uid: PROJECT_UID },
       services: services(),
@@ -233,7 +268,7 @@ describe('resolveInputs', () => {
   });
 
   it('leaves an optional input resolved from a null config value undefined rather than null', async () => {
-    const resolved = await resolveInputs(inputs({ project: {} }), {
+    const resolved = await resolveInputs(inputs({ org: {}, project: {} }), {
       parsed: {},
       projectConfig: { uid: null },
       services: services(),
@@ -362,6 +397,81 @@ describe('resolveInputs', () => {
 
     expect(resolved).toEqual({ org: 'org1' });
     expect(Object.keys(resolved)).toEqual(['org']);
+  });
+});
+
+describe('resolveInputs dependency ordering', () => {
+  it('normalises project against the resolved org even when the resolution entries are reversed', async () => {
+    const seen: unknown[] = [];
+
+    const resolved = await withResolution(reversedResolution(), () =>
+      resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
+        parsed: { org: 'org-from-flag', project: 'Project One' },
+        projectConfig: {},
+        services: recordingServices(seen),
+      }),
+    );
+
+    expect(seen).toEqual(['org-from-flag']);
+    expect(resolved).toEqual({ org: 'org-from-flag', project: PROJECT_UID });
+  });
+
+  it('prompts project against the resolved org even when the resolution entries are reversed', async () => {
+    const seen: unknown[] = [];
+
+    const resolved = await withResolution(reversedResolution(), () =>
+      resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
+        parsed: { org: 'org-from-flag' },
+        projectConfig: {},
+        services: recordingServices(seen),
+      }),
+    );
+
+    expect(seen).toEqual(['org-from-flag']);
+    expect(resolved).toEqual({ org: 'org-from-flag', project: PROJECT_UID });
+  });
+
+  it('throws naming both flags when a command declares project without org', async () => {
+    const spec = { project: { required: true } } as unknown as InputsSpec<'org' | 'project'>;
+
+    const promise = resolveInputs(spec, {
+      parsed: { project: 'Project One' },
+      projectConfig: {},
+      services: recordingServices([]),
+    });
+
+    await expect(promise).rejects.toBeInstanceOf(InputDependencyError);
+    await expect(promise).rejects.toThrow(
+      '--project cannot be resolved without --org: declare org in the command inputs.',
+    );
+  });
+
+  it('throws naming the cycle rather than looping when two inputs depend on each other', async () => {
+    const cyclic = {
+      ...resolutionModule.resolution,
+      org: { ...resolutionModule.resolution.org, dependsOn: ['project'] as FlagKey[] },
+    };
+
+    const promise = withResolution(cyclic, () =>
+      resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
+        parsed: { org: 'org1', project: 'Project One' },
+        projectConfig: {},
+        services: recordingServices([]),
+      }),
+    );
+
+    await expect(promise).rejects.toBeInstanceOf(InputDependencyError);
+    await expect(promise).rejects.toThrow('--org -> --project -> --org is a dependency cycle.');
+  });
+
+  it('restores the catalog order for inputs that declare no dependency at all', async () => {
+    const resolved = await resolveInputs(inputs({ org: { required: true }, limit: {}, skip: {} }), {
+      parsed: { org: 'org1' },
+      projectConfig: {},
+      services: services(),
+    });
+
+    expect(Object.keys(resolved)).toEqual(['org', 'limit', 'skip']);
   });
 });
 

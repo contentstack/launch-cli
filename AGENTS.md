@@ -80,9 +80,15 @@ Five touch points, in this order:
    command's `flags` keys must equal its `inputs` keys — both shipped commands assert this by
    deriving `flags` from `inputs` via `flagsFor`, rather than declaring the two independently.
 
-A command that declares `--project` in `inputs` must also declare `--org`: `resolution.project.normalize`
-reads `resolved.org` to resolve the project uid, and catalog order only resolves `org` first because
-both shipped commands declare it.
+A resolution entry declares what it needs resolved before it: `resolution.project` carries
+`dependsOn: DEPENDENCIES.project` (`['org']`) because its `prompt` and `normalize` read `resolved.org`.
+`resolveInputs` resolves in dependency order, not in the order the `resolution` literal happens to be
+written, so reordering that file changes nothing. Declaring a dependency is the whole contract: a
+command that puts `project` in its `inputs` without `org` is a **compile error** at the `inputs(...)`
+call (`Property 'org' is missing`), and a spec that reaches `resolveInputs` cast past that check
+throws an `InputDependencyError` naming both flags. A cycle between two entries throws the same error
+naming the cycle rather than looping. `DEPENDENCIES` in `src/flags/resolution.ts` is the single
+source: the runtime `dependsOn` and the compile-time constraint in `src/flags/inputs.ts` both read it.
 
 Everything else — parsing, resolution, prompting, name-to-uid normalisation, retries, auth
 headers, error mapping, exit codes, rendering — is inherited from `LaunchCommand`. If a new command
