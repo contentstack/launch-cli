@@ -6,7 +6,11 @@ import { ResolveServices } from './resolution';
 import { Rule } from './rules';
 
 function isAbsent(value: unknown): boolean {
-  return value === undefined || value === null;
+  if (value === undefined || value === null) {
+    return true;
+  }
+
+  return typeof value === 'string' && value.trim() === '';
 }
 
 export function resolutionOrder<K extends FlagKey>(keys: K[]): K[] {

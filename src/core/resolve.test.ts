@@ -398,6 +398,93 @@ describe('resolveInputs', () => {
     expect(resolved).toEqual({ org: 'org1' });
     expect(Object.keys(resolved)).toEqual(['org']);
   });
+
+  it.each(['', '   ', '\t\n'])('treats the blank --org %j as absent and reports the missing input', async (blank) => {
+    const promise = resolveInputs(inputs({ org: { required: true } }), {
+      parsed: { org: blank },
+      projectConfig: {},
+      services: services(),
+    });
+
+    await expect(promise).rejects.toBeInstanceOf(MissingInputError);
+    await expect(promise).rejects.toThrow('Missing required value for --org.');
+  });
+
+  it.each(['', '   '])('treats the blank organizationUid %j in the config file as absent', async (blank) => {
+    const promise = resolveInputs(inputs({ org: { required: true } }), {
+      parsed: {},
+      projectConfig: { organizationUid: blank },
+      services: services(),
+    });
+
+    await expect(promise).rejects.toBeInstanceOf(MissingInputError);
+    await expect(promise).rejects.toThrow('Missing required value for --org.');
+  });
+
+  it.each(['', '   '])('leaves an optional input given the blank value %j undefined rather than blank', async (blank) => {
+    const resolved = await resolveInputs(inputs({ org: {} }), {
+      parsed: { org: blank },
+      projectConfig: {},
+      services: services(),
+    });
+
+    expect(resolved.org).toBeUndefined();
+    expect(resolved).toEqual({ org: undefined });
+  });
+
+  it.each(['', '   '])('prompts rather than normalising a blank --project %j', async (blank) => {
+    const inquired: unknown[] = [];
+    const ux: UxLike = {
+      print: () => undefined,
+      inquire: async (payload: unknown) => {
+        inquired.push(payload);
+        return PROJECT_UID as never;
+      },
+    };
+    const api = {
+      projects: {
+        list: async () => ({
+          pagination: { count: 1, limit: 1, skip: 0 },
+          projects: [{ uid: PROJECT_UID, name: 'Project One' }],
+        }),
+        pages: async function* () {
+          yield {
+            pagination: { count: 1, limit: 1, skip: 0 },
+            projects: [{ uid: PROJECT_UID, name: 'Project One' }],
+          };
+        },
+      },
+    } as unknown as ApiSurface;
+
+    const resolved = await resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
+      parsed: { org: 'org1', project: blank },
+      projectConfig: {},
+      services: { api, ux, isTTY: true },
+    });
+
+    expect(resolved.project).toBe(PROJECT_UID);
+    expect(inquired).toHaveLength(1);
+  });
+
+  it('keeps a numeric zero supplied on argv rather than treating it as absent', async () => {
+    const resolved = await resolveInputs(inputs({ limit: {}, skip: {} }), {
+      parsed: { limit: 0, skip: 0 },
+      projectConfig: {},
+      services: services(),
+    });
+
+    expect(resolved).toEqual({ limit: 0, skip: 0 });
+  });
+
+  it('keeps a false boolean supplied on argv rather than treating it as absent', async () => {
+    const resolved = await resolveInputs(inputs({ yes: {} }), {
+      parsed: { yes: false },
+      projectConfig: {},
+      services: services(),
+    });
+
+    expect(resolved).toEqual({ yes: false });
+  });
 });
 
 describe('resolveInputs dependency ordering', () => {

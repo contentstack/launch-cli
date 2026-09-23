@@ -102,6 +102,33 @@ describe('RestApiClient', () => {
     });
   });
 
+  it.each(['', '   '])('refuses to send a request scoped by the blank organization uid %j', async (blank) => {
+    const http = fakeHttpClient([{ status: 200, data: {} }]);
+
+    const promise = buildClient(http).request({ method: 'GET', path: '/projects', orgUid: blank });
+
+    await expect(promise).rejects.toThrow(
+      'x-organization-uid was given a blank value; an unscoped Launch API request is never correct.',
+    );
+    expect(http.calls).toHaveLength(0);
+  });
+
+  it.each(['', '   '])('refuses to send a request scoped by the blank project uid %j', async (blank) => {
+    const http = fakeHttpClient([{ status: 200, data: {} }]);
+
+    const promise = buildClient(http).request({
+      method: 'GET',
+      path: '/projects/x',
+      orgUid: 'org1',
+      projectUid: blank,
+    });
+
+    await expect(promise).rejects.toThrow(
+      'x-project-uid was given a blank value; an unscoped Launch API request is never correct.',
+    );
+    expect(http.calls).toHaveLength(0);
+  });
+
   it('omits query and body and the scoping headers when they are not supplied', async () => {
     const http = fakeHttpClient([{ status: 200, data: {} }]);
 

@@ -44,6 +44,18 @@ function pruneUndefined(query: Record<string, string | number | undefined>): Rec
   return pruned;
 }
 
+function scopeHeader(headers: Record<string, string>, name: string, value: string | undefined): void {
+  if (value === undefined) {
+    return;
+  }
+
+  if (value.trim() === '') {
+    throw new Error(`${name} was given a blank value; an unscoped Launch API request is never correct.`);
+  }
+
+  headers[name] = value;
+}
+
 export class RestApiClient {
   constructor(private readonly options: RestApiClientOptions) {}
 
@@ -86,13 +98,8 @@ export class RestApiClient {
       ...(await this.options.auth.headers(req.orgUid)),
     };
 
-    if (req.orgUid) {
-      headers['x-organization-uid'] = req.orgUid;
-    }
-
-    if (req.projectUid) {
-      headers['x-project-uid'] = req.projectUid;
-    }
+    scopeHeader(headers, 'x-organization-uid', req.orgUid);
+    scopeHeader(headers, 'x-project-uid', req.projectUid);
 
     client.baseUrl(this.options.baseUrl).asJson().headers(headers);
 
