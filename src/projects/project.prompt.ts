@@ -1,16 +1,18 @@
-import { ApiSurface } from '../resources';
 import { MAX_LIMIT } from '../core/constants';
-import { UsageError } from '../core/errors';
-import { UxLike } from '../core/render';
+import { CancelledError, UsageError } from '../core/errors';
+import type { UxLike } from '../core/render';
+import type { ApiSurface } from '../resources';
 
-export interface SelectDeps {
+export interface PromptDeps {
   api: ApiSurface;
   ux: UxLike;
 }
 
-const UID_PATTERN = /^[0-9a-f]{24}$/i;
+function nothingChosen(value: unknown): boolean {
+  return value === undefined || value === null || value === '';
+}
 
-export async function promptForProject(deps: SelectDeps, org: string): Promise<string> {
+export async function promptForProject(deps: PromptDeps, org: string): Promise<string> {
   const page = await deps.api.projects.list({ org, limit: MAX_LIMIT, skip: 0 });
 
   if (page.projects.length === 0) {
@@ -25,26 +27,16 @@ export async function promptForProject(deps: SelectDeps, org: string): Promise<s
     );
   }
 
-  return deps.ux.inquire<string>({
+  const chosen = await deps.ux.inquire<string | undefined>({
     type: 'search-list',
     name: 'project',
     message: 'Choose a project',
     choices: page.projects.map((project) => ({ name: project.name, value: project.uid })),
   });
-}
 
-export async function resolveProjectUid(deps: SelectDeps, org: string, value: string): Promise<string> {
-  if (UID_PATTERN.test(value)) {
-    return value;
+  if (nothingChosen(chosen)) {
+    throw new CancelledError();
   }
 
-  for await (const page of deps.api.projects.pages({ org })) {
-    const match = page.projects.find((project) => project.name === value);
-
-    if (match) {
-      return match.uid;
-    }
-  }
-
-  throw new UsageError(`No project named "${value}" found in this organization.`);
+  return chosen as string;
 }

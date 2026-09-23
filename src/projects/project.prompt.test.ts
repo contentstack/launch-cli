@@ -1,16 +1,10 @@
-import { randomBytes } from 'node:crypto';
-
 import { ApiSurface } from '../resources';
-import { UsageError } from '../core/errors';
+import { CancelledError, UsageError } from '../core/errors';
 import { LaunchApiError } from '../transport/errors';
 import { UxLike } from '../core/render';
-import { promptForProject, resolveProjectUid } from './project.prompt';
+import { promptForProject } from './project.prompt';
 
 type FakeProject = { uid: string; name: string };
-
-const PRIMARY_UID = randomBytes(12).toString('hex');
-const SECOND_UID = randomBytes(12).toString('hex');
-const HEX_NAME = randomBytes(12).toString('hex');
 
 function fakeDeps(
   pages: FakeProject[][],
@@ -69,128 +63,6 @@ function failingDeps(failure: Error) {
   return { api, ux };
 }
 
-describe('resolveProjectUid', () => {
-  it('passes a 24-character hex uid straight through without calling the API', async () => {
-    const { deps, pageCalls } = fakeDeps([]);
-
-    await expect(resolveProjectUid(deps, 'org1', PRIMARY_UID)).resolves.toBe(
-      PRIMARY_UID,
-    );
-    expect(pageCalls).toEqual([]);
-  });
-
-  it('looks a name up and returns its uid', async () => {
-    const { deps, pageCalls, fetchedPages } = fakeDeps([[{ uid: PRIMARY_UID, name: 'marketing-site' }]]);
-
-    await expect(resolveProjectUid(deps, 'org1', 'marketing-site')).resolves.toBe(PRIMARY_UID);
-    expect(pageCalls).toEqual([{ org: 'org1' }]);
-    expect(fetchedPages).toEqual([0]);
-  });
-
-  it('throws naming the value when no project matches anywhere in the organization', async () => {
-    const { deps, pageCalls } = fakeDeps([[{ uid: PRIMARY_UID, name: 'marketing-site' }]]);
-
-    await expect(resolveProjectUid(deps, 'org1', 'ghost')).rejects.toThrow(UsageError);
-    await expect(resolveProjectUid(deps, 'org1', 'ghost')).rejects.toThrow(
-      'No project named "ghost" found in this organization.',
-    );
-    expect(pageCalls).toEqual([{ org: 'org1' }, { org: 'org1' }]);
-  });
-
-  it('walks past the first page to find a project the org only holds further in', async () => {
-    const firstPage = Array.from({ length: 100 }, (_, index) => ({
-      uid: index.toString().padStart(24, '0'),
-      name: `project-${index}`,
-    }));
-    const secondPage = [{ uid: SECOND_UID, name: 'docs-site' }];
-    const { deps, fetchedPages } = fakeDeps([firstPage, secondPage], undefined, 101);
-
-    await expect(resolveProjectUid(deps, 'org1', 'docs-site')).resolves.toBe(SECOND_UID);
-    expect(fetchedPages).toEqual([0, 1]);
-  });
-
-  it('exhausts every page before reporting a name the organization does not hold', async () => {
-    const { deps, fetchedPages } = fakeDeps(
-      [
-        [{ uid: 'a'.repeat(24), name: 'one' }],
-        [{ uid: 'b'.repeat(24), name: 'two' }],
-        [{ uid: 'c'.repeat(24), name: 'three' }],
-      ],
-      undefined,
-      3,
-    );
-
-    await expect(resolveProjectUid(deps, 'org1', 'ghost')).rejects.toThrow(
-      'No project named "ghost" found in this organization.',
-    );
-    expect(fetchedPages).toEqual([0, 1, 2]);
-  });
-
-  it('stops fetching pages as soon as the name matches rather than draining the organization', async () => {
-    const { deps, fetchedPages } = fakeDeps(
-      [
-        [{ uid: 'a'.repeat(24), name: 'one' }],
-        [{ uid: 'b'.repeat(24), name: 'two' }],
-        [{ uid: 'c'.repeat(24), name: 'three' }],
-      ],
-      undefined,
-      3,
-    );
-
-    await expect(resolveProjectUid(deps, 'org1', 'two')).resolves.toBe('b'.repeat(24));
-    expect(fetchedPages).toEqual([0, 1]);
-  });
-
-  it('reports a not-found rather than looping when the organization yields no pages at all', async () => {
-    const { deps, fetchedPages } = fakeDeps([], undefined, 150);
-
-    await expect(resolveProjectUid(deps, 'org1', 'ghost')).rejects.toThrow(UsageError);
-    await expect(resolveProjectUid(deps, 'org1', 'ghost')).rejects.toThrow(
-      'No project named "ghost" found in this organization.',
-    );
-    expect(fetchedPages).toEqual([]);
-  });
-
-  it('passes an uppercase hex uid straight through without calling the API', async () => {
-    const { deps, pageCalls } = fakeDeps([]);
-
-    await expect(resolveProjectUid(deps, 'org1', PRIMARY_UID.toUpperCase())).resolves.toBe(
-      PRIMARY_UID.toUpperCase(),
-    );
-    expect(pageCalls).toEqual([]);
-  });
-
-  it.each([['0'.repeat(23)], ['0'.repeat(25)]])('treats the %s-character hex string as a name, not a uid', async (value) => {
-    const { deps, pageCalls } = fakeDeps([[{ uid: PRIMARY_UID, name: value }]]);
-
-    await expect(resolveProjectUid(deps, 'org1', value)).resolves.toBe(PRIMARY_UID);
-    expect(pageCalls).toEqual([{ org: 'org1' }]);
-  });
-
-  it('returns a 24-character hex project name unchanged rather than looking it up', async () => {
-    const hexName = HEX_NAME;
-    const { deps, pageCalls } = fakeDeps([[{ uid: PRIMARY_UID, name: hexName }]]);
-
-    await expect(resolveProjectUid(deps, 'org1', hexName)).resolves.toBe(hexName);
-    expect(pageCalls).toEqual([]);
-  });
-
-  it('matches a project name case-sensitively', async () => {
-    const { deps } = fakeDeps([[{ uid: PRIMARY_UID, name: 'Marketing-Site' }]]);
-
-    await expect(resolveProjectUid(deps, 'org1', 'Marketing-Site')).resolves.toBe(PRIMARY_UID);
-    await expect(resolveProjectUid(deps, 'org1', 'marketing-site')).rejects.toThrow(
-      'No project named "marketing-site" found in this organization.',
-    );
-  });
-
-  it('propagates an api failure raised while paging the organization projects', async () => {
-    const failure = new LaunchApiError(403, [{ code: 'launch.FORBIDDEN', message: 'no access' }]);
-
-    await expect(resolveProjectUid(failingDeps(failure), 'org1', 'marketing-site')).rejects.toBe(failure);
-  });
-});
-
 describe('promptForProject', () => {
   it('offers every project by name and returns the chosen uid', async () => {
     const { deps, inquired, printed } = fakeDeps(
@@ -241,11 +113,12 @@ describe('promptForProject', () => {
     ]);
   });
 
-  it('returns nothing when the user picks no project, leaving the input unresolved', async () => {
-    const { deps, inquired } = fakeDeps([[{ uid: 'a'.repeat(24), name: 'one' }]], undefined);
+  it.each([[undefined], [null], ['']])('treats %p back from the picker as the user cancelling', async (answer) => {
+    const { deps, inquired } = fakeDeps([[{ uid: 'a'.repeat(24), name: 'one' }]], answer as string | undefined);
 
-    await expect(promptForProject(deps, 'org1')).resolves.toBeUndefined();
-    expect(inquired).toHaveLength(1);
+    await expect(promptForProject(deps, 'org1')).rejects.toThrow(CancelledError);
+    await expect(promptForProject(deps, 'org1')).rejects.toThrow('Cancelled. Nothing was changed.');
+    expect(inquired).toHaveLength(2);
   });
 
   it('propagates an api failure raised while listing the organization projects', async () => {

@@ -1,7 +1,7 @@
-import { ApiSurface } from '../resources';
-import { UxLike } from './render';
-import * as select from '../projects/project.prompt';
-import { DEPENDENCIES, catalog, resolutionTable } from '../resources';
+import { ApiSurface, DEPENDENCIES, catalog, resolutionTable } from './resources';
+import { UxLike } from './core/render';
+import * as prompt from './projects/project.prompt';
+import { ProjectResolver } from './projects/project.resolver';
 
 const table = resolutionTable;
 
@@ -66,8 +66,8 @@ describe('resolution', () => {
     expect(table.project.default).toBeUndefined();
   });
 
-  it('delegates the project prompt to the project selector with the resolved org', async () => {
-    const spy = jest.spyOn(select, 'promptForProject').mockResolvedValue(PROJECT_UID);
+  it('delegates the project prompt to the project picker with the resolved org', async () => {
+    const spy = jest.spyOn(prompt, 'promptForProject').mockResolvedValue(PROJECT_UID);
     const { services, resolved } = args();
 
     await expect(table.project.prompt?.({ services, resolved })).resolves.toBe(PROJECT_UID);
@@ -76,13 +76,23 @@ describe('resolution', () => {
     spy.mockRestore();
   });
 
-  it('delegates project normalisation to the project selector with the resolved org', async () => {
-    const spy = jest.spyOn(select, 'resolveProjectUid').mockResolvedValue(PROJECT_UID);
+  it('delegates project normalisation to the project resolver with the resolved org and a parsed reference', async () => {
+    const spy = jest.spyOn(ProjectResolver.prototype, 'toUid').mockResolvedValue(PROJECT_UID);
     const { services, resolved } = args();
 
     await expect(table.project.normalize?.('Project One', { services, resolved })).resolves.toBe(PROJECT_UID);
 
-    expect(spy).toHaveBeenCalledWith(services, 'org1', 'Project One');
+    expect(spy).toHaveBeenCalledWith('org1', { kind: 'name', name: 'Project One' });
+    spy.mockRestore();
+  });
+
+  it('hands the resolver a uid reference untouched when the value is already a uid', async () => {
+    const spy = jest.spyOn(ProjectResolver.prototype, 'toUid').mockResolvedValue(PROJECT_UID);
+    const { services, resolved } = args();
+
+    await expect(table.project.normalize?.(PROJECT_UID, { services, resolved })).resolves.toBe(PROJECT_UID);
+
+    expect(spy).toHaveBeenCalledWith('org1', { kind: 'uid', uid: PROJECT_UID });
     spy.mockRestore();
   });
 

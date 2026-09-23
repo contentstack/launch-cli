@@ -1,7 +1,9 @@
 import { Flags } from '@contentstack/cli-utilities';
 
 import type { ResolutionSpec } from '../core/resolution';
-import { promptForProject, resolveProjectUid } from './project.prompt';
+import { ProjectRef } from './project-ref';
+import { promptForProject } from './project.prompt';
+import { ProjectResolver } from './project.resolver';
 
 export const projectFlags = {
   project: Flags.string({ description: 'Project name or UID' }),
@@ -14,6 +16,7 @@ export const projectResolution = {
     configPath: 'uid',
     dependsOn: PROJECT_DEPENDENCIES.project,
     prompt: ({ services, resolved }) => promptForProject(services, resolved.org),
-    normalize: (value, { services, resolved }) => resolveProjectUid(services, resolved.org, value),
+    normalize: (value, { services, resolved }) =>
+      new ProjectResolver(services.api.projects).toUid(resolved.org, ProjectRef.parse(value)),
   } satisfies ResolutionSpec<string, 'org'>,
 };

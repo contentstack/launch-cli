@@ -1,5 +1,5 @@
 import { ApiSurface } from '../resources';
-import { InputDependencyError, MissingInputError, UsageError } from './errors';
+import { CancelledError, InputDependencyError, MissingInputError, UsageError } from './errors';
 import { UxLike } from './render';
 import { FlagKey } from '../resources';
 import { InputsSpec, inputs } from './inputs';
@@ -288,15 +288,15 @@ describe('resolveInputs', () => {
     expect(resolved.project).toBeUndefined();
   });
 
-  it('throws a MissingInputError when the prompt answers nothing for a required input', async () => {
+  it('propagates the cancellation the picker raises when the user chooses nothing', async () => {
     const promise = resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
       parsed: { org: 'org1' },
       projectConfig: {},
       services: services({ isTTY: true, answer: undefined }),
     });
 
-    await expect(promise).rejects.toBeInstanceOf(MissingInputError);
-    await expect(promise).rejects.toThrow('Missing required value for --project.');
+    await expect(promise).rejects.toBeInstanceOf(CancelledError);
+    await expect(promise).rejects.toThrow('Cancelled. Nothing was changed.');
   });
 
   it('does not prompt on a TTY when the flag already carries the value', async () => {
