@@ -246,6 +246,105 @@ describe('resolveInputs', () => {
 
     expect(resolved.project).toBeUndefined();
   });
+
+  it('throws a MissingInputError when the prompt answers nothing for a required input', async () => {
+    const promise = resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
+      parsed: { org: 'org1' },
+      projectConfig: {},
+      services: services({ isTTY: true, answer: undefined }),
+    });
+
+    await expect(promise).rejects.toBeInstanceOf(MissingInputError);
+    await expect(promise).rejects.toThrow('Missing required value for --project.');
+  });
+
+  it('does not prompt on a TTY when the flag already carries the value', async () => {
+    const inquired: unknown[] = [];
+    const ux: UxLike = {
+      print: () => undefined,
+      inquire: async (payload: unknown) => {
+        inquired.push(payload);
+        return undefined as never;
+      },
+    };
+    const api = {
+      projects: {
+        list: async () => ({
+          pagination: { count: 1, limit: 1, skip: 0 },
+          projects: [{ uid: PROJECT_UID, name: 'Project One' }],
+        }),
+      },
+    } as unknown as ApiSurface;
+
+    const resolved = await resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
+      parsed: { org: 'org1', project: PROJECT_UID },
+      projectConfig: {},
+      services: { api, ux, isTTY: true },
+    });
+
+    expect(resolved.project).toBe(PROJECT_UID);
+    expect(inquired).toEqual([]);
+  });
+
+  it('does not prompt on a TTY when the config file already carries the value', async () => {
+    const inquired: unknown[] = [];
+    const ux: UxLike = {
+      print: () => undefined,
+      inquire: async (payload: unknown) => {
+        inquired.push(payload);
+        return undefined as never;
+      },
+    };
+    const api = {
+      projects: {
+        list: async () => ({
+          pagination: { count: 1, limit: 1, skip: 0 },
+          projects: [{ uid: PROJECT_UID, name: 'Project One' }],
+        }),
+      },
+    } as unknown as ApiSurface;
+
+    const resolved = await resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
+      parsed: { org: 'org1' },
+      projectConfig: { uid: PROJECT_UID },
+      services: { api, ux, isTTY: true },
+    });
+
+    expect(resolved.project).toBe(PROJECT_UID);
+    expect(inquired).toEqual([]);
+  });
+
+  it('propagates a usage error raised while normalising a value', async () => {
+    const promise = resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
+      parsed: { org: 'org1', project: 'ghost' },
+      projectConfig: {},
+      services: services(),
+    });
+
+    await expect(promise).rejects.toBeInstanceOf(UsageError);
+    await expect(promise).rejects.toThrow('No project named "ghost" found in this organization.');
+  });
+
+  it('defaults yes to false when the flag was not passed', async () => {
+    const resolved = await resolveInputs(inputs({ yes: {} }), {
+      parsed: {},
+      projectConfig: {},
+      services: services(),
+    });
+
+    expect(resolved).toEqual({ yes: false });
+  });
+
+  it('excludes parsed flags the spec does not declare', async () => {
+    const resolved = await resolveInputs(inputs({ org: { required: true } }), {
+      parsed: { org: 'org1', limit: 10, skip: 5, config: '/tmp/.cs-launch.json' },
+      projectConfig: {},
+      services: services(),
+    });
+
+    expect(resolved).toEqual({ org: 'org1' });
+    expect(Object.keys(resolved)).toEqual(['org']);
+  });
 });
 
 describe('resolveInputs cross-flag rules', () => {

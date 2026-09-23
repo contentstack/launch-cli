@@ -21,6 +21,26 @@ describe('exactlyOneOf', () => {
     expect(() => rule({ limit: 10, skip: 5 })).toThrow(UsageError);
     expect(() => rule({ limit: 10, skip: 5 })).toThrow('Pass exactly one of --limit, --skip; --limit, --skip were supplied.');
   });
+
+  it.each([[null], [undefined], [false]])('does not count %p as a supplied value', (value) => {
+    const rule = exactlyOneOf('limit', 'skip');
+
+    expect(() => rule({ limit: 10, skip: value })).not.toThrow();
+  });
+
+  it('counts a boolean flag sitting at its false default as not supplied', () => {
+    const rule = exactlyOneOf('yes', 'limit');
+
+    expect(() => rule({ yes: false, limit: undefined })).toThrow('Pass exactly one of --yes, --limit; none was supplied.');
+    expect(() => rule({ yes: true, limit: undefined })).not.toThrow();
+  });
+
+  it.each([[0], ['']])('counts the falsy-but-present value %p as supplied', (value) => {
+    const rule = exactlyOneOf('limit', 'skip');
+
+    expect(() => rule({ limit: value })).not.toThrow();
+    expect(() => rule({ limit: value, skip: 5 })).toThrow('--limit, --skip were supplied.');
+  });
 });
 
 describe('dependsOnValue', () => {
@@ -41,6 +61,20 @@ describe('dependsOnValue', () => {
 
     expect(() => rule({ project: 'disable', org: 'org1' })).toThrow(UsageError);
     expect(() => rule({ project: 'disable', org: 'org1' })).toThrow('--org requires --project enable.');
+  });
+
+  it('fails when the gating input is absent entirely and a dependent was supplied', () => {
+    const rule = dependsOnValue('project', 'enable', 'org', 'limit');
+
+    expect(() => rule({ org: 'org1' })).toThrow(UsageError);
+    expect(() => rule({ org: 'org1' })).toThrow('--org requires --project enable.');
+  });
+
+  it('passes when the gating input is absent entirely and no dependent was supplied', () => {
+    const rule = dependsOnValue('project', 'enable', 'org', 'limit');
+
+    expect(() => rule({})).not.toThrow();
+    expect(() => rule({ org: null, limit: false })).not.toThrow();
   });
 });
 
