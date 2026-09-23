@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { UsageError } from '../errors';
 import { getByPath, readProjectConfig } from './project-config';
 
 const tempDirs: string[] = [];
@@ -41,8 +42,79 @@ describe('readProjectConfig', () => {
     expect(readProjectConfig(path)).toEqual({});
   });
 
-  it('returns an empty object when several blocks exist, deferring branch selection', () => {
-    const path = writeConfig({ main: { uid: 'p1' }, staging: { uid: 'p2' } });
+  it('uses the shared block when several branch blocks name the same project', () => {
+    const path = writeConfig({
+      main: { uid: 'p1', organizationUid: 'org1' },
+      staging: { uid: 'p1', organizationUid: 'org1' },
+    });
+
+    expect(readProjectConfig(path)).toEqual({ uid: 'p1', organizationUid: 'org1' });
+  });
+
+  it('uses the shared block for a realistic two-branch v1 config file', () => {
+    const path = writeConfig({
+      main: {
+        uid: 'blt1111111111111111',
+        organizationUid: 'blt2222222222222222',
+        name: 'my-site',
+        environments: [{ uid: 'blt3333333333333333', name: 'Default' }],
+      },
+      'feature/checkout': {
+        uid: 'blt1111111111111111',
+        organizationUid: 'blt2222222222222222',
+        name: 'my-site',
+        environments: [{ uid: 'blt4444444444444444', name: 'Preview' }],
+      },
+    });
+
+    expect(getByPath(readProjectConfig(path), 'uid')).toBe('blt1111111111111111');
+    expect(getByPath(readProjectConfig(path), 'organizationUid')).toBe('blt2222222222222222');
+  });
+
+  it('raises a usage error when the branch blocks name different projects', () => {
+    const path = writeConfig({
+      main: { uid: 'p1', organizationUid: 'org1' },
+      staging: { uid: 'p2', organizationUid: 'org1' },
+    });
+
+    expect(() => readProjectConfig(path)).toThrow(UsageError);
+    expect(() => readProjectConfig(path)).toThrow('--org');
+    expect(() => readProjectConfig(path)).toThrow('--project');
+    expect(() => readProjectConfig(path)).toThrow('main, staging');
+  });
+
+  it('raises a usage error when the branch blocks name different organizations', () => {
+    const path = writeConfig({
+      main: { uid: 'p1', organizationUid: 'org1' },
+      staging: { uid: 'p1', organizationUid: 'org2' },
+    });
+
+    expect(() => readProjectConfig(path)).toThrow(UsageError);
+    expect(() => readProjectConfig(path)).toThrow('main, staging');
+  });
+
+  it('raises a usage error when a branch block is not an object', () => {
+    const path = writeConfig({ main: { uid: 'p1', organizationUid: 'org1' }, staging: 'p1' });
+
+    expect(() => readProjectConfig(path)).toThrow(UsageError);
+    expect(() => readProjectConfig(path)).toThrow('main, staging');
+  });
+
+  it('raises a usage error when a branch block is null', () => {
+    const path = writeConfig({ main: { uid: 'p1', organizationUid: 'org1' }, staging: null });
+
+    expect(() => readProjectConfig(path)).toThrow(UsageError);
+  });
+
+  it('raises a usage error when every branch block is a primitive', () => {
+    const path = writeConfig({ main: 'p1', staging: 'p1' });
+
+    expect(() => readProjectConfig(path)).toThrow(UsageError);
+    expect(() => readProjectConfig(path)).toThrow('main, staging');
+  });
+
+  it('returns an empty object when the file holds no blocks at all', () => {
+    const path = writeConfig({});
 
     expect(readProjectConfig(path)).toEqual({});
   });
