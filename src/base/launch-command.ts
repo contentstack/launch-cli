@@ -1,10 +1,11 @@
 import { resolve as resolvePath } from 'node:path';
 
 import { Command } from '@contentstack/cli-command';
-import { FlagInput, cliux, isAuthenticated } from '@contentstack/cli-utilities';
+import { FlagInput, cliux, configHandler, isAuthenticated } from '@contentstack/cli-utilities';
 
 import { EXIT_CANCELLED, EXIT_RUNTIME, EXIT_USAGE, PROJECT_CONFIG_FILE } from '../config/constants';
 import { readProjectConfig } from '../config/project-config';
+import { RegionLike, resolveLaunchHubUrl } from '../config/region';
 import { CancelledError, UsageError } from '../errors';
 import { catalog, FlagKey } from '../flags/catalog';
 import { InputsSpec } from '../flags/inputs';
@@ -62,6 +63,10 @@ export abstract class LaunchCommand<K extends FlagKey = FlagKey> extends Command
   protected resolved!: Record<K, unknown>;
   protected ux: UxLike = cliux as unknown as UxLike;
 
+  protected get launchRegion(): RegionLike | undefined {
+    return configHandler.get('region') as RegionLike | undefined;
+  }
+
   async init(): Promise<void> {
     await super.init();
     this.requireAuth();
@@ -76,7 +81,7 @@ export abstract class LaunchCommand<K extends FlagKey = FlagKey> extends Command
       flags: flags as Partial<Record<FlagKey, unknown>>,
       inputs: (this.ctor as unknown as { inputs?: InputsSpec<K> }).inputs ?? ({} as InputsSpec<K>),
       rules: (this.ctor as unknown as { rules?: Rule[] }).rules,
-      launchHubUrl: this.launchHubUrl,
+      launchHubUrl: resolveLaunchHubUrl(this.launchRegion),
       analyticsInfo: this.config.userAgent,
       ux: this.ux,
       isTTY: Boolean(process.stdin.isTTY),

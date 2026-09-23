@@ -236,7 +236,10 @@ describe('LaunchCommand.init', () => {
     const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
     const originalIsTTY = process.stdin.isTTY;
     Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true });
-    Object.defineProperty(instance, 'launchHubUrl', { value: 'https://launch-api.test', configurable: true });
+    Object.defineProperty(instance, 'launchRegion', {
+      value: { launchHubUrl: 'https://launch-api.test' },
+      configurable: true,
+    });
     Object.defineProperty(instance, 'config', { value: { userAgent: 'cli/2.0.0' }, configurable: true });
     const parseMock = jest.fn().mockResolvedValue({ flags: {} });
     (instance as unknown as { parse: jest.Mock }).parse = parseMock;
@@ -259,11 +262,52 @@ describe('LaunchCommand.init', () => {
     Object.defineProperty(process.stdin, 'isTTY', { value: originalIsTTY, configurable: true });
   });
 
+  it('derives the hub url from the configured region cma when the region declares no launch hub url', async () => {
+    const instance = probe();
+    const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
+    const regionSpy = jest.spyOn(configHandler, 'get').mockImplementation((key: string) => {
+      if (key === 'region') return { cma: 'api.contentstack.io' };
+      return key === 'authorisationType' ? 'BASIC' : undefined;
+    });
+    Object.defineProperty(instance, 'config', { value: { userAgent: 'cli/2.0.0' }, configurable: true });
+    (instance as unknown as { parse: jest.Mock }).parse = jest.fn().mockResolvedValue({ flags: {} });
+    let capturedBaseUrl: string | undefined;
+    const createSpy = jest.spyOn(HttpClient, 'create').mockReturnValue(fakeHttpClient((url) => {
+      capturedBaseUrl = url;
+    }));
+
+    await instance.init();
+    await instance['services'].api.projects.list({ org: 'org1' });
+
+    expect(capturedBaseUrl).toBe(getManageApiBaseUrl('https://launch-api.contentstack.com'));
+
+    createSpy.mockRestore();
+    regionSpy.mockRestore();
+    authSpy.mockRestore();
+  });
+
+  it('fails with a usage error instead of a type error when no region is configured', async () => {
+    const instance = probe();
+    const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
+    Object.defineProperty(instance, 'config', { value: { userAgent: 'cli/2.0.0' }, configurable: true });
+    (instance as unknown as { parse: jest.Mock }).parse = jest.fn().mockResolvedValue({ flags: {} });
+
+    await expect(instance.init()).rejects.toBeInstanceOf(UsageError);
+    await expect(instance.init()).rejects.toThrow(
+      'Region not configured. Please set the region with command $ csdx config:set:region',
+    );
+
+    authSpy.mockRestore();
+  });
+
   it('resolves no inputs instead of throwing when the subclass declares no static inputs', async () => {
     const instance = new ProbeWithoutInputs([], {} as never) as ProbeWithoutInputs & { error: jest.Mock };
     (instance as unknown as { error: unknown }).error = jest.fn();
     const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
-    Object.defineProperty(instance, 'launchHubUrl', { value: 'https://launch-api.test', configurable: true });
+    Object.defineProperty(instance, 'launchRegion', {
+      value: { launchHubUrl: 'https://launch-api.test' },
+      configurable: true,
+    });
     Object.defineProperty(instance, 'config', { value: { userAgent: 'cli/2.0.0' }, configurable: true });
     (instance as unknown as { parse: jest.Mock }).parse = jest.fn().mockResolvedValue({ flags: {} });
 
@@ -279,7 +323,10 @@ describe('LaunchCommand.init rules', () => {
     const instance = new ProbeWithRules([], {} as never) as ProbeWithRules & { error: jest.Mock };
     (instance as unknown as { error: unknown }).error = jest.fn();
     const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
-    Object.defineProperty(instance, 'launchHubUrl', { value: 'https://launch-api.test', configurable: true });
+    Object.defineProperty(instance, 'launchRegion', {
+      value: { launchHubUrl: 'https://launch-api.test' },
+      configurable: true,
+    });
     Object.defineProperty(instance, 'config', { value: { userAgent: 'cli/2.0.0' }, configurable: true });
     (instance as unknown as { parse: jest.Mock }).parse = jest
       .fn()
