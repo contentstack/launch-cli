@@ -94,6 +94,28 @@ required-ness is enforced after the resolution chain runs instead. A command mus
 `this.resolved`, never `this.flags` — reading `this.flags` bypasses the resolution chain
 (config file, prompt, default) entirely and returns only what was passed on argv.
 
+## The cloud-function data URL loader
+
+`src/util/cloud-function/load-data-url.ts` loads a built cloud function from a `data:` URL, and it
+goes through `new Function('u', 'return import(u)')` instead of a plain `import(dataURL)`. That
+indirection is load-bearing, not a style choice.
+
+`tsconfig.json` sets `"module": "commonjs"`, so `tsc` rewrites a literal dynamic `import()` into
+`Promise.resolve(...).then(s => __importStar(require(s)))`, and `require()` cannot load a `data:`
+URL — the compiled CLI then fails with `MODULE_NOT_FOUND` on every `launch:functions` invocation
+while the TypeScript sources and the unit tests stay green. `tsc` does not look inside a `Function`
+constructor string, so the dynamic import survives compilation.
+
+The repo used to carry `scripts/patch-load-data-url-file.js`, a post-`tsc` rollup step that
+re-emitted the file as ESM, plus the `@rollup/plugin-typescript` dependency it needed. Both are
+gone; do not reintroduce them, and do not "simplify" the loader back to a bare `import()`.
+
+`test/integration/compiled-load-data-url.test.ts` guards this: it compiles the loader with the
+project's own `compilerOptions` and runs the emitted CommonJS in a child `node` process against a
+real `data:` URL. It has to be a child process — jest's VM cannot service a native dynamic import
+without `--experimental-vm-modules` — and it deliberately lives outside `src/util/cloud-function/`,
+which `jest.config.js` excludes from coverage collection.
+
 ## Commits
 
 Use Conventional Commits — `feat(scope): subject`, `fix(scope): subject`, `test:`, `docs:`,
