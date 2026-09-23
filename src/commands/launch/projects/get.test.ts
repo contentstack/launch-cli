@@ -84,6 +84,12 @@ describe('launch:projects:get', () => {
           pagination: { count: 1, limit: 1, skip: 0 },
           projects: [{ uid: 'a'.repeat(24), name: 'site' }],
         }),
+        pages: async function* () {
+          yield {
+            pagination: { count: 1, limit: 1, skip: 0 },
+            projects: [{ uid: 'a'.repeat(24), name: 'site' }],
+          };
+        },
       },
     } as unknown as ApiSurface;
 

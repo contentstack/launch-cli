@@ -20,7 +20,8 @@ export async function promptForProject(deps: SelectDeps, org: string): Promise<s
   if (page.pagination.count > page.projects.length) {
     deps.ux.print(
       `Showing the first ${page.projects.length} of ${page.pagination.count} projects; ` +
-        'refine your search if the one you want is missing.',
+        'refine your search if the one you want is missing. ' +
+        'Use --project <name> to reach any project in the organization.',
     );
   }
 
@@ -37,18 +38,12 @@ export async function resolveProjectUid(deps: SelectDeps, org: string, value: st
     return value;
   }
 
-  const page = await deps.api.projects.list({ org, limit: MAX_LIMIT, skip: 0 });
-  const match = page.projects.find((project) => project.name === value);
+  for await (const page of deps.api.projects.pages({ org })) {
+    const match = page.projects.find((project) => project.name === value);
 
-  if (match) {
-    return match.uid;
-  }
-
-  if (page.pagination.count > page.projects.length) {
-    throw new UsageError(
-      `Could not find a project named "${value}" among the first ${page.projects.length} of ` +
-        `${page.pagination.count} projects in this organization; pass the project UID instead.`,
-    );
+    if (match) {
+      return match.uid;
+    }
   }
 
   throw new UsageError(`No project named "${value}" found in this organization.`);

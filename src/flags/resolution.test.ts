@@ -14,6 +14,12 @@ function args() {
         pagination: { count: 1, limit: 1, skip: 0 },
         projects: [{ uid: PROJECT_UID, name: 'Project One' }],
       }),
+      pages: async function* () {
+        yield {
+          pagination: { count: 1, limit: 1, skip: 0 },
+          projects: [{ uid: PROJECT_UID, name: 'Project One' }],
+        };
+      },
     },
   } as unknown as ApiSurface;
 

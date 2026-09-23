@@ -6,3 +6,4 @@ export const EXIT_USAGE = 2;
 export const EXIT_CANCELLED = 3;
 export const DEFAULT_LIMIT = 50;
 export const MAX_LIMIT = 100;
+export const MAX_PAGES = 100;

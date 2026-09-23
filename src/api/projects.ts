@@ -1,3 +1,4 @@
+import { MAX_LIMIT, MAX_PAGES } from '../config/constants';
 import { LaunchApiError } from '../http/errors';
 import { RestApiClient } from '../http/rest-client';
 import { Project, ProjectResponse, ProjectsPage } from './types';
@@ -16,6 +17,11 @@ export interface ListProjectsParams {
   org: string;
   limit?: number;
   skip?: number;
+}
+
+export interface PageProjectsParams {
+  org: string;
+  pageSize?: number;
 }
 
 export interface GetProjectParams {
@@ -43,6 +49,31 @@ export class ProjectsApi {
     }
 
     return response;
+  }
+
+  async *pages(params: PageProjectsParams): AsyncGenerator<ProjectsPage> {
+    const limit = params.pageSize ?? MAX_LIMIT;
+    let skip = 0;
+
+    for (let fetched = 0; fetched < MAX_PAGES; fetched += 1) {
+      const page = await this.list({ org: params.org, limit, skip });
+
+      if (page.projects.length === 0) {
+        return;
+      }
+
+      yield page;
+
+      if (page.projects.length < limit) {
+        return;
+      }
+
+      skip += page.projects.length;
+
+      if (skip >= page.pagination.count) {
+        return;
+      }
+    }
   }
 
   async get(params: GetProjectParams): Promise<Project> {
