@@ -2,14 +2,16 @@ import { existsSync, readFileSync } from 'node:fs';
 
 import { UsageError } from '../errors';
 
+function isBlock(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 function identityOf(block: unknown): string | undefined {
-  if (typeof block !== 'object' || block === null) {
+  if (!isBlock(block)) {
     return undefined;
   }
 
-  const record = block as Record<string, unknown>;
-
-  return `${String(record.organizationUid)}/${String(record.uid)}`;
+  return `${String(block.organizationUid)}/${String(block.uid)}`;
 }
 
 function sharedBlock(entries: [string, unknown][]): Record<string, unknown> {
@@ -39,17 +41,21 @@ export function readProjectConfig(configPath: string): Record<string, unknown> {
     return {};
   }
 
-  if (typeof parsed !== 'object' || parsed === null) {
+  if (!isBlock(parsed)) {
     return {};
   }
 
-  const entries = Object.entries(parsed as Record<string, unknown>);
+  const entries = Object.entries(parsed);
 
   if (entries.length > 1) {
     return sharedBlock(entries);
   }
 
-  return entries.length === 1 ? (entries[0][1] as Record<string, unknown>) : {};
+  if (entries.length === 1 && isBlock(entries[0][1])) {
+    return entries[0][1];
+  }
+
+  return {};
 }
 
 export function getByPath(source: unknown, path: string): unknown {

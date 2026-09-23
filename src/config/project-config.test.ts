@@ -113,6 +113,43 @@ describe('readProjectConfig', () => {
     expect(() => readProjectConfig(path)).toThrow('main, staging');
   });
 
+  it('returns an empty object when the sole block holds a primitive instead of a project', () => {
+    const path = writeConfig({ main: 'x' });
+
+    expect(readProjectConfig(path)).toEqual({});
+  });
+
+  it('returns an empty object when the sole block is an array', () => {
+    const path = writeConfig({ main: [{ uid: 'p1', organizationUid: 'org1' }] });
+
+    expect(readProjectConfig(path)).toEqual({});
+  });
+
+  it('returns an empty object when the sole block is null', () => {
+    const path = writeConfig({ main: null });
+
+    expect(readProjectConfig(path)).toEqual({});
+  });
+
+  it('returns an empty object when the file root is an array', () => {
+    const path = writeConfig([{ uid: 'p1', organizationUid: 'org1' }]);
+
+    expect(readProjectConfig(path)).toEqual({});
+  });
+
+  it('returns an empty object when the file root is an empty array', () => {
+    const path = writeConfig([]);
+
+    expect(readProjectConfig(path)).toEqual({});
+  });
+
+  it('raises a usage error when every branch block is an array', () => {
+    const path = writeConfig({ main: [{ uid: 'p1' }], staging: [{ uid: 'p1' }] });
+
+    expect(() => readProjectConfig(path)).toThrow(UsageError);
+    expect(() => readProjectConfig(path)).toThrow('main, staging');
+  });
+
   it('returns an empty object when the file holds no blocks at all', () => {
     const path = writeConfig({});
 
