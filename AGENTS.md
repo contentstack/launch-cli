@@ -90,6 +90,12 @@ src/
                 and LaunchApiError / LaunchNetworkError - no CLI wording lives here
   projects/     one resource: repository, value object, domain service, presenter,
                 error wording, prompt adapter, and the flags it contributes
+  environments/ the environment DTOs, the framework preset table, and the environment
+                flags every create command contributes
+  deployments/  the deployment repository, the status classification, and the
+                wait/stream loop that projects:create, deployments:create and logs:get
+                all drive
+  git/          the internal git-namespace / repository / branch lookups
   functions/    the cloud-function runtime and the serve flags, treated as a resource
   resources.ts  the composition root: it assembles the catalog, the resolution table,
                 the dependency map and the api surface out of the resources
@@ -303,12 +309,87 @@ there is **no server-side maximum at all**.
 `PROJECT_SCAN_PAGE_SIZE` (100) lives in `src/projects/projects.api.ts` beside the `pages()`
 generator it sizes, because it is that repository's paging decision and not a CLI-wide one.
 
+**The deployment wait/stream loop.** `src/deployments/deployment.watcher.ts` polls a deployment to a
+terminal state and is the single place any command waits on one. `POST /projects` creates the
+project, its first environment **and** its first deployment, so `projects:create` is its first
+consumer; `deployments:create` (CL-7170) and `logs:get` (CL-7171) take the same function.
+
+The eight statuses in `contentfly-management-service`'s `DeploymentStatus` are **data**, held in
+`src/deployments/types.ts`, and `classifyStatus` is the only thing that reads them:
+
+| Kind | Statuses | Why |
+|---|---|---|
+| in-flight | `QUEUED`, `DEPLOYING` | the two the background-jobs service calls `INCOMPLETE_DEPLOYMENT_STATES` |
+| success | `LIVE`, `DEPLOYED` | exactly the pair `DeploymentStatusNotifierService`'s `isSuccess` names before it attaches a preview URL — the same question the CLI asks before printing the site URL |
+| failure | `ARCHIVED`, `SKIPPED`, `FAILED`, `CANCELLED` | declared, but not a deployment you can visit |
+| unknown | anything else | a status the service added after this was written |
+
+**Termination is proved, not assumed.** The loop ends three ways and no fourth: a success or failure
+status, an overall deadline (`DEPLOYMENT_WAIT_TIMEOUT_MS`), or an error thrown by the poll, which
+propagates. An **unknown** status is streamed verbatim and treated as in-flight rather than guessed
+at, because a status the service adds is far more likely to be a new in-flight state than a new
+terminal one, and reporting a healthy deployment as failed is worse than waiting out the deadline.
+The deadline is what stops it, and the check is `now() + delay >= deadline` **before** sleeping, so
+the loop never sleeps past its own deadline.
+
+Backoff reuses `RetryPolicy.delayFor` - do not introduce a second retry concept. The step is capped
+at `DEPLOYMENT_MAX_BACKOFF_STEPS` so a long deployment settles at a fixed poll interval.
+
+Output is one line per **status change**, always. The `  ... still <STATUS>` heartbeat is printed
+only when `isTTY`, so a CI log gets one line per transition and **no escape codes at all** - a test
+asserts the absence of `\u001b`.
+
+**Writing a test for it: the fake clock must advance.** `now()` and `sleep()` are injected and both
+are required, not optional with defaults. A fake `now: () => 0` with a `sleep` that does nothing
+makes the deadline unreachable and the suite **hangs** rather than failing - the same failure mode
+as the `loadDataURL` rule below. Have `sleep` advance the same counter `now` reads.
+
+**`projects:create`.** The command is thin; `ProjectCreator` in `src/projects/project.create.ts` is
+the domain service, and `src/projects/project.create.prompt.ts` is a UI adapter that renders choices
+and nothing more.
+
+Interactive order is pinned by a test against the order a real `csdx launch` run prompts in: type ->
+organization -> project name -> environment name -> (GitHub only: namespace -> repository -> branch)
+-> framework -> build command -> output directory -> response mode. Those prompts are **not**
+resolution-spec prompts, because which of them run depends on `--type`, and the resolution engine has
+no conditional dependency. What the specs do own is `normalize`, so a value from config is validated
+exactly like one from argv.
+
+The framework gate is the declarative rule `onlyWithValueOf('server-cmd', 'framework', ...)`,
+exported as `serverCommandFrameworkGate` and declared in `static rules`. It therefore fires after the
+resolution chain and **before any request**, which is the point: passing `--server-cmd` with a
+framework that has no server command costs exit 2 and nothing on the wire. The contract that falls
+out of running as a rule is that `--server-cmd` on argv requires `--framework` on argv; a user who
+wants to pick the framework interactively simply does not pass `--server-cmd`, and is prompted for
+one when the framework supports it.
+
+**Deployment failure is a partial success, and the wording says so.** The project and environment are
+real and are **not** rolled back. `deploymentFailureMessage` names the status, the project and
+environment that survived, and both follow-up commands with their scope already filled in -
+`deployments:create` to retry and `logs:get` to inspect. It exits **1**, not 2: nothing about the
+invocation was wrong.
+
+**The FileUpload archive.** `src/projects/project.archive.ts` owns the exclusion list
+(`node_modules`, `.git`, `.env`, `.env.local`, `.next`, `logs`, `.vscode`, `.cs-launch.json`) and
+applies it at **every** depth, not just the root. It skips symbolic links rather than following one
+into a loop. A path that is not a directory, and a directory that is empty once the exclusions apply,
+are both `UsageError` naming `--data-dir` - uploading an empty or wrong archive silently is worse
+than refusing. `src/projects/project.upload.ts` splits into `prepareUpload` (pure: raw body, or
+multipart when the signed URL carries form fields) and `uploadArchive` (the socket), and it uses
+`node:http`/`node:https` rather than `fetch` so `nock` can intercept it - nock 13 does not see
+undici's `fetch`.
+
+**Environment variables and argv.** `environmentVariables` is always `[]` on create: the variable
+sources are CL-7169. The shape is built by a function that takes no input at all, so there is no
+argv path into it to grow by accident, and a test passes `var`, `env-file` and `from-stack` into the
+request to prove the body is unchanged. **No secret may reach argv** (FR30, G16).
+
 **Cross-flag rules.** A rule that is pure flag-versus-flag and evaluable from argv alone belongs in
 oclif's native `exclusive` / `relationships` on the flag definition, where it also shows in `--help` -
 and a simple range does too: `limit` and `skip` carry oclif's own `min`/`max` rather than being
 checked later. A rule that must read a *resolved* value (one that config, a prompt or a default may
-have supplied) belongs in `src/core/rules.ts` - `exactlyOneOf` is the only one so far - declared
-as a `static rules = [...]` array on the command. `resolveInputs` evaluates them after resolution,
+have supplied) belongs in `src/core/rules.ts` - `exactlyOneOf` and `onlyWithValueOf` are the two so far -
+declared as a `static rules = [...]` array on the command. `resolveInputs` evaluates them after resolution,
 and a failing rule is a usage error (exit 2). Write the next rule when a command needs it; a rule
 kept alive only by its own test proves nothing.
 
@@ -320,6 +401,34 @@ value straight into `this.confirm(...)` or a thrown error's message. Building th
 debug logger and an in-flight secret registry to redact against, neither of which exists yet - until
 one does, a command handling variable values must redact them itself before they reach `confirm()`
 or an error message.
+
+**Value helpers.** `src/core/values.ts` holds `withinLength` and `oneOf`, the two checks a
+resolution spec's `normalize` reaches for. `oneOf` is case- and whitespace-insensitive and returns
+the **canonical** option, which is what makes a doc label map cleanly onto a service enum. Both
+resources use it rather than each writing their own.
+
+**Doc labels are not service enum values.** The Commands Details page is the user-facing contract and
+the management service is the wire contract, and for two flags they differ:
+
+| Flag | What a user types (doc) | What the API receives (service) | Where |
+|---|---|---|---|
+| `--type` | `GitHub` \| `FileUpload` | `GITPROVIDER` \| `FILEUPLOAD` | `PROJECT_TYPE_BY_CHOICE` |
+| `--framework` | `Gatsby`, `NextJs`, `CRA`, `CSR`, `Analog`, `Angular`, `Nuxt`, `Astro`, `VueJs`, `Remix`, `Other` | `GATSBY`, `NEXTJS`, `CRA`, `CSR`, `ANALOG`, `ANGULAR`, `NUXT`, `ASTRO`, `VUEJS`, `REMIX`, `OTHER` | `FRAMEWORK_PRESET_BY_LABEL` |
+
+`GitHub -> GITPROVIDER` is a **rename**, not a case change, and `NextJs -> NEXTJS` does not survive a
+naive `toUpperCase()` round trip in reverse. Both are explicit tables, and a test asserts the
+framework table is a bijection onto the service enum so a preset cannot be added on one side only.
+
+**Flag names come from the "All flags" tables (ruling D9).** Where the Commands Details per-command
+rows disagree with its §"All flags" tables, the tables win: `--org` not `--organization`,
+`--build-cmd` not `--build-command`, `--server-cmd` not `--server-command`, `--output-dir` not
+`--output-directory`, `--res-mode` not `--response-mode`. `--env-name` is the environment created
+alongside a project; `--name` stays the project name.
+
+**`this.dataDir`.** `LaunchCommand` already computed the data directory to find `.cs-launch.json`;
+it now exposes it, because `projects:create` has to zip that same directory and `--data-dir` is a
+base flag rather than a declared input, so `this.resolved` does not carry it. Read `this.dataDir`,
+never `process.cwd()` and never `this.flags['data-dir']`.
 
 Required-ness is declared in `inputs`, never as an oclif `required: true` flag: oclif's parse-time
 enforcement would fire before config or a prompt has had a chance to supply the value, so
