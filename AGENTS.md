@@ -181,6 +181,22 @@ is deliberately not a global flag - and `await this.confirm('<question>')` at th
 It returns silently when `--yes` was passed, prompts on a TTY, exits 2 when there is neither, and
 exits 3 when the user declines. Never assume a yes yourself.
 
+**Retired V1 command names (FR27).** `launch` (bare), `launch:deployments`, `launch:environments`,
+`launch:open`, `launch:logs`, `launch:rollback` and `launch:functions` still exist as commands, and
+each one refuses with **exit 2** and the CLI's own message naming its V2 replacement. They exist as
+commands rather than as nothing at all precisely so the message is ours: deleting the file would
+give oclif's "command not found", which tells a V1 user nothing about where the command went.
+
+`src/core/retired-command.ts` holds `RetiredCommand`, which declares `retiredName` and
+`replacements` and never parses argv - so a retired name refuses identically whether or not V1 flags
+are passed alongside it. A retired command file contains those two statics and a description,
+nothing else.
+
+`launch:functions` is a retired **topic name with a live child**: `launch:functions:serve` still
+routes to its own command. `test/integration/retired-commands.test.ts` pins one case per retired
+name and pins that the child is still reachable; do not collapse those into one parametrised case
+that a rename could silently shrink.
+
 **Exit codes.** `src/core/constants.ts` owns them, every Launch error carries its own, and
 `LaunchCommand.catch()` is one branch that reads it:
 
