@@ -39,7 +39,7 @@ the gate as a floor, never as evidence of correctness.
 broke every cloud function in `dist`. The cost is that Jest's default VM cannot service that import,
 so the suite runs under `--experimental-vm-modules`, and **only one test file per process may
 trigger a sandboxed dynamic import — a second one hangs the run rather than failing it**. Every
-`loadDataURL` case therefore lives in `src/util/cloud-function/cloud-functions.test.ts`. Add new
+`loadDataURL` case therefore lives in `src/functions/cloud-functions.test.ts`. Add new
 ones there. A hanging suite with no failing test is this constraint, not a flake.
 
 **Integration tests.** `test/integration/` drives real code with only the network faked by `nock`.
@@ -55,88 +55,166 @@ Two things make that reliable and both are load-bearing:
   the captured stdout, and `process.exitCode` is reset after each run because oclif sets it while
   handling a simulated CLI failure and would otherwise fail the whole jest run.
 
+`projects-command-flows.test.ts` drives the flows that only exist end to end: the
+project-folder flow (no flags, `.cs-launch.json` supplying org and project), `--config` at
+an arbitrary path, an OAUTH session asserted on the wire including 401 -> refresh -> 200,
+and the interactive picker. The picker needs `process.stdin.isTTY` set for the duration of
+the run, because jest's stdin is not a terminal and `LaunchCommand` reads it to decide
+whether prompting is allowed; restore it afterwards. Fake the network with `nock`, never
+`RestApiClient`.
+
 The confirm gate is the one part of `LaunchCommand` `runCommand` cannot reach yet: no shipped
-command declares `yes: {}`. It stays covered by `src/base/launch-command.test.ts` until one does.
+command declares `yes: {}`. It stays covered by `src/core/launch-command.test.ts` until one does.
 
-## Adding a command (V2)
+## Layout
 
-Five touch points, in this order:
+```
+src/
+  core/         the command framework: LaunchCommand, the resolver engine, errors,
+                exit codes, the global flag catalog, region derivation, the
+                .cs-launch.json store, and the output primitives
+  transport/    RestApiClient, the retry policy, auth strategies, proxy detection,
+                and LaunchApiError / LaunchNetworkError - no CLI wording lives here
+  projects/     one resource: repository, value object, domain service, presenter,
+                error wording, prompt adapter, and the flags it contributes
+  functions/    the cloud-function runtime and the serve flags, treated as a resource
+  resources.ts  the composition root: it assembles the catalog, the resolution table,
+                the dependency map and the api surface out of the resources
+  commands/     thin oclif commands - wire and call
+```
 
-1. **`src/flags/catalog.ts`** — only if the command introduces a flag no command uses yet.
-   Transcribe it from the Commands Details page §"All flags" tables. Never set `required: true`.
-   Catalog flag definition objects are shared by reference across every command that uses them —
-   never mutate one in place.
-2. **`src/flags/resolution.ts`** — one entry per new flag, saying where its value may come from:
-   `configPath`, `prompt`, `default`. `resolution` is typed `Record<FlagKey, ResolutionSpec>`, so a
-   catalog key added without a matching resolution entry is a **compile error**, not something a
-   test has to catch.
-3. **`src/api/<resource>.ts`** — only if the command calls an endpoint no command calls yet.
-   These modules take a `RestApiClient` and return typed data. No `ux`, no prompts, no `process.exit`.
-4. **`src/api/index.ts`** — a new resource module must be registered here: a field on `ApiSurface`
-   and its construction in `buildApi`. This is the one shared file every resource module edits,
-   so expect to rebase on it.
-5. **`src/commands/launch/<resource>/<verb>.ts`** — the command itself: a `static inputs`
-   declaration, `static flags = flagsFor(...)`, and a `run()` that calls the api and renders. The
-   command's `flags` keys must equal its `inputs` keys — both shipped commands assert this by
-   deriving `flags` from `inputs` via `flagsFor`, rather than declaring the two independently.
+`core` and `transport` never import a resource except through `resources.ts`, and they
+never import each other's wording. A resource imports `core` and `transport` freely.
+`resources.ts` is the only file every resource touches; everything else about projects
+lives under `src/projects/`.
 
-A resolution entry declares what it needs resolved before it: `resolution.project` carries
-`dependsOn: DEPENDENCIES.project` (`['org']`) because its `prompt` and `normalize` read `resolved.org`.
-`resolveInputs` resolves in dependency order, not in the order the `resolution` literal happens to be
-written, so reordering that file changes nothing. Declaring a dependency is the whole contract: a
-command that puts `project` in its `inputs` without `org` is a **compile error** at the `inputs(...)`
-call (`Property 'org' is missing`), and a spec that reaches `resolveInputs` cast past that check
-throws an `InputDependencyError` naming both flags. A cycle between two entries throws the same error
-naming the cycle rather than looping. `DEPENDENCIES` in `src/flags/resolution.ts` is the single
-source: the runtime `dependsOn` and the compile-time constraint in `src/flags/inputs.ts` both read it.
+`src/commands/` mirrors the oclif topic path and nothing else: `launch:projects:list`
+is `src/commands/launch/projects/list.ts`, and that path is the public contract.
 
-Everything else — parsing, resolution, prompting, name-to-uid normalisation, retries, auth
-headers, error mapping, exit codes, rendering — is inherited from `LaunchCommand`. If a new command
-needs a change in `src/base/`, `src/flags/` or `src/http/`, that is a signal worth raising rather
-than a routine edit.
+## Adding a resource (V2)
 
-**Confirm gate.** A destructive command opts in by adding `yes: {}` to its `inputs` — `--yes`
-is deliberately not a global flag — and `await this.confirm('<question>')` at the top of `run()`.
+A new resource - environments, variables, deployments, logs, cache - is a folder under
+`src/` plus one line per contribution in `src/resources.ts`. Nothing else is shared.
+
+1. **`src/<resource>/<resource>.api.ts`** - the repository. It takes a `RestApiClient`,
+   returns typed data, and passes its own error wording to `client.request(req, MESSAGES)`.
+   No `ux`, no prompts, no `process.exit`. It re-exports its own `types.ts` so the DTOs
+   have one import path.
+2. **`src/<resource>/<resource>.errors.ts`** - a `Record<code, message>` of the
+   `launch.<RESOURCE>.*` codes this resource rewords. The transport never knows a
+   message; it parses a body into a status, a code and the API's own text, and the
+   repository supplies the CLI wording.
+3. **`src/<resource>/<resource>.presenter.ts`** - columns and detail fields. Presentation
+   never lives in a command file: a test that wants the columns imports the presenter.
+4. **`src/<resource>/<resource>.inputs.ts`** - the flags this resource introduces and
+   their resolution specs. Transcribe a flag from the Commands Details page
+   §"All flags" tables and never set `required: true`. Catalog flag definition objects
+   are shared by reference across every command that uses them - never mutate one in
+   place. A resolution spec is written `{ ... } satisfies ResolutionSpec<T, D>`, where
+   `T` is the value type and `D` names the inputs it depends on, so `resolved.org` is a
+   `string` inside a prompt or normalize callback rather than something to cast. A spec
+   may carry `configPath` (a key of `ProjectConfig`, checked at compile time),
+   `dependsOn`, `prompt`, `normalize` and `default`.
+5. **`src/resources.ts`** - spread the new flags into `catalog`, the new specs into
+   `resolution`, the new dependencies into `DEPENDENCIES`, and add the repository to
+   `ApiSurface` / `buildApi`. This is the one shared file, so expect to rebase on it.
+6. **`src/commands/launch/<resource>/<verb>.ts`** - the command: a module-level
+   `inputs({...})`, `static flags = flagsFor(...)`, and a `run()` that calls the api and
+   renders through the presenter. Declare the spec at module level and extend
+   `LaunchCommand<typeof theSpec>`; a class cannot reference its own static in its own
+   `extends` clause.
+
+Anything with domain behaviour - "is this a uid or a name?", "which uid does this name
+have?" - is a value object and a domain service in the resource folder, not something
+inlined into a prompt module or a resolution spec. `projects/project-ref.ts` and
+`projects/project.resolver.ts` are the worked example: the prompt module is a UI adapter
+that renders choices and nothing more.
+
+**Typed resolved values.** `this.resolved.<flag>` carries the flag's own type, derived
+from the catalog entry: `Flags.string` gives `string`, `Flags.integer` gives `number`,
+`Flags.boolean` gives `boolean`. It widens to `| undefined` only when the input is
+neither declared `required: true` nor given a `default` in its resolution spec. A command
+should contain no casts at all; if one seems necessary, the type is wrong somewhere
+above it.
+
+A resolution entry declares what it needs resolved before it: the project spec carries
+`dependsOn: PROJECT_DEPENDENCIES.project` (`['org']`) because its `prompt` and `normalize`
+read `resolved.org`. `resolveInputs` resolves in dependency order, not in the order the
+`resolution` literal happens to be written, so reordering that file changes nothing.
+Declaring a dependency is the whole contract: a command that puts `project` in its
+`inputs` without `org` is a **compile error** at the `inputs(...)` call (`Property 'org'
+is missing`), and a spec that reaches `resolveInputs` cast past that check throws an
+`InputDependencyError` naming both flags. A cycle between two entries throws the same
+error naming the cycle rather than looping. `DEPENDENCIES` in `src/resources.ts` is the
+single source: the runtime `dependsOn` and the compile-time constraint in
+`src/core/inputs.ts` both read it. A key that is not a catalog flag is also a compile
+error, so `inputs({ bogus: {} })` cannot ship.
+
+Everything else - parsing, resolution, prompting, name-to-uid normalisation, retries,
+auth headers, error mapping, exit codes, rendering - is inherited from `LaunchCommand`.
+If a new resource needs a change in `src/core/` or `src/transport/`, that is a signal
+worth raising rather than a routine edit.
+
+**Confirm gate.** A destructive command opts in by adding `yes: {}` to its `inputs` - `--yes`
+is deliberately not a global flag - and `await this.confirm('<question>')` at the top of `run()`.
 It returns silently when `--yes` was passed, prompts on a TTY, exits 2 when there is neither, and
 exits 3 when the user declines. Never assume a yes yourself.
 
-**Exit codes.** `src/config/constants.ts` owns them and `LaunchCommand.catch()` is the only place
-that maps an error to one:
+**Exit codes.** `src/core/constants.ts` owns them, every Launch error carries its own, and
+`LaunchCommand.catch()` is one branch that reads it:
 
 | Code | Constant | Meaning |
 |---|---|---|
 | 0 | `EXIT_OK` | the command did what it was asked to do |
-| 1 | `EXIT_RUNTIME` | a runtime failure — `LaunchApiError`, an unauthenticated session, anything oclif handles |
-| 2 | `EXIT_USAGE` | a usage error — `UsageError`, `MissingInputError`, a failing cross-flag rule |
-| 3 | `EXIT_CANCELLED` | the user declined a confirmation (`CancelledError`) |
+| 1 | `EXIT_RUNTIME` | a runtime failure - `LaunchApiError`, `LaunchNetworkError`, `UnauthenticatedError`, anything oclif handles |
+| 2 | `EXIT_USAGE` | a usage error - `UsageError`, `MissingInputError`, a failing cross-flag rule |
+| 3 | `EXIT_CANCELLED` | the user declined a confirmation or chose nothing at a picker (`CancelledError`) |
 
 A declined confirmation is a deliberate "no", not a failure, so it does not share code 1 with an
-API 500 — a CI log has to be able to tell those apart. 130 would claim the process was killed by
+API 500 - a CI log has to be able to tell those apart. 130 would claim the process was killed by
 SIGINT, which is not what happened.
 
+A new error type subclasses `LaunchError` in `src/core/errors.ts` and declares its
+`exitCode`; it needs no change in `LaunchCommand`. An error that means a contributor wired
+a command wrongly stays a plain `Error` - `InputDependencyError` is the example - because
+it is a bug report, not a CLI outcome.
+
+**Auth.** One `AuthStrategy` is chosen once per command, by a factory that reads
+`authorisationType` a single time: `BasicAuth` sends `authtoken` and cannot refresh,
+`OAuthAuth` sends a bearer token and refreshes with `compareOAuthExpiry(true)` on a 401.
+Anything that is neither `BASIC` nor `OAUTH` is an `UnauthenticatedError`, which matches
+cli-utilities' own `isAuthenticated()`. Nothing else may read `authorisationType`.
+
+**The `.cs-launch.json` file.** `ProjectConfigStore` owns it. `load()` returns a typed
+`ProjectConfig`, applying the v1 rule that several branch blocks are usable only when they
+agree on one project. `save()` writes the keys it was given into every existing block, so it
+can never drop another branch's block, and refuses a file whose blocks disagree. A
+resolution spec addresses it by a key of `ProjectConfig`, never a dotted string.
+
 **Cross-flag rules.** A rule that is pure flag-versus-flag and evaluable from argv alone belongs in
-oclif's native `exclusive` / `relationships` on the catalog entry, where it also shows in `--help`.
+oclif's native `exclusive` / `relationships` on the flag definition, where it also shows in `--help`.
 A rule that must read a *resolved* value (one that config, a prompt or a default may have supplied)
-belongs in `src/flags/rules.ts` — `exactlyOneOf`, `dependsOnValue`, `requiresFrameworkIn` — declared
+belongs in `src/core/rules.ts` - `exactlyOneOf`, `dependsOnValue`, `requiresFrameworkIn` - declared
 as a `static rules = [...]` array on the command. `resolveInputs` evaluates them after resolution,
 and a failing rule is a usage error (exit 2).
 
 **Redaction.** Anything rendering an environment variable's value in a table or a detail block uses
-`src/output/redact.ts` (`REDACTED`, `redactedColumn`). Confirmation text and error text are not
-covered: nothing stops a future `variables:*` command from interpolating a value straight into
-`this.confirm(...)` or a thrown error's message. Building that guard needs a debug logger and an
-in-flight secret registry to redact against, neither of which exists yet — until one does, a command
-handling variable values must redact them itself before they reach `confirm()` or an error message.
+`src/core/redact.ts` (`REDACTED`, `redactedColumn`) from the resource's presenter. Confirmation text
+and error text are not covered: nothing stops a future `variables:*` command from interpolating a
+value straight into `this.confirm(...)` or a thrown error's message. Building that guard needs a
+debug logger and an in-flight secret registry to redact against, neither of which exists yet - until
+one does, a command handling variable values must redact them itself before they reach `confirm()`
+or an error message.
 
 Required-ness is declared in `inputs`, never as an oclif `required: true` flag: oclif's parse-time
 enforcement would fire before config or a prompt has had a chance to supply the value, so
 required-ness is enforced after the resolution chain runs instead. A command must read
-`this.resolved`, never `this.flags` — reading `this.flags` bypasses the resolution chain
+`this.resolved`, never `this.flags` - reading `this.flags` bypasses the resolution chain
 (config file, prompt, default) entirely and returns only what was passed on argv.
 
 ## The cloud-function data URL loader
 
-`src/util/cloud-function/load-data-url.ts` loads a built cloud function from a `data:` URL, and it
+`src/functions/load-data-url.ts` loads a built cloud function from a `data:` URL, and it
 goes through `new Function('u', 'return import(u)')` instead of a plain `import(dataURL)`. That
 indirection is load-bearing, not a style choice.
 

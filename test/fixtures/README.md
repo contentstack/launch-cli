@@ -51,7 +51,7 @@ live values are real customer data. Both were replaced with synthetic values of 
 consistently across every file:
 
 - project `uid` → a 24-character lowercase hex string, so it matches the UID form
-  `src/select/project.ts` recognises.
+  `src/projects/project-ref.ts` recognises.
 - `organizationUid`, `createdBy`, `updatedBy` → a `blt`-prefixed Contentstack uid.
 - project and repository names → generic placeholders (`sample-project`, `marketing-site`,
   `docs-site`, owner `octo-user`).
