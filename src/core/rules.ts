@@ -26,6 +26,24 @@ export function exactlyOneOf(...keys: FlagKey[]): Rule {
   };
 }
 
+export function onlyWithValueOf(key: FlagKey, gate: FlagKey, allowed: readonly string[]): Rule {
+  return (resolved) => {
+    if (!isSupplied(resolved[key])) {
+      return;
+    }
+
+    const value = resolved[gate];
+
+    if (typeof value === 'string' && allowed.includes(value)) {
+      return;
+    }
+
+    const found = typeof value === 'string' && value !== '' ? `--${gate} is ${value}` : `--${gate} was not supplied`;
+
+    throw new UsageError(`--${key} is only supported when --${gate} is one of ${allowed.join(', ')}; ${found}.`);
+  };
+}
+
 export function atLeastOneOf(...keys: FlagKey[]): Rule {
   return (resolved) => {
     if (keys.some((key) => isSupplied(resolved[key]))) {

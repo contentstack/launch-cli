@@ -1,4 +1,8 @@
-import { ApiSurface, DEPENDENCIES, catalog, resolutionTable } from './resources';
+import { ApiSurface, DEPENDENCIES, buildApi, catalog, resolutionTable } from './resources';
+import { DeploymentsApi } from './deployments/deployments.api';
+import { EnvironmentsApi } from './environments/environments.api';
+import { GitApi } from './git/git.api';
+import { ProjectsApi } from './projects/projects.api';
 import { UxLike } from './core/render';
 import * as prompt from './projects/project.prompt';
 import { ProjectResolver } from './projects/project.resolver';
@@ -126,5 +130,24 @@ describe('resolution', () => {
   it('declares no prompt or normalize for org', () => {
     expect(table.org.prompt).toBeUndefined();
     expect(table.org.normalize).toBeUndefined();
+  });
+});
+
+describe('the api surface', () => {
+  it('assembles one repository per resource from the single client', () => {
+    const client = {} as never;
+    const api = buildApi(client);
+
+    expect(Object.keys(api).sort()).toEqual(['deployments', 'environments', 'git', 'projects']);
+    expect(api.projects).toBeInstanceOf(ProjectsApi);
+    expect(api.environments).toBeInstanceOf(EnvironmentsApi);
+    expect(api.deployments).toBeInstanceOf(DeploymentsApi);
+    expect(api.git).toBeInstanceOf(GitApi);
+  });
+
+  it('contributes every resource’s flags to the one catalog', () => {
+    for (const flag of ['org', 'project', 'type', 'env-name', 'framework', 'server-cmd', 'namespace', 'repo']) {
+      expect(catalog).toHaveProperty(flag);
+    }
   });
 });

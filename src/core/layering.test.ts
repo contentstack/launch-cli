@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 const SRC = join(__dirname, '..');
 const LAYERS = ['core', 'transport'];
-const RESOURCES = ['projects', 'functions'];
+const RESOURCES = ['projects', 'functions', 'environments', 'deployments', 'git'];
 
 function sourceFilesIn(layer: string): string[] {
   return readdirSync(join(SRC, layer))

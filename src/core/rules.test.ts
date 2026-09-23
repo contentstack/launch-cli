@@ -1,5 +1,5 @@
 import { UsageError } from './errors';
-import { atLeastOneOf, exactlyOneOf } from './rules';
+import { atLeastOneOf, exactlyOneOf, onlyWithValueOf } from './rules';
 
 describe('exactlyOneOf', () => {
   it('passes when exactly one of the named inputs has a value', () => {
@@ -73,5 +73,59 @@ describe('atLeastOneOf', () => {
     const rule = atLeastOneOf('limit', 'skip');
 
     expect(() => rule({ limit: value })).not.toThrow();
+  });
+});
+
+describe('onlyWithValueOf', () => {
+  const SUPPORTED = ['ANALOG', 'ANGULAR', 'NUXT', 'ASTRO', 'REMIX', 'OTHER'];
+
+  it('passes when the gated flag was not supplied at all, whatever the gate says', () => {
+    const rule = onlyWithValueOf('server-cmd', 'framework', SUPPORTED);
+
+    expect(() => rule({ framework: 'NEXTJS' })).not.toThrow();
+    expect(() => rule({})).not.toThrow();
+  });
+
+  it('passes when the gate value is one the rule allows', () => {
+    const rule = onlyWithValueOf('server-cmd', 'framework', SUPPORTED);
+
+    for (const framework of SUPPORTED) {
+      expect(() => rule({ 'server-cmd': 'npm start', framework })).not.toThrow();
+    }
+  });
+
+  it('fails naming every supported value and the value it actually found', () => {
+    const rule = onlyWithValueOf('server-cmd', 'framework', SUPPORTED);
+
+    expect(() => rule({ 'server-cmd': 'npm start', framework: 'NEXTJS' })).toThrow(UsageError);
+    expect(() => rule({ 'server-cmd': 'npm start', framework: 'NEXTJS' })).toThrow(
+      '--server-cmd is only supported when --framework is one of ANALOG, ANGULAR, NUXT, ASTRO, REMIX, OTHER; ' +
+        '--framework is NEXTJS.',
+    );
+  });
+
+  it('fails saying the gate was not supplied when there is no gate value to report', () => {
+    const rule = onlyWithValueOf('server-cmd', 'framework', SUPPORTED);
+    const expected =
+      '--server-cmd is only supported when --framework is one of ANALOG, ANGULAR, NUXT, ASTRO, REMIX, OTHER; ' +
+      '--framework was not supplied.';
+
+    expect(() => rule({ 'server-cmd': 'npm start' })).toThrow(expected);
+    expect(() => rule({ 'server-cmd': 'npm start', framework: undefined })).toThrow(expected);
+    expect(() => rule({ 'server-cmd': 'npm start', framework: null })).toThrow(expected);
+    expect(() => rule({ 'server-cmd': 'npm start', framework: '' })).toThrow(expected);
+    expect(() => rule({ 'server-cmd': 'npm start', framework: 7 })).toThrow(expected);
+  });
+
+  it.each([[null], [undefined], [false]])('does not gate on %p as a supplied gated value', (value) => {
+    const rule = onlyWithValueOf('server-cmd', 'framework', SUPPORTED);
+
+    expect(() => rule({ 'server-cmd': value, framework: 'NEXTJS' })).not.toThrow();
+  });
+
+  it('gates on the falsy-but-present empty string, which the API would still receive', () => {
+    const rule = onlyWithValueOf('server-cmd', 'framework', SUPPORTED);
+
+    expect(() => rule({ 'server-cmd': '', framework: 'NEXTJS' })).toThrow(UsageError);
   });
 });
