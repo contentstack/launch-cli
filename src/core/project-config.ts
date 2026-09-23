@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 import { UsageError } from './errors';
 
@@ -15,8 +15,6 @@ export interface ProjectConfig {
 }
 
 export type ProjectConfigKey = keyof ProjectConfig;
-
-export const DEFAULT_BLOCK_KEY = 'project';
 
 type Blocks = Record<string, unknown>;
 
@@ -68,27 +66,6 @@ export class ProjectConfigStore {
     }
 
     return {};
-  }
-
-  save(config: ProjectConfig): void {
-    const blocks = this.blocks();
-    const entries = Object.entries(blocks);
-
-    if (entries.length > 1) {
-      agreedBlock(entries);
-    }
-
-    const next: Blocks = {};
-
-    if (entries.length === 0) {
-      next[DEFAULT_BLOCK_KEY] = config;
-    } else {
-      for (const [branch, block] of entries) {
-        next[branch] = { ...(isBlock(block) ? block : {}), ...config };
-      }
-    }
-
-    writeFileSync(this.path, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
   }
 
   private unusable(reason: string): Blocks {
