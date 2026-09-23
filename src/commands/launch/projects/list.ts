@@ -10,20 +10,22 @@ export const PROJECT_COLUMNS: TableColumn<Project>[] = [
   { header: 'UPDATED', value: (project) => project.updatedAt ?? '-' },
 ];
 
-export default class ProjectsList extends LaunchCommand<'org' | 'limit' | 'skip'> {
+const listInputs = inputs({ org: { required: true }, limit: {}, skip: {} });
+
+export default class ProjectsList extends LaunchCommand<typeof listInputs> {
   static description = 'List Launch projects in an organization';
 
   static examples = ['$ csdx launch:projects:list --org <org-uid>'];
 
-  static inputs = inputs({ org: { required: true }, limit: {}, skip: {} });
+  static inputs = listInputs;
 
-  static flags = flagsFor(ProjectsList.inputs);
+  static flags = flagsFor(listInputs);
 
   async run(): Promise<void> {
     const page = await this.services.api.projects.list({
-      org: this.resolved.org as string,
-      limit: this.resolved.limit as number,
-      skip: this.resolved.skip as number,
+      org: this.resolved.org,
+      limit: this.resolved.limit,
+      skip: this.resolved.skip,
     });
 
     renderTable(this.ux, PROJECT_COLUMNS, page.projects);

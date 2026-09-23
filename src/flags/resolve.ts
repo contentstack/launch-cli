@@ -2,8 +2,8 @@ import { getByPath } from '../config/project-config';
 import { UsageError } from '../errors';
 import { PROJECT_CONFIG_FILE } from '../config/constants';
 import { FlagKey } from './catalog';
-import { InputsSpec } from './inputs';
-import { ResolveServices, resolution } from './resolution';
+import { AnyInputs, InputKeys, Resolved } from './inputs';
+import { ResolveServices, resolutionTable } from './resolution';
 import { Rule } from './rules';
 
 export class MissingInputError extends UsageError {
@@ -49,7 +49,7 @@ export function resolutionOrder<K extends FlagKey>(keys: K[]): K[] {
 
     settled.set(key, false);
 
-    for (const dependency of resolution[key].dependsOn ?? []) {
+    for (const dependency of resolutionTable[key].dependsOn ?? []) {
       if (!keys.includes(dependency as K)) {
         throw new InputDependencyError(
           `--${key} cannot be resolved without --${dependency}: declare ${dependency} in the command inputs.`,
@@ -77,16 +77,14 @@ export interface ResolveArgs {
   rules?: Rule[];
 }
 
-export async function resolveInputs<K extends FlagKey>(
-  spec: InputsSpec<K>,
-  args: ResolveArgs,
-): Promise<Record<K, unknown>> {
-  const resolved = {} as Record<K, unknown>;
+export async function resolveInputs<S extends AnyInputs>(spec: S, args: ResolveArgs): Promise<Resolved<S>> {
+  const resolved = {} as Resolved<S>;
 
-  const declared = (Object.keys(resolution) as K[]).filter((candidate) => candidate in spec);
+  type K = InputKeys<S>;
+  const declared = (Object.keys(resolutionTable) as K[]).filter((candidate) => candidate in spec);
 
   for (const key of resolutionOrder(declared)) {
-    const rule = resolution[key];
+    const rule = resolutionTable[key];
     let value = args.parsed[key];
 
     if (isAbsent(value) && rule.configPath) {
@@ -113,7 +111,7 @@ export async function resolveInputs<K extends FlagKey>(
       value = undefined;
     }
 
-    resolved[key] = value;
+    resolved[key] = value as Resolved<S>[K];
   }
 
   for (const rule of args.rules ?? []) {

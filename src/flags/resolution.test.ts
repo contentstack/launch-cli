@@ -2,7 +2,9 @@ import { ApiSurface } from '../api';
 import { UxLike } from '../output/render';
 import * as select from '../select/project';
 import { catalog } from './catalog';
-import { DEPENDENCIES, resolution } from './resolution';
+import { DEPENDENCIES, resolutionTable } from './resolution';
+
+const table = resolutionTable;
 
 const PROJECT_UID = 'a'.repeat(24);
 
@@ -28,48 +30,48 @@ function args() {
 
 describe('resolution', () => {
   it('declares a rule for every catalog flag and no rule for anything else', () => {
-    expect(Object.keys(resolution).sort()).toEqual(Object.keys(catalog).sort());
+    expect(Object.keys(table).sort()).toEqual(Object.keys(catalog).sort());
   });
 
   it('does not silently pass when a catalog flag is missing a resolution entry', () => {
-    const incomplete = { ...resolution } as Record<string, unknown>;
+    const incomplete = { ...table } as Record<string, unknown>;
     delete incomplete.skip;
 
     expect(Object.keys(incomplete).sort()).not.toEqual(Object.keys(catalog).sort());
   });
 
   it('does not silently pass when resolution has an entry the catalog does not', () => {
-    const withExtra = { ...resolution, bogus: {} } as Record<string, unknown>;
+    const withExtra = { ...table, bogus: {} } as Record<string, unknown>;
 
     expect(Object.keys(withExtra).sort()).not.toEqual(Object.keys(catalog).sort());
   });
 
   it('reads org from organizationUid and project from uid in the config file', () => {
-    expect(resolution.org.configPath).toBe('organizationUid');
-    expect(resolution.project.configPath).toBe('uid');
+    expect(table.org.configPath).toBe('organizationUid');
+    expect(table.project.configPath).toBe('uid');
   });
 
   it('declares no config path for the flags that only ever come from the command line', () => {
-    expect(resolution.limit.configPath).toBeUndefined();
-    expect(resolution.skip.configPath).toBeUndefined();
-    expect(resolution.yes.configPath).toBeUndefined();
-    expect(resolution.config.configPath).toBeUndefined();
-    expect(resolution['data-dir'].configPath).toBeUndefined();
+    expect(table.limit.configPath).toBeUndefined();
+    expect(table.skip.configPath).toBeUndefined();
+    expect(table.yes.configPath).toBeUndefined();
+    expect(table.config.configPath).toBeUndefined();
+    expect(table['data-dir'].configPath).toBeUndefined();
   });
 
   it('declares the paging and confirmation defaults and no default for the rest', () => {
-    expect(resolution.limit.default).toBe(50);
-    expect(resolution.skip.default).toBe(0);
-    expect(resolution.yes.default).toBe(false);
-    expect(resolution.org.default).toBeUndefined();
-    expect(resolution.project.default).toBeUndefined();
+    expect(table.limit.default).toBe(50);
+    expect(table.skip.default).toBe(0);
+    expect(table.yes.default).toBe(false);
+    expect(table.org.default).toBeUndefined();
+    expect(table.project.default).toBeUndefined();
   });
 
   it('delegates the project prompt to the project selector with the resolved org', async () => {
     const spy = jest.spyOn(select, 'promptForProject').mockResolvedValue(PROJECT_UID);
     const { services, resolved } = args();
 
-    await expect(resolution.project.prompt?.({ services, resolved })).resolves.toBe(PROJECT_UID);
+    await expect(table.project.prompt?.({ services, resolved })).resolves.toBe(PROJECT_UID);
 
     expect(spy).toHaveBeenCalledWith(services, 'org1');
     spy.mockRestore();
@@ -79,19 +81,19 @@ describe('resolution', () => {
     const spy = jest.spyOn(select, 'resolveProjectUid').mockResolvedValue(PROJECT_UID);
     const { services, resolved } = args();
 
-    await expect(resolution.project.normalize?.('Project One', { services, resolved })).resolves.toBe(PROJECT_UID);
+    await expect(table.project.normalize?.('Project One', { services, resolved })).resolves.toBe(PROJECT_UID);
 
     expect(spy).toHaveBeenCalledWith(services, 'org1', 'Project One');
     spy.mockRestore();
   });
 
   it('declares project as depending on org so the order of the literal cannot matter', () => {
-    expect(resolution.project.dependsOn).toEqual(['org']);
-    expect(resolution.project.dependsOn).toBe(DEPENDENCIES.project);
+    expect(table.project.dependsOn).toEqual(['org']);
+    expect(table.project.dependsOn).toBe(DEPENDENCIES.project);
   });
 
   it('declares no dependency for any flag other than project', () => {
-    const withDependencies = Object.entries(resolution)
+    const withDependencies = Object.entries(table)
       .filter(([, spec]) => spec.dependsOn !== undefined)
       .map(([key]) => key);
 
@@ -100,7 +102,7 @@ describe('resolution', () => {
   });
 
   it('declares no prompt or normalize for org', () => {
-    expect(resolution.org.prompt).toBeUndefined();
-    expect(resolution.org.normalize).toBeUndefined();
+    expect(table.org.prompt).toBeUndefined();
+    expect(table.org.normalize).toBeUndefined();
   });
 });

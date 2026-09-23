@@ -12,19 +12,21 @@ export function projectDetailFields(project: Project): [string, string][] {
   ];
 }
 
-export default class ProjectsGet extends LaunchCommand<'org' | 'project'> {
+const getInputs = inputs({ org: { required: true }, project: { required: true } });
+
+export default class ProjectsGet extends LaunchCommand<typeof getInputs> {
   static description = 'Show a single Launch project';
 
   static examples = ['$ csdx launch:projects:get --org <org-uid> --project <name-or-uid>'];
 
-  static inputs = inputs({ org: { required: true }, project: { required: true } });
+  static inputs = getInputs;
 
-  static flags = flagsFor(ProjectsGet.inputs);
+  static flags = flagsFor(getInputs);
 
   async run(): Promise<void> {
     const result = await this.services.api.projects.get({
-      org: this.resolved.org as string,
-      project: this.resolved.project as string,
+      org: this.resolved.org,
+      project: this.resolved.project,
     });
 
     renderDetail(this.ux, projectDetailFields(result));

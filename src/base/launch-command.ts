@@ -8,16 +8,16 @@ import { readProjectConfig } from '../config/project-config';
 import { RegionLike, resolveLaunchHubUrl } from '../config/region';
 import { CancelledError, UsageError } from '../errors';
 import { catalog, FlagKey } from '../flags/catalog';
-import { InputsSpec } from '../flags/inputs';
+import { AnyInputs, Resolved } from '../flags/inputs';
 import { resolveInputs } from '../flags/resolve';
 import { Rule } from '../flags/rules';
 import { LaunchApiError } from '../http/errors';
 import { UxLike } from '../output/render';
 import { ServiceContext, buildServiceContext } from './service-context';
 
-export interface ResolveLaunchContextArgs<K extends FlagKey> {
+export interface ResolveLaunchContextArgs<S extends AnyInputs> {
   flags: Partial<Record<FlagKey, unknown>>;
-  inputs: InputsSpec<K>;
+  inputs: S;
   rules?: Rule[];
   launchHubUrl: string;
   analyticsInfo: string;
@@ -25,16 +25,16 @@ export interface ResolveLaunchContextArgs<K extends FlagKey> {
   isTTY: boolean;
 }
 
-export interface ResolveLaunchContextResult<K extends FlagKey> {
+export interface ResolveLaunchContextResult<S extends AnyInputs> {
   services: ServiceContext;
-  resolved: Record<K, unknown>;
+  resolved: Resolved<S>;
 }
 
-export async function resolveLaunchContext<K extends FlagKey>(
-  args: ResolveLaunchContextArgs<K>,
-): Promise<ResolveLaunchContextResult<K>> {
-  const dataDir = (args.flags['data-dir'] as string) || process.cwd();
-  const configPath = (args.flags.config as string) || resolvePath(dataDir, PROJECT_CONFIG_FILE);
+export async function resolveLaunchContext<S extends AnyInputs>(
+  args: ResolveLaunchContextArgs<S>,
+): Promise<ResolveLaunchContextResult<S>> {
+  const dataDir = stringFlag(args.flags['data-dir']) || process.cwd();
+  const configPath = stringFlag(args.flags.config) || resolvePath(dataDir, PROJECT_CONFIG_FILE);
 
   const services = buildServiceContext({
     launchHubUrl: args.launchHubUrl,
@@ -53,14 +53,22 @@ export async function resolveLaunchContext<K extends FlagKey>(
   return { services, resolved };
 }
 
-export abstract class LaunchCommand<K extends FlagKey = FlagKey> extends Command {
+function stringFlag(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Command {
   static baseFlags = {
     config: catalog.config,
     'data-dir': catalog['data-dir'],
   };
 
+  static inputs: AnyInputs = {};
+
+  static rules: Rule[] | undefined = undefined;
+
   protected services!: ServiceContext;
-  protected resolved!: Record<K, unknown>;
+  protected resolved!: Resolved<S>;
   protected ux: UxLike = cliux as unknown as UxLike;
 
   protected get launchRegion(): RegionLike | undefined {
@@ -72,15 +80,15 @@ export abstract class LaunchCommand<K extends FlagKey = FlagKey> extends Command
     this.requireAuth();
 
     const { flags } = await this.parse({
-      flags: (this.ctor as unknown as { flags: FlagInput }).flags,
+      flags: this.contract.flags as FlagInput,
       baseFlags: LaunchCommand.baseFlags as FlagInput,
       strict: true,
     });
 
-    const { services, resolved } = await resolveLaunchContext({
+    const { services, resolved } = await resolveLaunchContext<S>({
       flags: flags as Partial<Record<FlagKey, unknown>>,
-      inputs: (this.ctor as unknown as { inputs?: InputsSpec<K> }).inputs ?? ({} as InputsSpec<K>),
-      rules: (this.ctor as unknown as { rules?: Rule[] }).rules,
+      inputs: this.contract.inputs as S,
+      rules: this.contract.rules,
       launchHubUrl: resolveLaunchHubUrl(this.launchRegion),
       analyticsInfo: this.config.userAgent,
       ux: this.ux,
@@ -92,13 +100,13 @@ export abstract class LaunchCommand<K extends FlagKey = FlagKey> extends Command
   }
 
   protected async confirm(message: string): Promise<void> {
-    const inputs = (this.ctor as unknown as { inputs?: InputsSpec<K> }).inputs;
+    const inputs = this.contract.inputs;
 
     if (!inputs || !('yes' in inputs)) {
       throw new Error(`${this.constructor.name} calls confirm() but does not declare yes: {} in its static inputs.`);
     }
 
-    if ((this.resolved as Record<string, unknown>).yes === true) {
+    if (this.resolvedValues.yes === true) {
       return;
     }
 
@@ -116,6 +124,14 @@ export abstract class LaunchCommand<K extends FlagKey = FlagKey> extends Command
     if (!confirmed) {
       throw new CancelledError();
     }
+  }
+
+  protected get contract(): typeof LaunchCommand {
+    return this.constructor as typeof LaunchCommand;
+  }
+
+  protected get resolvedValues(): Partial<Record<FlagKey, unknown>> {
+    return this.resolved;
   }
 
   protected requireAuth(): void {

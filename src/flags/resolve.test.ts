@@ -4,22 +4,22 @@ import { UxLike } from '../output/render';
 import { FlagKey } from './catalog';
 import { InputsSpec, inputs } from './inputs';
 import * as resolutionModule from './resolution';
-import { ResolutionSpec } from './resolution';
+import { AnyResolutionSpec } from './resolution';
 import { InputDependencyError, MissingInputError, resolveInputs } from './resolve';
 import { exactlyOneOf } from './rules';
 
-function withResolution<T>(replacement: Record<string, ResolutionSpec>, run: () => Promise<T>): Promise<T> {
-  const holder = resolutionModule as unknown as { resolution: Record<string, ResolutionSpec> };
-  const original = holder.resolution;
-  holder.resolution = replacement;
+function withResolution<T>(replacement: Record<string, AnyResolutionSpec>, run: () => Promise<T>): Promise<T> {
+  const holder = resolutionModule as unknown as { resolutionTable: Record<string, AnyResolutionSpec> };
+  const original = holder.resolutionTable;
+  holder.resolutionTable = replacement;
 
   return run().finally(() => {
-    holder.resolution = original;
+    holder.resolutionTable = original;
   });
 }
 
-function reversedResolution(): Record<string, ResolutionSpec> {
-  return Object.fromEntries(Object.entries(resolutionModule.resolution).reverse());
+function reversedResolution(): Record<string, AnyResolutionSpec> {
+  return Object.fromEntries(Object.entries(resolutionModule.resolutionTable).reverse());
 }
 
 function recordingServices(seen: unknown[]) {
