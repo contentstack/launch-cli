@@ -75,7 +75,7 @@ describe('resolveInputs', () => {
       services: services(),
     });
 
-    expect(resolved).toEqual({ org: 'from-flag', limit: 50, skip: 0 });
+    expect(resolved).toEqual({ org: 'from-flag', limit: 100, skip: 0 });
   });
 
   it('falls back to config when the flag is absent', async () => {
@@ -264,7 +264,7 @@ describe('resolveInputs', () => {
       services: services(),
     });
 
-    expect(resolved).toEqual({ limit: 50, skip: 0 });
+    expect(resolved).toEqual({ limit: 100, skip: 0 });
   });
 
   it('leaves an optional input resolved from a null config value undefined rather than null', async () => {

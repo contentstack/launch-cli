@@ -1,4 +1,4 @@
-import { MAX_LIMIT, MAX_PAGES } from '../core/constants';
+import { MAX_PAGES } from '../core/constants';
 import { UsageError } from '../core/errors';
 import { LaunchApiError } from '../transport/errors';
 import { RestApiClient, RestRequest } from '../transport/rest-client';
@@ -6,6 +6,8 @@ import { PROJECT_ERROR_MESSAGES } from './project.errors';
 import { Project, ProjectResponse, ProjectsPage } from './types';
 
 export * from './types';
+
+export const PROJECT_SCAN_PAGE_SIZE = 100;
 
 const MALFORMED_CODE = 'launch.RESPONSE.MALFORMED';
 
@@ -70,7 +72,7 @@ export class ProjectsApi {
   }
 
   async *pages(params: PageProjectsParams): AsyncGenerator<ProjectsPage> {
-    const limit = params.pageSize ?? MAX_LIMIT;
+    const limit = params.pageSize ?? PROJECT_SCAN_PAGE_SIZE;
     let skip = 0;
 
     for (let fetched = 0; fetched < MAX_PAGES; fetched += 1) {

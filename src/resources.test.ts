@@ -55,7 +55,7 @@ describe('resolution', () => {
   });
 
   it('declares the paging and confirmation defaults and no default for the rest', () => {
-    expect(table.limit.default).toBe(50);
+    expect(table.limit.default).toBe(100);
     expect(table.skip.default).toBe(0);
     expect(table.yes.default).toBe(false);
     expect(table.org.default).toBeUndefined();

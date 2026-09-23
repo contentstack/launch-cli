@@ -1,4 +1,5 @@
 import { ApiSurface } from '../resources';
+import { CLIENT_MAX_LIMIT, PICKER_PAGE_SIZE } from '../core/constants';
 import { CancelledError, UsageError } from '../core/errors';
 import { LaunchApiError } from '../transport/errors';
 import { UxLike } from '../core/render';
@@ -145,5 +146,14 @@ describe('promptForProject', () => {
       message: 'Choose a project',
       choices: projects.map((project) => ({ name: project.name, value: project.uid })),
     });
+  });
+
+  it('asks the picker page for its own page size rather than the client limit guard', async () => {
+    const { deps, listCalls } = fakeDeps([[{ uid: 'a'.repeat(24), name: 'site' }]], 'a'.repeat(24));
+
+    await promptForProject(deps, 'org1');
+
+    expect(listCalls).toEqual([{ org: 'org1', limit: PICKER_PAGE_SIZE, skip: 0 }]);
+    expect(listCalls).not.toEqual([{ org: 'org1', limit: CLIENT_MAX_LIMIT, skip: 0 }]);
   });
 });

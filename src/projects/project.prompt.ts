@@ -1,4 +1,4 @@
-import { MAX_LIMIT } from '../core/constants';
+import { PICKER_PAGE_SIZE } from '../core/constants';
 import { CancelledError, UsageError } from '../core/errors';
 import type { UxLike } from '../core/render';
 import type { ApiSurface } from '../resources';
@@ -13,7 +13,7 @@ function nothingChosen(value: unknown): boolean {
 }
 
 export async function promptForProject(deps: PromptDeps, org: string): Promise<string> {
-  const page = await deps.api.projects.list({ org, limit: MAX_LIMIT, skip: 0 });
+  const page = await deps.api.projects.list({ org, limit: PICKER_PAGE_SIZE, skip: 0 });
 
   if (page.projects.length === 0) {
     throw new UsageError('No projects found in this organization.');

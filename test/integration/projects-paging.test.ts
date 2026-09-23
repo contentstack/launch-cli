@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import nock from 'nock';
 
 import { buildApi } from '../../src/resources';
-import { MAX_LIMIT } from '../../src/core/constants';
+import { PROJECT_SCAN_PAGE_SIZE } from '../../src/projects/projects.api';
 import { UsageError } from '../../src/core/errors';
 import { RestApiClient } from '../../src/transport/rest-client';
 import { UxLike } from '../../src/core/render';
@@ -37,7 +37,7 @@ function projectsOfSize(size: number, prefix: string) {
 }
 
 function pageOf(projects: { uid: string; name: string }[], count: number) {
-  return { pagination: { count, limit: MAX_LIMIT, skip: null }, projects };
+  return { pagination: { count, limit: PROJECT_SCAN_PAGE_SIZE, skip: null }, projects };
 }
 
 describe('integration: paging GET /projects for name resolution', () => {
@@ -52,11 +52,11 @@ describe('integration: paging GET /projects for name resolution', () => {
   it('resolves a name that only exists beyond the first page', async () => {
     const first = nock(ORIGIN)
       .get(`${BASE_PATH}/projects`)
-      .query({ limit: String(MAX_LIMIT), skip: '0' })
-      .reply(200, pageOf(projectsOfSize(MAX_LIMIT, 'a'), 101));
+      .query({ limit: String(PROJECT_SCAN_PAGE_SIZE), skip: '0' })
+      .reply(200, pageOf(projectsOfSize(PROJECT_SCAN_PAGE_SIZE, 'a'), 101));
     const second = nock(ORIGIN)
       .get(`${BASE_PATH}/projects`)
-      .query({ limit: String(MAX_LIMIT), skip: String(MAX_LIMIT) })
+      .query({ limit: String(PROJECT_SCAN_PAGE_SIZE), skip: String(PROJECT_SCAN_PAGE_SIZE) })
       .reply(200, pageOf([{ uid: TARGET_UID, name: 'docs-site' }], 101));
 
     await expect(new ProjectResolver(buildDeps().api.projects).toUid(ORG_UID, ProjectRef.parse('docs-site'))).resolves.toBe(TARGET_UID);
@@ -69,12 +69,12 @@ describe('integration: paging GET /projects for name resolution', () => {
   it('never asks for the second page when the first page already holds the name', async () => {
     const first = nock(ORIGIN)
       .get(`${BASE_PATH}/projects`)
-      .query({ limit: String(MAX_LIMIT), skip: '0' })
-      .reply(200, pageOf([...projectsOfSize(MAX_LIMIT - 1, 'a'), { uid: TARGET_UID, name: 'docs-site' }], 500));
+      .query({ limit: String(PROJECT_SCAN_PAGE_SIZE), skip: '0' })
+      .reply(200, pageOf([...projectsOfSize(PROJECT_SCAN_PAGE_SIZE - 1, 'a'), { uid: TARGET_UID, name: 'docs-site' }], 500));
     const second = nock(ORIGIN)
       .get(`${BASE_PATH}/projects`)
-      .query({ limit: String(MAX_LIMIT), skip: String(MAX_LIMIT) })
-      .reply(200, pageOf(projectsOfSize(MAX_LIMIT, 'b'), 500));
+      .query({ limit: String(PROJECT_SCAN_PAGE_SIZE), skip: String(PROJECT_SCAN_PAGE_SIZE) })
+      .reply(200, pageOf(projectsOfSize(PROJECT_SCAN_PAGE_SIZE, 'b'), 500));
 
     await expect(new ProjectResolver(buildDeps().api.projects).toUid(ORG_UID, ProjectRef.parse('docs-site'))).resolves.toBe(TARGET_UID);
 
@@ -85,15 +85,15 @@ describe('integration: paging GET /projects for name resolution', () => {
   it('reports a plain not-found after walking every page of the organization', async () => {
     const first = nock(ORIGIN)
       .get(`${BASE_PATH}/projects`)
-      .query({ limit: String(MAX_LIMIT), skip: '0' })
-      .reply(200, pageOf(projectsOfSize(MAX_LIMIT, 'a'), 150));
+      .query({ limit: String(PROJECT_SCAN_PAGE_SIZE), skip: '0' })
+      .reply(200, pageOf(projectsOfSize(PROJECT_SCAN_PAGE_SIZE, 'a'), 150));
     const second = nock(ORIGIN)
       .get(`${BASE_PATH}/projects`)
-      .query({ limit: String(MAX_LIMIT), skip: String(MAX_LIMIT) })
+      .query({ limit: String(PROJECT_SCAN_PAGE_SIZE), skip: String(PROJECT_SCAN_PAGE_SIZE) })
       .reply(200, pageOf(projectsOfSize(50, 'b'), 150));
     const third = nock(ORIGIN)
       .get(`${BASE_PATH}/projects`)
-      .query({ limit: String(MAX_LIMIT), skip: '150' })
+      .query({ limit: String(PROJECT_SCAN_PAGE_SIZE), skip: '150' })
       .reply(200, pageOf([], 150));
 
     const rejection = await new ProjectResolver(buildDeps().api.projects).toUid(ORG_UID, ProjectRef.parse('ghost')).catch((error: unknown) => error);
@@ -108,11 +108,11 @@ describe('integration: paging GET /projects for name resolution', () => {
   it('stops on an empty page even when the reported count promises more', async () => {
     const first = nock(ORIGIN)
       .get(`${BASE_PATH}/projects`)
-      .query({ limit: String(MAX_LIMIT), skip: '0' })
+      .query({ limit: String(PROJECT_SCAN_PAGE_SIZE), skip: '0' })
       .reply(200, pageOf([], 900));
     const second = nock(ORIGIN)
       .get(`${BASE_PATH}/projects`)
-      .query({ limit: String(MAX_LIMIT), skip: '0' })
+      .query({ limit: String(PROJECT_SCAN_PAGE_SIZE), skip: '0' })
       .reply(200, pageOf([], 900));
 
     const rejection = await new ProjectResolver(buildDeps().api.projects).toUid(ORG_UID, ProjectRef.parse('ghost')).catch((error: unknown) => error);

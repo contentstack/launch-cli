@@ -63,7 +63,7 @@ describe('integration: shipped commands driven through oclif runCommand', () => 
   it('prints the project table and the pagination line for launch:projects:list', async () => {
     const scope = nock(LAUNCH_HUB_URL)
       .get('/manage/projects')
-      .query({ limit: '50', skip: '0' })
+      .query({ limit: '100', skip: '0' })
       .reply(200, listFixture);
 
     const { error, stdout } = await runLaunch(['launch:projects:list', '--org', ORG_UID, '--data-dir', DATA_DIR]);

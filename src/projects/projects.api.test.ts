@@ -1,4 +1,5 @@
-import { EXIT_USAGE, MAX_LIMIT, MAX_PAGES } from '../core/constants';
+import { EXIT_USAGE, MAX_PAGES } from '../core/constants';
+import { PROJECT_SCAN_PAGE_SIZE } from './projects.api';
 import { LaunchApiError, parseErrorEnvelope } from '../transport/errors';
 import { RestApiClient, RestRequest } from '../transport/rest-client';
 import { ProjectsPage } from './types';
@@ -13,7 +14,7 @@ function pagingRestClient(pages: { count: number; projects: { uid: string; name:
     request: async (req: RestRequest) => {
       requests.push(req);
       const page = pages[Math.min(index++, pages.length - 1)];
-      return { pagination: { count: page.count, limit: MAX_LIMIT, skip: null }, projects: page.projects };
+      return { pagination: { count: page.count, limit: PROJECT_SCAN_PAGE_SIZE, skip: null }, projects: page.projects };
     },
   } as unknown as RestApiClient;
   return { client, requests };
@@ -156,20 +157,20 @@ describe('ProjectsApi', () => {
     await expect(new ProjectsApi(client).list({ org: 'org1' })).rejects.toBe(failure);
   });
 
-  it('pages the organization one MAX_LIMIT page at a time, advancing skip by the projects returned', async () => {
+  it('pages the organization one PROJECT_SCAN_PAGE_SIZE page at a time, advancing skip by the projects returned', async () => {
     const { client, requests } = pagingRestClient([
-      { count: 150, projects: projectsOfSize(MAX_LIMIT, 'a') },
+      { count: 150, projects: projectsOfSize(PROJECT_SCAN_PAGE_SIZE, 'a') },
       { count: 150, projects: projectsOfSize(50, 'b') },
     ]);
 
     const collected = await drain(new ProjectsApi(client).pages({ org: 'org1' }));
 
     expect(collected).toHaveLength(2);
-    expect(collected[0].projects).toHaveLength(MAX_LIMIT);
+    expect(collected[0].projects).toHaveLength(PROJECT_SCAN_PAGE_SIZE);
     expect(collected[1].projects).toHaveLength(50);
     expect(requests).toEqual([
-      { method: 'GET', path: '/projects', orgUid: 'org1', query: { limit: MAX_LIMIT, skip: 0 } },
-      { method: 'GET', path: '/projects', orgUid: 'org1', query: { limit: MAX_LIMIT, skip: MAX_LIMIT } },
+      { method: 'GET', path: '/projects', orgUid: 'org1', query: { limit: PROJECT_SCAN_PAGE_SIZE, skip: 0 } },
+      { method: 'GET', path: '/projects', orgUid: 'org1', query: { limit: PROJECT_SCAN_PAGE_SIZE, skip: PROJECT_SCAN_PAGE_SIZE } },
     ]);
   });
 
@@ -240,12 +241,12 @@ describe('ProjectsApi', () => {
 
   it('fetches no further page once the consumer stops reading', async () => {
     const { client, requests } = pagingRestClient([
-      { count: 150, projects: projectsOfSize(MAX_LIMIT, 'a') },
+      { count: 150, projects: projectsOfSize(PROJECT_SCAN_PAGE_SIZE, 'a') },
       { count: 150, projects: projectsOfSize(50, 'b') },
     ]);
 
     for await (const page of new ProjectsApi(client).pages({ org: 'org1' })) {
-      expect(page.projects).toHaveLength(MAX_LIMIT);
+      expect(page.projects).toHaveLength(PROJECT_SCAN_PAGE_SIZE);
       break;
     }
 

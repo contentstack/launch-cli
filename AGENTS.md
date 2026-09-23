@@ -241,6 +241,21 @@ path the user passed with `--config` it is a `UsageError` naming the path, becau
 there produced "Missing required value for --org" for a typo, a directory and a corrupt
 file alike.
 
+**Pagination constants.** `src/core/constants.ts` owns four numbers and they are deliberately not
+one number reused four times. `contentfly-management-service`'s `PaginationArgs` is
+`limit: number = 10` with `@IsOptional()` and **no** `@Max()`, so the API's own default is 10 and
+there is **no server-side maximum at all**.
+
+| Constant | Value | What it is |
+|---|---|---|
+| `DEFAULT_LIMIT` | 100 | what `limit` resolves to when nobody passed it. `projects:list` fetches one page and stops - it does not loop - so the default is one high page |
+| `CLIENT_MAX_LIMIT` | 1000 | an honest **client-side sanity guard** on `--limit`, not a mirror of a server rule. There is no server rule to mirror. Do not "correct" it back to 100 because a doc table says 0-100 |
+| `PICKER_PAGE_SIZE` | 100 | the page the interactive project picker fetches. It is separate from `CLIENT_MAX_LIMIT` on purpose: raising the client cap must never dump 1000 choices into a prompt |
+| `MAX_PAGES` | 100 | how many pages a name-to-uid scan will walk before raising `ProjectScanLimitError` |
+
+`PROJECT_SCAN_PAGE_SIZE` (100) lives in `src/projects/projects.api.ts` beside the `pages()`
+generator it sizes, because it is that repository's paging decision and not a CLI-wide one.
+
 **Cross-flag rules.** A rule that is pure flag-versus-flag and evaluable from argv alone belongs in
 oclif's native `exclusive` / `relationships` on the flag definition, where it also shows in `--help` -
 and a simple range does too: `limit` and `skip` carry oclif's own `min`/`max` rather than being
