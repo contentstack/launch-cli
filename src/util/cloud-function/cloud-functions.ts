@@ -4,6 +4,7 @@ import express, {
   Response,
 } from 'express';
 import { Express } from 'express-serve-static-core';
+import { Server } from 'http';
 import path from 'path';
 
 import { CloudFunctionsValidator } from './cloud-functions-validator';
@@ -67,7 +68,11 @@ export class CloudFunctions {
 
     dotenv.config({ path: path.join(this.pathToSourceCode, ENV_FILE_NAME) });
 
-    app.listen(servingPort, () => {
+    this.startServer(app, servingPort);
+  }
+
+  private startServer(app: Express, servingPort: number): Server {
+    return app.listen(servingPort, () => {
       console.log(`Serving on port ${servingPort}`);
     });
   }
