@@ -18,7 +18,7 @@ function buildClient(): RestApiClient {
   return new RestApiClient({
     baseUrl: `${ORIGIN}${BASE_PATH}`,
     analyticsInfo: ANALYTICS_INFO,
-    authHeaders: async () => ({ authtoken: AUTHTOKEN }),
+    auth: { headers: async () => ({ authtoken: AUTHTOKEN }) },
     retryDelayMs: 0,
     sleep: async () => undefined,
   });

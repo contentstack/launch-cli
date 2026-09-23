@@ -11,3 +11,10 @@ export class CancelledError extends Error {
     this.name = 'CancelledError';
   }
 }
+
+export class UnauthenticatedError extends Error {
+  constructor() {
+    super('This session carries no Contentstack authorisation type. Run csdx auth:login to continue.');
+    this.name = 'UnauthenticatedError';
+  }
+}

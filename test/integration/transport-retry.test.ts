@@ -15,7 +15,7 @@ function buildClient(overrides: Partial<ConstructorParameters<typeof RestApiClie
   return new RestApiClient({
     baseUrl: `${ORIGIN}${BASE_PATH}`,
     analyticsInfo: ANALYTICS_INFO,
-    authHeaders: async () => ({ authtoken: randomUUID() }),
+    auth: { headers: async () => ({ authtoken: randomUUID() }) },
     retryDelayMs: 0,
     sleep: async () => undefined,
     ...overrides,
@@ -85,12 +85,16 @@ describe('integration: transport-level retries', () => {
       .get(`${BASE_PATH}/projects`)
       .reply(401, { error_message: 'access token is invalid or expired' });
     const second = nock(ORIGIN).get(`${BASE_PATH}/projects`).reply(200, { projects: [] });
-    const refreshAuth = jest.fn(async () => undefined);
+    const refresh = jest.fn(async () => undefined);
 
-    const result = await buildClient({ refreshAuth }).request({ method: 'GET', path: '/projects', orgUid: ORG_UID });
+    const result = await buildClient({ auth: { headers: async () => ({ authtoken: randomUUID() }), refresh } }).request({
+      method: 'GET',
+      path: '/projects',
+      orgUid: ORG_UID,
+    });
 
     expect(result).toEqual({ projects: [] });
-    expect(refreshAuth).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenCalledTimes(1);
     expect(expired.isDone()).toBe(true);
     expect(second.isDone()).toBe(true);
     expect(nock.pendingMocks()).toEqual([]);

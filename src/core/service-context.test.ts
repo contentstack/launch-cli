@@ -4,12 +4,21 @@ import { HttpClient, authHandler, configHandler } from '@contentstack/cli-utilit
 
 import { ProjectsApi } from '../projects/projects.api';
 import { LaunchApiError } from '../transport/errors';
+import { UnauthenticatedError } from './errors';
 import { UxLike } from './render';
-import { authHeaders, buildServiceContext } from './service-context';
+import { buildServiceContext } from './service-context';
 
 interface CapturedCall {
   baseUrl?: string;
   headers?: Record<string, string>;
+}
+
+const UX: UxLike = { print: () => undefined, inquire: async () => undefined as never };
+
+function basicSession(token = randomUUID()) {
+  return jest
+    .spyOn(configHandler, 'get')
+    .mockImplementation((key: string) => (key === 'authorisationType' ? 'BASIC' : key === 'authtoken' ? token : undefined));
 }
 
 function capturingHttpClient(statuses: number[], captured: CapturedCall[]) {
@@ -38,71 +47,69 @@ function capturingHttpClient(statuses: number[], captured: CapturedCall[]) {
   });
 }
 
+function context() {
+  return buildServiceContext({
+    launchHubUrl: 'https://launch-api.test',
+    analyticsInfo: 'cli/2.0.0',
+    ux: UX,
+    isTTY: false,
+  });
+}
+
 describe('buildServiceContext', () => {
   it('wires an api surface onto a rest client built from the supplied base url', () => {
-    const ux: UxLike = { print: () => undefined, inquire: async () => undefined as never };
+    const configSpy = basicSession();
 
-    const context = buildServiceContext({
+    const built = buildServiceContext({
       launchHubUrl: 'https://launch-api.test',
       analyticsInfo: 'cli/2.0.0',
-      ux,
+      ux: UX,
       isTTY: true,
     });
 
-    expect(context.api.projects).toBeInstanceOf(ProjectsApi);
-    expect(context.ux).toBe(ux);
-    expect(context.isTTY).toBe(true);
+    expect(built.api.projects).toBeInstanceOf(ProjectsApi);
+    expect(built.ux).toBe(UX);
+    expect(built.isTTY).toBe(true);
+    configSpy.mockRestore();
   });
 
   it('carries isTTY: false through unchanged', () => {
-    const ux: UxLike = { print: () => undefined, inquire: async () => undefined as never };
+    const configSpy = basicSession();
 
-    const context = buildServiceContext({
-      launchHubUrl: 'https://launch-api.test',
-      analyticsInfo: 'cli/2.0.0',
-      ux,
-      isTTY: false,
-    });
+    expect(context().isTTY).toBe(false);
+    configSpy.mockRestore();
+  });
 
-    expect(context.isTTY).toBe(false);
+  it('refuses to build a context for a session with no authorisation type', () => {
+    const configSpy = jest.spyOn(configHandler, 'get').mockImplementation(() => undefined);
+
+    expect(() => context()).toThrow(UnauthenticatedError);
+    configSpy.mockRestore();
   });
 });
 
 describe('buildServiceContext request wiring', () => {
   it('targets the manage base path under the launch hub url and sends the analytics info header', async () => {
     const captured: CapturedCall[] = [];
+    const configSpy = basicSession();
     const httpSpy = capturingHttpClient([200], captured);
 
-    const context = buildServiceContext({
-      launchHubUrl: 'https://launch-api.test',
-      analyticsInfo: 'cli/2.0.0',
-      ux: { print: () => undefined, inquire: async () => undefined as never },
-      isTTY: false,
-    });
-    await context.api.projects.list({ org: 'org1' });
+    await context().api.projects.list({ org: 'org1' });
 
     expect(captured[0].baseUrl).toBe('https://launch-api.test/manage');
     expect(captured[0].headers?.['X-CS-CLI']).toBe('cli/2.0.0');
     httpSpy.mockRestore();
+    configSpy.mockRestore();
   });
 
-  it('treats a session with no authorisation type as a token session that is never refreshed', async () => {
+  it('sends the authtoken and never refreshes on a BASIC session that gets a 401', async () => {
     const token = randomUUID();
     const expirySpy = jest.spyOn(authHandler, 'compareOAuthExpiry').mockResolvedValue(undefined);
-    const configSpy = jest
-      .spyOn(configHandler, 'get')
-      .mockImplementation((key: string) => (key === 'authtoken' ? token : undefined));
+    const configSpy = basicSession(token);
     const captured: CapturedCall[] = [];
     const httpSpy = capturingHttpClient([401], captured);
 
-    const context = buildServiceContext({
-      launchHubUrl: 'https://launch-api.test',
-      analyticsInfo: 'cli/2.0.0',
-      ux: { print: () => undefined, inquire: async () => undefined as never },
-      isTTY: false,
-    });
-
-    await expect(context.api.projects.list({ org: 'org1' })).rejects.toBeInstanceOf(LaunchApiError);
+    await expect(context().api.projects.list({ org: 'org1' })).rejects.toBeInstanceOf(LaunchApiError);
 
     expect(captured).toHaveLength(1);
     expect(captured[0].headers?.authtoken).toBe(token);
@@ -122,14 +129,7 @@ describe('buildServiceContext request wiring', () => {
     const captured: CapturedCall[] = [];
     const httpSpy = capturingHttpClient([200], captured);
 
-    const context = buildServiceContext({
-      launchHubUrl: 'https://launch-api.test',
-      analyticsInfo: 'cli/2.0.0',
-      ux: { print: () => undefined, inquire: async () => undefined as never },
-      isTTY: false,
-    });
-
-    await expect(context.api.projects.list({ org: 'org1' })).rejects.toBe(failure);
+    await expect(context().api.projects.list({ org: 'org1' })).rejects.toBe(failure);
 
     expect(captured[0].headers).toBeUndefined();
     httpSpy.mockRestore();
@@ -153,151 +153,12 @@ describe('buildServiceContext request wiring', () => {
     const captured: CapturedCall[] = [];
     const httpSpy = capturingHttpClient([401, 200], captured);
 
-    const context = buildServiceContext({
-      launchHubUrl: 'https://launch-api.test',
-      analyticsInfo: 'cli/2.0.0',
-      ux: { print: () => undefined, inquire: async () => undefined as never },
-      isTTY: false,
-    });
-    await context.api.projects.list({ org: 'org1' });
+    await context().api.projects.list({ org: 'org1' });
 
     expect(captured).toHaveLength(2);
     expect(captured[0].headers?.authorization).toBe(`Bearer ${staleToken}`);
     expect(captured[1].headers?.authorization).toBe(`Bearer ${freshToken}`);
     expect(expirySpy).toHaveBeenCalledWith(true);
-    httpSpy.mockRestore();
-    configSpy.mockRestore();
-    expirySpy.mockRestore();
-  });
-});
-
-describe('authHeaders', () => {
-  it('returns a bearer authorization header when the authorisation type is OAUTH', async () => {
-    const expirySpy = jest.spyOn(authHandler, 'compareOAuthExpiry').mockResolvedValue(undefined);
-    const spy = jest.spyOn(configHandler, 'get').mockImplementation((key: string) => {
-      if (key === 'authorisationType') return 'OAUTH';
-      if (key === 'oauthAccessToken') return 'oauth-token-value';
-      return undefined;
-    });
-
-    const headers = await authHeaders();
-
-    expect(headers).toEqual({ authorization: 'Bearer oauth-token-value' });
-    spy.mockRestore();
-    expirySpy.mockRestore();
-  });
-
-  it('awaits the oauth expiry check before reading the access token', async () => {
-    const order: string[] = [];
-    const expirySpy = jest.spyOn(authHandler, 'compareOAuthExpiry').mockImplementation(async () => {
-      await Promise.resolve();
-      order.push('expiry-check');
-    });
-    const spy = jest.spyOn(configHandler, 'get').mockImplementation((key: string) => {
-      if (key === 'authorisationType') return 'OAUTH';
-      if (key === 'oauthAccessToken') {
-        order.push('read-token');
-        return 'refreshed-token-value';
-      }
-      return undefined;
-    });
-
-    const headers = await authHeaders();
-
-    expect(order).toEqual(['expiry-check', 'read-token']);
-    expect(expirySpy).toHaveBeenCalledWith();
-    expect(headers).toEqual({ authorization: 'Bearer refreshed-token-value' });
-    spy.mockRestore();
-    expirySpy.mockRestore();
-  });
-
-  it('does not run the oauth expiry check when the authorisation type is BASIC', async () => {
-    const expirySpy = jest.spyOn(authHandler, 'compareOAuthExpiry').mockResolvedValue(undefined);
-    const spy = jest.spyOn(configHandler, 'get').mockImplementation((key: string) => {
-      if (key === 'authorisationType') return 'BASIC';
-      if (key === 'authtoken') return 'basic-token-value';
-      return undefined;
-    });
-
-    const headers = await authHeaders();
-
-    expect(headers).toEqual({ authtoken: 'basic-token-value' });
-    expect(expirySpy).not.toHaveBeenCalled();
-    spy.mockRestore();
-    expirySpy.mockRestore();
-  });
-});
-
-describe('buildServiceContext auth refresh', () => {
-  it('does not touch credentials when a BASIC session gets a 401', async () => {
-    const expirySpy = jest.spyOn(authHandler, 'compareOAuthExpiry').mockResolvedValue(undefined);
-    const configSpy = jest.spyOn(configHandler, 'get').mockImplementation((key: string) => {
-      if (key === 'authorisationType') return 'BASIC';
-      if (key === 'authtoken') return 'basic-token-value';
-      return undefined;
-    });
-    const httpSpy = jest.spyOn(HttpClient, 'create').mockImplementation(() => {
-      const client: Record<string, unknown> = {};
-      client.baseUrl = () => client;
-      client.interceptors = { response: { use: () => 0 } };
-      client.asJson = () => client;
-      client.headers = () => client;
-      client.queryParams = () => client;
-      client.payload = () => client;
-      client.send = async () => ({ status: 401, data: { errors: [] } });
-      return client as unknown as ReturnType<typeof HttpClient.create>;
-    });
-
-    const context = buildServiceContext({
-      launchHubUrl: 'https://launch-api.test',
-      analyticsInfo: 'cli/2.0.0',
-      ux: { print: () => undefined, inquire: async () => undefined as never },
-      isTTY: false,
-    });
-
-    await expect(context.api.projects.list({ org: 'org1' })).rejects.toBeDefined();
-
-    expect(expirySpy).not.toHaveBeenCalled();
-    httpSpy.mockRestore();
-    configSpy.mockRestore();
-    expirySpy.mockRestore();
-  });
-
-  it('forces a token refresh and retries once when the api answers 401', async () => {
-    const expirySpy = jest.spyOn(authHandler, 'compareOAuthExpiry').mockResolvedValue(undefined);
-    const configSpy = jest.spyOn(configHandler, 'get').mockImplementation((key: string) => {
-      if (key === 'authorisationType') return 'OAUTH';
-      if (key === 'oauthAccessToken') return 'oauth-token-value';
-      return undefined;
-    });
-    const statuses = [401, 200];
-    let index = 0;
-    const httpSpy = jest.spyOn(HttpClient, 'create').mockImplementation(() => {
-      const client: Record<string, unknown> = {};
-      client.baseUrl = () => client;
-      client.interceptors = { response: { use: () => 0 } };
-      client.asJson = () => client;
-      client.headers = () => client;
-      client.queryParams = () => client;
-      client.payload = () => client;
-      client.send = async () => ({
-        status: statuses[index++],
-        data: { projects: [], pagination: { count: 0, limit: 0, skip: 0 } },
-      });
-      return client as unknown as ReturnType<typeof HttpClient.create>;
-    });
-
-    const context = buildServiceContext({
-      launchHubUrl: 'https://launch-api.test',
-      analyticsInfo: 'cli/2.0.0',
-      ux: { print: () => undefined, inquire: async () => undefined as never },
-      isTTY: false,
-    });
-    const page = await context.api.projects.list({ org: 'org1' });
-
-    expect(index).toBe(2);
-    expect(expirySpy).toHaveBeenCalledWith(true);
-    expect(page.projects).toEqual([]);
     httpSpy.mockRestore();
     configSpy.mockRestore();
     expirySpy.mockRestore();

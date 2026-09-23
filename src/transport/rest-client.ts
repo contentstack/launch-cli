@@ -1,4 +1,5 @@
 import { API_VERSION } from '../core/constants';
+import { AuthStrategy } from './auth-strategy';
 import { ErrorMessages, parseErrorEnvelope } from './errors';
 import { HttpMethod, RetryPolicy } from './retry-policy';
 import { createUtilityHttpClient } from './utility-http-client';
@@ -26,8 +27,7 @@ export interface HttpClientLike {
 export interface RestApiClientOptions {
   baseUrl: string;
   analyticsInfo: string;
-  authHeaders: (orgUid?: string) => Promise<Record<string, string>>;
-  refreshAuth?: () => Promise<unknown>;
+  auth: AuthStrategy;
   createHttpClient?: () => HttpClientLike;
   maxRetries?: number;
   retryDelayMs?: number;
@@ -60,9 +60,9 @@ export class RestApiClient {
         return response.data as T;
       }
 
-      if (response.status === 401 && !refreshed && this.options.refreshAuth) {
+      if (response.status === 401 && !refreshed && this.options.auth.refresh) {
         refreshed = true;
-        await this.options.refreshAuth();
+        await this.options.auth.refresh();
         continue;
       }
 
@@ -83,7 +83,7 @@ export class RestApiClient {
     const headers: Record<string, string> = {
       'X-CS-CLI': this.options.analyticsInfo,
       'x-cs-api-version': API_VERSION,
-      ...(await this.options.authHeaders(req.orgUid)),
+      ...(await this.options.auth.headers(req.orgUid)),
     };
 
     if (req.orgUid) {

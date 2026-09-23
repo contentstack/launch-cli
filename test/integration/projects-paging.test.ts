@@ -19,7 +19,7 @@ function buildDeps() {
   const client = new RestApiClient({
     baseUrl: `${ORIGIN}${BASE_PATH}`,
     analyticsInfo: ANALYTICS_INFO,
-    authHeaders: async () => ({}),
+    auth: { headers: async () => ({}) },
     retryDelayMs: 0,
     sleep: async () => undefined,
   });

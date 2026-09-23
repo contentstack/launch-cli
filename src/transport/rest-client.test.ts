@@ -67,7 +67,7 @@ function buildClient(http: ReturnType<typeof fakeHttpClient>, overrides = {}) {
   return new RestApiClient({
     baseUrl: 'https://launch-api.test/manage',
     analyticsInfo: 'cli/2.0.0',
-    authHeaders: async () => ({ authtoken: 'tok' }),
+    auth: { headers: async () => ({ authtoken: 'tok' }) },
     createHttpClient: http.create,
     sleep: http.sleep,
     ...overrides,
@@ -144,27 +144,33 @@ describe('RestApiClient', () => {
       { status: 401, data: {} },
       { status: 200, data: { ok: true } },
     ]);
-    const refreshAuth = jest.fn(async () => undefined);
+    const refresh = jest.fn(async () => undefined);
 
-    const result = await buildClient(http, { refreshAuth }).request({ method: 'GET', path: '/projects' });
+    const result = await buildClient(http, { auth: { headers: async () => ({ authtoken: 'tok' }), refresh } }).request({
+      method: 'GET',
+      path: '/projects',
+    });
 
     expect(result).toEqual({ ok: true });
-    expect(refreshAuth).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenCalledTimes(1);
     expect(http.calls).toHaveLength(2);
   });
 
   it('throws when a 401 persists after a single refresh', async () => {
     const http = fakeHttpClient([{ status: 401, data: { errors: [{ code: 'launch.AUTH', message: 'nope' }] } }]);
-    const refreshAuth = jest.fn(async () => undefined);
+    const refresh = jest.fn(async () => undefined);
 
-    await expect(buildClient(http, { refreshAuth }).request({ method: 'GET', path: '/projects' })).rejects.toBeInstanceOf(
-      LaunchApiError,
-    );
+    await expect(
+      buildClient(http, { auth: { headers: async () => ({ authtoken: 'tok' }), refresh } }).request({
+        method: 'GET',
+        path: '/projects',
+      }),
+    ).rejects.toBeInstanceOf(LaunchApiError);
     expect(http.calls).toHaveLength(2);
-    expect(refreshAuth).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenCalledTimes(1);
 
     const error = (await buildClient(fakeHttpClient([{ status: 401, data: { errors: [{ code: 'launch.AUTH', message: 'nope' }] } }]), {
-      refreshAuth: async () => undefined,
+      auth: { headers: async () => ({ authtoken: 'tok' }), refresh: async () => undefined },
     })
       .request({ method: 'GET', path: '/projects' })
       .catch((e) => e)) as LaunchApiError;
@@ -176,10 +182,10 @@ describe('RestApiClient', () => {
     expect(error.errors).toEqual([{ code: 'launch.AUTH', message: 'nope' }]);
   });
 
-  it('does not attempt a refresh when no refreshAuth is configured', async () => {
+  it('does not attempt a refresh when the auth strategy cannot refresh', async () => {
     const http = fakeHttpClient([{ status: 401, data: {} }]);
 
-    const error = (await buildClient(http, { refreshAuth: undefined })
+    const error = (await buildClient(http, { auth: { headers: async () => ({ authtoken: 'tok' }) } })
       .request({ method: 'GET', path: '/projects' })
       .catch((e) => e)) as LaunchApiError;
 
@@ -297,16 +303,16 @@ describe('RestApiClient', () => {
     ]);
   });
 
-  it('passes the request org uid to authHeaders so it can scope the credentials', async () => {
+  it('passes the request org uid to the auth strategy so it can scope the credentials', async () => {
     const http = fakeHttpClient([{ status: 200, data: {} }]);
     const seen: (string | undefined)[] = [];
-    const authHeaders = async (orgUid?: string) => {
+    const headers = async (orgUid?: string) => {
       seen.push(orgUid);
       return {};
     };
 
-    await buildClient(http, { authHeaders }).request({ method: 'GET', path: '/projects', orgUid: 'org1' });
-    await buildClient(http, { authHeaders }).request({ method: 'GET', path: '/projects' });
+    await buildClient(http, { auth: { headers } }).request({ method: 'GET', path: '/projects', orgUid: 'org1' });
+    await buildClient(http, { auth: { headers } }).request({ method: 'GET', path: '/projects' });
 
     expect(seen).toEqual(['org1', undefined]);
   });
@@ -340,26 +346,26 @@ describe('RestApiClient', () => {
     const staleToken = randomUUID();
     const freshToken = randomUUID();
     let token = staleToken;
-    const authHeaders = jest.fn(async () => ({ authtoken: token }));
-    const refreshAuth = async () => {
+    const headers = jest.fn(async () => ({ authtoken: token }));
+    const refresh = async () => {
       token = freshToken;
     };
 
-    await buildClient(http, { authHeaders, refreshAuth }).request({ method: 'GET', path: '/projects' });
+    await buildClient(http, { auth: { headers, refresh } }).request({ method: 'GET', path: '/projects' });
 
-    expect(authHeaders).toHaveBeenCalledTimes(2);
+    expect(headers).toHaveBeenCalledTimes(2);
     expect(http.calls[0].headers.authtoken).toBe(staleToken);
     expect(http.calls[1].headers.authtoken).toBe(freshToken);
   });
 
-  it('propagates a refreshAuth rejection unchanged rather than wrapping it in a LaunchApiError', async () => {
+  it('propagates a refresh rejection unchanged rather than wrapping it in a LaunchApiError', async () => {
     const http = fakeHttpClient([{ status: 401, data: {} }]);
     const failure = new Error('oauth refresh failed');
-    const refreshAuth = async () => {
+    const refresh = async () => {
       throw failure;
     };
 
-    const error = await buildClient(http, { refreshAuth })
+    const error = await buildClient(http, { auth: { headers: async () => ({ authtoken: 'tok' }), refresh } })
       .request({ method: 'GET', path: '/projects' })
       .catch((e) => e);
 
@@ -406,13 +412,16 @@ describe('RestApiClient', () => {
       { status: 429, data: {} },
       { status: 200, data: { ok: true } },
     ]);
-    const refreshAuth = jest.fn(async () => undefined);
+    const refresh = jest.fn(async () => undefined);
 
     await expect(
-      buildClient(http, { refreshAuth, retryDelayMs: 10 }).request({ method: 'GET', path: '/projects' }),
+      buildClient(http, {
+        auth: { headers: async () => ({ authtoken: 'tok' }), refresh },
+        retryDelayMs: 10,
+      }).request({ method: 'GET', path: '/projects' }),
     ).resolves.toEqual({ ok: true });
 
-    expect(refreshAuth).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenCalledTimes(1);
     expect(http.calls).toHaveLength(3);
     expect(http.waits).toEqual([10]);
   });
@@ -423,13 +432,16 @@ describe('RestApiClient', () => {
       { status: 401, data: {} },
       { status: 200, data: { ok: true } },
     ]);
-    const refreshAuth = jest.fn(async () => undefined);
+    const refresh = jest.fn(async () => undefined);
 
     await expect(
-      buildClient(http, { refreshAuth, retryDelayMs: 10 }).request({ method: 'GET', path: '/projects' }),
+      buildClient(http, {
+        auth: { headers: async () => ({ authtoken: 'tok' }), refresh },
+        retryDelayMs: 10,
+      }).request({ method: 'GET', path: '/projects' }),
     ).resolves.toEqual({ ok: true });
 
-    expect(refreshAuth).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenCalledTimes(1);
     expect(http.calls).toHaveLength(3);
     expect(http.waits).toEqual([10]);
   });
@@ -439,7 +451,7 @@ describe('RestApiClient', () => {
     const client = new RestApiClient({
       baseUrl: 'https://launch-api.test/manage',
       analyticsInfo: 'cli/2.0.0',
-      authHeaders: async () => ({}),
+      auth: { headers: async () => ({}) },
       createHttpClient: http.create,
     });
 
@@ -454,7 +466,7 @@ describe('RestApiClient', () => {
     const client = new RestApiClient({
       baseUrl: 'https://launch-api.test/manage',
       analyticsInfo: 'cli/2.0.0',
-      authHeaders: async () => ({}),
+      auth: { headers: async () => ({}) },
       createHttpClient: http.create,
       retryDelayMs: 1,
     });
@@ -481,7 +493,7 @@ describe('RestApiClient', () => {
     const client = new RestApiClient({
       baseUrl: 'https://launch-api.test/manage',
       analyticsInfo: 'cli/2.0.0',
-      authHeaders: async () => ({}),
+      auth: { headers: async () => ({}) },
     });
 
     await expect(client.request({ method: 'GET', path: '/projects' })).resolves.toEqual({ fromDefaultClient: true });
