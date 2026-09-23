@@ -2,8 +2,11 @@ import { UsageError } from '../core/errors';
 import {
   PROJECT_DESCRIPTION_MAX_LENGTH,
   PROJECT_NAME_MAX_LENGTH,
+  PROJECT_TYPE_BY_CHOICE,
+  PROJECT_TYPE_CHOICES,
   projectFlags,
   projectResolution,
+  projectTypeChoiceOf,
 } from './project.inputs';
 
 describe('project value-field limits', () => {
@@ -15,7 +18,7 @@ describe('project value-field limits', () => {
 
 describe('projectFlags', () => {
   it('contributes the project value fields under the names the all-flags table gives them', () => {
-    expect(Object.keys(projectFlags).sort()).toEqual(['description', 'name', 'project']);
+    expect(Object.keys(projectFlags).sort()).toEqual(['description', 'name', 'project', 'type']);
   });
 
   it.each([['name'], ['description'], ['project']])('declares %s without oclif required-ness', (flag) => {
@@ -66,5 +69,33 @@ describe('projectResolution description', () => {
     expect(spec.configPath).toBeUndefined();
     expect(spec.prompt).toBeUndefined();
     expect(spec.default).toBeUndefined();
+  });
+});
+
+describe('the --type flag', () => {
+  it('names the two values the doc gives and maps each to the service project type', () => {
+    expect(PROJECT_TYPE_CHOICES).toEqual(['GitHub', 'FileUpload']);
+    expect(PROJECT_TYPE_BY_CHOICE).toEqual({ GitHub: 'GITPROVIDER', FileUpload: 'FILEUPLOAD' });
+  });
+
+  it('accepts either value however it was cased or padded', () => {
+    expect(projectTypeChoiceOf('GitHub')).toBe('GitHub');
+    expect(projectTypeChoiceOf('github')).toBe('GitHub');
+    expect(projectTypeChoiceOf(' FILEUPLOAD ')).toBe('FileUpload');
+  });
+
+  it('refuses a value outside the two, naming both', () => {
+    expect(() => projectTypeChoiceOf('Gitlab')).toThrow(UsageError);
+    expect(() => projectTypeChoiceOf('Gitlab')).toThrow(
+      '--type must be one of GitHub, FileUpload; "Gitlab" is not.',
+    );
+  });
+
+  it('normalises a type from any source into the doc value', async () => {
+    const spec = projectResolution.type as { normalize(value: string, args: unknown): Promise<unknown> };
+
+    await expect(spec.normalize('fileupload', { services: {}, resolved: {}, source: 'config' })).resolves.toBe(
+      'FileUpload',
+    );
   });
 });
