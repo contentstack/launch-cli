@@ -22,6 +22,6 @@ export default class ProjectsList extends LaunchCommand<typeof listInputs> {
     });
 
     renderTable(this.ux, PROJECT_COLUMNS, page.projects);
-    renderPagination(this.ux, page.pagination);
+    renderPagination(this.ux, page.pagination, page.projects.length);
   }
 }

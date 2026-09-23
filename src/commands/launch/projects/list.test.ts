@@ -102,7 +102,7 @@ describe('launch:projects:list', () => {
     ]);
   });
 
-  it('passes a non-default limit and skip through to the api and reports that window', async () => {
+  it('passes a non-default limit and skip through to the api and reports the rows it printed', async () => {
     const { command, lines, listed } = commandUnderTest(
       {
         pagination: { count: 120, limit: 10, skip: 20 },
@@ -114,7 +114,7 @@ describe('launch:projects:list', () => {
     await command.run();
 
     expect(listed).toEqual([{ org: 'org1', limit: 10, skip: 20 }]);
-    expect(lines[lines.length - 1]).toBe('Showing 21-30 of 120');
+    expect(lines[lines.length - 1]).toBe('Showing 21-21 of 120');
   });
 
   it('declares org as required and limit and skip as optional', () => {

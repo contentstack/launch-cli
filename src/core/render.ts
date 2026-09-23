@@ -15,6 +15,31 @@ export interface TableColumn<T> {
 }
 
 const GUTTER = '  ';
+const UNPRINTABLE = '-';
+
+function cellText(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (value === undefined || value === null) {
+    return '';
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? String(value) : UNPRINTABLE;
+  }
+
+  if (typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value);
+  }
+
+  return UNPRINTABLE;
+}
+
+function finite(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
 
 export function renderTable<T>(ux: UxLike, columns: TableColumn<T>[], rows: T[]): void {
   if (rows.length === 0) {
@@ -22,7 +47,7 @@ export function renderTable<T>(ux: UxLike, columns: TableColumn<T>[], rows: T[])
     return;
   }
 
-  const cells = rows.map((row) => columns.map((column) => column.value(row) ?? ''));
+  const cells = rows.map((row) => columns.map((column) => cellText(column.value(row))));
   const widths = columns.map((column, index) =>
     Math.max(column.header.length, ...cells.map((rowCells) => rowCells[index].length)),
   );
@@ -40,7 +65,7 @@ export function renderTable<T>(ux: UxLike, columns: TableColumn<T>[], rows: T[])
 
 export function renderDetail(ux: UxLike, fields: [string, string][]): void {
   const present = fields
-    .map(([label, value]) => [label, value ?? ''] as [string, string])
+    .map(([label, value]) => [label, cellText(value)] as [string, string])
     .filter(([, value]) => value !== '');
   const width = Math.max(0, ...present.map(([label]) => label.length));
 
@@ -49,19 +74,22 @@ export function renderDetail(ux: UxLike, fields: [string, string][]): void {
   }
 }
 
-export function renderPagination(ux: UxLike, pagination: Pagination): void {
-  if (pagination.count === 0) {
+export function renderPagination(ux: UxLike, pagination: Pagination, rowsPrinted: number): void {
+  const printed = finite(rowsPrinted);
+  const count = finite(pagination?.count);
+
+  if (printed === undefined || printed <= 0 || count === undefined || count <= 0) {
     return;
   }
 
-  const skip = pagination.skip ?? 0;
+  const skip = Math.max(0, Math.trunc(finite(pagination.skip) ?? 0));
   const first = skip + 1;
-  const last = Math.min(skip + pagination.limit, pagination.count);
+  const last = Math.min(skip + Math.trunc(printed), count);
 
   if (last < first) {
-    ux.print(`Showing 0 of ${pagination.count}`);
+    ux.print(`Showing 0 of ${count}`);
     return;
   }
 
-  ux.print(`Showing ${first}-${last} of ${pagination.count}`);
+  ux.print(`Showing ${first}-${last} of ${count}`);
 }

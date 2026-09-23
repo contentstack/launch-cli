@@ -136,7 +136,7 @@ describe('integration: GET /projects', () => {
 
     const page = await buildApi(buildClient()).projects.list({ org: ORG_UID });
     renderTable(ux, PROJECT_COLUMNS, page.projects);
-    renderPagination(ux, page.pagination);
+    renderPagination(ux, page.pagination, page.projects.length);
 
     expect(lines).toEqual([
       'UID                       NAME            TYPE         UPDATED',

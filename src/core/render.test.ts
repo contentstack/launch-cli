@@ -1,4 +1,4 @@
-import { UxLike, renderDetail, renderPagination, renderTable } from './render';
+import { Pagination, UxLike, renderDetail, renderPagination, renderTable } from './render';
 
 function fakeUx() {
   const lines: string[] = [];
@@ -81,6 +81,58 @@ describe('renderTable', () => {
     expect(lines).toEqual(['UID  NAME', '     site']);
   });
 
+  it.each([
+    [123, '123'],
+    [0, '0'],
+    [true, 'true'],
+    [false, 'false'],
+    [BigInt(10), '10'],
+  ])('renders the non-string cell %p as %j rather than crashing', (value, expected) => {
+    const { ux, lines } = fakeUx();
+    const width = Math.max('NAME'.length, expected.length);
+
+    renderTable(
+      ux,
+      [
+        { header: 'NAME', value: () => value as unknown as string },
+        { header: 'TAIL', value: () => 'ok' },
+      ],
+      [{}, {}],
+    );
+
+    expect(lines).toEqual([
+      `${'NAME'.padEnd(width)}  TAIL`,
+      `${expected.padEnd(width)}  ok`,
+      `${expected.padEnd(width)}  ok`,
+    ]);
+  });
+
+  it.each([[{}], [[1, 2]], [Symbol('x')], [() => undefined], [Number.NaN], [Number.POSITIVE_INFINITY]].map((value) => [value]))(
+    'renders the unprintable cell %p as a dash rather than object text',
+    (value) => {
+      const { ux, lines } = fakeUx();
+
+      renderTable(ux, [{ header: 'NAME', value: () => value as unknown as string }], [{}]);
+
+      expect(lines).toEqual(['NAME', '-']);
+    },
+  );
+
+  it.each([[undefined], [null]])('renders the absent cell %p as a blank', (value) => {
+    const { ux, lines } = fakeUx();
+
+    renderTable(
+      ux,
+      [
+        { header: 'NAME', value: () => value as unknown as string },
+        { header: 'TAIL', value: () => 'ok' },
+      ],
+      [{}],
+    );
+
+    expect(lines).toEqual(['NAME  TAIL', '      ok']);
+  });
+
   it('pads a middle column to its widest cell and leaves the last column unpadded', () => {
     const { ux, lines } = fakeUx();
 
@@ -141,6 +193,25 @@ describe('renderDetail', () => {
     expect(lines).toEqual(['name  site']);
   });
 
+  it.each([
+    [123, '123'],
+    [true, 'true'],
+  ])('renders the non-string detail value %p as %j', (value, expected) => {
+    const { ux, lines } = fakeUx();
+
+    renderDetail(ux, [['uid', value as unknown as string]]);
+
+    expect(lines).toEqual([`uid  ${expected}`]);
+  });
+
+  it.each([[{}], [Number.NaN]])('renders the unprintable detail value %p as a dash', (value) => {
+    const { ux, lines } = fakeUx();
+
+    renderDetail(ux, [['uid', value as unknown as string]]);
+
+    expect(lines).toEqual(['uid  -']);
+  });
+
   it('aligns a single non-empty field', () => {
     const { ux, lines } = fakeUx();
 
@@ -156,7 +227,7 @@ describe('renderPagination', () => {
   it('reports the window and the total', () => {
     const { ux, lines } = fakeUx();
 
-    renderPagination(ux, { count: 120, limit: 50, skip: 50 });
+    renderPagination(ux, { count: 120, limit: 50, skip: 50 }, 50);
 
     expect(lines).toEqual(['Showing 51-100 of 120']);
   });
@@ -164,7 +235,7 @@ describe('renderPagination', () => {
   it('clamps the window to the total on the last page', () => {
     const { ux, lines } = fakeUx();
 
-    renderPagination(ux, { count: 3, limit: 50, skip: 0 });
+    renderPagination(ux, { count: 3, limit: 50, skip: 0 }, 3);
 
     expect(lines).toEqual(['Showing 1-3 of 3']);
   });
@@ -172,7 +243,7 @@ describe('renderPagination', () => {
   it('prints nothing when count is zero', () => {
     const { ux, lines } = fakeUx();
 
-    renderPagination(ux, { count: 0, limit: 50, skip: 0 });
+    renderPagination(ux, { count: 0, limit: 50, skip: 0 }, 0);
 
     expect(lines).toEqual([]);
   });
@@ -180,7 +251,7 @@ describe('renderPagination', () => {
   it('shows correct window at page boundary', () => {
     const { ux, lines } = fakeUx();
 
-    renderPagination(ux, { count: 100, limit: 25, skip: 75 });
+    renderPagination(ux, { count: 100, limit: 25, skip: 75 }, 25);
 
     expect(lines).toEqual(['Showing 76-100 of 100']);
   });
@@ -188,7 +259,7 @@ describe('renderPagination', () => {
   it('treats a null skip as the first page', () => {
     const { ux, lines } = fakeUx();
 
-    renderPagination(ux, { count: 11, limit: 2, skip: null });
+    renderPagination(ux, { count: 11, limit: 2, skip: null }, 2);
 
     expect(lines).toEqual(['Showing 1-2 of 11']);
   });
@@ -196,7 +267,7 @@ describe('renderPagination', () => {
   it('treats a missing skip as the first page', () => {
     const { ux, lines } = fakeUx();
 
-    renderPagination(ux, { count: 11, limit: 2 });
+    renderPagination(ux, { count: 11, limit: 2 }, 2);
 
     expect(lines).toEqual(['Showing 1-2 of 11']);
   });
@@ -204,15 +275,7 @@ describe('renderPagination', () => {
   it('reports an empty window rather than an impossible range when skip is past the end', () => {
     const { ux, lines } = fakeUx();
 
-    renderPagination(ux, { count: 50, limit: 50, skip: 200 });
-
-    expect(lines).toEqual(['Showing 0 of 50']);
-  });
-
-  it('reports an empty window rather than an impossible range when the limit is zero', () => {
-    const { ux, lines } = fakeUx();
-
-    renderPagination(ux, { count: 50, limit: 0, skip: 0 });
+    renderPagination(ux, { count: 50, limit: 50, skip: 200 }, 50);
 
     expect(lines).toEqual(['Showing 0 of 50']);
   });
@@ -220,7 +283,7 @@ describe('renderPagination', () => {
   it('reports an empty window when skip equals the total count', () => {
     const { ux, lines } = fakeUx();
 
-    renderPagination(ux, { count: 50, limit: 50, skip: 50 });
+    renderPagination(ux, { count: 50, limit: 50, skip: 50 }, 50);
 
     expect(lines).toEqual(['Showing 0 of 50']);
   });
@@ -228,23 +291,80 @@ describe('renderPagination', () => {
   it('reports a single-record window when skip is one short of the total count', () => {
     const { ux, lines } = fakeUx();
 
-    renderPagination(ux, { count: 50, limit: 50, skip: 49 });
+    renderPagination(ux, { count: 50, limit: 50, skip: 49 }, 1);
 
     expect(lines).toEqual(['Showing 50-50 of 50']);
   });
 
-  it('clamps a limit larger than the total count to the count', () => {
+  it('describes the rows actually printed rather than the window that was requested', () => {
     const { ux, lines } = fakeUx();
 
-    renderPagination(ux, { count: 3, limit: 500, skip: 0 });
+    renderPagination(ux, { count: 50, limit: 50, skip: 0 }, 3);
 
-    expect(lines).toEqual(['Showing 1-3 of 3']);
+    expect(lines).toEqual(['Showing 1-3 of 50']);
+  });
+
+  it.each([[0], [-1], [Number.NaN], [undefined as unknown as number]])(
+    'prints nothing when the row count is %p because no row was rendered',
+    (rows) => {
+      const { ux, lines } = fakeUx();
+
+      renderPagination(ux, { count: 50, limit: 50, skip: 0 }, rows);
+
+      expect(lines).toEqual([]);
+    },
+  );
+
+  it.each([
+    [undefined as unknown as number],
+    [null as unknown as number],
+    [Number.NaN],
+    [Number.POSITIVE_INFINITY],
+    ['7' as unknown as number],
+  ])('prints nothing rather than a total of %p when count is not a finite number', (count) => {
+    const { ux, lines } = fakeUx();
+
+    renderPagination(ux, { count, limit: 50, skip: 0 }, 3);
+
+    expect(lines).toEqual([]);
+  });
+
+  it.each([
+    [undefined as unknown as number],
+    [null as unknown as number],
+    [Number.NaN],
+    ['50' as unknown as number],
+  ])('reports the rows printed even when the limit is %p', (limit) => {
+    const { ux, lines } = fakeUx();
+
+    renderPagination(ux, { count: 7, limit, skip: 0 }, 2);
+
+    expect(lines).toEqual(['Showing 1-2 of 7']);
+  });
+
+  it.each([[-9], [-1], ['3' as unknown as number], [Number.NaN], [1.5]])(
+    'clamps the unusable skip %p to the first page rather than printing a negative range',
+    (skip) => {
+      const { ux, lines } = fakeUx();
+
+      renderPagination(ux, { count: 50, limit: 50, skip }, 40);
+
+      expect(lines).toEqual([skip === 1.5 ? 'Showing 2-41 of 50' : 'Showing 1-40 of 50']);
+    },
+  );
+
+  it('prints nothing rather than reading fields off an absent pagination block', () => {
+    const { ux, lines } = fakeUx();
+
+    renderPagination(ux, undefined as unknown as Pagination, 3);
+
+    expect(lines).toEqual([]);
   });
 
   it('prints nothing when count is zero even with a limit and a skip past the end', () => {
     const { ux, lines } = fakeUx();
 
-    renderPagination(ux, { count: 0, limit: 50, skip: 200 });
+    renderPagination(ux, { count: 0, limit: 50, skip: 200 }, 0);
 
     expect(lines).toEqual([]);
   });
@@ -253,7 +373,7 @@ describe('renderPagination', () => {
     const { ux, lines } = fakeUx();
 
     renderTable(ux, [{ header: 'UID', value: (row: { uid: string }) => row.uid }], []);
-    renderPagination(ux, { count: 0, limit: 50, skip: 0 });
+    renderPagination(ux, { count: 0, limit: 50, skip: 0 }, 0);
 
     expect(lines).toEqual(['No records found.']);
   });
