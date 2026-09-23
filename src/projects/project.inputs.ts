@@ -16,7 +16,10 @@ export const projectResolution = {
     configPath: 'uid',
     dependsOn: PROJECT_DEPENDENCIES.project,
     prompt: ({ services, resolved }) => promptForProject(services, resolved.org),
-    normalize: (value, { services, resolved }) =>
-      new ProjectResolver(services.api.projects).toUid(resolved.org, ProjectRef.parse(value)),
+    normalize: (value, { services, resolved, source }) =>
+      new ProjectResolver(services.api.projects).toUid(
+        resolved.org,
+        source === 'flag' ? ProjectRef.parse(value) : ProjectRef.uid(value),
+      ),
   } satisfies ResolutionSpec<string, 'org'>,
 };

@@ -76,25 +76,42 @@ describe('resolution', () => {
     spy.mockRestore();
   });
 
-  it('delegates project normalisation to the project resolver with the resolved org and a parsed reference', async () => {
+  it('delegates a project name passed on argv to the project resolver as a parsed reference', async () => {
     const spy = jest.spyOn(ProjectResolver.prototype, 'toUid').mockResolvedValue(PROJECT_UID);
     const { services, resolved } = args();
 
-    await expect(table.project.normalize?.('Project One', { services, resolved })).resolves.toBe(PROJECT_UID);
+    await expect(table.project.normalize?.('Project One', { services, resolved, source: 'flag' })).resolves.toBe(
+      PROJECT_UID,
+    );
 
     expect(spy).toHaveBeenCalledWith('org1', { kind: 'name', name: 'Project One' });
     spy.mockRestore();
   });
 
-  it('hands the resolver a uid reference untouched when the value is already a uid', async () => {
+  it('hands the resolver a uid reference untouched when the argv value is already a uid', async () => {
     const spy = jest.spyOn(ProjectResolver.prototype, 'toUid').mockResolvedValue(PROJECT_UID);
     const { services, resolved } = args();
 
-    await expect(table.project.normalize?.(PROJECT_UID, { services, resolved })).resolves.toBe(PROJECT_UID);
+    await expect(table.project.normalize?.(PROJECT_UID, { services, resolved, source: 'flag' })).resolves.toBe(
+      PROJECT_UID,
+    );
 
     expect(spy).toHaveBeenCalledWith('org1', { kind: 'uid', uid: PROJECT_UID });
     spy.mockRestore();
   });
+
+  it.each(['config', 'prompt', 'default'] as const)(
+    'hands the resolver a uid reference for a value that came from %s, whatever its shape',
+    async (source) => {
+      const spy = jest.spyOn(ProjectResolver.prototype, 'toUid').mockResolvedValue(PROJECT_UID);
+      const { services, resolved } = args();
+
+      await expect(table.project.normalize?.('Project One', { services, resolved, source })).resolves.toBe(PROJECT_UID);
+
+      expect(spy).toHaveBeenCalledWith('org1', { kind: 'uid', uid: 'Project One' });
+      spy.mockRestore();
+    },
+  );
 
   it('declares project as depending on org so the order of the literal cannot matter', () => {
     expect(table.project.dependsOn).toEqual(['org']);

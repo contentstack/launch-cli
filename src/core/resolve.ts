@@ -2,7 +2,7 @@ import { ProjectConfig } from './project-config';
 import { InputDependencyError, MissingInputError } from './errors';
 import { FlagKey, resolutionTable } from '../resources';
 import { AnyInputs, InputKeys, Resolved } from './inputs';
-import { AnyResolutionSpec, ResolveServices } from './resolution';
+import { AnyResolutionSpec, InputSource, ResolveServices } from './resolution';
 import { Rule } from './rules';
 
 function isAbsent(value: unknown): boolean {
@@ -77,23 +77,27 @@ export async function resolveInputs<S extends AnyInputs>(spec: S, args: ResolveA
   for (const key of resolutionOrder(declared)) {
     const rule = resolutionTable[key];
     let value = args.parsed[key];
+    let source: InputSource = 'flag';
 
     if (isAbsent(value) && rule.configPath) {
       value = args.projectConfig[rule.configPath];
+      source = 'config';
     }
 
     if (isAbsent(value) && rule.prompt && args.services.isTTY) {
       requireDependencies(rule);
       value = await rule.prompt({ services: args.services, resolved });
+      source = 'prompt';
     }
 
     if (isAbsent(value) && rule.default !== undefined) {
       value = rule.default;
+      source = 'default';
     }
 
     if (!isAbsent(value) && rule.normalize) {
       requireDependencies(rule);
-      value = await rule.normalize(value, { services: args.services, resolved });
+      value = await rule.normalize(value, { services: args.services, resolved, source });
     }
 
     if (isAbsent(value)) {

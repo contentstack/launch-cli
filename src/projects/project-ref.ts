@@ -16,4 +16,8 @@ export function parseProjectRef(input: string): ProjectRef {
   return PROJECT_UID_PATTERN.test(input) ? { kind: 'uid', uid: input } : { kind: 'name', name: input };
 }
 
-export const ProjectRef = { parse: parseProjectRef };
+export function uidProjectRef(input: string): ProjectUidRef {
+  return { kind: 'uid', uid: input };
+}
+
+export const ProjectRef = { parse: parseProjectRef, uid: uidProjectRef };

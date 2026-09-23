@@ -226,14 +226,14 @@ describe('resolveInputs', () => {
     expect(resolved.project).toBe(PROJECT_UID);
   });
 
-  it('normalises a project name supplied by the config file into its uid', async () => {
+  it('takes the config file uid field as a uid even when it reads like a name', async () => {
     const resolved = await resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
       parsed: { org: 'org1' },
       projectConfig: { uid: 'Project One' },
       services: services(),
     });
 
-    expect(resolved.project).toBe(PROJECT_UID);
+    expect(resolved.project).toBe('Project One');
   });
 
   it('treats a null organizationUid in the config file as absent and reports the missing input', async () => {
@@ -603,6 +603,68 @@ describe('resolveInputs dependency ordering', () => {
 
     expect(resolved).toEqual({ org: 'org1', project: PROJECT_UID });
     expect(seen).toEqual(['org1']);
+  });
+
+  it('takes a config-supplied project uid as a uid rather than sniffing its shape', async () => {
+    const seen: unknown[] = [];
+
+    const resolved = await resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
+      parsed: { org: 'org1' },
+      projectConfig: { uid: 'blt4d9e2a7c1f6b3085' },
+      services: { ...recordingServices(seen), isTTY: false },
+    });
+
+    expect(resolved.project).toBe('blt4d9e2a7c1f6b3085');
+    expect(seen).toEqual([]);
+  });
+
+  it('still looks up a project name supplied on argv, the one place the value is ambiguous', async () => {
+    const seen: unknown[] = [];
+
+    const resolved = await resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
+      parsed: { org: 'org1', project: 'Project One' },
+      projectConfig: {},
+      services: recordingServices(seen),
+    });
+
+    expect(resolved.project).toBe(PROJECT_UID);
+    expect(seen).toEqual(['org1']);
+  });
+
+  it('takes a picked project uid as a uid rather than sniffing its shape', async () => {
+    const seen: unknown[] = [];
+    const base = recordingServices(seen);
+    const services = {
+      ...base,
+      ux: { print: () => undefined, inquire: async () => 'blt4d9e2a7c1f6b3085' as never },
+      isTTY: true,
+    };
+
+    const resolved = await resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
+      parsed: { org: 'org1' },
+      projectConfig: {},
+      services,
+    });
+
+    expect(resolved.project).toBe('blt4d9e2a7c1f6b3085');
+    expect(seen).toEqual(['org1']);
+  });
+
+  it('runs a normalize that declares no dependency at all without demanding one', async () => {
+    const custom = {
+      ...resolutionModule.resolution,
+      org: { ...resolutionModule.resolution.org, normalize: async (value: unknown) => `${String(value)}-normalised` },
+    };
+
+    const resolved = await withResolution(custom, () =>
+      resolveInputs(inputs({ org: { required: true } }), {
+        parsed: { org: 'org1' },
+        projectConfig: {},
+        services: recordingServices([]),
+      }),
+    );
+
+    expect(resolved).toEqual({ org: 'org1-normalised' });
   });
 
   it('restores the catalog order for inputs that declare no dependency at all', async () => {

@@ -15,6 +15,16 @@ export interface PromptArgs<D extends FlagKey = never> {
   resolved: { [P in D]: ValueOf<Catalog[P]> };
 }
 
+export type InputSource = 'flag' | 'config' | 'prompt' | 'default';
+
+export interface NormalizeArgs<D extends FlagKey = never> extends PromptArgs<D> {
+  source: InputSource;
+}
+
+export interface LooseNormalizeArgs extends LooseArgs {
+  source: InputSource;
+}
+
 export interface LooseArgs {
   services: ResolveServices;
   resolved: Partial<Record<FlagKey, unknown>>;
@@ -24,7 +34,7 @@ export interface ResolutionSpec<T, D extends FlagKey = never> {
   configPath?: ProjectConfigKey;
   dependsOn?: readonly D[];
   prompt?(args: PromptArgs<D>): Promise<T>;
-  normalize?(value: T, args: PromptArgs<D>): Promise<T>;
+  normalize?(value: T, args: NormalizeArgs<D>): Promise<T>;
   default?: T;
 }
 
@@ -32,7 +42,7 @@ export interface AnyResolutionSpec {
   configPath?: ProjectConfigKey;
   dependsOn?: readonly FlagKey[];
   prompt?(args: LooseArgs): Promise<unknown>;
-  normalize?(value: unknown, args: LooseArgs): Promise<unknown>;
+  normalize?(value: unknown, args: LooseNormalizeArgs): Promise<unknown>;
   default?: unknown;
 }
 

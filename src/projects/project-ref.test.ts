@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
-import { ProjectRef, parseProjectRef } from './project-ref';
+import { ProjectRef, parseProjectRef, uidProjectRef } from './project-ref';
 
 const UID = randomBytes(12).toString('hex');
 
@@ -21,6 +21,14 @@ describe('parseProjectRef', () => {
     'classifies %p as a name',
     (input) => {
       expect(parseProjectRef(input)).toEqual({ kind: 'name', name: input });
+    },
+  );
+
+  it.each([['blt4d9e2a7c1f6b3085'], ['marketing-site'], [''], ['0'.repeat(24)]])(
+    'takes %p as a uid without sniffing its shape when the caller already knows it is one',
+    (input) => {
+      expect(uidProjectRef(input)).toEqual({ kind: 'uid', uid: input });
+      expect(ProjectRef.uid(input)).toEqual({ kind: 'uid', uid: input });
     },
   );
 
