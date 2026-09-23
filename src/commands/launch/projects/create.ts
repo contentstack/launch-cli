@@ -45,6 +45,7 @@ export default class ProjectsCreate extends LaunchCommand<typeof createInputs> {
     await new ProjectCreator(this.services, defaultWatchTiming()).create({
       org: resolved.org,
       dataDir: this.dataDir,
+      configPath: this.configPath,
       type: resolved.type,
       name: resolved.name,
       description: resolved.description,

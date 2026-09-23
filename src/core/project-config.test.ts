@@ -1,9 +1,9 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { UsageError } from './errors';
-import { ProjectConfigStore } from './project-config';
+import { DEFAULT_BLOCK_KEY, ProjectConfigStore } from './project-config';
 
 const tempDirs: string[] = [];
 
@@ -17,6 +17,10 @@ function storeFor(contents: unknown): ProjectConfigStore {
   const path = tempPath();
   writeFileSync(path, JSON.stringify(contents));
   return new ProjectConfigStore(path);
+}
+
+function fileAt(store: ProjectConfigStore): unknown {
+  return JSON.parse(readFileSync(store.path, 'utf8'));
 }
 
 afterEach(() => {
@@ -197,5 +201,139 @@ describe('ProjectConfigStore.load', () => {
 
   it.each([[null], [42], ['string'], [true]])('returns an empty object when the file contains %p', (contents) => {
     expect(storeFor(contents).load()).toEqual({});
+  });
+});
+
+describe('ProjectConfigStore.save', () => {
+  it('writes a single default block when the file does not exist yet', () => {
+    const store = new ProjectConfigStore(tempPath());
+
+    store.save({ uid: 'p1', organizationUid: 'org1' });
+
+    expect(fileAt(store)).toEqual({ [DEFAULT_BLOCK_KEY]: { uid: 'p1', organizationUid: 'org1' } });
+    expect(store.load()).toEqual({ uid: 'p1', organizationUid: 'org1' });
+  });
+
+  it('writes a single default block when the existing file holds no blocks', () => {
+    const store = storeFor({});
+
+    store.save({ uid: 'p1', organizationUid: 'org1' });
+
+    expect(fileAt(store)).toEqual({ [DEFAULT_BLOCK_KEY]: { uid: 'p1', organizationUid: 'org1' } });
+  });
+
+  it('writes a single default block when the existing file is not valid JSON', () => {
+    const path = tempPath();
+    writeFileSync(path, 'not json');
+    const store = new ProjectConfigStore(path);
+
+    store.save({ uid: 'p1', organizationUid: 'org1' });
+
+    expect(fileAt(store)).toEqual({ [DEFAULT_BLOCK_KEY]: { uid: 'p1', organizationUid: 'org1' } });
+  });
+
+  it('merges into the sole existing block rather than replacing it', () => {
+    const store = storeFor({ main: { uid: 'p1', organizationUid: 'org1', name: 'old-name' } });
+
+    store.save({ name: 'new-name' });
+
+    expect(fileAt(store)).toEqual({ main: { uid: 'p1', organizationUid: 'org1', name: 'new-name' } });
+  });
+
+  it('updates every branch block and discards none of them', () => {
+    const store = storeFor({
+      main: {
+        uid: 'p1',
+        organizationUid: 'org1',
+        name: 'my-site',
+        environments: [{ uid: 'e1', name: 'Default' }],
+      },
+      'feature/checkout': {
+        uid: 'p1',
+        organizationUid: 'org1',
+        name: 'my-site',
+        environments: [{ uid: 'e2', name: 'Preview' }],
+      },
+    });
+
+    store.save({ uid: 'p1', name: 'renamed' });
+
+    expect(fileAt(store)).toEqual({
+      main: { uid: 'p1', organizationUid: 'org1', name: 'renamed', environments: [{ uid: 'e1', name: 'Default' }] },
+      'feature/checkout': {
+        uid: 'p1',
+        organizationUid: 'org1',
+        name: 'renamed',
+        environments: [{ uid: 'e2', name: 'Preview' }],
+      },
+    });
+  });
+
+  it('refuses to write over branch blocks that do not agree on one project', () => {
+    const store = storeFor({
+      main: { uid: 'p1', organizationUid: 'org1' },
+      staging: { uid: 'p2', organizationUid: 'org1' },
+    });
+
+    expect(() => store.save({ name: 'renamed' })).toThrow(UsageError);
+    expect(() => store.save({ name: 'renamed' })).toThrow('main, staging');
+    expect(fileAt(store)).toEqual({
+      main: { uid: 'p1', organizationUid: 'org1' },
+      staging: { uid: 'p2', organizationUid: 'org1' },
+    });
+  });
+
+  it('refuses to write when the sole existing block names a different project', () => {
+    const store = storeFor({ main: { uid: 'p1', organizationUid: 'org1', name: 'other-site' } });
+
+    expect(() => store.save({ uid: 'p2', organizationUid: 'org1', name: 'my-site' })).toThrow(UsageError);
+    expect(() => store.save({ uid: 'p2', organizationUid: 'org1', name: 'my-site' })).toThrow(
+      `The config file at '${store.path}' already names project p1. Delete it or pass --config with another path.`,
+    );
+    expect(fileAt(store)).toEqual({ main: { uid: 'p1', organizationUid: 'org1', name: 'other-site' } });
+  });
+
+  it('refuses to write when every agreeing branch block names a different project', () => {
+    const store = storeFor({
+      main: { uid: 'p1', organizationUid: 'org1' },
+      staging: { uid: 'p1', organizationUid: 'org1' },
+    });
+
+    expect(() => store.save({ uid: 'p2', organizationUid: 'org1' })).toThrow('already names project p1');
+    expect(fileAt(store)).toEqual({
+      main: { uid: 'p1', organizationUid: 'org1' },
+      staging: { uid: 'p1', organizationUid: 'org1' },
+    });
+  });
+
+  it('writes over a block whose project uid is absent rather than treating it as a different project', () => {
+    const store = storeFor({ main: { organizationUid: 'org1' } });
+
+    store.save({ uid: 'p2', organizationUid: 'org1' });
+
+    expect(fileAt(store)).toEqual({ main: { uid: 'p2', organizationUid: 'org1' } });
+  });
+
+  it('replaces a sole non-object block rather than spreading a primitive into it', () => {
+    const store = storeFor({ main: 'x' });
+
+    store.save({ uid: 'p1', organizationUid: 'org1' });
+
+    expect(fileAt(store)).toEqual({ main: { uid: 'p1', organizationUid: 'org1' } });
+  });
+
+  it('writes the file so that a later load reads back exactly what was saved', () => {
+    const store = new ProjectConfigStore(tempPath());
+    const config = {
+      uid: 'p1',
+      organizationUid: 'org1',
+      name: 'my-site',
+      environments: [{ uid: 'e1', name: 'Default' }],
+    };
+
+    store.save(config);
+
+    expect(store.load()).toEqual(config);
+    expect(readFileSync(store.path, 'utf8').endsWith('\n')).toBe(true);
   });
 });

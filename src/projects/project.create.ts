@@ -1,4 +1,5 @@
 import { MissingInputError, UsageError } from '../core/errors';
+import { ProjectConfig, ProjectConfigStore } from '../core/project-config';
 import { renderDetail } from '../core/render';
 import type { ServiceContext } from '../core/service-context';
 import { DeploymentUnsuccessfulError } from '../deployments/deployment.errors';
@@ -27,6 +28,7 @@ export const NO_DEPLOYMENT_STATUS = 'NONE';
 export interface CreateRequest {
   org: string;
   dataDir: string;
+  configPath?: string;
   type?: string;
   name?: string;
   description?: string;
@@ -120,7 +122,34 @@ export class ProjectCreator {
 
     const project = await this.services.api.projects.create({ org: request.org, input });
 
+    this.remember(request, project);
+
     await this.follow(request.org, project, envName);
+  }
+
+  private remember(request: CreateRequest, project: Project): void {
+    const path = request.configPath;
+
+    if (path === undefined) {
+      return;
+    }
+
+    const config: ProjectConfig = { uid: project.uid, organizationUid: request.org };
+
+    if (project.name !== undefined) {
+      config.name = project.name;
+    }
+
+    try {
+      new ProjectConfigStore(path).save(config);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+
+      this.services.ux.print(
+        `Could not record this project in ${path}: ${reason} ` +
+          'Pass --org and --project explicitly when you run Launch commands in this folder.',
+      );
+    }
   }
 
   private async follow(org: string, project: Project, envName: string): Promise<void> {

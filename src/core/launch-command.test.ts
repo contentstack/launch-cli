@@ -481,6 +481,8 @@ describe('resolveLaunchContext', () => {
     });
 
     expect((loadSpy.mock.instances[0] as ProjectConfigStore).path).toBe(resolvePath(dir, PROJECT_CONFIG_FILE));
+    expect(result.configPath).toBe(resolvePath(dir, PROJECT_CONFIG_FILE));
+    expect(result.dataDir).toBe(dir);
     expect(result.resolved).toEqual({ org: 'org-from-cwd' });
     expect(result.services.isTTY).toBe(false);
     cwdSpy.mockRestore();
@@ -505,6 +507,7 @@ describe('resolveLaunchContext', () => {
     });
 
     expect(result.resolved).toEqual({ org: 'org-from-data-dir' });
+    expect(result.configPath).toBe(resolvePath(dir, PROJECT_CONFIG_FILE));
   });
 
   it('reads the exact file named by the config flag, ignoring data-dir and the default file name', async () => {
@@ -524,6 +527,7 @@ describe('resolveLaunchContext', () => {
     });
 
     expect(result.resolved).toEqual({ org: 'org-from-custom-config' });
+    expect(result.configPath).toBe(customPath);
     expect(result.services.ux).toBe(ux);
     expect(result.services.isTTY).toBe(true);
   });

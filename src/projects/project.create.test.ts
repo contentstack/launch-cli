@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -48,6 +48,7 @@ interface Scenario {
   branches?: unknown[];
   detected?: unknown;
   createFails?: Error;
+  createdProject?: unknown;
 }
 
 let dataDir: string;
@@ -83,7 +84,7 @@ function harness(scenario: Scenario = {}) {
           throw scenario.createFails;
         }
 
-        return { uid: PROJECT_UID, name: 'My Site', projectType: 'GITPROVIDER' };
+        return scenario.createdProject ?? { uid: PROJECT_UID, name: 'My Site', projectType: 'GITPROVIDER' };
       },
       signedUploadUrl: async () => ({ uploadUrl: 'https://uploads.example.test/x', uploadUid: 'upload-uid' }),
       gitFramework: async (params: unknown) => {
@@ -131,6 +132,14 @@ function harness(scenario: Scenario = {}) {
   const services: ServiceContext = { api, ux, isTTY: scenario.isTTY ?? false };
 
   return { creator: new ProjectCreator(services, advancingTiming()), printed, asked, created, gitCalls };
+}
+
+function configPathIn(dir: string): string {
+  return join(dir, '.cs-launch.json');
+}
+
+function configFileIn(dir: string): unknown {
+  return JSON.parse(readFileSync(configPathIn(dir), 'utf8'));
 }
 
 function gitRequest(overrides: Partial<CreateRequest> = {}): CreateRequest {
@@ -634,5 +643,107 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await expect(creator.create(gitRequest())).rejects.toBe(boom);
     expect(printed).toEqual([]);
+  });
+});
+
+describe('ProjectCreator writing the project config', () => {
+  beforeEach(() => {
+    (uploadArchive as jest.Mock).mockImplementation(async () => undefined);
+    dataDir = mkdtempSync(join(tmpdir(), 'launch-create-'));
+    writeFileSync(join(dataDir, 'index.html'), '<h1>site</h1>');
+  });
+
+  afterEach(() => {
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  it('writes the created project into .cs-launch.json on the GitHub path', async () => {
+    const { creator } = harness();
+
+    await creator.create(gitRequest({ configPath: configPathIn(dataDir) }));
+
+    expect(configFileIn(dataDir)).toEqual({
+      project: { uid: PROJECT_UID, organizationUid: ORG, name: 'My Site' },
+    });
+  });
+
+  it('writes the created project into .cs-launch.json on the FileUpload path', async () => {
+    const { creator } = harness();
+
+    await creator.create(uploadRequest({ configPath: configPathIn(dataDir) }));
+
+    expect(configFileIn(dataDir)).toEqual({
+      project: { uid: PROJECT_UID, organizationUid: ORG, name: 'My Site' },
+    });
+  });
+
+  it('keeps every other branch block in an existing multi-branch file', async () => {
+    writeFileSync(
+      configPathIn(dataDir),
+      JSON.stringify({
+        main: { uid: PROJECT_UID, organizationUid: ORG, environments: [{ uid: 'e1', name: 'Default' }] },
+        'feature/checkout': { uid: PROJECT_UID, organizationUid: ORG, environments: [{ uid: 'e2', name: 'Preview' }] },
+      }),
+    );
+    const { creator } = harness();
+
+    await creator.create(gitRequest({ configPath: configPathIn(dataDir) }));
+
+    expect(configFileIn(dataDir)).toEqual({
+      main: {
+        uid: PROJECT_UID,
+        organizationUid: ORG,
+        name: 'My Site',
+        environments: [{ uid: 'e1', name: 'Default' }],
+      },
+      'feature/checkout': {
+        uid: PROJECT_UID,
+        organizationUid: ORG,
+        name: 'My Site',
+        environments: [{ uid: 'e2', name: 'Preview' }],
+      },
+    });
+  });
+
+  it('reports the miss and leaves the file alone when it already names a different project', async () => {
+    const existing = { project: { uid: 'other-project', organizationUid: ORG, name: 'Other Site' } };
+    writeFileSync(configPathIn(dataDir), JSON.stringify(existing));
+    const { creator, printed } = harness();
+
+    await expect(creator.create(gitRequest({ configPath: configPathIn(dataDir) }))).resolves.toBeUndefined();
+
+    expect(configFileIn(dataDir)).toEqual(existing);
+    expect(printed).toContain(
+      `Could not record this project in ${configPathIn(dataDir)}: ` +
+        `The config file at '${configPathIn(dataDir)}' already names project other-project. ` +
+        'Delete it or pass --config with another path. ' +
+        'Pass --org and --project explicitly when you run Launch commands in this folder.',
+    );
+  });
+
+  it('reports the miss and still reports the created project when the file cannot be written', async () => {
+    const unwritable = join(dataDir, 'no-such-folder', '.cs-launch.json');
+    const { creator, printed } = harness();
+
+    await expect(creator.create(gitRequest({ configPath: unwritable }))).resolves.toBeUndefined();
+
+    expect(printed.some((line) => line.startsWith(`Could not record this project in ${unwritable}:`))).toBe(true);
+    expect(printed.some((line) => line.includes(PROJECT_UID))).toBe(true);
+  });
+
+  it('omits the project name when the api returns a project without one', async () => {
+    const { creator } = harness({ createdProject: { uid: PROJECT_UID } });
+
+    await creator.create(gitRequest({ configPath: configPathIn(dataDir) }));
+
+    expect(configFileIn(dataDir)).toEqual({ project: { uid: PROJECT_UID, organizationUid: ORG } });
+  });
+
+  it('writes nothing at all when no config path was supplied', async () => {
+    const { creator } = harness();
+
+    await creator.create(gitRequest());
+
+    expect(existsSync(configPathIn(dataDir))).toBe(false);
   });
 });

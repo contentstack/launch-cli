@@ -10,6 +10,7 @@ function commandUnderTest(resolved: Record<string, unknown>, dataDir = '/tmp/sit
     resolved: { org: 'org1', ...resolved },
     services: { api: {}, ux: { print: () => undefined, inquire: async () => undefined }, isTTY: false },
     dataDir,
+    configPath: `${dataDir}/.cs-launch.json`,
   });
 
   return command;
@@ -43,6 +44,7 @@ describe('launch:projects:create', () => {
       {
         org: 'org1',
         dataDir: '/tmp/site',
+        configPath: '/tmp/site/.cs-launch.json',
         type: 'GitHub',
         name: 'My Site',
         description: 'A site',
@@ -70,6 +72,17 @@ describe('launch:projects:create', () => {
     await commandUnderTest({}, '/elsewhere/project').run();
 
     expect(requests[0].dataDir).toBe('/elsewhere/project');
+  });
+
+  it('passes the config path the base command resolved so create writes where the next command reads', async () => {
+    const requests: { configPath: string }[] = [];
+    jest.spyOn(ProjectCreator.prototype, 'create').mockImplementation(async (request) => {
+      requests.push(request as { configPath: string });
+    });
+
+    await commandUnderTest({}, '/elsewhere/project').run();
+
+    expect(requests[0].configPath).toBe('/elsewhere/project/.cs-launch.json');
   });
 
   it('propagates a failure from the creator rather than swallowing it', async () => {
