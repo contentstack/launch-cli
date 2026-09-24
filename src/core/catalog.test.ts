@@ -1,22 +1,22 @@
 import { Parser } from '@oclif/core';
 
-import { globalFlags } from './catalog';
+import { coreFlags } from './catalog';
 import { CLIENT_MAX_LIMIT } from './constants';
 
 async function parse(argv: string[]): Promise<Record<string, unknown>> {
-  const { flags } = await Parser.parse(argv, { flags: globalFlags });
+  const { flags } = await Parser.parse(argv, { flags: coreFlags });
   return flags as Record<string, unknown>;
 }
 
-describe('globalFlags', () => {
+describe('coreFlags', () => {
   it('advertises the limit range in the flag itself, not only in the help text', () => {
-    expect(globalFlags.limit).toMatchObject({ min: 0, max: CLIENT_MAX_LIMIT });
-    expect(globalFlags.limit.description).toBe(`Number of records to fetch (0-${CLIENT_MAX_LIMIT})`);
+    expect(coreFlags.limit).toMatchObject({ min: 0, max: CLIENT_MAX_LIMIT });
+    expect(coreFlags.limit.description).toBe(`Number of records to fetch (0-${CLIENT_MAX_LIMIT})`);
   });
 
   it('advertises the skip floor in the flag itself', () => {
-    expect(globalFlags.skip).toMatchObject({ min: 0 });
-    expect((globalFlags.skip as unknown as { max?: number }).max).toBeUndefined();
+    expect(coreFlags.skip).toMatchObject({ min: 0 });
+    expect((coreFlags.skip as unknown as { max?: number }).max).toBeUndefined();
   });
 
   it.each([['0'], ['1'], [String(CLIENT_MAX_LIMIT)]])('accepts the in-range limit %s', async (limit) => {

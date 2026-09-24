@@ -46,7 +46,7 @@ export interface AnyResolutionSpec {
   default?: unknown;
 }
 
-export const globalResolution = {
+export const coreResolution = {
   limit: { default: DEFAULT_LIMIT } satisfies ResolutionSpec<number>,
   skip: { default: 0 } satisfies ResolutionSpec<number>,
   yes: { default: false } satisfies ResolutionSpec<boolean>,

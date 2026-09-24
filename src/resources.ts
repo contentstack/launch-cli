@@ -1,5 +1,5 @@
-import { globalFlags } from './core/catalog';
-import { globalResolution, type AnyResolutionSpec } from './core/resolution';
+import { coreFlags } from './core/catalog';
+import { coreResolution, type AnyResolutionSpec } from './core/resolution';
 import { organizationFlags, organizationResolution } from './organizations/organization.inputs';
 import { PROJECT_DEPENDENCIES, projectFlags, projectResolution } from './projects/project.inputs';
 import { environmentFlags, environmentResolution } from './environments/environment.inputs';
@@ -12,7 +12,7 @@ import { OrganizationsApi } from './organizations/organizations.api';
 import type { CmaSession } from './transport/cma-client';
 import type { RestApiClient } from './transport/rest-client';
 
-export const catalog = { ...organizationFlags, ...globalFlags, ...projectFlags, ...environmentFlags, ...gitFlags };
+export const catalog = { ...organizationFlags, ...coreFlags, ...projectFlags, ...environmentFlags, ...gitFlags };
 
 export type Catalog = typeof catalog;
 export type FlagKey = keyof Catalog;
@@ -20,7 +20,7 @@ export type FlagKey = keyof Catalog;
 export const resolution = {
   ...projectResolution,
   ...organizationResolution,
-  ...globalResolution,
+  ...coreResolution,
   ...environmentResolution,
   ...gitResolution,
 };
