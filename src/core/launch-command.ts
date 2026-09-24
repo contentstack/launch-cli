@@ -12,6 +12,7 @@ import { AnyInputs, Resolved } from './inputs';
 import { resolveInputs } from './resolve';
 import { Rule } from './rules';
 import { UxLike } from './render';
+import { registerSearchList } from './search-list';
 import { ServiceContext, buildServiceContext } from './service-context';
 
 export interface ResolveLaunchContextArgs<S extends AnyInputs> {
@@ -84,6 +85,7 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
   async init(): Promise<void> {
     await super.init();
     this.requireAuth();
+    registerSearchList();
 
     const { flags } = await this.parse({
       flags: this.contract.flags,

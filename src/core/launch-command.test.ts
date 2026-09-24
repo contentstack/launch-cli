@@ -13,6 +13,7 @@ import { LaunchApiError } from '../transport/errors';
 import { UxLike } from './render';
 import { LaunchCommand, resolveLaunchContext } from './launch-command';
 import * as serviceContext from './service-context';
+import { SearchListClass, utilitiesLoader } from './search-list';
 import { pretendTerminal, stdinReportingTTY } from '../../test/support/terminal';
 
 class Probe extends LaunchCommand {
@@ -308,6 +309,29 @@ describe('LaunchCommand.init', () => {
     createSpy.mockRestore();
     authSpy.mockRestore();
     restoreTTY();
+  });
+
+  it('registers the searchable picker on the inquirer cliux prompts with before anything can prompt', async () => {
+    const load = utilitiesLoader();
+    const prompts = (load('inquirer') as { prompt: { prompts: Record<string, unknown> } }).prompt.prompts;
+    delete prompts['search-list'];
+    const instance = probe();
+    const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
+    Object.defineProperty(instance, 'launchRegion', { value: { launchHubUrl: 'https://launch-api.test' }, configurable: true });
+    Object.defineProperty(instance, 'config', { value: { userAgent: 'cli/2.0.0' }, configurable: true });
+    let registeredWhenParsed: unknown;
+    (instance as unknown as { parse: jest.Mock }).parse = jest.fn(async () => {
+      registeredWhenParsed = prompts['search-list'];
+      return { flags: {} };
+    });
+
+    await instance.init();
+
+    expect((registeredWhenParsed as SearchListClass).prototype).toBeInstanceOf(
+      load('inquirer-search-list') as SearchListClass,
+    );
+    expect(prompts['search-list']).toBe(registeredWhenParsed);
+    authSpy.mockRestore();
   });
 
   it('derives the hub url from the configured region cma when the region declares no launch hub url', async () => {
