@@ -10,7 +10,7 @@ export interface SearchListPrompt {
   pointer: number;
   list: SearchChoice[];
   filterList: SearchChoice[];
-  getCurrentValue(): unknown;
+  getCurrentValue(line?: unknown): unknown;
 }
 
 export type SearchListClass = new (...params: never[]) => SearchListPrompt;
@@ -34,8 +34,8 @@ export function launchSearchList(SearchList: SearchListClass): SearchListClass {
       this.pointer = startingPointer(this.list, this.opt.default);
     }
 
-    getCurrentValue(): unknown {
-      return this.filterList.length > 0 ? this.filterList[this.pointer].value : this.rl.line;
+    getCurrentValue(line?: unknown): unknown {
+      return this.filterList.length > 0 ? this.filterList[this.pointer].value : String(line ?? '');
     }
   };
 }

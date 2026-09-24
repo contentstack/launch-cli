@@ -7,7 +7,7 @@ interface Prompt {
   pointer: number;
   rl: { line: string };
   filterChoices(): void;
-  getCurrentValue(): unknown;
+  getCurrentValue(line?: unknown): unknown;
 }
 
 const CHOICES = [
@@ -67,10 +67,18 @@ describe('launchSearchList', () => {
     expect(prompt.getCurrentValue()).toBe('Other');
   });
 
-  it('submits the typed text rather than the first choice when the text matches nothing', () => {
+  it('submits the submitted line rather than the first choice when the typed text matches nothing', () => {
     const prompt = typed(open({}), 'no-such-framework-9987');
+    prompt.rl.line = '';
 
-    expect(prompt.getCurrentValue()).toBe('no-such-framework-9987');
+    expect(prompt.getCurrentValue('no-such-framework-9987')).toBe('no-such-framework-9987');
+  });
+
+  it('reads nothing as the value when the typed text matches nothing and no line was submitted', () => {
+    const prompt = typed(open({}), 'no-such-framework-9987');
+    prompt.rl.line = '';
+
+    expect(prompt.getCurrentValue()).toBe('');
   });
 });
 
