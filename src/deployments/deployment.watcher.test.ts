@@ -49,6 +49,7 @@ function harness(statuses: (string | undefined)[], options: { isTTY?: boolean; t
 
 function failingHarness(outcomes: (string | Error)[], options: { timeoutMs?: number } = {}) {
   const lines: string[] = [];
+  const slept: number[] = [];
   let clock = 0;
   let polls = 0;
 
@@ -73,6 +74,7 @@ function failingHarness(outcomes: (string | Error)[], options: { timeoutMs?: num
     ux,
     isTTY: false,
     sleep: async (ms: number) => {
+      slept.push(ms);
       clock += ms;
     },
     now: () => clock,
@@ -81,48 +83,93 @@ function failingHarness(outcomes: (string | Error)[], options: { timeoutMs?: num
     timeoutMs: options.timeoutMs ?? 60_000,
   };
 
-  return { deps, lines, pollCount: () => polls };
+  return { deps, lines, slept, pollCount: () => polls };
 }
 
 describe('deployment wait loop surviving a failing poll', () => {
   it('keeps waiting through a transient poll failure and reports the terminal status', async () => {
     const blip = new Error('502 Bad Gateway');
-    const { deps, lines, pollCount } = failingHarness(['QUEUED', blip, 'DEPLOYING', 'LIVE']);
+    const { deps, lines, slept, pollCount } = failingHarness(['QUEUED', blip, 'DEPLOYING', 'LIVE']);
 
     const outcome = await watchDeployment(deps);
 
     expect(outcome.kind).toBe('success');
     expect(outcome.status).toBe('LIVE');
     expect(pollCount()).toBe(4);
+    expect(slept).toEqual([1000, 2000, 3000]);
     expect(lines.some((line) => line.includes('502 Bad Gateway'))).toBe(false);
+  });
+
+  it('backs off between failing polls by the same growing step the in-flight path uses', async () => {
+    const blip = new Error('503 Service Unavailable');
+    const { deps, slept, pollCount } = failingHarness([blip, blip, 'LIVE']);
+
+    const outcome = await watchDeployment(deps);
+
+    expect(outcome.kind).toBe('success');
+    expect(pollCount()).toBe(3);
+    expect(slept).toEqual([1000, 2000]);
+  });
+
+  it('caps the backoff after a failing poll at maxBackoffSteps', async () => {
+    const blip = new Error('503 Service Unavailable');
+    const { deps, slept } = failingHarness(['DEPLOYING', 'DEPLOYING', 'DEPLOYING', blip, 'LIVE']);
+
+    await watchDeployment(deps);
+
+    expect(slept).toEqual([1000, 2000, 3000, 3000]);
   });
 
   it('resets its patience after a poll that succeeded between failures', async () => {
     const blip = new Error('503 Service Unavailable');
-    const { deps, pollCount } = failingHarness([blip, blip, 'DEPLOYING', blip, blip, 'LIVE']);
+    const { deps, slept, pollCount } = failingHarness([blip, blip, 'DEPLOYING', blip, blip, 'LIVE']);
 
     const outcome = await watchDeployment(deps);
 
     expect(outcome.kind).toBe('success');
     expect(pollCount()).toBe(6);
+    expect(slept).toEqual([1000, 2000, 3000, 3000, 3000]);
   });
 
   it('propagates the error once the poll has failed DEPLOYMENT_MAX_POLL_ERRORS times in a row', async () => {
     const outage = new Error('500 Internal Server Error');
-    const { deps, pollCount } = failingHarness([outage]);
+    const { deps, slept, pollCount } = failingHarness([outage]);
 
     await expect(watchDeployment(deps)).rejects.toThrow('500 Internal Server Error');
 
     expect(pollCount()).toBe(DEPLOYMENT_MAX_POLL_ERRORS);
+    expect(slept).toEqual([1000, 2000]);
   });
 
-  it('propagates the error rather than waiting when the deadline is already behind it', async () => {
+  it('propagates the error without sleeping when the retry would land exactly on the deadline', async () => {
     const outage = new Error('500 Internal Server Error');
-    const { deps, pollCount } = failingHarness([outage], { timeoutMs: 0 });
+    const { deps, slept, pollCount } = failingHarness([outage, 'LIVE'], { timeoutMs: 1000 });
 
     await expect(watchDeployment(deps)).rejects.toThrow('500 Internal Server Error');
 
     expect(pollCount()).toBe(1);
+    expect(slept).toEqual([]);
+  });
+
+  it('propagates the error without sleeping when the retry would land past the deadline', async () => {
+    const outage = new Error('500 Internal Server Error');
+    const { deps, slept, pollCount } = failingHarness([outage, 'LIVE'], { timeoutMs: 999 });
+
+    await expect(watchDeployment(deps)).rejects.toThrow('500 Internal Server Error');
+
+    expect(pollCount()).toBe(1);
+    expect(slept).toEqual([]);
+  });
+
+  it('retries a failing poll when the retry lands one millisecond before the deadline', async () => {
+    const outage = new Error('500 Internal Server Error');
+    const { deps, slept, pollCount } = failingHarness([outage, 'LIVE'], { timeoutMs: 1001 });
+
+    const outcome = await watchDeployment(deps);
+
+    expect(outcome.kind).toBe('success');
+    expect(pollCount()).toBe(2);
+    expect(slept).toEqual([1000]);
   });
 });
 
@@ -268,16 +315,56 @@ describe('deployment wait loop', () => {
     expect(pollCount()).toBe(1);
   });
 
-  it('offers a real clock and a real sleep, bounded by the declared timing constants', async () => {
+  it('times out without sleeping when the next poll would land exactly on the deadline', async () => {
+    const { deps, slept, pollCount } = harness(['DEPLOYING', 'LIVE'], { timeoutMs: 1000 });
+
+    const outcome = await watchDeployment(deps);
+
+    expect(outcome.kind).toBe('timed-out');
+    expect(pollCount()).toBe(1);
+    expect(slept).toEqual([]);
+  });
+
+  it('times out without sleeping when the next poll would land past the deadline', async () => {
+    const { deps, slept, pollCount } = harness(['DEPLOYING', 'LIVE'], { timeoutMs: 999 });
+
+    const outcome = await watchDeployment(deps);
+
+    expect(outcome.kind).toBe('timed-out');
+    expect(pollCount()).toBe(1);
+    expect(slept).toEqual([]);
+  });
+
+  it('polls again when the next poll lands one millisecond before the deadline', async () => {
+    const { deps, slept, pollCount } = harness(['DEPLOYING', 'LIVE'], { timeoutMs: 1001 });
+
+    const outcome = await watchDeployment(deps);
+
+    expect(outcome.kind).toBe('success');
+    expect(pollCount()).toBe(2);
+    expect(slept).toEqual([1000]);
+  });
+
+  it('offers a real clock and a sleep that resolves only once its delay has elapsed', async () => {
+    jest.useFakeTimers({ now: 5000 });
     const timing = defaultWatchTiming();
-    const before = timing.now();
+    let woke = false;
 
-    await timing.sleep(0);
+    const sleeping = timing.sleep(1500).then(() => {
+      woke = true;
+    });
+    await jest.advanceTimersByTimeAsync(1499);
+    const wokeEarly = woke;
+    await jest.advanceTimersByTimeAsync(1);
+    await sleeping;
+    const now = timing.now();
+    jest.useRealTimers();
 
-    expect(timing.now()).toBeGreaterThanOrEqual(before);
+    expect(wokeEarly).toBe(false);
+    expect(woke).toBe(true);
+    expect(now).toBe(6500);
     expect(timing.pollDelayMs).toBe(DEPLOYMENT_POLL_DELAY_MS);
     expect(timing.maxBackoffSteps).toBe(DEPLOYMENT_MAX_BACKOFF_STEPS);
     expect(timing.timeoutMs).toBe(DEPLOYMENT_WAIT_TIMEOUT_MS);
-    expect(DEPLOYMENT_WAIT_TIMEOUT_MS).toBeGreaterThan(DEPLOYMENT_POLL_DELAY_MS);
   });
 });
