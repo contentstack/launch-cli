@@ -1,11 +1,13 @@
 import { ApiSurface, buildApi } from '../resources';
 import { RestApiClient } from '../transport/rest-client';
 import { selectAuthStrategy } from '../transport/auth-strategy';
+import { createCmaSession } from '../transport/cma-client';
 import { getManageApiBaseUrl } from './region';
 import { UxLike } from './render';
 
 export interface ServiceContextOptions {
   launchHubUrl: string;
+  cma?: string;
   analyticsInfo: string;
   ux: UxLike;
   isTTY: boolean;
@@ -24,5 +26,7 @@ export function buildServiceContext(options: ServiceContextOptions): ServiceCont
     auth: selectAuthStrategy(),
   });
 
-  return { api: buildApi(client), ux: options.ux, isTTY: options.isTTY };
+  const cma = createCmaSession({ cma: options.cma, analyticsInfo: options.analyticsInfo });
+
+  return { api: buildApi(client, cma), ux: options.ux, isTTY: options.isTTY };
 }

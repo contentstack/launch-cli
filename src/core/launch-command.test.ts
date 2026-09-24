@@ -12,6 +12,7 @@ import { exactlyOneOf } from './rules';
 import { LaunchApiError } from '../transport/errors';
 import { UxLike } from './render';
 import { LaunchCommand, resolveLaunchContext } from './launch-command';
+import * as serviceContext from './service-context';
 
 class Probe extends LaunchCommand {
   static flags = {};
@@ -77,7 +78,7 @@ describe('LaunchCommand.catch', () => {
   it('reports a missing input as a usage error', async () => {
     const instance = probe();
 
-    await instance['catch'](new MissingInputError('org'));
+    await instance['catch'](new MissingInputError('org', { config: true, prompt: true }));
 
     expect(instance.error).toHaveBeenCalledWith(expect.stringContaining('Missing required value for --org'), {
       exit: 2,
@@ -300,10 +301,15 @@ describe('LaunchCommand.init', () => {
       capturedBaseUrl = url;
     }));
 
+    const contextSpy = jest.spyOn(serviceContext, 'buildServiceContext');
+
     await instance.init();
     await instance['services'].api.projects.list({ org: 'org1' });
 
     expect(capturedBaseUrl).toBe(getManageApiBaseUrl('https://launch-api.contentstack.com'));
+    expect(contextSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ launchHubUrl: 'https://launch-api.contentstack.com', cma: 'api.contentstack.io' }),
+    );
 
     createSpy.mockRestore();
     regionSpy.mockRestore();

@@ -96,6 +96,8 @@ src/
                 wait/stream loop that projects:create, deployments:create and logs:get
                 all drive
   git/          the internal git-namespace / repository / branch lookups
+  organizations/ the --org flag, its organization picker, and the lookup behind it,
+                which reads the Contentstack Management API rather than Launch
   functions/    the cloud-function runtime and the serve flags, treated as a resource
   resources.ts  the composition root: it assembles the catalog, the resolution table,
                 the dependency map and the api surface out of the resources
@@ -213,6 +215,29 @@ by the **resolved reference** (a uid) rather than by its display name: fetching 
 put a request on the wire on both refusal paths. The name is fetched only after the gate opens, and
 it is what the success line reports - `✔ Project "<name>" deleted.` - falling back to the
 reference when the API returns a project with no name.
+
+**The organization prompt.** `--org` resolves flag -> `.cs-launch.json` -> prompt (TTY only), and
+the prompt is `promptForOrganization` in `src/organizations/organization.prompt.ts`, so every command
+that declares `org` inherits it. The management service has no organization-listing endpoint, so the
+lookup reads the **Contentstack Management API** through the management SDK, as V1 did:
+`src/transport/cma-client.ts` opens one SDK client per command on the region's `cma` host and adapts
+it to the narrow `CmaSession` interface, and `OrganizationsApi` in `src/organizations/organizations.api.ts`
+is the repository over it. `organizations` is a resource folder like any other, so `core` never imports
+it and `layering.test.ts` lists it with no outgoing edges.
+
+- **Paging.** `fetchAll({ limit: 100, asc: 'name', include_count: true, skip })`, advancing `skip` by
+  100. It stops on a page shorter than 100 (an empty page included) or once `skip + items` reaches the
+  reported `count`, and after `MAX_PAGES` full pages it raises rather than loop.
+- **OAuth scope.** When the session carries `oauthOrgUid`, only that organization is fetched and it
+  is used without asking; a line says which one.
+- **Failure** of either call is an `OrganizationLookupError` (exit 1) in the CLI's own words, never a
+  raw SDK error, and it suggests `--org`.
+- The picker labels each organization by name and resolves to its uid. Text typed at the search list
+  that matches neither a uid nor a name is a usage error, not a crash.
+
+`MissingInputError` names only the remedies that exist for the flag it is about: "set it in
+`.cs-launch.json`" only when the spec has a `configPath`, "run in an interactive terminal" only when
+it has a prompt (or, for `projects:create`, when the creator asks for it).
 
 **`projects:update` and client-side field limits.** The command sends `PUT /projects/:uid` with
 `{name?, description?}` - the only two fields `UpdateProjectInput` declares in

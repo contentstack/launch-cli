@@ -3,7 +3,6 @@ import { Flags } from '@contentstack/cli-utilities';
 import { CLIENT_MAX_LIMIT, PROJECT_CONFIG_FILE } from './constants';
 
 export const globalFlags = {
-  org: Flags.string({ description: 'Organization UID' }),
   limit: Flags.integer({
     min: 0,
     max: CLIENT_MAX_LIMIT,

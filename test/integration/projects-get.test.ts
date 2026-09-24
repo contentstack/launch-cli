@@ -9,6 +9,17 @@ import { UxLike, renderDetail } from '../../src/core/render';
 import getFileUploadFixture from '../fixtures/project-get-fileupload.json';
 import getFixture from '../fixtures/project-get.json';
 import notFoundFixture from '../fixtures/project-not-found.json';
+import type { CmaSession } from '../../src/transport/cma-client';
+
+const UNUSED_CMA: CmaSession = {
+  fetchOrganizations: async () => {
+    throw new Error('this test lists no organizations');
+  },
+  fetchOrganization: async () => {
+    throw new Error('this test fetches no organization');
+  },
+  scopedOrganizationUid: () => undefined,
+};
 
 const ORIGIN = 'https://launch-api.integration.test';
 const BASE_PATH = '/manage';
@@ -60,7 +71,7 @@ describe('integration: GET /projects/{project_uid}', () => {
         return [200, getFixture];
       });
 
-    await buildApi(buildClient()).projects.get({ org: ORG_UID, project: PROJECT_UID });
+    await buildApi(buildClient(), UNUSED_CMA).projects.get({ org: ORG_UID, project: PROJECT_UID });
 
     expect(scope.isDone()).toBe(true);
     expect(capturedPath).toBe(`${BASE_PATH}/projects/${PROJECT_UID}`);
@@ -74,7 +85,7 @@ describe('integration: GET /projects/{project_uid}', () => {
   it('unwraps the documented project envelope into a bare Project', async () => {
     nock(ORIGIN).get(`${BASE_PATH}/projects/${PROJECT_UID}`).query({}).reply(200, getFixture);
 
-    const project: Project = await buildApi(buildClient()).projects.get({ org: ORG_UID, project: PROJECT_UID });
+    const project: Project = await buildApi(buildClient(), UNUSED_CMA).projects.get({ org: ORG_UID, project: PROJECT_UID });
 
     expect(project).not.toHaveProperty('project');
     expect(project.uid).toBe(PROJECT_UID);
@@ -98,7 +109,7 @@ describe('integration: GET /projects/{project_uid}', () => {
     nock(ORIGIN).get(`${BASE_PATH}/projects/${PROJECT_UID}`).query({}).reply(200, getFixture);
     const { ux, lines } = recordingUx();
 
-    const project = await buildApi(buildClient()).projects.get({ org: ORG_UID, project: PROJECT_UID });
+    const project = await buildApi(buildClient(), UNUSED_CMA).projects.get({ org: ORG_UID, project: PROJECT_UID });
     renderDetail(ux, projectDetailFields(project));
 
     expect(lines).toEqual(['uid   a1b2c3d4e5f60718293a4b5c', 'name  sample-project', 'type  GITPROVIDER']);
@@ -107,7 +118,7 @@ describe('integration: GET /projects/{project_uid}', () => {
   it('unwraps a FileUpload project that carries neither repository nor description', async () => {
     nock(ORIGIN).get(`${BASE_PATH}/projects/${FILEUPLOAD_PROJECT_UID}`).query({}).reply(200, getFileUploadFixture);
 
-    const project: Project = await buildApi(buildClient()).projects.get({
+    const project: Project = await buildApi(buildClient(), UNUSED_CMA).projects.get({
       org: ORG_UID,
       project: FILEUPLOAD_PROJECT_UID,
     });
@@ -122,7 +133,7 @@ describe('integration: GET /projects/{project_uid}', () => {
     nock(ORIGIN).get(`${BASE_PATH}/projects/${FILEUPLOAD_PROJECT_UID}`).query({}).reply(200, getFileUploadFixture);
     const { ux, lines } = recordingUx();
 
-    const project = await buildApi(buildClient()).projects.get({ org: ORG_UID, project: FILEUPLOAD_PROJECT_UID });
+    const project = await buildApi(buildClient(), UNUSED_CMA).projects.get({ org: ORG_UID, project: FILEUPLOAD_PROJECT_UID });
     renderDetail(ux, projectDetailFields(project));
 
     expect(lines).toEqual(['uid   c3d4e5f60718293a4b5c6d7e', 'name  docs-site', 'type  FILEUPLOAD']);
@@ -131,7 +142,7 @@ describe('integration: GET /projects/{project_uid}', () => {
   it('raises a LaunchApiError carrying the mapped message for the documented 404 body', async () => {
     nock(ORIGIN).get(`${BASE_PATH}/projects/${PROJECT_UID}`).query({}).reply(404, notFoundFixture);
 
-    const rejection = await buildApi(buildClient())
+    const rejection = await buildApi(buildClient(), UNUSED_CMA)
       .projects.get({ org: ORG_UID, project: PROJECT_UID })
       .catch((error: unknown) => error);
 
@@ -152,7 +163,7 @@ describe('integration: GET /projects/{project_uid}', () => {
       .reply(429, { errors: [{ code: 'launch.RATE_LIMITED', message: 'Too many requests.' }], status: 429 });
     const succeeded = nock(ORIGIN).get(`${BASE_PATH}/projects/${PROJECT_UID}`).query({}).reply(200, getFixture);
 
-    const project = await buildApi(buildClient()).projects.get({ org: ORG_UID, project: PROJECT_UID });
+    const project = await buildApi(buildClient(), UNUSED_CMA).projects.get({ org: ORG_UID, project: PROJECT_UID });
 
     expect(throttled.isDone()).toBe(true);
     expect(succeeded.isDone()).toBe(true);

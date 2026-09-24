@@ -3,7 +3,7 @@ import { join, relative, sep } from 'node:path';
 
 const SRC = join(__dirname, '..');
 const LAYERS = ['core', 'transport'];
-const RESOURCES = ['projects', 'functions', 'environments', 'deployments', 'git'];
+const RESOURCES = ['projects', 'functions', 'environments', 'deployments', 'git', 'organizations'];
 
 const RESOURCE_EDGES: Record<string, string[]> = {
   projects: ['environments', 'deployments', 'git'],
@@ -11,6 +11,7 @@ const RESOURCE_EDGES: Record<string, string[]> = {
   environments: [],
   deployments: [],
   git: [],
+  organizations: [],
 };
 
 function filesUnder(directory: string): string[] {

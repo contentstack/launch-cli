@@ -336,7 +336,7 @@ describe('integration: launch:projects:create on the wire', () => {
     const { error } = await runCommand(['launch:projects:create', '--org', ORG_UID, '--data-dir', dataDir], config);
 
     expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toContain('Missing required value for --type');
+    expect(error?.message).toBe('Missing required value for --type. Pass --type or run in an interactive terminal.');
     expect(onWire).toEqual([]);
   });
 });

@@ -46,6 +46,12 @@ export function resolutionOrder<K extends FlagKey>(keys: K[]): K[] {
   return ordered;
 }
 
+function missing(key: FlagKey): MissingInputError {
+  const rule = resolutionTable[key];
+
+  return new MissingInputError(key, { config: rule.configPath !== undefined, prompt: rule.prompt !== undefined });
+}
+
 export interface ResolveArgs {
   parsed: Partial<Record<FlagKey, unknown>>;
   projectConfig: ProjectConfig;
@@ -63,7 +69,7 @@ export async function resolveInputs<S extends AnyInputs>(spec: S, args: ResolveA
   const requireDependencies = (rule: AnyResolutionSpec): void => {
     for (const dependency of rule.dependsOn ?? []) {
       if (isAbsent((resolved as Partial<Record<FlagKey, unknown>>)[dependency])) {
-        throw new MissingInputError(dependency);
+        throw missing(dependency);
       }
     }
   };
@@ -96,7 +102,7 @@ export async function resolveInputs<S extends AnyInputs>(spec: S, args: ResolveA
 
     if (isAbsent(value)) {
       if (spec[key].required) {
-        throw new MissingInputError(key);
+        throw missing(key);
       }
 
       value = undefined;

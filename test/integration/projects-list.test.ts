@@ -7,6 +7,17 @@ import { LaunchApiError } from '../../src/transport/errors';
 import { RestApiClient } from '../../src/transport/rest-client';
 import { UxLike, renderPagination, renderTable } from '../../src/core/render';
 import listFixture from '../fixtures/projects-list.json';
+import type { CmaSession } from '../../src/transport/cma-client';
+
+const UNUSED_CMA: CmaSession = {
+  fetchOrganizations: async () => {
+    throw new Error('this test lists no organizations');
+  },
+  fetchOrganization: async () => {
+    throw new Error('this test fetches no organization');
+  },
+  scopedOrganizationUid: () => undefined,
+};
 
 const ORIGIN = 'https://launch-api.integration.test';
 const BASE_PATH = '/manage';
@@ -56,7 +67,7 @@ describe('integration: GET /projects', () => {
         return [200, listFixture];
       });
 
-    await buildApi(buildClient()).projects.list({ org: ORG_UID, limit: 50, skip: 0 });
+    await buildApi(buildClient(), UNUSED_CMA).projects.list({ org: ORG_UID, limit: 50, skip: 0 });
 
     expect(scope.isDone()).toBe(true);
     expect(capturedPath).toBe(`${BASE_PATH}/projects?limit=50&skip=0`);
@@ -77,7 +88,7 @@ describe('integration: GET /projects', () => {
         return [200, listFixture];
       });
 
-    await buildApi(buildClient()).projects.list({ org: ORG_UID });
+    await buildApi(buildClient(), UNUSED_CMA).projects.list({ org: ORG_UID });
 
     expect(scope.isDone()).toBe(true);
     expect(capturedPath).toBe(`${BASE_PATH}/projects`);
@@ -86,7 +97,7 @@ describe('integration: GET /projects', () => {
   it('parses the documented bare envelope into a ProjectsPage', async () => {
     nock(ORIGIN).get(`${BASE_PATH}/projects`).query({}).reply(200, listFixture);
 
-    const page: ProjectsPage = await buildApi(buildClient()).projects.list({ org: ORG_UID });
+    const page: ProjectsPage = await buildApi(buildClient(), UNUSED_CMA).projects.list({ org: ORG_UID });
 
     expect(page).not.toHaveProperty('projects.projects');
     expect(page.pagination).toEqual({ count: 3, limit: 10, skip: null });
@@ -111,7 +122,7 @@ describe('integration: GET /projects', () => {
   it('parses a FileUpload project that carries neither repository nor description', async () => {
     nock(ORIGIN).get(`${BASE_PATH}/projects`).query({}).reply(200, listFixture);
 
-    const page: ProjectsPage = await buildApi(buildClient()).projects.list({ org: ORG_UID });
+    const page: ProjectsPage = await buildApi(buildClient(), UNUSED_CMA).projects.list({ org: ORG_UID });
 
     expect(page.projects[2].projectType).toBe('FILEUPLOAD');
     expect(page.projects[2].repository).toBeUndefined();
@@ -134,7 +145,7 @@ describe('integration: GET /projects', () => {
     nock(ORIGIN).get(`${BASE_PATH}/projects`).query({}).reply(200, listFixture);
     const { ux, lines } = recordingUx();
 
-    const page = await buildApi(buildClient()).projects.list({ org: ORG_UID });
+    const page = await buildApi(buildClient(), UNUSED_CMA).projects.list({ org: ORG_UID });
     renderTable(ux, PROJECT_COLUMNS, page.projects);
     renderPagination(ux, page.pagination, page.projects.length);
 
@@ -154,7 +165,7 @@ describe('integration: GET /projects', () => {
       .reply(429, { errors: [{ code: 'launch.RATE_LIMITED', message: 'Too many requests.' }], status: 429 });
     const succeeded = nock(ORIGIN).get(`${BASE_PATH}/projects`).query({}).reply(200, listFixture);
 
-    const page = await buildApi(buildClient()).projects.list({ org: ORG_UID });
+    const page = await buildApi(buildClient(), UNUSED_CMA).projects.list({ org: ORG_UID });
 
     expect(throttled.isDone()).toBe(true);
     expect(succeeded.isDone()).toBe(true);
@@ -166,7 +177,7 @@ describe('integration: GET /projects', () => {
     const body = { errors: [{ code: 'launch.RATE_LIMITED', message: 'Too many requests.' }], status: 429 };
     nock(ORIGIN).get(`${BASE_PATH}/projects`).query({}).times(4).reply(429, body);
 
-    const rejection = await buildApi(buildClient())
+    const rejection = await buildApi(buildClient(), UNUSED_CMA)
       .projects.list({ org: ORG_UID })
       .catch((error: unknown) => error);
 

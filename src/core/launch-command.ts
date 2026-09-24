@@ -19,6 +19,7 @@ export interface ResolveLaunchContextArgs<S extends AnyInputs> {
   inputs: S;
   rules?: Rule[];
   launchHubUrl: string;
+  cma?: string;
   analyticsInfo: string;
   ux: UxLike;
   isTTY: boolean;
@@ -40,6 +41,7 @@ export async function resolveLaunchContext<S extends AnyInputs>(
 
   const services = buildServiceContext({
     launchHubUrl: args.launchHubUrl,
+    cma: args.cma,
     analyticsInfo: args.analyticsInfo,
     ux: args.ux,
     isTTY: args.isTTY,
@@ -89,11 +91,14 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
       strict: true,
     });
 
+    const region = this.launchRegion ?? {};
+
     const { services, resolved, dataDir, configPath } = await resolveLaunchContext<S>({
       flags: flags as Partial<Record<FlagKey, unknown>>,
       inputs: this.contract.inputs as S,
       rules: this.contract.rules,
-      launchHubUrl: resolveLaunchHubUrl(this.launchRegion),
+      launchHubUrl: resolveLaunchHubUrl(region),
+      cma: region.cma,
       analyticsInfo: this.config.userAgent,
       ux: this.ux,
       isTTY: Boolean(process.stdin.isTTY),

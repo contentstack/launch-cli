@@ -47,7 +47,6 @@ export interface AnyResolutionSpec {
 }
 
 export const globalResolution = {
-  org: { configPath: 'organizationUid' } satisfies ResolutionSpec<string>,
   limit: { default: DEFAULT_LIMIT } satisfies ResolutionSpec<number>,
   skip: { default: 0 } satisfies ResolutionSpec<number>,
   yes: { default: false } satisfies ResolutionSpec<boolean>,

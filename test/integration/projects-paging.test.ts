@@ -9,6 +9,17 @@ import { RestApiClient } from '../../src/transport/rest-client';
 import { UxLike } from '../../src/core/render';
 import { ProjectRef } from '../../src/projects/project-ref';
 import { ProjectResolver } from '../../src/projects/project.resolver';
+import type { CmaSession } from '../../src/transport/cma-client';
+
+const UNUSED_CMA: CmaSession = {
+  fetchOrganizations: async () => {
+    throw new Error('this test lists no organizations');
+  },
+  fetchOrganization: async () => {
+    throw new Error('this test fetches no organization');
+  },
+  scopedOrganizationUid: () => undefined,
+};
 
 const ORIGIN = 'https://launch-api.paging.test';
 const BASE_PATH = '/manage';
@@ -26,7 +37,7 @@ function buildDeps() {
   });
   const ux: UxLike = { print: () => undefined, inquire: async () => undefined as never };
 
-  return { api: buildApi(client), ux };
+  return { api: buildApi(client, UNUSED_CMA), ux };
 }
 
 function projectsOfSize(size: number, prefix: string) {

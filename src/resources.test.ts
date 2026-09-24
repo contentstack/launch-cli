@@ -5,7 +5,20 @@ import { GitApi } from './git/git.api';
 import { ProjectsApi } from './projects/projects.api';
 import { UxLike } from './core/render';
 import * as prompt from './projects/project.prompt';
+import * as organizationPrompt from './organizations/organization.prompt';
+import { OrganizationsApi } from './organizations/organizations.api';
 import { ProjectResolver } from './projects/project.resolver';
+import type { CmaSession } from './transport/cma-client';
+
+const UNUSED_CMA: CmaSession = {
+  fetchOrganizations: async () => {
+    throw new Error('this test lists no organizations');
+  },
+  fetchOrganization: async () => {
+    throw new Error('this test fetches no organization');
+  },
+  scopedOrganizationUid: () => undefined,
+};
 
 const table = resolutionTable;
 
@@ -127,22 +140,45 @@ describe('resolution', () => {
     expect(Object.keys(DEPENDENCIES)).toEqual(['project']);
   });
 
-  it('declares no prompt or normalize for org', () => {
-    expect(table.org.prompt).toBeUndefined();
+  it('delegates the org prompt to the organization picker and normalises nothing', async () => {
+    const spy = jest.spyOn(organizationPrompt, 'promptForOrganization').mockResolvedValue('org9');
+    const { services } = args();
+
+    await expect(table.org.prompt?.({ services, resolved: {} })).resolves.toBe('org9');
+    expect(spy).toHaveBeenCalledWith(services);
     expect(table.org.normalize).toBeUndefined();
+    expect(table.org.dependsOn).toBeUndefined();
   });
 });
 
 describe('the api surface', () => {
   it('assembles one repository per resource from the single client', () => {
     const client = {} as never;
-    const api = buildApi(client);
+    const api = buildApi(client, UNUSED_CMA);
 
-    expect(Object.keys(api).sort()).toEqual(['deployments', 'environments', 'git', 'projects']);
+    expect(Object.keys(api).sort()).toEqual(['deployments', 'environments', 'git', 'organizations', 'projects']);
+    expect(api.organizations).toBeInstanceOf(OrganizationsApi);
     expect(api.projects).toBeInstanceOf(ProjectsApi);
     expect(api.environments).toBeInstanceOf(EnvironmentsApi);
     expect(api.deployments).toBeInstanceOf(DeploymentsApi);
     expect(api.git).toBeInstanceOf(GitApi);
+  });
+
+  it('hands the organizations repository the CMA session it was given', async () => {
+    const fetched: unknown[] = [];
+    const cma: CmaSession = {
+      fetchOrganizations: async () => ({ items: [], count: 0 }),
+      fetchOrganization: async (uid) => {
+        fetched.push(uid);
+        return { uid, name: 'Scoped Org' };
+      },
+      scopedOrganizationUid: () => 'org7',
+    };
+
+    const available = await buildApi({} as never, cma).organizations.available();
+
+    expect(fetched).toEqual(['org7']);
+    expect(available).toEqual({ organizations: [{ uid: 'org7', name: 'Scoped Org' }], scoped: true });
   });
 
   it('contributes every resource’s flags to the one catalog', () => {

@@ -6,6 +6,17 @@ import { ProjectsPage } from './types';
 import { buildApi } from '../resources';
 import { PROJECT_ERROR_MESSAGES } from './project.errors';
 import { ProjectScanLimitError, ProjectsApi } from './projects.api';
+import type { CmaSession } from '../transport/cma-client';
+
+const UNUSED_CMA: CmaSession = {
+  fetchOrganizations: async () => {
+    throw new Error('this test lists no organizations');
+  },
+  fetchOrganization: async () => {
+    throw new Error('this test fetches no organization');
+  },
+  scopedOrganizationUid: () => undefined,
+};
 
 function pagingRestClient(pages: { count: number; projects: { uid: string; name: string }[] }[]) {
   const requests: RestRequest[] = [];
@@ -267,7 +278,7 @@ describe('ProjectsApi', () => {
   it('buildApi exposes the projects resource', () => {
     const { client } = fakeRestClient({});
 
-    expect(buildApi(client).projects).toBeInstanceOf(ProjectsApi);
+    expect(buildApi(client, UNUSED_CMA).projects).toBeInstanceOf(ProjectsApi);
   });
 });
 

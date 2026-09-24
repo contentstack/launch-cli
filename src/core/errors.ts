@@ -42,14 +42,34 @@ export class SessionExpiredError extends LaunchError {
   }
 }
 
+export interface InputRemedies {
+  config: boolean;
+  prompt: boolean;
+}
+
+function advice(flag: string, remedies: InputRemedies): string {
+  const steps = [`Pass --${flag}`];
+
+  if (remedies.config) {
+    steps.push(`set it in ${PROJECT_CONFIG_FILE}`);
+  }
+
+  if (remedies.prompt) {
+    steps.push('run in an interactive terminal');
+  }
+
+  if (steps.length < 3) {
+    return `${steps.join(' or ')}.`;
+  }
+
+  return `${steps.slice(0, -1).join(', ')}, or ${steps[steps.length - 1]}.`;
+}
+
 export class MissingInputError extends UsageError {
   readonly flag: string;
 
-  constructor(flag: string) {
-    super(
-      `Missing required value for --${flag}. Pass --${flag}, set it in ${PROJECT_CONFIG_FILE}, ` +
-        'or run in an interactive terminal.',
-    );
+  constructor(flag: string, remedies: InputRemedies) {
+    super(`Missing required value for --${flag}. ${advice(flag, remedies)}`);
     this.name = 'MissingInputError';
     this.flag = flag;
   }

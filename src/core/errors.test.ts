@@ -46,7 +46,7 @@ describe('UnauthenticatedError', () => {
 
 describe('MissingInputError', () => {
   it('names the flag, points at the three sources and inherits the usage exit code', () => {
-    const error = new MissingInputError('org');
+    const error = new MissingInputError('org', { config: true, prompt: true });
 
     expect(error).toBeInstanceOf(UsageError);
     expect(error).toBeInstanceOf(LaunchError);
@@ -67,5 +67,16 @@ describe('InputDependencyError', () => {
     expect(error).not.toBeInstanceOf(LaunchError);
     expect(error.name).toBe('InputDependencyError');
     expect(error.message).toBe('--project -> --org is a dependency cycle.');
+  });
+
+  it.each([
+    [{ config: true, prompt: false }, `Pass --org or set it in ${PROJECT_CONFIG_FILE}.`],
+    [{ config: false, prompt: true }, 'Pass --org or run in an interactive terminal.'],
+    [{ config: false, prompt: false }, 'Pass --org.'],
+  ])('offers only the remedies %p says exist', (remedies, advice) => {
+    const error = new MissingInputError('org', remedies);
+
+    expect(error.message).toBe(`Missing required value for --org. ${advice}`);
+    expect(error.exitCode).toBe(EXIT_USAGE);
   });
 });

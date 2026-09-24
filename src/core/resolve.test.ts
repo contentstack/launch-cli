@@ -111,6 +111,26 @@ describe('resolveInputs', () => {
     );
   });
 
+  it('advises only the remedies that exist for a required input with no config key and no prompt', async () => {
+    const promise = resolveInputs(inputs({ name: { required: true } }), {
+      parsed: {},
+      projectConfig: { name: 'from-config' },
+      services: services({ isTTY: true }),
+    });
+
+    await expect(promise).rejects.toBeInstanceOf(MissingInputError);
+    await expect(promise).rejects.toThrow(new MissingInputError('name', { config: false, prompt: false }));
+    await expect(promise).rejects.toThrow('Missing required value for --name. Pass --name.');
+  });
+
+  it('advises the config file but not a terminal for a required input that has a config key and no prompt', async () => {
+    const promise = withResolution({ ...resolutionModule.resolutionTable, org: { configPath: 'organizationUid' } }, () =>
+      resolveInputs(inputs({ org: { required: true } }), { parsed: {}, projectConfig: {}, services: services() }),
+    );
+
+    await expect(promise).rejects.toThrow('Missing required value for --org. Pass --org or set it in .cs-launch.json.');
+  });
+
   it('leaves an optional unresolved input undefined instead of throwing', async () => {
     const resolved = await resolveInputs(inputs({ org: {}, project: {} }), {
       parsed: {},
@@ -557,7 +577,7 @@ describe('resolveInputs dependency ordering', () => {
     const promise = resolveInputs(inputs({ org: {}, project: {} }), {
       parsed: { project: 'Project One' },
       projectConfig: {},
-      services: recordingServices(seen),
+      services: { ...recordingServices(seen), isTTY: false },
     });
 
     await expect(promise).rejects.toBeInstanceOf(MissingInputError);
@@ -568,11 +588,13 @@ describe('resolveInputs dependency ordering', () => {
   it('refuses to prompt for a value whose declared dependency resolved to nothing', async () => {
     const seen: unknown[] = [];
 
-    const promise = resolveInputs(inputs({ org: {}, project: {} }), {
-      parsed: {},
-      projectConfig: {},
-      services: { ...recordingServices(seen), isTTY: true },
-    });
+    const promise = withResolution({ ...resolutionModule.resolutionTable, org: { configPath: 'organizationUid' } }, () =>
+      resolveInputs(inputs({ org: {}, project: {} }), {
+        parsed: {},
+        projectConfig: {},
+        services: { ...recordingServices(seen), isTTY: true },
+      }),
+    );
 
     await expect(promise).rejects.toBeInstanceOf(MissingInputError);
     await expect(promise).rejects.toThrow('Missing required value for --org.');
@@ -773,7 +795,7 @@ describe('resolveInputs cross-flag rules and where a value came from', () => {
 
 describe('MissingInputError', () => {
   it('is a UsageError so it maps to the usage exit code with every other usage failure', () => {
-    const error = new MissingInputError('org');
+    const error = new MissingInputError('org', { config: true, prompt: true });
 
     expect(error).toBeInstanceOf(UsageError);
     expect(error.name).toBe('MissingInputError');

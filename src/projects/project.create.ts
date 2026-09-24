@@ -37,6 +37,7 @@ export { serverCommandFrameworkGate } from '../environments/environment.inputs';
 export const DEFAULT_OUTPUT_DIRECTORY = './';
 export const NO_DEPLOYMENT_STATUS = 'NONE';
 export const FIRST_LOOKUP_ATTEMPTS = 3;
+export const CREATE_PROMPT_REMEDIES = { config: false, prompt: true };
 
 export function reasonOf(error: unknown): string {
   const text = (error instanceof Error ? error.message : String(error)).trim();
@@ -361,7 +362,7 @@ export class ProjectCreator {
     }
 
     if (!this.services.isTTY) {
-      throw new MissingInputError('framework');
+      throw new MissingInputError('framework', CREATE_PROMPT_REMEDIES);
     }
 
     return frameworkPresetOf(
@@ -415,7 +416,7 @@ export class ProjectCreator {
     }
 
     if (!this.services.isTTY) {
-      throw new MissingInputError(flag);
+      throw new MissingInputError(flag, CREATE_PROMPT_REMEDIES);
     }
 
     return ask();
