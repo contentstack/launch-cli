@@ -10,6 +10,10 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+export function hasUid<T extends { uid?: unknown }>(entity: T): entity is T & { uid: string } {
+  return typeof entity.uid === 'string' && entity.uid.trim() !== '';
+}
+
 function withArticle(noun: string): string {
   return `${/^[aeiou]/i.test(noun) ? 'an' : 'a'} ${noun}`;
 }

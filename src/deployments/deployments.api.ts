@@ -1,7 +1,7 @@
-import { assertPage, unwrap } from '../transport/envelope';
+import { assertPage, hasUid, malformed, unwrap } from '../transport/envelope';
 import { RestApiClient, RestRequest } from '../transport/rest-client';
 import { DEPLOYMENT_ERROR_MESSAGES } from './deployment.errors';
-import { Deployment, DeploymentResponse, DeploymentsPage } from './types';
+import { Deployment, DeploymentResponse, DeploymentsPage, IdentifiedDeployment } from './types';
 
 export * from './types';
 
@@ -56,9 +56,18 @@ export class DeploymentsApi {
     return unwrap<Deployment>(response, 'deployment', 'deployment response');
   }
 
-  async latest(params: DeploymentScope): Promise<Deployment | undefined> {
+  async latest(params: DeploymentScope): Promise<IdentifiedDeployment | undefined> {
     const page = await this.list({ ...params, limit: 1, skip: 0 });
+    const [deployment] = page.deployments;
 
-    return page.deployments[0];
+    if (deployment === undefined) {
+      return undefined;
+    }
+
+    if (!hasUid(deployment)) {
+      throw malformed('The Launch API returned a deployment without a deployment uid.');
+    }
+
+    return deployment;
   }
 }

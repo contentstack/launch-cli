@@ -20,7 +20,7 @@ export const IN_FLIGHT_STATUSES: readonly DeploymentStatus[] = ['QUEUED', 'DEPLO
 export const SUCCESS_STATUSES: readonly DeploymentStatus[] = ['LIVE', 'DEPLOYED'];
 
 export interface Deployment {
-  uid: string;
+  uid?: string;
   status?: string;
   deploymentNumber?: number;
   deploymentUrl?: string;
@@ -31,6 +31,8 @@ export interface Deployment {
   createdAt?: string;
   updatedAt?: string;
 }
+
+export type IdentifiedDeployment = Deployment & { uid: string };
 
 export interface DeploymentResponse {
   deployment: Deployment;

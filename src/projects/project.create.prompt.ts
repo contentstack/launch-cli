@@ -39,8 +39,8 @@ export async function askChoice(ux: UxLike, message: string, choices: Choice[], 
   );
 }
 
-function noteTruncation(ux: UxLike, count: number, shown: number, noun: string, flag: string): void {
-  if (count > shown) {
+function noteTruncation(ux: UxLike, count: number | undefined, shown: number, noun: string, flag: string): void {
+  if (typeof count === 'number' && count > shown) {
     ux.print(`Showing the first ${shown} of ${count} ${noun}. Use ${flag} to reach any of them.`);
   }
 }

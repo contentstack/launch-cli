@@ -13,8 +13,8 @@ export interface ProjectRepository {
 export type ProjectType = 'GITPROVIDER' | 'FILEUPLOAD';
 
 export interface Project {
-  uid: string;
-  name: string;
+  uid?: string;
+  name?: string;
   description?: string;
   projectType?: ProjectType;
   repository?: ProjectRepository;
@@ -27,6 +27,8 @@ export interface Project {
   updatedBy?: string;
   deletedBy?: string | null;
 }
+
+export type IdentifiedProject = Project & { uid: string };
 
 export interface ProjectUpdate {
   name?: string;

@@ -2,6 +2,7 @@ import { PICKER_PAGE_SIZE } from '../core/constants';
 import { CancelledError, UsageError } from '../core/errors';
 import type { UxLike } from '../core/render';
 import type { ApiSurface } from '../resources';
+import { hasUid } from '../transport/envelope';
 
 export interface PromptDeps {
   api: ApiSurface;
@@ -14,14 +15,17 @@ function nothingChosen(value: unknown): boolean {
 
 export async function promptForProject(deps: PromptDeps, org: string): Promise<string> {
   const page = await deps.api.projects.list({ org, limit: PICKER_PAGE_SIZE, skip: 0 });
+  const choosable = page.projects.filter(hasUid);
 
-  if (page.projects.length === 0) {
+  if (choosable.length === 0) {
     throw new UsageError('No projects found in this organization.');
   }
 
-  if (page.pagination.count > page.projects.length) {
+  const total = page.pagination.count;
+
+  if (typeof total === 'number' && total > page.projects.length) {
     deps.ux.print(
-      `Showing the first ${page.projects.length} of ${page.pagination.count} projects; ` +
+      `Showing the first ${page.projects.length} of ${total} projects; ` +
         'refine your search if the one you want is missing. ' +
         'Use --project <name> to reach any project in the organization.',
     );
@@ -31,7 +35,7 @@ export async function promptForProject(deps: PromptDeps, org: string): Promise<s
     type: 'search-list',
     name: 'project',
     message: 'Choose a project',
-    choices: page.projects.map((project) => ({ name: project.name, value: project.uid })),
+    choices: choosable.map((project) => ({ name: project.name ?? project.uid, value: project.uid })),
   });
 
   if (nothingChosen(chosen)) {

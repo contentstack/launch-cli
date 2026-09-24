@@ -5,12 +5,12 @@ import { LaunchApiError } from '../transport/errors';
 import { UxLike } from '../core/render';
 import { promptForProject } from './project.prompt';
 
-type FakeProject = { uid: string; name: string };
+type FakeProject = { uid?: string; name?: string };
 
 function fakeDeps(
   pages: FakeProject[][],
   answer?: string,
-  totalCount: number = pages.reduce((total, page) => total + page.length, 0),
+  totalCount: number | null = pages.reduce((total, page) => total + page.length, 0),
 ) {
   const inquired: unknown[] = [];
   const printed: string[] = [];
@@ -89,6 +89,26 @@ describe('promptForProject', () => {
     expect(printed).toEqual([]);
   });
 
+  it('leaves out a project it could not act on and labels a nameless one by its uid', async () => {
+    const { deps, inquired } = fakeDeps(
+      [[{ name: 'no-uid' }, { uid: '', name: 'blank-uid' }, { uid: 'c'.repeat(24) }, { uid: 'a'.repeat(24), name: 'one' }]],
+      'c'.repeat(24),
+    );
+
+    await expect(promptForProject(deps, 'org1')).resolves.toBe('c'.repeat(24));
+    expect((inquired[0] as { choices: unknown }).choices).toEqual([
+      { name: 'c'.repeat(24), value: 'c'.repeat(24) },
+      { name: 'one', value: 'a'.repeat(24) },
+    ]);
+  });
+
+  it('throws rather than prompting when no listed project carries a uid', async () => {
+    const { deps, inquired } = fakeDeps([[{ name: 'no-uid' }]]);
+
+    await expect(promptForProject(deps, 'org1')).rejects.toThrow('No projects found in this organization.');
+    expect(inquired).toEqual([]);
+  });
+
   it('fetches a single capped page rather than paging the whole organization into the picker', async () => {
     const { deps, listCalls, pageCalls, fetchedPages } = fakeDeps(
       [[{ uid: 'a'.repeat(24), name: 'one' }], [{ uid: 'b'.repeat(24), name: 'two' }]],
@@ -146,6 +166,14 @@ describe('promptForProject', () => {
       message: 'Choose a project',
       choices: projects.map((project) => ({ name: project.name, value: project.uid })),
     });
+  });
+
+  it('prompts without a truncation warning when the page reports no usable total', async () => {
+    const { deps, inquired, printed } = fakeDeps([[{ uid: 'a'.repeat(24), name: 'site' }]], 'a'.repeat(24), null);
+
+    await expect(promptForProject(deps, 'org1')).resolves.toBe('a'.repeat(24));
+    expect(printed).toEqual([]);
+    expect(inquired).toHaveLength(1);
   });
 
   it('asks the picker page for its own page size rather than the client limit guard', async () => {

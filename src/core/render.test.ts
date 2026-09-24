@@ -1,4 +1,4 @@
-import { Pagination, UxLike, renderDetail, renderPagination, renderTable } from './render';
+import { UxLike, renderDetail, renderPagination, renderTable } from './render';
 
 function fakeUx() {
   const lines: string[] = [];
@@ -330,7 +330,7 @@ describe('renderPagination', () => {
   });
 
   it.each([
-    [undefined as unknown as number],
+    [undefined],
     [null as unknown as number],
     [Number.NaN],
     ['50' as unknown as number],
@@ -356,7 +356,7 @@ describe('renderPagination', () => {
   it('prints nothing rather than reading fields off an absent pagination block', () => {
     const { ux, lines } = fakeUx();
 
-    renderPagination(ux, undefined as unknown as Pagination, 3);
+    renderPagination(ux, undefined, 3);
 
     expect(lines).toEqual([]);
   });

@@ -29,7 +29,7 @@ import {
 import { deploymentFailureMessage, projectCreatedFields } from './project.presenter';
 import { PROJECT_TYPE_BY_CHOICE, ProjectTypeChoice, askProjectType, projectTypeChoiceOf } from './project.inputs';
 import { uploadArchive } from './project.upload';
-import type { CreateProjectInput, DetectedFramework, Project } from './types';
+import type { CreateProjectInput, DetectedFramework, IdentifiedProject } from './types';
 
 export { DEPLOYMENT_WAIT_TIMEOUT_MS, defaultWatchTiming } from '../deployments/deployment.watcher';
 export { serverCommandFrameworkGate } from '../environments/environment.inputs';
@@ -67,7 +67,7 @@ export interface CreateRequest {
 
 interface Survivors {
   org: string;
-  project: Project;
+  project: IdentifiedProject;
   envName: string;
   environment?: Environment;
   deployment?: Deployment;
@@ -165,7 +165,7 @@ export class ProjectCreator {
     await this.follow(request.org, project, envName);
   }
 
-  private remember(request: CreateRequest, project: Project): void {
+  private remember(request: CreateRequest, project: IdentifiedProject): void {
     const path = request.configPath;
 
     if (path === undefined) {
@@ -204,7 +204,7 @@ export class ProjectCreator {
     return lookup();
   }
 
-  private async follow(org: string, project: Project, envName: string): Promise<void> {
+  private async follow(org: string, project: IdentifiedProject, envName: string): Promise<void> {
     const environment = await this.explaining({ org, project, envName }, () =>
       this.appearing(() => this.services.api.environments.first({ org, project: project.uid })),
     );

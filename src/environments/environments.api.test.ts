@@ -78,6 +78,18 @@ describe('EnvironmentsApi', () => {
     expect(requests[0].query).toEqual({ limit: 1, skip: 0 });
   });
 
+  it.each([[undefined], [null], [''], ['  ']])(
+    'refuses a first environment whose uid is %p rather than handing back one nothing can address',
+    async (uid) => {
+      const { client } = fakeRestClient({ pagination: { count: 1, limit: 1 }, environments: [{ uid, name: 'Default' }] });
+
+      const failure = await new EnvironmentsApi(client).first(SCOPE).catch((error: Error) => error);
+
+      expect(failure).toBeInstanceOf(LaunchApiError);
+      expect((failure as Error).message).toBe('The Launch API returned an environment without an environment uid.');
+    },
+  );
+
   it('reports no first environment when the project has none', async () => {
     const { client } = fakeRestClient({ pagination: { count: 0, limit: 1 }, environments: [] });
 

@@ -44,6 +44,9 @@ fileignoreconfig:
 - filename: src/environments/environments.api.ts
   ignore_detectors:
     - filename
+- filename: src/environments/environments.api.test.ts
+  ignore_detectors:
+    - filename
 - filename: src/transport/envelope.ts
   ignore_detectors:
     - filename

@@ -113,6 +113,16 @@ describe('project create prompts', () => {
     expect(printed).toEqual(['Showing the first 1 of 250 namespaces. Use --namespace to reach any of them.']);
   });
 
+  it('says nothing about truncation when the page reports no usable count', async () => {
+    for (const pagination of [{ limit: 100 }, { count: '250', limit: 100 }]) {
+      const { deps: d, printed } = deps(['my-org'], { namespaces: { pagination, namespaces: [{ name: 'my-org' }] } });
+
+      await expect(askNamespace(d, ORG)).resolves.toBe('my-org');
+
+      expect(printed).toEqual([]);
+    }
+  });
+
   it('says nothing about truncation when the page held everything', async () => {
     const { deps: d, printed } = deps(['my-org'], {
       namespaces: { pagination: { count: 1, limit: 100 }, namespaces: [{ name: 'my-org' }] },

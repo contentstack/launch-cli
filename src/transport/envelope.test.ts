@@ -1,5 +1,5 @@
 import { LaunchApiError } from './errors';
-import { MALFORMED_CODE, assertArray, assertPage, isRecord, malformed, unwrap } from './envelope';
+import { MALFORMED_CODE, assertArray, assertPage, hasUid, isRecord, malformed, unwrap } from './envelope';
 
 function failureFrom(act: () => unknown): LaunchApiError {
   try {
@@ -99,4 +99,12 @@ describe('response envelope', () => {
       expect(error.message).toBe('The Launch API returned a project list without a pagination block.');
     },
   );
+
+  it.each([[undefined], [null], [''], ['   '], [7]])('does not count %p as a uid', (uid) => {
+    expect(hasUid({ uid })).toBe(false);
+  });
+
+  it('counts a non-blank string as a uid', () => {
+    expect(hasUid({ uid: 'p1' })).toBe(true);
+  });
 });

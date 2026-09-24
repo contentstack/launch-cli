@@ -9,6 +9,11 @@ describe('deployment presenter', () => {
     expect(deploymentLabel({ uid: UID, deploymentNumber: 7 })).toBe('#7');
   });
 
+  it('labels a deployment that carries neither a number nor a uid rather than printing undefined', () => {
+    expect(deploymentLabel({})).toBe('with no number');
+    expect(deploymentStatusLine({}, 'QUEUED', 'in-flight')).toBe('→ Deployment with no number is QUEUED');
+  });
+
   it('labels a deployment by its uid when the number is absent or unusable', () => {
     expect(deploymentLabel({ uid: UID })).toBe(UID);
     expect(deploymentLabel({ uid: UID, deploymentNumber: Number.NaN })).toBe(UID);

@@ -6,7 +6,7 @@ import { ProjectRef } from './project-ref';
 import { ProjectPages, ProjectResolver } from './project.resolver';
 import { ProjectsPage } from './types';
 
-type FakeProject = { uid: string; name: string };
+type FakeProject = { uid?: string | null; name?: string };
 
 const PRIMARY_UID = randomBytes(12).toString('hex');
 const SECOND_UID = randomBytes(12).toString('hex');
@@ -36,6 +36,20 @@ function failingPages(failure: Error): ProjectPages {
 }
 
 describe('ProjectResolver', () => {
+  it('skips a project of the wanted name that carries no uid and resolves the next one that does', async () => {
+    const { projects } = fakePages([[{ name: 'shared' }, { uid: '  ', name: 'shared' }], [{ uid: SECOND_UID, name: 'shared' }]]);
+
+    await expect(new ProjectResolver(projects).toUid('org1', { kind: 'name', name: 'shared' })).resolves.toBe(SECOND_UID);
+  });
+
+  it('reports no match rather than resolving to nothing when the only project of that name has no uid', async () => {
+    const { projects } = fakePages([[{ uid: null, name: 'shared' }]]);
+
+    await expect(new ProjectResolver(projects).toUid('org1', { kind: 'name', name: 'shared' })).rejects.toThrow(
+      'No project named "shared" found in this organization.',
+    );
+  });
+
   it('returns a uid reference without calling the API at all', async () => {
     const { projects, pageCalls } = fakePages([]);
 

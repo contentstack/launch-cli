@@ -18,7 +18,7 @@ const UNUSED_CMA: CmaSession = {
   scopedOrganizationUid: () => undefined,
 };
 
-function pagingRestClient(pages: { count: number; projects: { uid: string; name: string }[] }[]) {
+function pagingRestClient(pages: { count?: number; projects: { uid: string; name: string }[] }[]) {
   const requests: RestRequest[] = [];
   let index = 0;
   const client = {
@@ -194,6 +194,21 @@ describe('ProjectsApi', () => {
 
     await drain(new ProjectsApi(client).pages({ org: 'org1', pageSize: 2 }));
 
+    expect(requests.map((request) => request.query)).toEqual([
+      { limit: 2, skip: 0 },
+      { limit: 2, skip: 2 },
+    ]);
+  });
+
+  it('keeps paging to a short page when the API reports no total at all', async () => {
+    const { client, requests } = pagingRestClient([
+      { projects: projectsOfSize(2, 'a') },
+      { projects: projectsOfSize(1, 'b') },
+    ]);
+
+    const collected = await drain(new ProjectsApi(client).pages({ org: 'org1', pageSize: 2 }));
+
+    expect(collected).toHaveLength(2);
     expect(requests.map((request) => request.query)).toEqual([
       { limit: 2, skip: 0 },
       { limit: 2, skip: 2 },
@@ -487,6 +502,21 @@ describe('ProjectsApi create and detection endpoints', () => {
       'The Launch API returned a project response without a project.',
     );
   });
+
+  it.each([[undefined], [null], [''], ['   '], [42]])(
+    'raises a malformed-response error when create returns a project whose uid is %p',
+    async (uid) => {
+      const { client } = fakeRestClient({ project: { uid, name: 'sample-project' } });
+
+      const failure = await new ProjectsApi(client)
+        .create({ org: 'org1', input: CREATE_INPUT })
+        .catch((error: Error) => error);
+
+      expect(failure).toBeInstanceOf(LaunchApiError);
+      expect((failure as LaunchApiError).exitCode).toBe(1);
+      expect((failure as Error).message).toBe('The Launch API returned a project response without a project uid.');
+    },
+  );
 
   it('raises a malformed-response error when create returns nothing at all', async () => {
     const { client } = fakeRestClient(undefined);

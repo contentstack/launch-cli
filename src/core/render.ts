@@ -1,6 +1,6 @@
 export interface Pagination {
-  count: number;
-  limit: number;
+  count?: number;
+  limit?: number;
   skip?: number | null;
 }
 
@@ -74,9 +74,13 @@ export function renderDetail(ux: UxLike, fields: [string, string][]): void {
   }
 }
 
-export function renderPagination(ux: UxLike, pagination: Pagination, rowsPrinted: number): void {
+export function renderPagination(ux: UxLike, pagination: Pagination | undefined, rowsPrinted: number): void {
+  if (pagination === undefined) {
+    return;
+  }
+
   const printed = finite(rowsPrinted);
-  const count = finite(pagination?.count);
+  const count = finite(pagination.count);
 
   if (printed === undefined || printed <= 0 || count === undefined || count <= 0) {
     return;

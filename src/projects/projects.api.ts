@@ -1,11 +1,12 @@
 import { MAX_PAGES } from '../core/constants';
 import { UsageError } from '../core/errors';
-import { assertPage, isRecord, malformed, unwrap } from '../transport/envelope';
+import { assertPage, hasUid, isRecord, malformed, unwrap } from '../transport/envelope';
 import { RestApiClient, RestRequest } from '../transport/rest-client';
 import { PROJECT_ERROR_MESSAGES } from './project.errors';
 import {
   CreateProjectInput,
   DetectedFramework,
+  IdentifiedProject,
   Project,
   ProjectResponse,
   ProjectUpdate,
@@ -130,8 +131,9 @@ export class ProjectsApi {
       }
 
       skip += page.projects.length;
+      const total = page.pagination.count;
 
-      if (skip >= page.pagination.count) {
+      if (typeof total === 'number' && skip >= total) {
         return;
       }
     }
@@ -162,15 +164,20 @@ export class ProjectsApi {
     return unwrap<Project>(response, 'project', 'project response');
   }
 
-  async create(params: CreateProjectParams): Promise<Project> {
+  async create(params: CreateProjectParams): Promise<IdentifiedProject> {
     const response = await this.request<ProjectResponse>({
       method: 'POST',
       path: '/projects',
       orgUid: params.org,
       body: params.input,
     });
+    const project = unwrap<Project>(response, 'project', 'project response');
 
-    return unwrap<Project>(response, 'project', 'project response');
+    if (!hasUid(project)) {
+      throw malformed('The Launch API returned a project response without a project uid.');
+    }
+
+    return project;
   }
 
   async signedUploadUrl(params: SignedUploadUrlParams): Promise<SignedUploadUrl> {

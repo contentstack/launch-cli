@@ -37,7 +37,7 @@ export interface EnvironmentDomain {
 }
 
 export interface Environment {
-  uid: string;
+  uid?: string;
   name?: string;
   gitBranch?: string;
   frameworkPreset?: string;
@@ -46,6 +46,8 @@ export interface Environment {
   serverCommand?: string;
   domains?: EnvironmentDomain[];
 }
+
+export type IdentifiedEnvironment = Environment & { uid: string };
 
 export interface EnvironmentsPage {
   pagination: Pagination;

@@ -1,7 +1,7 @@
-import { assertPage } from '../transport/envelope';
+import { assertPage, hasUid, malformed } from '../transport/envelope';
 import { RestApiClient, RestRequest } from '../transport/rest-client';
 import { ENVIRONMENT_ERROR_MESSAGES } from './environment.errors';
-import { Environment, EnvironmentsPage } from './types';
+import { EnvironmentsPage, IdentifiedEnvironment } from './types';
 
 export * from './types';
 
@@ -33,9 +33,18 @@ export class EnvironmentsApi {
     return response;
   }
 
-  async first(params: { org: string; project: string }): Promise<Environment | undefined> {
+  async first(params: { org: string; project: string }): Promise<IdentifiedEnvironment | undefined> {
     const page = await this.list({ ...params, limit: 1, skip: 0 });
+    const [environment] = page.environments;
 
-    return page.environments[0];
+    if (environment === undefined) {
+      return undefined;
+    }
+
+    if (!hasUid(environment)) {
+      throw malformed('The Launch API returned an environment without an environment uid.');
+    }
+
+    return environment;
   }
 }

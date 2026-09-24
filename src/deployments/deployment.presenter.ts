@@ -11,7 +11,7 @@ const MARKERS: Record<StatusKind, string> = {
 export function deploymentLabel(deployment: Deployment): string {
   return typeof deployment.deploymentNumber === 'number' && Number.isFinite(deployment.deploymentNumber)
     ? `#${deployment.deploymentNumber}`
-    : deployment.uid;
+    : (deployment.uid ?? 'with no number');
 }
 
 export function deploymentStatusLine(deployment: Deployment, status: string, kind: StatusKind): string {

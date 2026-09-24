@@ -111,6 +111,18 @@ describe('DeploymentsApi', () => {
     expect(requests[0].query).toEqual({ limit: 1, skip: 0 });
   });
 
+  it.each([[undefined], [null], [''], ['  ']])(
+    'refuses a latest deployment whose uid is %p rather than handing back one nothing can poll',
+    async (uid) => {
+      const { client } = fakeRestClient({ pagination: { count: 1, limit: 1 }, deployments: [{ uid, status: 'QUEUED' }] });
+
+      const failure = await new DeploymentsApi(client).latest(SCOPE).catch((error: Error) => error);
+
+      expect(failure).toBeInstanceOf(LaunchApiError);
+      expect((failure as Error).message).toBe('The Launch API returned a deployment without a deployment uid.');
+    },
+  );
+
   it('reports no latest deployment when the environment has none', async () => {
     const { client } = fakeRestClient({ pagination: { count: 0, limit: 1 }, deployments: [] });
 

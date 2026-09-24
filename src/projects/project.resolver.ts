@@ -1,5 +1,6 @@
 import { UsageError } from '../core/errors';
 import type { ProjectRef } from './project-ref';
+import { hasUid } from '../transport/envelope';
 import type { PageProjectsParams } from './projects.api';
 import type { ProjectsPage } from './types';
 
@@ -16,7 +17,7 @@ export class ProjectResolver {
     }
 
     for await (const page of this.projects.pages({ org })) {
-      const match = page.projects.find((project) => project.name === ref.name);
+      const match = page.projects.filter(hasUid).find((project) => project.name === ref.name);
 
       if (match) {
         return match.uid;
