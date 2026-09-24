@@ -73,22 +73,17 @@ export class CloudFunctions {
 
   private startServer(app: Express, servingPort: number): Promise<Server> {
     return new Promise<Server>((resolve, reject) => {
-      let listening = false;
+      const refuse = (error: NodeJS.ErrnoException): void => {
+        reject(listenFailure(error, servingPort));
+      };
 
       const server = app.listen(servingPort, () => {
-        listening = true;
+        server.off('error', refuse);
         console.log(`Serving on port ${servingPort}`);
         resolve(server);
       });
 
-      server.on('error', (error: NodeJS.ErrnoException) => {
-        if (listening) {
-          console.error(error);
-          return;
-        }
-
-        reject(listenFailure(error, servingPort));
-      });
+      server.once('error', refuse);
     });
   }
 

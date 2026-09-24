@@ -1,6 +1,6 @@
 import { UsageError } from './errors';
 import type { InputSource } from './resolution';
-import { InputSources, ResolvedValues, atLeastOneOf, exactlyOneOf, onlyWithValueOf } from './rules';
+import { InputSources, ResolvedValues, atLeastOneOf, exactlyOneOf, onlyWithValueOf, requireValueOf } from './rules';
 
 function from(source: InputSource, values: ResolvedValues): InputSources {
   return Object.fromEntries(Object.keys(values).map((key) => [key, source]));
@@ -143,11 +143,14 @@ describe('onlyWithValueOf', () => {
     }
   });
 
-  it('reads the gate value wherever it came from, including a default', () => {
+  it('leaves the decision to the command when the gate value came only from a default, allowed or not', () => {
     const rule = onlyWithValueOf('server-cmd', 'framework', SUPPORTED);
 
     expect(() =>
       rule({ 'server-cmd': 'npm start', framework: 'NUXT' }, { 'server-cmd': 'flag', framework: 'default' }),
+    ).not.toThrow();
+    expect(() =>
+      rule({ 'server-cmd': 'npm start', framework: 'NEXTJS' }, { 'server-cmd': 'flag', framework: 'default' }),
     ).not.toThrow();
   });
 
@@ -161,22 +164,29 @@ describe('onlyWithValueOf', () => {
     );
   });
 
-  it('fails saying the gate was not supplied when there is no gate value to report', () => {
+  it('leaves the decision to the command when the gate has not been decided yet, because it may be prompted or detected later', () => {
     const rule = onlyWithValueOf('server-cmd', 'framework', SUPPORTED);
-    const expected =
-      '--server-cmd is only supported when --framework is one of ANALOG, ANGULAR, NUXT, ASTRO, REMIX, OTHER; ' +
-      '--framework was not supplied.';
 
-    expect(() => rule(...typed({ 'server-cmd': 'npm start' }))).toThrow(expected);
-    expect(() => rule(...typed({ 'server-cmd': 'npm start', framework: undefined }))).toThrow(expected);
-    expect(() => rule(...typed({ 'server-cmd': 'npm start', framework: null }))).toThrow(expected);
-    expect(() => rule(...typed({ 'server-cmd': 'npm start', framework: '' }))).toThrow(expected);
-    expect(() => rule(...typed({ 'server-cmd': 'npm start', framework: 7 }))).toThrow(expected);
+    expect(() => rule(...typed({ 'server-cmd': 'npm start' }))).not.toThrow();
+    expect(() => rule(...typed({ 'server-cmd': 'npm start', framework: undefined }))).not.toThrow();
+    expect(() => rule(...typed({ 'server-cmd': 'npm start', framework: null }))).not.toThrow();
+    expect(() => rule(...typed({ 'server-cmd': 'npm start', framework: '' }))).not.toThrow();
+    expect(() => rule(...typed({ 'server-cmd': 'npm start', framework: 7 }))).not.toThrow();
   });
 
   it.each([[null], [undefined], [false], [''], ['   ']])('does not gate on %p as a supplied gated value', (value) => {
     const rule = onlyWithValueOf('server-cmd', 'framework', SUPPORTED);
 
     expect(() => rule(...typed({ 'server-cmd': value, framework: 'NEXTJS' }))).not.toThrow();
+  });
+});
+
+describe('requireValueOf', () => {
+  it('accepts a value the gate allows and names every allowed value and the found one otherwise', () => {
+    expect(() => requireValueOf('branch', 'type', ['GitHub'], 'GitHub')).not.toThrow();
+    expect(() => requireValueOf('branch', 'type', ['GitHub'], 'FileUpload')).toThrow(UsageError);
+    expect(() => requireValueOf('branch', 'type', ['GitHub'], 'FileUpload')).toThrow(
+      '--branch is only supported when --type is one of GitHub; --type is FileUpload.',
+    );
   });
 });

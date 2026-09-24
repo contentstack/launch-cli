@@ -365,18 +365,15 @@ describe('CloudFunctions serve failures', () => {
     expect(mapped).not.toBeInstanceOf(PortInUseError);
   });
 
-  it('logs an error raised after the server is already listening rather than rejecting', async () => {
+  it('leaves an error raised after the server is listening unhandled, exactly as V1 did, so the process exits 1', async () => {
     writeFunctionFile('hello.js', 'export default function hello(request, response) { response.send("hi"); }');
-    const logged: unknown[] = [];
-    const errorSpy = jest.spyOn(console, 'error').mockImplementation((value: unknown) => {
-      logged.push(value);
-    });
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     const server = (await new CloudFunctions(workspace).serve(await freePort())) as Server;
     const late = new Error('late failure');
 
-    server.emit('error', late);
-
-    expect(logged).toEqual([late]);
+    expect(server.listenerCount('error')).toBe(0);
+    expect(() => server.emit('error', late)).toThrow(/late failure/);
+    expect(errorSpy).not.toHaveBeenCalled();
 
     errorSpy.mockRestore();
     await new Promise<void>((resolve) => server.close(() => resolve()));

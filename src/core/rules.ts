@@ -30,21 +30,27 @@ export function exactlyOneOf(...keys: FlagKey[]): Rule {
   };
 }
 
-export function onlyWithValueOf(key: FlagKey, gate: FlagKey, allowed: readonly string[]): Rule {
+export function requireValueOf(flag: string, gate: string, allowed: readonly string[], value: string): void {
+  if (!allowed.includes(value)) {
+    throw new UsageError(
+      `--${flag} is only supported when --${gate} is one of ${allowed.join(', ')}; --${gate} is ${value}.`,
+    );
+  }
+}
+
+export function onlyWithValueOf(flag: FlagKey, gate: FlagKey, allowed: readonly string[]): Rule {
   return (resolved, sources) => {
-    if (!isSupplied(resolved[key], sources[key])) {
+    if (!isSupplied(resolved[flag], sources[flag])) {
       return;
     }
 
     const value = resolved[gate];
 
-    if (typeof value === 'string' && allowed.includes(value)) {
+    if (typeof value !== 'string' || !isSupplied(value, sources[gate])) {
       return;
     }
 
-    const found = typeof value === 'string' && value !== '' ? `--${gate} is ${value}` : `--${gate} was not supplied`;
-
-    throw new UsageError(`--${key} is only supported when --${gate} is one of ${allowed.join(', ')}; ${found}.`);
+    requireValueOf(flag, gate, allowed, value);
   };
 }
 

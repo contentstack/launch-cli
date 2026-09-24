@@ -1,6 +1,7 @@
 import { MissingInputError, UsageError } from '../core/errors';
 import { ProjectConfig, ProjectConfigStore } from '../core/project-config';
 import { renderDetail } from '../core/render';
+import { requireValueOf } from '../core/rules';
 import type { ServiceContext } from '../core/service-context';
 import { DeploymentUnsuccessfulError } from '../deployments/deployment.errors';
 import { deploymentUrlOf } from '../deployments/deployment.presenter';
@@ -8,6 +9,8 @@ import { WatchTiming, watchDeployment } from '../deployments/deployment.watcher'
 import type { Deployment } from '../deployments/types';
 import {
   FRAMEWORK_CHOICES,
+  FRAMEWORK_PRESET_BY_LABEL,
+  OUTPUT_DIRECTORY_BY_FRAMEWORK,
   RESPONSE_MODES,
   ResponseMode,
   ToggleValue,
@@ -29,14 +32,19 @@ import {
   repositorySearchTerm,
 } from './project.create.prompt';
 import { deploymentFailureMessage, projectCreatedFields } from './project.presenter';
-import { PROJECT_TYPE_BY_CHOICE, ProjectTypeChoice, askProjectType, projectTypeChoiceOf } from './project.inputs';
+import {
+  GIT_ONLY_FLAGS,
+  PROJECT_TYPE_BY_CHOICE,
+  ProjectTypeChoice,
+  askProjectType,
+  projectTypeChoiceOf,
+} from './project.inputs';
 import { uploadArchive } from './project.upload';
 import type { CreateProjectInput, DetectedFramework, IdentifiedProject } from './types';
 
 export { DEPLOYMENT_WAIT_TIMEOUT_MS, defaultWatchTiming } from '../deployments/deployment.watcher';
 export { serverCommandFrameworkGate } from '../environments/environment.inputs';
 
-export const DEFAULT_OUTPUT_DIRECTORY = './';
 export const NO_DEPLOYMENT_STATUS = 'NONE';
 export const FIRST_LOOKUP_ATTEMPTS = 3;
 export const CREATE_PROMPT_REMEDIES = { config: false, prompt: true };
@@ -50,7 +58,7 @@ export function reasonOf(error: unknown): string {
 export interface CreateRequest {
   org: string;
   dataDir: string;
-  configPath?: string;
+  configPath: string;
   type?: ProjectTypeChoice;
   name?: string;
   description?: string;
@@ -104,7 +112,10 @@ export class ProjectCreator {
   ) {}
 
   async create(request: CreateRequest): Promise<void> {
+    this.refuseLinkedFolder(request);
+
     const choice = await this.projectType(request);
+    this.refuseGitFlagsOffGitHub(request, choice);
     const name = await this.need('name', request.name, () => askText(this.services.ux, 'Project name'));
     const envName = await this.need('env-name', request.envName, () =>
       askText(this.services.ux, 'Environment name'),
@@ -117,12 +128,8 @@ export class ProjectCreator {
       name: envName,
       gitBranch: source.branch,
       uploadUid: source.uploadUid,
-      buildCommand: await this.need('build-cmd', request.buildCmd, () =>
-        askOptionalText(this.services.ux, 'Build command', source.detected.buildCommand),
-      ),
-      outputDirectory: await this.need('output-dir', request.outputDir, () =>
-        askText(this.services.ux, 'Output directory', source.detected.outputDirectory ?? DEFAULT_OUTPUT_DIRECTORY),
-      ),
+      buildCommand: await this.buildCommand(request, source.detected),
+      outputDirectory: await this.outputDirectory(request, framework, source.detected),
       serverCommand: await this.serverCommand(request, framework, source.detected),
       frameworkPreset: framework,
       environmentVariables: emptyEnvironmentVariables(),
@@ -169,10 +176,6 @@ export class ProjectCreator {
 
   private remember(request: CreateRequest, project: IdentifiedProject): void {
     const path = request.configPath;
-
-    if (path === undefined) {
-      return;
-    }
 
     const config: ProjectConfig = { uid: project.uid, organizationUid: request.org };
 
@@ -245,7 +248,15 @@ export class ProjectCreator {
       return;
     }
 
-    throw this.unsuccessful({ org, project, envName, environment, deployment, status: outcome.status });
+    throw this.unsuccessful({
+      org,
+      project,
+      envName,
+      environment,
+      deployment,
+      status: outcome.status,
+      timedOut: outcome.kind === 'timed-out',
+    });
   }
 
   private async explaining<T>(survivors: Survivors, step: () => Promise<T>): Promise<T> {
@@ -256,7 +267,9 @@ export class ProjectCreator {
     }
   }
 
-  private unsuccessful(failure: Survivors & { status: string; reason?: string }): DeploymentUnsuccessfulError {
+  private unsuccessful(
+    failure: Survivors & { status: string; reason?: string; timedOut?: boolean },
+  ): DeploymentUnsuccessfulError {
     return new DeploymentUnsuccessfulError(
       deploymentFailureMessage({
         reason: failure.reason,
@@ -267,6 +280,7 @@ export class ProjectCreator {
         environmentUid: failure.environment?.uid,
         deploymentUid: failure.deployment?.uid,
         status: failure.status,
+        timedOut: failure.timedOut,
       }),
     );
   }
@@ -338,8 +352,15 @@ export class ProjectCreator {
   }
 
   private async selectUploadSource(request: CreateRequest): Promise<SourceSelection> {
-    const archive = archiveDirectory(request.dataDir, request.configPath === undefined ? [] : [request.configPath]);
+    const archive = archiveDirectory(request.dataDir, [request.configPath]);
     const signed = await this.services.api.projects.signedUploadUrl({ org: request.org });
+
+    if (archive.skippedLinks.length > 0) {
+      this.services.ux.print(
+        `Skipping ${archive.skippedLinks.length} symbolic link(s), which are never uploaded: ` +
+          archive.skippedLinks.join(', '),
+      );
+    }
 
     this.services.ux.print(`Uploading ${archive.entries.length} files from ${request.dataDir}`);
     await uploadArchive(signed, archive.buffer);
@@ -357,18 +378,27 @@ export class ProjectCreator {
       return request.framework;
     }
 
-    if (!this.services.isTTY) {
+    if (this.services.isTTY) {
+      return frameworkPresetOf(
+        await askChoice(
+          this.services.ux,
+          'Framework preset',
+          FRAMEWORK_CHOICES.map((label) => ({ name: label, value: label })),
+          frameworkLabelOf(detected.framework),
+        ),
+      );
+    }
+
+    const label = frameworkLabelOf(detected.framework);
+
+    if (label === undefined) {
       throw new MissingInputError('framework', CREATE_PROMPT_REMEDIES);
     }
 
-    return frameworkPresetOf(
-      await askChoice(
-        this.services.ux,
-        'Framework preset',
-        FRAMEWORK_CHOICES.map((label) => ({ name: label, value: label })),
-        frameworkLabelOf(detected.framework),
-      ),
-    );
+    const preset = FRAMEWORK_PRESET_BY_LABEL[label.toLowerCase()];
+    this.services.ux.print(`Using the detected framework ${preset}. Pass --framework to choose another.`);
+
+    return preset;
   }
 
   private async serverCommand(
@@ -376,30 +406,121 @@ export class ProjectCreator {
     framework: FrameworkPreset,
     detected: DetectedFramework,
   ): Promise<string | undefined> {
+    if (request.serverCmd !== undefined) {
+      requireValueOf('server-cmd', 'framework', SERVER_COMMAND_FRAMEWORKS, framework);
+
+      return request.serverCmd;
+    }
+
     if (!SERVER_COMMAND_FRAMEWORKS.includes(framework)) {
       return undefined;
     }
 
-    if (request.serverCmd !== undefined) {
-      return request.serverCmd;
+    if (this.services.isTTY) {
+      return askOptionalText(this.services.ux, 'Server command', detected.serverCommand);
     }
 
-    return this.services.isTTY
-      ? askOptionalText(this.services.ux, 'Server command', detected.serverCommand)
-      : undefined;
+    return this.detectedValue(detected.serverCommand, 'server command', '--server-cmd');
+  }
+
+  private async buildCommand(request: CreateRequest, detected: DetectedFramework): Promise<string | undefined> {
+    if (request.buildCmd !== undefined) {
+      return request.buildCmd;
+    }
+
+    if (this.services.isTTY) {
+      return askOptionalText(this.services.ux, 'Build command', detected.buildCommand);
+    }
+
+    return this.detectedValue(detected.buildCommand, 'build command', '--build-cmd');
+  }
+
+  private async outputDirectory(
+    request: CreateRequest,
+    framework: FrameworkPreset,
+    detected: DetectedFramework,
+  ): Promise<string> {
+    if (request.outputDir !== undefined) {
+      return request.outputDir;
+    }
+
+    const fallback = OUTPUT_DIRECTORY_BY_FRAMEWORK[framework];
+
+    if (this.services.isTTY) {
+      return askText(this.services.ux, 'Output directory', detected.outputDirectory ?? fallback);
+    }
+
+    const found = this.detectedValue(detected.outputDirectory, 'output directory', '--output-dir');
+
+    if (found !== undefined) {
+      return found;
+    }
+
+    this.services.ux.print(
+      `Using the default output directory "${fallback}" for ${framework}. Pass --output-dir to change it.`,
+    );
+
+    return fallback;
+  }
+
+  private detectedValue(value: string | undefined, noun: string, flag: string): string | undefined {
+    if (typeof value !== 'string' || value.trim() === '') {
+      return undefined;
+    }
+
+    this.services.ux.print(`Using the detected ${noun} "${value}". Pass ${flag} to change it.`);
+
+    return value;
+  }
+
+  private refuseLinkedFolder(request: CreateRequest): void {
+    const linked = new ProjectConfigStore(request.configPath).linkedProject();
+
+    if (linked === undefined) {
+      return;
+    }
+
+    const named = linked.name ? `"${linked.name}" (${linked.uid})` : `${linked.uid}`;
+
+    throw new UsageError(
+      `This folder is already linked to the project ${named} in ${request.configPath}. ` +
+        'To create a new project, remove that file or pass --config with a different path.',
+    );
+  }
+
+  private refuseGitFlagsOffGitHub(request: CreateRequest, choice: ProjectTypeChoice): void {
+    const supplied: Record<(typeof GIT_ONLY_FLAGS)[number], string | undefined> = {
+      branch: request.branch,
+      namespace: request.namespace,
+      repo: request.repo,
+    };
+
+    for (const flag of GIT_ONLY_FLAGS) {
+      if (supplied[flag] !== undefined) {
+        requireValueOf(flag, 'type', ['GitHub'], choice);
+      }
+    }
   }
 
   private async streaming(request: CreateRequest): Promise<boolean> {
-    const mode = await this.need('res-mode', request.resMode, () =>
-      askChoice(
+    if (request.resMode !== undefined) {
+      return request.resMode === ('streaming' satisfies ResponseMode);
+    }
+
+    if (this.services.isTTY) {
+      const mode = await askChoice(
         this.services.ux,
         'Response mode',
         RESPONSE_MODES.map((value) => ({ name: value, value })),
         RESPONSE_MODES[0],
-      ),
-    );
+      );
 
-    return mode === ('streaming' satisfies ResponseMode);
+      return mode === ('streaming' satisfies ResponseMode);
+    }
+
+    this.services.ux.print('Using the buffered response mode. Pass --res-mode streaming to stream responses.');
+
+    return false;
   }
 
   private async need<T extends string | undefined>(

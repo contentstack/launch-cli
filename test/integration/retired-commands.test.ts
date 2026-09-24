@@ -7,6 +7,8 @@ import { Config, Interfaces, Plugin } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
+import { productionSources } from '../support/sources';
+
 const LAUNCH_HUB_URL = 'https://launch-api.integration.test';
 const DATA_DIR = tmpdir();
 
@@ -24,6 +26,23 @@ const CONFIG: Record<string, unknown> = {
 };
 
 let config: Interfaces.Config;
+
+const PLANNED_COMMANDS: Record<string, string> = {
+  'launch:environments:create': 'CL-7168',
+  'launch:environments:list': 'CL-7168',
+  'launch:deployments:create': 'CL-7170',
+  'launch:deployments:get': 'CL-7170',
+  'launch:deployments:list': 'CL-7170',
+  'launch:deployments:rollback': 'CL-7170',
+  'launch:logs:get': 'CL-7171',
+  'launch:site:open': 'CL-7172',
+};
+
+function commandsNamedInSource(): string[] {
+  const named = productionSources().flatMap((source) => [...source.text.matchAll(/\blaunch(?::[a-z][a-z-]*)+/g)].map((match) => match[0]));
+
+  return [...new Set(named)].sort();
+}
 
 describe('integration: retired V1 command names', () => {
   beforeAll(async () => {
@@ -118,6 +137,21 @@ describe('integration: retired V1 command names', () => {
 
     expect(readdirSync(logs).sort()).toEqual(['error.log', 'info.log']);
     rmSync(projectDir, { recursive: true, force: true });
+  });
+
+  it('names only commands that exist or are planned in a ticket, wherever the CLI tells a user to run one', () => {
+    const registered = new Set(config.commands.map((command) => command.id));
+    const named = commandsNamedInSource();
+    const unknown = named.filter((id) => !registered.has(id) && PLANNED_COMMANDS[id] === undefined);
+
+    expect(named).toEqual(expect.arrayContaining(['launch:deployments:create', 'launch:logs:get', 'launch:site:open']));
+    expect(unknown).toEqual([]);
+  });
+
+  it('drops a command from the planned list once it ships, so the list cannot hide a typo later', () => {
+    const registered = new Set(config.commands.map((command) => command.id));
+
+    expect(Object.entries(PLANNED_COMMANDS).filter(([id]) => registered.has(id))).toEqual([]);
   });
 
   it('lists the V2 topics under launch --help', async () => {

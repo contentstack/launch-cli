@@ -32,6 +32,7 @@ function capturingHttpClient(statuses: number[], captured: CapturedCall[]) {
     client.interceptors = { response: { use: () => 0 } };
     client.requestConfig = () => ({});
     client.asJson = () => client;
+    client.timeout = () => client;
     client.headers = (headers: Record<string, string>) => {
       call.headers = headers;
       return client;

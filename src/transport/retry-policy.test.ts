@@ -1,5 +1,12 @@
 import { LaunchNetworkError } from './errors';
-import { DEFAULT_MAX_RETRIES, DEFAULT_RETRY_DELAY_MS, HttpMethod, RetryPolicy } from './retry-policy';
+import {
+  DEFAULT_MAX_RETRIES,
+  DEFAULT_RETRY_DELAY_MS,
+  HttpMethod,
+  MAX_RETRY_AFTER_MS,
+  RetryPolicy,
+  retryAfterMs,
+} from './retry-policy';
 
 function retryable(): LaunchNetworkError {
   return new LaunchNetworkError('Could not reach the Launch API.', new Error('socket hang up'), true);
@@ -50,7 +57,24 @@ describe('RetryPolicy', () => {
     },
   );
 
-  it.each([[200], [301], [400], [401], [404], [409], [500], [503]])(
+  it.each([502, 503, 504])('treats a %i as retryable only on the idempotent GET and HEAD', (status) => {
+    const policy = new RetryPolicy();
+
+    expect(ALL_METHODS.map((method) => [method, policy.isRetryableStatus(status, method)])).toEqual(
+      ALL_METHODS.map((method) => [method, method === 'GET' || method === 'HEAD']),
+    );
+  });
+
+  it('waits the longer of its own backoff and the delay the server asked for', () => {
+    const policy = new RetryPolicy({ retryDelayMs: 1000 });
+
+    expect(policy.delayFor(2)).toBe(2000);
+    expect(policy.delayFor(2, 1999)).toBe(2000);
+    expect(policy.delayFor(2, 2001)).toBe(2001);
+    expect(policy.delayFor(2, 0)).toBe(2000);
+  });
+
+  it.each([[200], [301], [400], [401], [404], [409], [500], [501], [505]])(
     'treats %i as not retryable on any method',
     (status) => {
       const policy = new RetryPolicy();
@@ -114,5 +138,28 @@ describe('RetryPolicy', () => {
 
     expect([1, 2, 3].map((attempt) => policy.delayFor(attempt))).toEqual([10, 20, 30]);
     expect(policy.delayFor(0)).toBe(0);
+  });
+});
+
+describe('retryAfterMs', () => {
+  it.each<[string, Record<string, unknown> | undefined, number | undefined]>([
+    ['whole seconds', { 'retry-after': '7' }, 7000],
+    ['seconds padded with spaces', { 'retry-after': ' 3 ' }, 3000],
+    ['zero seconds', { 'retry-after': '0' }, 0],
+    ['exactly the cap', { 'retry-after': '30' }, MAX_RETRY_AFTER_MS],
+    ['more than the cap', { 'retry-after': '31' }, MAX_RETRY_AFTER_MS],
+    ['an HTTP date', { 'retry-after': 'Wed, 21 Oct 2015 07:28:00 GMT' }, undefined],
+    ['a negative number', { 'retry-after': '-5' }, undefined],
+    ['a fraction', { 'retry-after': '1.5' }, undefined],
+    ['an empty value', { 'retry-after': '' }, undefined],
+    ['a non-string value', { 'retry-after': 7 }, undefined],
+    ['no such header', {}, undefined],
+    ['no headers at all', undefined, undefined],
+  ])('reads %s', (_label, headers, expected) => {
+    expect(retryAfterMs(headers)).toBe(expected);
+  });
+
+  it('caps a server-requested wait at thirty seconds', () => {
+    expect(MAX_RETRY_AFTER_MS).toBe(30_000);
   });
 });

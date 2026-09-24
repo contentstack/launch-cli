@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 import { configHandler } from '@contentstack/cli-utilities';
 
 import { EXIT_RUNTIME } from '../core/constants';
@@ -10,6 +12,55 @@ const MESSAGES = {
 };
 
 describe('parseErrorEnvelope', () => {
+  it('reads the field-named entry the management service sends for a validation failure', () => {
+    const error = parseErrorEnvelope(400, {
+      errors: [{ name: { code: 'launch.PROJECTS.NAME.TOO_LONG', message: 'Project name must be 200 characters or fewer.' } }],
+      status: 400,
+    });
+
+    expect(error.message).toBe('Project name must be 200 characters or fewer.');
+    expect(error.code).toBe('launch.PROJECTS.NAME.TOO_LONG');
+    expect(error.errors).toEqual([
+      { field: 'name', code: 'launch.PROJECTS.NAME.TOO_LONG', message: 'Project name must be 200 characters or fewer.' },
+    ]);
+  });
+
+  it('maps a field-named code to the supplied wording, as it does a top-level one', () => {
+    const error = parseErrorEnvelope(
+      409,
+      { errors: [{ name: { code: 'launch.RESOURCE.DUPLICATE_NAME', message: 'duplicate' } }] },
+      MESSAGES,
+    );
+
+    expect(error.message).toBe('Something of that name already exists.');
+  });
+
+  it('keeps every entry, field-named or not, in the order the service sent them', () => {
+    const error = parseErrorEnvelope(400, {
+      errors: [
+        { description: { code: 'launch.PROJECTS.DESCRIPTION.TOO_LONG', message: 'too long' } },
+        { code: 'launch.BODY_EMPTY', message: 'empty' },
+      ],
+    });
+
+    expect(error.errors).toEqual([
+      { field: 'description', code: 'launch.PROJECTS.DESCRIPTION.TOO_LONG', message: 'too long' },
+      { code: 'launch.BODY_EMPTY', message: 'empty' },
+    ]);
+    expect(error.message).toBe('too long');
+  });
+
+  it.each<[string, unknown]>([
+    ['a field whose value is not an object', { name: 'oops' }],
+    ['a field whose value is null', { name: null }],
+    ['two fields in one entry', { name: { code: 'a', message: 'a' }, type: { code: 'b', message: 'b' } }],
+    ['an empty entry', {}],
+  ])('does not guess at %s and falls back to the status message', (_label, entry) => {
+    const error = parseErrorEnvelope(400, { errors: [entry] });
+
+    expect(error.message).toBe('Launch API request failed with status 400.');
+  });
+
   it('maps a known code to the supplied wording and keeps status, code and raw errors', () => {
     const error = parseErrorEnvelope(
       409,
@@ -201,6 +252,21 @@ describe('diagnoseTransportError', () => {
     const diagnosed = diagnoseTransportError(cause) as LaunchNetworkError;
 
     expect(diagnosed).toBeInstanceOf(LaunchNetworkError);
+    expect(diagnosed.message).toBe(
+      'Proxy error: Unable to connect to proxy server at http://corp.internal:3128. Please verify your proxy configuration.',
+    );
+  });
+
+  it('never puts proxy credentials into the message a user sees', () => {
+    withProxy(undefined);
+    const phrase = randomBytes(12).toString('hex');
+    process.env.HTTPS_PROXY = `http://ops:${phrase}@corp.internal:3128`;
+    const cause = Object.assign(new Error('connect ECONNREFUSED 10.0.0.1:3128'), { code: 'ECONNREFUSED' });
+
+    const diagnosed = diagnoseTransportError(cause) as LaunchNetworkError;
+
+    expect(diagnosed.message).not.toContain(phrase);
+    expect(diagnosed.message).not.toContain('ops:');
     expect(diagnosed.message).toBe(
       'Proxy error: Unable to connect to proxy server at http://corp.internal:3128. Please verify your proxy configuration.',
     );

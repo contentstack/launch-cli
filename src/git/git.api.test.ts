@@ -121,6 +121,7 @@ describe('GitApi', () => {
   it('rewords the Git failures the CLI has its own wording for', () => {
     expect(Object.keys(GIT_ERROR_MESSAGES).sort()).toEqual([
       'launch.GIT_BRANCH.NOT_FOUND',
+      'launch.GIT_PROVIDER.UNAUTHORIZED_ACCESS',
       'launch.GIT_REPOSITORY.NOT_FOUND',
       'launch.PROVIDER.REQUIRED',
       'launch.USERCONNECTION.NOT_FOUND',

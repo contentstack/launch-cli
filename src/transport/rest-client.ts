@@ -1,7 +1,7 @@
 import { API_VERSION } from '../core/constants';
 import { AuthStrategy } from './auth-strategy';
 import { ErrorMessages, diagnoseTransportError, parseErrorEnvelope } from './errors';
-import { HttpMethod, RetryPolicy } from './retry-policy';
+import { DEFAULT_REQUEST_TIMEOUT_MS, HttpMethod, RetryPolicy, retryAfterMs } from './retry-policy';
 import { createUtilityHttpClient } from './utility-http-client';
 
 export { HTTP_METHODS } from './retry-policy';
@@ -16,13 +16,20 @@ export interface RestRequest {
   projectUid?: string;
 }
 
+export interface HttpResponse {
+  status: number;
+  data: unknown;
+  headers?: Record<string, unknown>;
+}
+
 export interface HttpClientLike {
   baseUrl(url: string): HttpClientLike;
   asJson(): HttpClientLike;
+  timeout(ms: number): HttpClientLike;
   headers(headers: Record<string, string>): HttpClientLike;
   queryParams(query: object): HttpClientLike;
   payload(body: unknown): HttpClientLike;
-  send(method: HttpMethod, path: string): Promise<{ status: number; data: unknown }>;
+  send(method: HttpMethod, path: string): Promise<HttpResponse>;
 }
 
 export interface RestApiClientOptions {
@@ -32,6 +39,7 @@ export interface RestApiClientOptions {
   createHttpClient?: () => HttpClientLike;
   maxRetries?: number;
   retryDelayMs?: number;
+  requestTimeoutMs?: number;
   sleep?: (ms: number) => Promise<void>;
 }
 
@@ -59,9 +67,15 @@ function scopeHeader(headers: Record<string, string>, name: string, value: strin
 
 const EXPIRED_TOKEN_MESSAGE = 'access token is invalid or expired';
 
+const GIT_PROVIDER_CODE_PREFIX = 'launch.GIT_PROVIDER.';
+
+function isGitProviderRejection(status: number, data: unknown): boolean {
+  return parseErrorEnvelope(status, data).errors.some((entry) => entry.code?.startsWith(GIT_PROVIDER_CODE_PREFIX));
+}
+
 function isAuthChallenge(status: number, data: unknown): boolean {
   if (status === 401) {
-    return true;
+    return !isGitProviderRejection(status, data);
   }
 
   const { error_message: errorMessage } = (data ?? {}) as { error_message?: unknown };
@@ -79,7 +93,7 @@ export class RestApiClient {
     let attempt = 0;
 
     for (;;) {
-      let response: { status: number; data: unknown };
+      let response: HttpResponse;
 
       try {
         response = await this.send(req);
@@ -105,7 +119,7 @@ export class RestApiClient {
 
       if (policy.shouldRetry(response.status, req.method, attempt)) {
         attempt += 1;
-        await sleep(policy.delayFor(attempt));
+        await sleep(policy.delayFor(attempt, retryAfterMs(response.headers)));
         continue;
       }
 
@@ -113,20 +127,23 @@ export class RestApiClient {
     }
   }
 
-  private async send(req: RestRequest): Promise<{ status: number; data: unknown }> {
+  private async send(req: RestRequest): Promise<HttpResponse> {
     const create = this.options.createHttpClient ?? createUtilityHttpClient;
     const client = create();
 
     const headers: Record<string, string> = {
       'X-CS-CLI': this.options.analyticsInfo,
       'x-cs-api-version': API_VERSION,
-      ...(await this.options.auth.headers(req.orgUid)),
+      ...(await this.options.auth.headers()),
     };
 
     scopeHeader(headers, 'x-organization-uid', req.orgUid);
     scopeHeader(headers, 'x-project-uid', req.projectUid);
 
-    client.baseUrl(this.options.baseUrl).headers(headers);
+    client
+      .baseUrl(this.options.baseUrl)
+      .timeout(this.options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS)
+      .headers(headers);
 
     if (req.query) {
       client.queryParams(pruneUndefined(req.query));

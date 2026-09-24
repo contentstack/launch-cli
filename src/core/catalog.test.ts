@@ -10,8 +10,8 @@ async function parse(argv: string[]): Promise<Record<string, unknown>> {
 
 describe('coreFlags', () => {
   it('advertises the limit range in the flag itself, not only in the help text', () => {
-    expect(coreFlags.limit).toMatchObject({ min: 0, max: CLIENT_MAX_LIMIT });
-    expect(coreFlags.limit.description).toBe(`Number of records to fetch (0-${CLIENT_MAX_LIMIT})`);
+    expect(coreFlags.limit).toMatchObject({ min: 1, max: CLIENT_MAX_LIMIT });
+    expect(coreFlags.limit.description).toBe(`Number of records to fetch (1-${CLIENT_MAX_LIMIT})`);
   });
 
   it('advertises the skip floor in the flag itself', () => {
@@ -19,11 +19,11 @@ describe('coreFlags', () => {
     expect((coreFlags.skip as unknown as { max?: number }).max).toBeUndefined();
   });
 
-  it.each([['0'], ['1'], [String(CLIENT_MAX_LIMIT)]])('accepts the in-range limit %s', async (limit) => {
+  it.each([['1'], ['2'], [String(CLIENT_MAX_LIMIT)]])('accepts the in-range limit %s', async (limit) => {
     await expect(parse(['--limit', limit])).resolves.toMatchObject({ limit: Number(limit) });
   });
 
-  it.each([['-1'], [String(CLIENT_MAX_LIMIT + 1)], ['99999']])('rejects the out-of-range limit %s', async (limit) => {
+  it.each([['0'], ['-1'], [String(CLIENT_MAX_LIMIT + 1)], ['99999']])('rejects the out-of-range limit %s', async (limit) => {
     await expect(parse(['--limit', limit])).rejects.toThrow(/Expected an integer/);
   });
 

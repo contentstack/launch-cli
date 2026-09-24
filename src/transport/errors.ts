@@ -3,6 +3,7 @@ import { LaunchError } from '../core/errors';
 import { proxyUrl } from './proxy';
 
 export interface ApiErrorEntry {
+  field?: string;
   code?: string;
   message?: string;
 }
@@ -32,11 +33,34 @@ export class LaunchApiError extends LaunchError {
   }
 }
 
+function isObject(value: unknown): value is object {
+  return typeof value === 'object' && value !== null;
+}
+
+function fieldNamedEntry(value: object): ApiErrorEntry | undefined {
+  const fields = Object.getOwnPropertyNames(value);
+
+  if (fields.length !== 1 || 'code' in value || 'message' in value) {
+    return undefined;
+  }
+
+  const [field] = fields;
+  const nested: unknown = (value as Record<string, unknown>)[field];
+
+  return isObject(nested) ? { field, ...entryFrom(nested) } : undefined;
+}
+
 function entryFrom(value: unknown): ApiErrorEntry {
   const entry: ApiErrorEntry = {};
 
-  if (typeof value !== 'object' || value === null) {
+  if (!isObject(value)) {
     return entry;
+  }
+
+  const named = fieldNamedEntry(value);
+
+  if (named !== undefined) {
+    return named;
   }
 
   if ('code' in value && typeof value.code === 'string') {

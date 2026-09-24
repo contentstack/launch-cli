@@ -5,6 +5,7 @@ import { HttpClient, configHandler } from '@contentstack/cli-utilities';
 import { API_VERSION } from '../core/constants';
 import { LaunchApiError, LaunchNetworkError } from './errors';
 import { HttpClientLike, RestApiClient } from './rest-client';
+import { DEFAULT_REQUEST_TIMEOUT_MS } from './retry-policy';
 
 interface RecordedCall {
   method: string;
@@ -14,6 +15,7 @@ interface RecordedCall {
   query?: object;
   body?: unknown;
   json?: boolean;
+  timeout?: number;
 }
 
 function fakeHttpClient(responses: ({ status: number; data: unknown } | Error)[]) {
@@ -30,6 +32,10 @@ function fakeHttpClient(responses: ({ status: number; data: unknown } | Error)[]
       },
       asJson: () => {
         call.json = true;
+        return client;
+      },
+      timeout: (ms) => {
+        call.timeout = ms;
         return client;
       },
       headers: (h) => {
@@ -93,6 +99,18 @@ function withoutProxy(): () => void {
 }
 
 describe('RestApiClient', () => {
+  it('gives every request a sixty-second timeout unless one is configured, so a stalled connection cannot hang a command', async () => {
+    const defaults = fakeHttpClient([{ status: 200, data: {} }]);
+    const configured = fakeHttpClient([{ status: 200, data: {} }]);
+
+    await buildClient(defaults).request({ method: 'GET', path: '/projects' });
+    await buildClient(configured, { requestTimeoutMs: 1234 }).request({ method: 'GET', path: '/projects' });
+
+    expect(DEFAULT_REQUEST_TIMEOUT_MS).toBe(60_000);
+    expect(defaults.calls.map((call) => call.timeout)).toEqual([DEFAULT_REQUEST_TIMEOUT_MS]);
+    expect(configured.calls.map((call) => call.timeout)).toEqual([1234]);
+  });
+
   it('sends the declared method, path, query, body and headers and returns the payload', async () => {
     const http = fakeHttpClient([{ status: 200, data: { projects: [] } }]);
 
@@ -231,6 +249,40 @@ describe('RestApiClient', () => {
     expect(error.errors).toEqual([{ code: 'launch.AUTH', message: 'nope' }]);
   });
 
+  it.each<[string, unknown]>([
+    ['a top-level Git provider code', { errors: [{ code: 'launch.GIT_PROVIDER.UNAUTHORIZED_ACCESS', message: 'Unauthorized access to git provider.' }] }],
+    ['a field-named Git provider code', { errors: [{ gitProviderNamespace: { code: 'launch.GIT_PROVIDER.UNAUTHORIZED_ACCESS', message: 'Unauthorized access to git provider.' } }] }],
+  ])('treats a 401 carrying %s as a Git access failure and never refreshes the login or resends', async (_label, data) => {
+    const http = fakeHttpClient([{ status: 401, data }, { status: 201, data: { project: {} } }]);
+    const refresh = jest.fn(async () => undefined);
+
+    const error = (await buildClient(http, { auth: { headers: async () => ({ authtoken: 'tok' }), refresh } })
+      .request({ method: 'POST', path: '/projects', body: { name: 'site' } })
+      .catch((caught: unknown) => caught)) as LaunchApiError;
+
+    expect(refresh).not.toHaveBeenCalled();
+    expect(http.calls).toHaveLength(1);
+    expect(error).toBeInstanceOf(LaunchApiError);
+    expect(error.status).toBe(401);
+    expect(error.code).toBe('launch.GIT_PROVIDER.UNAUTHORIZED_ACCESS');
+  });
+
+  it('still treats a 401 as a session challenge when its error entry carries a message but no code', async () => {
+    const http = fakeHttpClient([
+      { status: 401, data: { errors: [{ message: 'Unauthorized' }] } },
+      { status: 200, data: { ok: true } },
+    ]);
+    const refresh = jest.fn(async () => undefined);
+
+    const result = await buildClient(http, { auth: { headers: async () => ({}), refresh } }).request({
+      method: 'GET',
+      path: '/projects',
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
   it('does not attempt a refresh when the auth strategy cannot refresh', async () => {
     const http = fakeHttpClient([{ status: 401, data: {} }]);
 
@@ -352,18 +404,15 @@ describe('RestApiClient', () => {
     ]);
   });
 
-  it('passes the request org uid to the auth strategy so it can scope the credentials', async () => {
+  it('asks the auth strategy for its headers once per attempt and with no arguments, since no strategy scopes by org', async () => {
     const http = fakeHttpClient([{ status: 200, data: {} }]);
-    const seen: (string | undefined)[] = [];
-    const headers = async (orgUid?: string) => {
-      seen.push(orgUid);
-      return {};
-    };
+    const headers = jest.fn(async () => ({}));
 
     await buildClient(http, { auth: { headers } }).request({ method: 'GET', path: '/projects', orgUid: 'org1' });
-    await buildClient(http, { auth: { headers } }).request({ method: 'GET', path: '/projects' });
 
-    expect(seen).toEqual(['org1', undefined]);
+    expect(headers).toHaveBeenCalledTimes(1);
+    expect(headers).toHaveBeenCalledWith();
+    expect(http.calls[0].headers['x-organization-uid']).toBe('org1');
   });
 
   it('backs off by retryDelayMs times the attempt number between retries', async () => {
@@ -665,6 +714,7 @@ describe('RestApiClient', () => {
     };
     fakeClient.baseUrl = () => fakeClient;
     fakeClient.asJson = () => fakeClient;
+    fakeClient.timeout = () => fakeClient;
     fakeClient.requestConfig = () => ({});
     fakeClient.headers = () => fakeClient;
     fakeClient.queryParams = () => fakeClient;

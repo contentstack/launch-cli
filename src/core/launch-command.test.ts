@@ -11,7 +11,7 @@ import { CancelledError, MissingInputError, UsageError } from './errors';
 import { exactlyOneOf } from './rules';
 import { LaunchApiError } from '../transport/errors';
 import { UxLike } from './render';
-import { LaunchCommand, resolveLaunchContext } from './launch-command';
+import { LaunchCommand, projectConfigLoader, resolveLaunchContext } from './launch-command';
 import * as serviceContext from './service-context';
 import { SearchListClass, utilitiesLoader } from './search-list';
 import { pretendTerminal, stdinReportingTTY, stdoutReportingTTY } from '../../test/support/terminal';
@@ -77,6 +77,7 @@ function fakeHttpClient(
   client.interceptors = { response: { use: () => 0 } };
   client.requestConfig = () => ({});
   client.asJson = () => client;
+  client.timeout = () => client;
   client.headers = (headers: Record<string, string>) => {
     onHeaders(headers);
     return client;
@@ -396,7 +397,7 @@ describe('LaunchCommand.init', () => {
 });
 
 describe('LaunchCommand.init authentication gate', () => {
-  it('stops at the auth check, never parsing flags or building the service context', async () => {
+  it('parses the flags first, so a bad flag is a usage error, then stops at the auth check without building the service context', async () => {
     const instance = new Probe([], {} as never) as Probe & { error: jest.Mock };
     const failure = new Error('You are not logged in. Run csdx auth:login to continue.');
     (instance as unknown as { error: unknown }).error = jest.fn(() => {
@@ -412,7 +413,7 @@ describe('LaunchCommand.init authentication gate', () => {
     expect(instance.error).toHaveBeenCalledWith('You are not logged in. Run csdx auth:login to continue.', {
       exit: EXIT_RUNTIME,
     });
-    expect(parseMock).not.toHaveBeenCalled();
+    expect(parseMock).toHaveBeenCalledTimes(1);
     expect(createSpy).not.toHaveBeenCalled();
     expect(instance['services']).toBeUndefined();
     expect(instance['resolved']).toBeUndefined();
@@ -622,5 +623,40 @@ describe('resolveLaunchContext', () => {
     expect(result.configPath).toBe(customPath);
     expect(result.services.ux).toBe(ux);
     expect(result.services.isTTY).toBe(true);
+  });
+});
+
+describe('projectConfigLoader', () => {
+  function store(config: object) {
+    const load = jest.fn(() => config);
+
+    return { store: { load } as unknown as ProjectConfigStore, load };
+  }
+
+  it('reads a default-location config only when a value is first needed, and only once', () => {
+    const { store: lazy, load } = store({ organizationUid: 'org1' });
+
+    const loader = projectConfigLoader(lazy, false);
+
+    expect(load).not.toHaveBeenCalled();
+    expect(typeof loader).toBe('function');
+    expect((loader as () => object)()).toEqual({ organizationUid: 'org1' });
+    expect((loader as () => object)()).toEqual({ organizationUid: 'org1' });
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads a config named by --config at once, so a wrong path fails before anything else happens', () => {
+    const { store: named, load } = store({ uid: 'p1' });
+
+    expect(projectConfigLoader(named, true)).toEqual({ uid: 'p1' });
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets a load failure surface from the lazy read, not from building the loader', () => {
+    const failing = { load: jest.fn(() => { throw new Error('branches disagree'); }) } as unknown as ProjectConfigStore;
+
+    const loader = projectConfigLoader(failing, false);
+
+    expect(() => (loader as () => object)()).toThrow('branches disagree');
   });
 });

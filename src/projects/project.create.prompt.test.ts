@@ -103,6 +103,37 @@ describe('project create prompts', () => {
     ]);
   });
 
+  it('offers only GitHub namespaces, leaving out those of an external Git provider the create flow cannot use', async () => {
+    const { deps: d, asked, printed } = deps(['my-org'], {
+      namespaces: {
+        pagination: { count: 3, limit: 100 },
+        namespaces: [
+          { name: 'my-org', provider: 'GitHub' },
+          { name: 'gitlab-group', provider: 'ExternalGitProvider' },
+          { name: 'legacy-org' },
+        ],
+      },
+    });
+
+    await askNamespace(d, ORG);
+
+    expect((asked[0] as { choices: unknown }).choices).toEqual([
+      { name: 'my-org', value: 'my-org' },
+      { name: 'legacy-org', value: 'legacy-org' },
+    ]);
+    expect(printed).toEqual([]);
+  });
+
+  it('says there is no GitHub namespace when the organization has only external ones', async () => {
+    const { deps: d } = deps(['x'], {
+      namespaces: { pagination: { count: 1, limit: 100 }, namespaces: [{ name: 'gitlab-group', provider: 'ExternalGitProvider' }] },
+    });
+
+    await expect(askNamespace(d, ORG)).rejects.toThrow(
+      'No GitHub namespaces are connected to this organization. Connect GitHub in the Launch app first.',
+    );
+  });
+
   it('says how to reach a namespace the first page did not show', async () => {
     const { deps: d, printed } = deps(['my-org'], {
       namespaces: { pagination: { count: 250, limit: 100 }, namespaces: [{ name: 'my-org' }] },

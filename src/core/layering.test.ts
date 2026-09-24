@@ -3,7 +3,10 @@ import { join, relative, sep } from 'node:path';
 
 const SRC = join(__dirname, '..');
 const LAYERS = ['core', 'transport'];
-const RESOURCES = ['projects', 'functions', 'environments', 'deployments', 'git', 'organizations'];
+const NOT_RESOURCES = [...LAYERS, 'commands'];
+const RESOURCES = readdirSync(SRC, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory() && !NOT_RESOURCES.includes(entry.name))
+  .map((entry) => entry.name);
 
 const RESOURCE_EDGES: Record<string, string[]> = {
   projects: ['environments', 'deployments', 'git'],
@@ -122,6 +125,7 @@ describe('layering between resources', () => {
   });
 
   it('declares an allow-list entry for every resource and invents none', () => {
+    expect(RESOURCES.length).toBeGreaterThanOrEqual(6);
     expect(Object.keys(RESOURCE_EDGES).sort()).toEqual([...RESOURCES].sort());
     for (const targets of Object.values(RESOURCE_EDGES)) {
       for (const target of targets) {

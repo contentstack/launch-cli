@@ -6,6 +6,7 @@ import {
 } from '../../../projects/project.create';
 
 type WatchTiming = ReturnType<typeof defaultWatchTiming>;
+import { gitOnlyFlagRules } from '../../../projects/project.inputs';
 import ProjectsCreate from './create';
 
 function commandUnderTest(resolved: Record<string, unknown>, dataDir = '/tmp/site') {
@@ -97,8 +98,9 @@ describe('launch:projects:create', () => {
     await expect(commandUnderTest({}).run()).rejects.toBe(boom);
   });
 
-  it('declares the framework gate as a rule, so a bad pairing costs no API call', () => {
-    expect(ProjectsCreate.rules).toEqual([serverCommandFrameworkGate]);
+  it('declares the framework gate and the GitHub-only flag gates as rules, so a bad pairing costs no API call', () => {
+    expect(ProjectsCreate.rules).toEqual([serverCommandFrameworkGate, ...gitOnlyFlagRules]);
+    expect(gitOnlyFlagRules).toHaveLength(3);
   });
 
   it('declares every flag it reads and requires only the organization', () => {

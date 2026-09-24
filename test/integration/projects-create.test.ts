@@ -178,6 +178,48 @@ function stubFollowUp(status: string): void {
     });
 }
 
+function withoutFlags(args: string[], ...names: string[]): string[] {
+  const kept: string[] = [];
+
+  for (let index = 0; index < args.length; index += 1) {
+    if (names.includes(args[index])) {
+      index += 1;
+      continue;
+    }
+
+    kept.push(args[index]);
+  }
+
+  return kept;
+}
+
+function stubRepositoryLookup(): void {
+  hub()
+    .get('/manage/git-repositories')
+    .query({ provider: 'GitHub', namespace: 'my-org', search: 'my-repo', limit: 100, skip: 0 })
+    .reply(200, { pagination: { count: 1, limit: 100, skip: null }, repositories: [MY_REPO] });
+}
+
+function stubDetection(detected: Record<string, unknown>): void {
+  hub()
+    .get('/manage/projects/framework')
+    .query({ provider: 'GitHub', repoName: 'my-org/my-repo', branchName: 'main', namespace: 'my-org' })
+    .reply(200, detected);
+}
+
+function captureCreate(): { scope: nock.Scope; body: () => unknown } {
+  let sent: unknown;
+  const scope = hub()
+    .post('/manage/projects', (body: unknown) => {
+      sent = body;
+      return true;
+    })
+    .query({})
+    .reply(201, { project: CREATED_PROJECT });
+
+  return { scope, body: () => sent };
+}
+
 describe('integration: launch:projects:create on the wire', () => {
   beforeAll(async () => {
     const plugin = new Plugin({ ignoreManifest: true, isRoot: true, root: process.cwd() });
@@ -307,7 +349,7 @@ describe('integration: launch:projects:create on the wire', () => {
     expect(error?.message).toContain(`The project "My Site" (${PROJECT_UID})`);
     expect(error?.message).toContain('have not been rolled back');
     expect(error?.message).toContain(
-      `Run csdx launch:deployments:create --org ${ORG_UID} --project ${PROJECT_UID} --environment ${ENVIRONMENT_UID}`,
+      `Run csdx launch:deployments:create --org ${ORG_UID} --project ${PROJECT_UID} --env ${ENVIRONMENT_UID}`,
     );
     expect(error?.message).toContain(`csdx launch:logs:get --org ${ORG_UID} --project ${PROJECT_UID}`);
     expect(error?.message).toContain(`--deployment ${DEPLOYMENT_UID}`);
@@ -631,6 +673,215 @@ describe('integration: launch:projects:create on the wire', () => {
     expect(prompts.messages).toEqual(['Framework preset']);
     expect(create.isDone()).toBe(true);
     expect(onWire).toEqual([]);
+  });
+
+  it('reports a GitHub authorisation failure as a GitHub problem, never as an expired Contentstack login, and posts once', async () => {
+    stubGitLookups();
+    const create = hub()
+      .post('/manage/projects')
+      .query({})
+      .reply(401, {
+        errors: [{ code: 'launch.GIT_PROVIDER.UNAUTHORIZED_ACCESS', message: 'Unauthorized access to git provider.' }],
+        status: 401,
+      });
+    const resent = hub().post('/manage/projects').query({}).reply(201, { project: CREATED_PROJECT });
+
+    const { error } = await runCommand(gitFlags(), config);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.message).toBe(
+      'Launch could not access your GitHub account. Reconnect GitHub in the Launch app, then try again.',
+    );
+    expect(error?.message).not.toContain('auth:login');
+    expect(create.isDone()).toBe(true);
+    expect(resent.isDone()).toBe(false);
+  });
+
+  it('shows the message of a field-named validation error instead of a bare status', async () => {
+    stubGitLookups();
+    hub()
+      .post('/manage/projects')
+      .query({})
+      .reply(400, {
+        errors: [{ name: { code: 'launch.PROJECTS.NAME.INVALID', message: 'Project name contains characters that are not allowed.' } }],
+        status: 400,
+      });
+
+    const { error } = await runCommand(gitFlags(), config);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.message).toBe('Project name contains characters that are not allowed.');
+  });
+
+  it('uses the detected framework, build command and output directory and the buffered default when there is no terminal', async () => {
+    stubGitLookups();
+    const create = captureCreate();
+    stubFollowUp('LIVE');
+
+    const { error, stdout } = await runCommand(
+      withoutFlags(gitFlags(), '--framework', '--build-cmd', '--output-dir', '--res-mode'),
+      config,
+    );
+
+    expect(error).toBeUndefined();
+    expect(create.body()).toMatchObject({
+      environment: {
+        frameworkPreset: 'NEXTJS',
+        buildCommand: 'npm run build',
+        outputDirectory: '.next',
+        isStreamingEnabled: false,
+      },
+    });
+    expect(stdout).toContain('Using the detected framework NEXTJS. Pass --framework to choose another.');
+    expect(stdout).toContain('Using the detected build command "npm run build". Pass --build-cmd to change it.');
+    expect(stdout).toContain('Using the detected output directory ".next". Pass --output-dir to change it.');
+    expect(stdout).toContain('Using the buffered response mode. Pass --res-mode streaming to stream responses.');
+  });
+
+  it("falls back to the framework's V1 output directory and sends no build command when detection found neither", async () => {
+    stubRepositoryLookup();
+    stubDetection({ framework: 'NEXTJS' });
+    const create = captureCreate();
+    stubFollowUp('LIVE');
+
+    const { error, stdout } = await runCommand(
+      withoutFlags(gitFlags(), '--framework', '--build-cmd', '--output-dir', '--res-mode'),
+      config,
+    );
+
+    expect(error).toBeUndefined();
+    expect((create.body() as { environment: Record<string, unknown> }).environment.outputDirectory).toBe('./.next');
+    expect((create.body() as { environment: Record<string, unknown> }).environment).not.toHaveProperty('buildCommand');
+    expect(stdout).toContain('Using the default output directory "./.next" for NEXTJS. Pass --output-dir to change it.');
+  });
+
+  it('exits 2 naming --framework when there is no terminal and nothing was detected', async () => {
+    stubRepositoryLookup();
+    stubDetection({});
+    const create = captureCreate();
+
+    const { error } = await runCommand(withoutFlags(gitFlags(), '--framework'), config);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toContain('--framework');
+    expect(create.scope.isDone()).toBe(false);
+  });
+
+  it('uses a detected server command for a server framework when there is no terminal', async () => {
+    stubRepositoryLookup();
+    stubDetection({ framework: 'NUXT', buildCommand: 'npm run build', outputDirectory: './.output', serverCommand: 'node .output/server/index.mjs' });
+    const create = captureCreate();
+    stubFollowUp('LIVE');
+
+    const { error } = await runCommand(
+      withoutFlags(gitFlags(), '--framework', '--build-cmd', '--output-dir', '--res-mode'),
+      config,
+    );
+
+    expect(error).toBeUndefined();
+    expect((create.body() as { environment: Record<string, unknown> }).environment).toMatchObject({
+      frameworkPreset: 'NUXT',
+      serverCommand: 'node .output/server/index.mjs',
+    });
+  });
+
+  it('accepts --server-cmd without --framework when the framework it lands on supports one', async () => {
+    stubRepositoryLookup();
+    stubDetection({ framework: 'NUXT' });
+    const create = captureCreate();
+    stubFollowUp('LIVE');
+
+    const { error } = await runCommand(
+      [...withoutFlags(gitFlags(), '--framework'), '--server-cmd', '"node server.mjs"'],
+      config,
+    );
+
+    expect(error).toBeUndefined();
+    expect((create.body() as { environment: Record<string, unknown> }).environment.serverCommand).toBe('node server.mjs');
+  });
+
+  it('refuses --server-cmd before creating anything when the framework it lands on does not support one', async () => {
+    stubRepositoryLookup();
+    stubDetection({ framework: 'NEXTJS', buildCommand: 'npm run build', outputDirectory: '.next' });
+    const create = captureCreate();
+
+    const { error } = await runCommand(
+      [...withoutFlags(gitFlags(), '--framework'), '--server-cmd', 'npm-start'],
+      config,
+    );
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe(
+      '--server-cmd is only supported when --framework is one of ANALOG, ANGULAR, NUXT, ASTRO, REMIX, OTHER; ' +
+        '--framework is NEXTJS.',
+    );
+    expect(create.scope.isDone()).toBe(false);
+  });
+
+  it.each([
+    ['--branch', 'main'],
+    ['--namespace', 'my-org'],
+    ['--repo', 'my-org/my-repo'],
+  ])('refuses %s with --type FileUpload before uploading anything', async (flag, value) => {
+    const signed = hub().get('/manage/projects/upload/signed_url').query({}).reply(200, awsSignedUpload());
+
+    const { error } = await runCommand(
+      [
+        'launch:projects:create',
+        '--org',
+        ORG_UID,
+        '--type',
+        'FileUpload',
+        '--name',
+        'Site',
+        '--env-name',
+        'Default',
+        '--data-dir',
+        dataDir,
+        flag,
+        value,
+      ],
+      config,
+    );
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe(`${flag} is only supported when --type is one of GitHub; --type is FileUpload.`);
+    expect(signed.isDone()).toBe(false);
+  });
+
+  it('refuses before uploading or creating anything when the folder is already linked to another project', async () => {
+    const other = randomBytes(12).toString('hex');
+    writeFileSync(
+      join(dataDir, '.cs-launch.json'),
+      JSON.stringify({ project: { uid: other, organizationUid: ORG_UID, name: 'Existing Site' } }),
+    );
+    const signed = hub().get('/manage/projects/upload/signed_url').query({}).reply(200, awsSignedUpload());
+    const create = captureCreate();
+
+    const { error } = await runCommand(
+      [
+        'launch:projects:create',
+        '--org',
+        ORG_UID,
+        '--type',
+        'FileUpload',
+        '--name',
+        'Site',
+        '--env-name',
+        'Default',
+        '--framework',
+        'Other',
+        '--data-dir',
+        dataDir,
+      ],
+      config,
+    );
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toContain(`already linked to the project "Existing Site" (${other})`);
+    expect(error?.message).toContain('--config');
+    expect(signed.isDone()).toBe(false);
+    expect(create.scope.isDone()).toBe(false);
   });
 
   it('exits 2 naming the first missing value when there is no terminal to prompt on', async () => {

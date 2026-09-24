@@ -43,6 +43,20 @@ export const TOGGLE_VALUES = ['enable', 'disable'] as const;
 
 export type ToggleValue = (typeof TOGGLE_VALUES)[number];
 
+export const OUTPUT_DIRECTORY_BY_FRAMEWORK: Record<FrameworkPreset, string> = {
+  GATSBY: './public',
+  NEXTJS: './.next',
+  CRA: './build',
+  CSR: './',
+  ANALOG: './dist/analog/public',
+  ANGULAR: './dist',
+  NUXT: './.output',
+  ASTRO: './dist',
+  VUEJS: './dist',
+  REMIX: './build',
+  OTHER: './',
+};
+
 export function frameworkPresetOf(value: string): FrameworkPreset {
   return FRAMEWORK_PRESET_BY_LABEL[oneOf('framework', value, FRAMEWORK_CHOICES).toLowerCase()];
 }

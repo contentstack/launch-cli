@@ -36,6 +36,7 @@ export interface PartialCreateFailure {
   environmentUid?: string;
   deploymentUid?: string;
   reason?: string;
+  timedOut?: boolean;
 }
 
 export function projectCreatedFields(project: Project, siteUrl?: string): [string, string][] {
@@ -49,8 +50,18 @@ export function projectCreatedFields(project: Project, siteUrl?: string): [strin
 
 export function deploymentFailureMessage(failure: PartialCreateFailure): string {
   const scope = `--org ${failure.org} --project ${failure.projectUid}`;
-  const environment = failure.environmentUid === undefined ? '' : ` --environment ${failure.environmentUid}`;
+  const environment = failure.environmentUid === undefined ? '' : ` --env ${failure.environmentUid}`;
   const deployment = failure.deploymentUid === undefined ? '' : ` --deployment ${failure.deploymentUid}`;
+
+  if (failure.timedOut === true) {
+    return (
+      `The deployment was still ${failure.status} when the CLI stopped waiting for it; it may still finish. ` +
+      `The project "${failure.projectName}" (${failure.projectUid}) and its environment ` +
+      `"${failure.environmentName}" were created. Do not start another deployment yet: ` +
+      `run csdx launch:deployments:get ${scope}${environment}${deployment} to see how it ends, ` +
+      `or csdx launch:logs:get ${scope}${environment}${deployment} to follow it.`
+    );
+  }
 
   const opening =
     failure.reason === undefined

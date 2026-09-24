@@ -2,6 +2,7 @@ import { Flags } from '@contentstack/cli-utilities';
 
 import type { UxLike } from '../core/render';
 import type { ResolutionSpec } from '../core/resolution';
+import { onlyWithValueOf } from '../core/rules';
 import { oneOf, withinLength } from '../core/values';
 import { ProjectRef } from './project-ref';
 import type { ProjectType } from './types';
@@ -32,6 +33,10 @@ export function askProjectType(ux: UxLike): Promise<string> {
     PROJECT_TYPE_CHOICES.map((value) => ({ name: value, value })),
   );
 }
+
+export const GIT_ONLY_FLAGS = ['branch', 'namespace', 'repo'] as const;
+
+export const gitOnlyFlagRules = GIT_ONLY_FLAGS.map((flag) => onlyWithValueOf(flag, 'type', ['GitHub']));
 
 export const projectFlags = {
   project: Flags.string({ description: 'Project name or UID' }),

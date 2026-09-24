@@ -1,5 +1,5 @@
 import AdmZip from 'adm-zip';
-import { lstatSync, readFileSync, readdirSync } from 'node:fs';
+import { Stats, lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { UsageError } from '../core/errors';
@@ -18,10 +18,22 @@ export const UPLOAD_EXCLUDED_NAMES: readonly string[] = [
 export interface ArchivedDirectory {
   buffer: Buffer;
   entries: string[];
+  skippedLinks: string[];
 }
 
-export function isExcludedName(name: string): boolean {
+export const ROOT_ONLY_EXCLUDED_NAMES: readonly string[] = ['logs'];
+
+export function isExcludedName(name: string, atRoot: boolean): boolean {
+  if (ROOT_ONLY_EXCLUDED_NAMES.includes(name) || name.endsWith('.zip')) {
+    return atRoot;
+  }
+
   return UPLOAD_EXCLUDED_NAMES.includes(name);
+}
+
+interface Collected {
+  files: Map<string, Stats>;
+  links: string[];
 }
 
 function directoryStats(root: string) {
@@ -47,11 +59,11 @@ function readable<T>(relative: string, read: () => T): T {
   }
 }
 
-function collect(root: string, prefix: string, found: string[], skipped: readonly string[]): void {
+function collect(root: string, prefix: string, found: Collected, skipped: readonly string[]): void {
   const listing = readable(prefix === '' ? '.' : prefix, () => readdirSync(join(root, prefix)));
 
   for (const entry of listing) {
-    if (isExcludedName(entry)) {
+    if (isExcludedName(entry, prefix === '')) {
       continue;
     }
 
@@ -68,8 +80,13 @@ function collect(root: string, prefix: string, found: string[], skipped: readonl
       continue;
     }
 
+    if (stats.isSymbolicLink()) {
+      found.links.push(relative);
+      continue;
+    }
+
     if (stats.isFile()) {
-      found.push(relative);
+      found.files.set(relative, stats);
     }
   }
 }
@@ -83,13 +100,14 @@ export function archiveDirectory(root: string, excludedFiles: readonly string[] 
     );
   }
 
-  const entries: string[] = [];
+  const found: Collected = { files: new Map(), links: [] };
   collect(
     root,
     '',
-    entries,
+    found,
     excludedFiles.map((path) => resolve(path)),
   );
+  const entries = [...found.files.keys()].sort();
 
   if (entries.length === 0) {
     throw new UsageError(
@@ -101,8 +119,8 @@ export function archiveDirectory(root: string, excludedFiles: readonly string[] 
   const zip = new AdmZip();
 
   for (const entry of entries) {
-    zip.addFile(entry, readable(entry, () => readFileSync(join(root, entry))));
+    zip.addFile(entry, readable(entry, () => readFileSync(join(root, entry))), '', found.files.get(entry));
   }
 
-  return { buffer: zip.toBuffer(), entries };
+  return { buffer: zip.toBuffer(), entries, skippedLinks: found.links.sort() };
 }

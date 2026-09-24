@@ -7,7 +7,7 @@ export const BASIC_AUTHORISATION = 'BASIC';
 export const OAUTH_AUTHORISATION = 'OAUTH';
 
 export interface AuthStrategy {
-  headers(orgUid?: string): Promise<Record<string, string>>;
+  headers(): Promise<Record<string, string>>;
   refresh?(): Promise<unknown>;
 }
 

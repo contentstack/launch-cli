@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -228,6 +228,7 @@ function gitRequest(overrides: Partial<CreateRequest> = {}): CreateRequest {
   return {
     org: ORG,
     dataDir,
+    configPath: configPathIn(dataDir),
     type: 'GitHub',
     name: 'My Site',
     envName: 'Default',
@@ -246,6 +247,7 @@ function uploadRequest(overrides: Partial<CreateRequest> = {}): CreateRequest {
   return {
     org: ORG,
     dataDir,
+    configPath: configPathIn(dataDir),
     type: 'FileUpload',
     name: 'My Site',
     envName: 'Default',
@@ -431,7 +433,7 @@ describe('ProjectCreator prompting order and refusals', () => {
       answers: ['GitHub', 'My Site', 'Default', 'my-org', 'my-org/my-repo', 'main', 'NextJs', 'npm run build', '.next', 'buffered'],
     });
 
-    await creator.create({ org: ORG, dataDir });
+    await creator.create({ org: ORG, dataDir, configPath: configPathIn(dataDir) });
 
     expect(asked).toEqual([
       'Project type',
@@ -455,7 +457,7 @@ describe('ProjectCreator prompting order and refusals', () => {
   ])('exits 2 naming --%s when there is no terminal to ask on', async (flag, supplied) => {
     const { creator } = harness();
 
-    const failure = await creator.create({ org: ORG, dataDir, ...supplied }).catch((error: Error) => error);
+    const failure = await creator.create({ org: ORG, dataDir, configPath: configPathIn(dataDir), ...supplied }).catch((error: Error) => error);
 
     expect(failure).toBeInstanceOf(MissingInputError);
     expect((failure as MissingInputError).flag).toBe(flag);
@@ -463,7 +465,7 @@ describe('ProjectCreator prompting order and refusals', () => {
   });
 
   it('exits 2 naming --framework when nothing detected can be offered without a terminal', async () => {
-    const { creator } = harness();
+    const { creator } = harness({ detected: {} });
 
     const failure = await creator
       .create(gitRequest({ framework: undefined }))
@@ -552,7 +554,7 @@ describe('ProjectCreator prompting order and refusals', () => {
   it('cancels with exit 3 when nothing is picked at a prompt', async () => {
     const { creator } = harness({ isTTY: true, answers: [undefined] });
 
-    const failure = await creator.create({ org: ORG, dataDir }).catch((error: Error) => error);
+    const failure = await creator.create({ org: ORG, dataDir, configPath: configPathIn(dataDir) }).catch((error: Error) => error);
 
     expect(failure).toBeInstanceOf(CancelledError);
     expect((failure as CancelledError).exitCode).toBe(3);
@@ -565,6 +567,7 @@ describe('ProjectCreator prompting order and refusals', () => {
     expect(supported.asked).toEqual(['Server command']);
     expect((bodyOf(supported.created).environment as Record<string, unknown>).serverCommand).toBe('npm start');
 
+    rmSync(configPathIn(dataDir), { force: true });
     const unsupported = harness({ isTTY: true, answers: [] });
     await unsupported.creator.create(gitRequest({ framework: 'NEXTJS', serverCmd: undefined }));
 
@@ -622,7 +625,7 @@ describe('ProjectCreator on the FileUpload path', () => {
 
   it('leaves a --config file that lives inside the data dir out of the upload', async () => {
     const configPath = join(dataDir, 'launch.json');
-    writeFileSync(configPath, JSON.stringify({ project: { uid: 'p0', organizationUid: ORG } }));
+    writeFileSync(configPath, JSON.stringify({ project: { organizationUid: ORG } }));
     const { creator, printed } = harness({ createdProject: { uid: 'p0', name: 'My Site' } });
 
     await creator.create(uploadRequest({ configPath }));
@@ -630,8 +633,21 @@ describe('ProjectCreator on the FileUpload path', () => {
     expect(printed[0]).toBe(`Uploading 1 files from ${dataDir}`);
   });
 
+  it('says which symbolic links it left out of the upload before uploading', async () => {
+    symlinkSync(join(dataDir, 'index.html'), join(dataDir, 'linked.html'));
+    const { creator, printed } = harness();
+
+    await creator.create(uploadRequest());
+
+    expect(printed.slice(0, 2)).toEqual([
+      'Skipping 1 symbolic link(s), which are never uploaded: linked.html',
+      `Uploading 1 files from ${dataDir}`,
+    ]);
+  });
+
   it('creates the project with no server command when the optional prompt is left empty', async () => {
     for (const answer of ['', '   ', undefined, null]) {
+      rmSync(configPathIn(dataDir), { force: true });
       (uploadArchive as jest.Mock).mockClear();
       const { creator, created, asked } = harness({ isTTY: true, answers: [answer] });
 
@@ -646,6 +662,7 @@ describe('ProjectCreator on the FileUpload path', () => {
 
   it('creates the project with no build command when the optional prompt is left empty', async () => {
     for (const answer of ['', '   ', undefined, null]) {
+      rmSync(configPathIn(dataDir), { force: true });
       const { creator, created, asked, askedPayloads } = harness({ isTTY: true, answers: [answer] });
 
       await creator.create(uploadRequest({ buildCmd: undefined, serverCmd: 'npm start' }));
@@ -780,8 +797,8 @@ describe('ProjectCreator waiting on the first deployment', () => {
     expect((failure as Error).message).toBe(
       'The deployment did not succeed; its last status was FAILED. ' +
         'The project "My Site" (p1) and its environment "Default" were created and have not been rolled back. ' +
-        'Run csdx launch:deployments:create --org org1 --project p1 --environment e1 to try the deployment again, ' +
-        'or csdx launch:logs:get --org org1 --project p1 --environment e1 --deployment d1 ' +
+        'Run csdx launch:deployments:create --org org1 --project p1 --env e1 to try the deployment again, ' +
+        'or csdx launch:logs:get --org org1 --project p1 --env e1 --deployment d1 ' +
         'to see why it did not succeed.',
     );
   });
@@ -792,7 +809,9 @@ describe('ProjectCreator waiting on the first deployment', () => {
     const failure = await creator.create(gitRequest()).catch((error: Error) => error);
 
     expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
-    expect((failure as Error).message).toContain('its last status was DEPLOYING');
+    expect((failure as Error).message).toContain('The deployment was still DEPLOYING when the CLI stopped waiting');
+    expect((failure as Error).message).toContain('Do not start another deployment yet');
+    expect((failure as Error).message).not.toContain('deployments:create');
   });
 
   it('exits 1 naming no deployment when the API reported none to wait on', async () => {
@@ -845,7 +864,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
     expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
     expect((failure as DeploymentUnsuccessfulError).exitCode).toBe(1);
     expect((failure as Error).message).toContain('socket hang up.');
-    expect((failure as Error).message).toContain('--org org1 --project p1 --environment e1');
+    expect((failure as Error).message).toContain('--org org1 --project p1 --env e1');
     expect((failure as Error).message).not.toContain('--deployment');
     expect(calls.get).toEqual([]);
   });
@@ -860,7 +879,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
     expect((failure as Error).message).toContain('The Launch API answered 502 Bad Gateway.');
     expect((failure as Error).message).toContain('have not been rolled back');
     expect((failure as Error).message).toContain('--org org1 --project p1');
-    expect((failure as Error).message).toContain('--environment e1');
+    expect((failure as Error).message).toContain('--env e1');
     expect((failure as Error).message).toContain('--deployment d1');
   });
 
@@ -986,8 +1005,8 @@ describe('ProjectCreator writing the project config', () => {
     writeFileSync(
       configPathIn(dataDir),
       JSON.stringify({
-        main: { uid: PROJECT_UID, organizationUid: ORG, environments: [{ uid: 'e1', name: 'Default' }] },
-        'feature/checkout': { uid: PROJECT_UID, organizationUid: ORG, environments: [{ uid: 'e2', name: 'Preview' }] },
+        main: { organizationUid: ORG, environments: [{ uid: 'e1', name: 'Default' }] },
+        'feature/checkout': { organizationUid: ORG, environments: [{ uid: 'e2', name: 'Preview' }] },
       }),
     );
     const { creator } = harness();
@@ -1010,20 +1029,29 @@ describe('ProjectCreator writing the project config', () => {
     });
   });
 
-  it('reports the miss and leaves the file alone when it already names a different project', async () => {
+  it('refuses before creating anything, and leaves the file alone, when the folder already names a project', async () => {
     const existing = { project: { uid: 'other-project', organizationUid: ORG, name: 'Other Site' } };
     writeFileSync(configPathIn(dataDir), JSON.stringify(existing));
-    const { creator, printed } = harness();
+    const { creator, created } = harness();
 
-    await expect(creator.create(gitRequest({ configPath: configPathIn(dataDir) }))).resolves.toBeUndefined();
+    const failure = await creator.create(gitRequest({ configPath: configPathIn(dataDir) })).catch((error: Error) => error);
 
-    expect(configFileIn(dataDir)).toEqual(existing);
-    expect(printed).toContain(
-      `Could not record this project in ${configPathIn(dataDir)}: ` +
-        `The config file at '${configPathIn(dataDir)}' already names project other-project. ` +
-        'Delete it or pass --config with another path. ' +
-        'Pass --org and --project explicitly when you run Launch commands in this folder.',
+    expect(failure).toBeInstanceOf(UsageError);
+    expect((failure as UsageError).message).toBe(
+      `This folder is already linked to the project "Other Site" (other-project) in ${configPathIn(dataDir)}. ` +
+        'To create a new project, remove that file or pass --config with a different path.',
     );
+    expect(created).toEqual([]);
+    expect(configFileIn(dataDir)).toEqual(existing);
+  });
+
+  it('names a linked project by uid alone when the file carries no name', async () => {
+    writeFileSync(configPathIn(dataDir), JSON.stringify({ project: { uid: 'other-project' } }));
+    const { creator } = harness();
+
+    const failure = await creator.create(gitRequest({ configPath: configPathIn(dataDir) })).catch((error: Error) => error);
+
+    expect((failure as UsageError).message).toContain('already linked to the project other-project in');
   });
 
   it('reports the miss and leaves an unparseable config file untouched, still completing the create', async () => {
@@ -1060,11 +1088,4 @@ describe('ProjectCreator writing the project config', () => {
     expect(configFileIn(dataDir)).toEqual({ project: { uid: PROJECT_UID, organizationUid: ORG } });
   });
 
-  it('writes nothing at all when no config path was supplied', async () => {
-    const { creator } = harness();
-
-    await creator.create(gitRequest());
-
-    expect(existsSync(configPathIn(dataDir))).toBe(false);
-  });
 });

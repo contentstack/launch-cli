@@ -56,11 +56,47 @@ describe('project archive', () => {
     file('index.html');
     file('packages/site/node_modules/left-pad/index.js');
     file('packages/site/.env');
+    file('packages/site/.git/HEAD');
+    file('packages/site/.next/build.js');
     file('packages/site/src/main.ts');
 
     const archived = archiveDirectory(root);
 
     expect(archived.entries).toEqual(['index.html', 'packages/site/src/main.ts']);
+  });
+
+  it('keeps a nested logs folder, because below the root it is source such as a route, and drops only the root one', () => {
+    file('index.html');
+    file('logs/run.log');
+    file('app/logs/page.tsx');
+    file('packages/site/logs/index.ts');
+
+    const archived = archiveDirectory(root);
+
+    expect(archived.entries).toEqual(['app/logs/page.tsx', 'index.html', 'packages/site/logs/index.ts']);
+  });
+
+  it('leaves out a zip file at the root, as V1 did, and keeps one nested in the tree', () => {
+    file('index.html');
+    file('previous-upload.zip');
+    file('assets/fonts.zip');
+
+    const archived = archiveDirectory(root);
+
+    expect(archived.entries).toEqual(['assets/fonts.zip', 'index.html']);
+  });
+
+  it('keeps each file\'s permissions, so an executable script stays executable after the upload', () => {
+    file('index.html');
+    file('bin/build.sh', '#!/bin/sh');
+    chmodSync(join(root, 'bin/build.sh'), 0o755);
+    chmodSync(join(root, 'index.html'), 0o644);
+
+    const zip = new AdmZip(archiveDirectory(root).buffer);
+    const modeOf = (name: string) => ((zip.getEntry(name)?.header.attr ?? 0) >>> 16) & 0o777;
+
+    expect(modeOf('bin/build.sh')).toBe(0o755);
+    expect(modeOf('index.html')).toBe(0o644);
   });
 
   it('applies the exclusions across a large tree rather than only a small one', () => {
@@ -91,10 +127,12 @@ describe('project archive', () => {
   it('skips a symbolic link rather than following it into a loop', () => {
     file('index.html');
     symlinkSync(root, join(root, 'self'));
+    symlinkSync(join(root, 'index.html'), join(root, 'nested-link.html'));
 
     const archived = archiveDirectory(root);
 
     expect(archived.entries).toEqual(['index.html']);
+    expect(archived.skippedLinks).toEqual(['nested-link.html', 'self']);
   });
 
   it('refuses a path that is not a directory with a usage error naming --data-dir', () => {
@@ -184,7 +222,12 @@ describe('project archive', () => {
       '.vscode',
       '.cs-launch.json',
     ]);
-    expect(isExcludedName('node_modules')).toBe(true);
-    expect(isExcludedName('src')).toBe(false);
+    expect(isExcludedName('node_modules', true)).toBe(true);
+    expect(isExcludedName('node_modules', false)).toBe(true);
+    expect(isExcludedName('logs', true)).toBe(true);
+    expect(isExcludedName('logs', false)).toBe(false);
+    expect(isExcludedName('site.zip', true)).toBe(true);
+    expect(isExcludedName('site.zip', false)).toBe(false);
+    expect(isExcludedName('src', true)).toBe(false);
   });
 });

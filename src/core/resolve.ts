@@ -54,7 +54,7 @@ function missing(key: FlagKey): MissingInputError {
 
 export interface ResolveArgs {
   parsed: Partial<Record<FlagKey, unknown>>;
-  projectConfig: ProjectConfig;
+  projectConfig: ProjectConfig | (() => ProjectConfig);
   services: ResolveServices;
   rules?: Rule[];
 }
@@ -62,6 +62,8 @@ export interface ResolveArgs {
 export async function resolveInputs<S extends AnyInputs>(spec: S, args: ResolveArgs): Promise<Resolved<S>> {
   const resolved = {} as Resolved<S>;
   const sources: InputSources = {};
+  const readConfig = (): ProjectConfig =>
+    typeof args.projectConfig === 'function' ? args.projectConfig() : args.projectConfig;
 
   type K = InputKeys<S>;
   const declared = (Object.keys(resolutionTable) as K[]).filter((candidate) => candidate in spec);
@@ -80,7 +82,7 @@ export async function resolveInputs<S extends AnyInputs>(spec: S, args: ResolveA
     let source: InputSource = 'flag';
 
     if (isAbsent(value) && rule.configPath) {
-      value = args.projectConfig[rule.configPath];
+      value = readConfig()[rule.configPath];
       source = 'config';
     }
 

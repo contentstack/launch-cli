@@ -1,4 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { authHandler, configHandler } from '@contentstack/cli-utilities';
 import { Config, Interfaces, Plugin } from '@oclif/core';
@@ -142,6 +144,67 @@ describe('integration: shipped commands driven through oclif runCommand', () => 
     expect(lookup.isDone()).toBe(true);
     expect(fetch.isDone()).toBe(true);
     expect(stdout).toContain('uid   a1b2c3d4e5f60718293a4b5c');
+  });
+
+  it('refuses --limit 0 with exit 2 before any request, because the API reads a zero limit as no limit at all', async () => {
+    const scope = nock(LAUNCH_HUB_URL).get('/manage/projects').query(true).reply(200, listFixture);
+
+    const { error } = await runLaunch(['launch:projects:list', '--org', ORG_UID, '--limit', '0', '--data-dir', DATA_DIR]);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toContain('--limit');
+    expect(scope.isDone()).toBe(false);
+  });
+
+  it('sends --limit 1, the smallest page it accepts', async () => {
+    const scope = nock(LAUNCH_HUB_URL).get('/manage/projects').query({ limit: '1', skip: '0' }).reply(200, listFixture);
+
+    const { error } = await runLaunch(['launch:projects:list', '--org', ORG_UID, '--limit', '1', '--data-dir', DATA_DIR]);
+
+    expect(error).toBeUndefined();
+    expect(scope.isDone()).toBe(true);
+  });
+
+  it('ignores a conflicting multi-branch config file when the flags already supply every value, and reports it only when one is needed', async () => {
+    const folder = mkdtempSync(join(tmpdir(), 'launch-conflict-'));
+    writeFileSync(
+      join(folder, '.cs-launch.json'),
+      JSON.stringify({ main: { uid: 'a'.repeat(24), organizationUid: ORG_UID }, dev: { uid: 'b'.repeat(24), organizationUid: ORG_UID } }),
+    );
+    const scope = nock(LAUNCH_HUB_URL).get('/manage/projects').query({ limit: '100', skip: '0' }).reply(200, listFixture);
+
+    try {
+      const withFlags = await runLaunch(['launch:projects:list', '--org', ORG_UID, '--data-dir', folder]);
+      const needingConfig = await runLaunch(['launch:projects:get', '--org', ORG_UID, '--data-dir', folder]);
+
+      expect(withFlags.error).toBeUndefined();
+      expect(scope.isDone()).toBe(true);
+      expect(needingConfig.error?.oclif?.exit).toBe(2);
+      expect(needingConfig.error?.message).toContain('main');
+      expect(needingConfig.error?.message).toContain('dev');
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
+  });
+
+  it('reports a bad flag as a usage error, exit 2, even when the user is logged out', async () => {
+    jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(false);
+
+    const { error } = await runLaunch(['launch:projects:list', '--org', ORG_UID, '--no-such-flag', '--data-dir', DATA_DIR]);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toContain('--no-such-flag');
+  });
+
+  it('still refuses a logged-out user with exit 1 once the flags parse', async () => {
+    jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(false);
+    const scope = nock(LAUNCH_HUB_URL).get('/manage/projects').query(true).reply(200, listFixture);
+
+    const { error } = await runLaunch(['launch:projects:list', '--org', ORG_UID, '--data-dir', DATA_DIR]);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.message).toBe('You are not logged in. Run csdx auth:login to continue.');
+    expect(scope.isDone()).toBe(false);
   });
 
   it('exits 2 when a required input is missing and there is no terminal to prompt on', async () => {

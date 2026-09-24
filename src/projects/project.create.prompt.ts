@@ -2,7 +2,7 @@ import { PICKER_PAGE_SIZE } from '../core/constants';
 import { CancelledError, UsageError } from '../core/errors';
 import type { UxLike } from '../core/render';
 import type { ApiSurface } from '../resources';
-import type { GitRepository } from '../git/types';
+import { GIT_PROVIDER_GITHUB, GitRepository } from '../git/types';
 
 export interface CreatePromptDeps {
   api: ApiSurface;
@@ -57,6 +57,10 @@ export function findRepository(repositories: GitRepository[], wanted: string): G
   return repositories.find((repository) => repositoryLabel(repository) === wanted || repository.name === wanted);
 }
 
+function isGitHubNamespace(provider: string | undefined): boolean {
+  return provider === undefined || provider === GIT_PROVIDER_GITHUB;
+}
+
 export async function askNamespace(deps: CreatePromptDeps, org: string): Promise<string> {
   const page = await deps.api.git.namespaces({ org, limit: PICKER_PAGE_SIZE, skip: 0 });
   const named = page.namespaces.filter((namespace) => Boolean(namespace.name));
@@ -67,12 +71,20 @@ export async function askNamespace(deps: CreatePromptDeps, org: string): Promise
     );
   }
 
-  noteTruncation(deps.ux, page.pagination.count, named.length, 'namespaces', '--namespace');
+  const github = named.filter((namespace) => isGitHubNamespace(namespace.provider));
+
+  if (github.length === 0) {
+    throw new UsageError(
+      'No GitHub namespaces are connected to this organization. Connect GitHub in the Launch app first.',
+    );
+  }
+
+  noteTruncation(deps.ux, page.pagination.count, page.namespaces.length, 'namespaces', '--namespace');
 
   return askChoice(
     deps.ux,
     'Choose a Git namespace',
-    named.map((namespace) => ({ name: namespace.name as string, value: namespace.name as string })),
+    github.map((namespace) => ({ name: namespace.name as string, value: namespace.name as string })),
   );
 }
 

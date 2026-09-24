@@ -121,6 +121,26 @@ export class ProjectConfigStore {
     }
   }
 
+  linkedProject(): ProjectConfig | undefined {
+    const read = this.read();
+
+    if (read === undefined || typeof read === 'string') {
+      return undefined;
+    }
+
+    for (const block of Object.values(read)) {
+      if (isBlock(block)) {
+        const config = configFrom(block);
+
+        if (typeof config.uid === 'string' && config.uid.trim() !== '') {
+          return config;
+        }
+      }
+    }
+
+    return undefined;
+  }
+
   private existingBlocks(): Blocks {
     const read = this.read();
 

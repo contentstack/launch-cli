@@ -114,10 +114,31 @@ describe('project create presentation', () => {
     expect(message).toBe(
       'The deployment did not succeed; its last status was FAILED. ' +
         'The project "My Site" (p1) and its environment "Default" were created and have not been rolled back. ' +
-        'Run csdx launch:deployments:create --org org1 --project p1 --environment e1 to try the deployment again, ' +
-        'or csdx launch:logs:get --org org1 --project p1 --environment e1 --deployment d1 ' +
+        'Run csdx launch:deployments:create --org org1 --project p1 --env e1 to try the deployment again, ' +
+        'or csdx launch:logs:get --org org1 --project p1 --env e1 --deployment d1 ' +
         'to see why it did not succeed.',
     );
+  });
+
+  it('tells a user whose wait ran out that the deployment may still finish, and never to start another one', () => {
+    const message = deploymentFailureMessage({
+      org: 'org1',
+      projectName: 'My Site',
+      projectUid: 'p1',
+      environmentName: 'Default',
+      environmentUid: 'e1',
+      deploymentUid: 'd1',
+      status: 'DEPLOYING',
+      timedOut: true,
+    });
+
+    expect(message).toBe(
+      'The deployment was still DEPLOYING when the CLI stopped waiting for it; it may still finish. ' +
+        'The project "My Site" (p1) and its environment "Default" were created. Do not start another deployment yet: ' +
+        'run csdx launch:deployments:get --org org1 --project p1 --env e1 --deployment d1 to see how it ends, ' +
+        'or csdx launch:logs:get --org org1 --project p1 --env e1 --deployment d1 to follow it.',
+    );
+    expect(message).not.toContain('deployments:create');
   });
 
   it('leaves out the scope it does not have rather than naming an undefined one', () => {

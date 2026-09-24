@@ -4,7 +4,7 @@ import { Command } from '@contentstack/cli-command';
 import { cliux, configHandler, isAuthenticated } from '@contentstack/cli-utilities';
 
 import { EXIT_RUNTIME, PROJECT_CONFIG_FILE } from './constants';
-import { ProjectConfigStore } from './project-config';
+import { ProjectConfig, ProjectConfigStore } from './project-config';
 import { RegionLike, resolveLaunchHubUrl } from './region';
 import { CancelledError, LaunchError, UsageError } from './errors';
 import { catalog, FlagKey } from '../resources';
@@ -53,12 +53,26 @@ export async function resolveLaunchContext<S extends AnyInputs>(
 
   const resolved = await resolveInputs(args.inputs, {
     parsed: args.flags,
-    projectConfig: new ProjectConfigStore(configPath, Boolean(namedConfig)).load(),
+    projectConfig: projectConfigLoader(new ProjectConfigStore(configPath, Boolean(namedConfig)), Boolean(namedConfig)),
     services,
     rules: args.rules,
   });
 
   return { services, resolved, dataDir, configPath };
+}
+
+export function projectConfigLoader(store: ProjectConfigStore, named: boolean): ProjectConfig | (() => ProjectConfig) {
+  if (named) {
+    return store.load();
+  }
+
+  let loaded: ProjectConfig | undefined;
+
+  return () => {
+    loaded = loaded ?? store.load();
+
+    return loaded;
+  };
 }
 
 function stringFlag(value: unknown): string | undefined {
@@ -87,7 +101,6 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
 
   async init(): Promise<void> {
     await super.init();
-    this.requireAuth();
     registerSearchList();
 
     const { flags } = await this.parse({
@@ -95,6 +108,8 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
       baseFlags: LaunchCommand.baseFlags,
       strict: true,
     });
+
+    this.requireAuth();
 
     const region = this.launchRegion ?? {};
 
