@@ -77,7 +77,7 @@
     "additionalVersionFlags": [
       "-v"
     ],
-    "repositoryPrefix": "<%- repo %>/blob/main/packages/contentstack-launch/<%- commandPath %>"
+    "repositoryPrefix": "<%- repo %>/blob/v<%- version %>/<%- commandPath %>"
   },
   "scripts": {
     "build": "npm run clean && npm run compile",
