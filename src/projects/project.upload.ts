@@ -3,6 +3,7 @@ import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import { URL } from 'node:url';
 
+import { isAbsent } from '../core/values';
 import { UploadFailedError } from './project.errors';
 import type { SignedUploadField, SignedUploadUrl } from './types';
 
@@ -52,7 +53,10 @@ export function prepareUpload(target: SignedUploadUrl, archive: Buffer): Prepare
   const fields = pairs(target.fields);
 
   if (fields.length === 0) {
-    headers['content-type'] = headers['content-type'] ?? UPLOAD_CONTENT_TYPE;
+    if (isAbsent(headers['content-type'])) {
+      headers['content-type'] = UPLOAD_CONTENT_TYPE;
+    }
+
     headers['content-length'] = String(archive.length);
 
     return { method: target.method ?? 'PUT', headers, body: archive };

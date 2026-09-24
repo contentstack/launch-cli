@@ -38,4 +38,7 @@ fileignoreconfig:
 - filename: test/integration/projects-list.test.ts
   ignore_detectors:
     - filecontent
+- filename: test/integration/project-upload.test.ts
+  allowed_patterns:
+    - "key: 'Content-Type'"
 version: "1.0"

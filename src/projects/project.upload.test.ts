@@ -48,6 +48,18 @@ describe('signed upload preparation', () => {
     expect(prepared.headers['content-type']).toBe('application/octet-stream');
   });
 
+  it.each([[''], ['   ']])('sends the zip content type when the signed url supplied a blank one (%p)', (blank) => {
+    const prepared = prepareUpload(
+      { uploadUrl: UPLOAD_URL, uploadUid: UPLOAD_UID, headers: [pair('Content-Type', blank)] },
+      ARCHIVE,
+    );
+
+    expect(prepared.headers).toEqual({
+      'content-type': UPLOAD_CONTENT_TYPE,
+      'content-length': String(ARCHIVE.length),
+    });
+  });
+
   it('keeps a content type the signed url supplied under a capitalised header name', () => {
     const prepared = prepareUpload(
       {

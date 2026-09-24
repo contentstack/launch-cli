@@ -90,6 +90,39 @@ describe('integration: uploading the project archive on the wire', () => {
     expect((failure as Error).message).toBe('The upload of your project files was refused with HTTP 403.');
   });
 
+  it('accepts 299, the last status in the success range', async () => {
+    const scope = nock(HOST).put('/bucket').reply(299, '');
+
+    await expect(uploadArchive({ uploadUrl: `${HOST}/bucket`, uploadUid: 'u' }, ARCHIVE)).resolves.toBeUndefined();
+
+    expect(scope.isDone()).toBe(true);
+  });
+
+  it.each([[300], [302], [303], [304]])('exits 1 rather than reporting a redirect (%p) as an upload', async (status) => {
+    nock(HOST).put('/bucket').reply(status, '', { location: `${HOST}/elsewhere` });
+
+    const failure = await uploadArchive({ uploadUrl: `${HOST}/bucket`, uploadUid: 'u' }, ARCHIVE).catch(
+      (error: Error) => error,
+    );
+
+    expect(failure).toBeInstanceOf(UploadFailedError);
+    expect((failure as UploadFailedError).exitCode).toBe(1);
+    expect((failure as Error).message).toBe(`The upload of your project files was refused with HTTP ${status}.`);
+  });
+
+  it('sends the zip content type on the wire when the signed url supplied a blank one', async () => {
+    const scope = nock(HOST).put('/bucket').matchHeader('content-type', 'application/zip').reply(200, '');
+
+    const blankContentType = {
+      key: 'Content-Type',
+      value: '',
+    };
+
+    await uploadArchive({ uploadUrl: `${HOST}/bucket`, uploadUid: 'u', headers: [blankContentType] }, ARCHIVE);
+
+    expect(scope.isDone()).toBe(true);
+  });
+
   it('exits 1 naming the transport failure when the socket dies midway', async () => {
     nock(HOST).put('/bucket').replyWithError(new Error('socket hang up'));
 
