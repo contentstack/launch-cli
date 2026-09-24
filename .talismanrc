@@ -1,41 +1,9 @@
 fileignoreconfig:
 - filename: .github/workflows/secrets-scan.yml
-  ignore_detectors:
-    - filecontent
+  checksum: aa468892940460dd050b7bc2ec997d589fe88c3557779dabdb1583645e45b79b
 - filename: .husky/secrets-scan.sh
   checksum: 5a44edca8d209ca4b7f6eefc4ce2caab838679f8916ef6136ad68584c0705cb6
-- filename: src/commands/launch/index.test.ts
-  checksum: 9db6c02ad35a0367343cd753b916dd64db4a9efd24838201d2e1113ed19c9b62
-- filename: src/commands/launch/rollback.test.ts
-  checksum: a1010882456f315a918afe2777f90472985e9966bd308c5311ac0de318b14e8c
-- filename: test/unit/commands/rollback.test.ts
-  checksum: d1f931f2d9a397131409399ad6463653e28b5a2224e870b641d9ba57c4418f18
 - filename: package-lock.json
-  ignore_detectors:
-    - filecontent
-- filename: src/adapters/github.test.ts
-  checksum: b3d3d3a3c14adde103152d2ac4e1c4b7121a5f7533a87c3cc600f6d25fb59d1b
-- filename: src/adapters/file-upload.test.ts
-  allowed_patterns:
-    - "--(disable|enable)-cs-auth is passed"
-- filename: src/adapters/file-upload.ts
-  allowed_patterns:
-    - "const \\{ formFieldKey, formFieldValue \\} of fields"
-    - "formData\\.append\\(formFieldKey, formFieldValue\\)"
-    - "headers: \\{ key: string; value: string \\}\\[\\]"
-    - "headers\\?\\.reduce\\(\\(acc, \\{ key, value \\}\\)"
-    - "\\(\\{ key, value \\}\\) => \\(\\{ key, value \\}\\)\\)"
-    - "const \\{ token, apiKey \\} = configHandler\\.get"
-- filename: test/fixtures/project-get.json
-  ignore_detectors:
-    - filecontent
-- filename: test/fixtures/projects-list.json
-  ignore_detectors:
-    - filecontent
-- filename: test/integration/projects-get.test.ts
-  ignore_detectors:
-    - filecontent
-- filename: test/integration/projects-list.test.ts
   ignore_detectors:
     - filecontent
 - filename: test/integration/project-upload.test.ts
@@ -66,4 +34,24 @@ fileignoreconfig:
 - filename: src/core/resolution.ts
   allowed_patterns:
     - "FlagKey"
+- filename: test/fixtures/project-get.json
+  allowed_patterns:
+    - "a1b2c3d4e5f60718293a4b5c"
+    - "b2c3d4e5f60718293a4b5c6d"
+    - "c3d4e5f60718293a4b5c6d7e"
+- filename: test/fixtures/projects-list.json
+  allowed_patterns:
+    - "a1b2c3d4e5f60718293a4b5c"
+    - "b2c3d4e5f60718293a4b5c6d"
+    - "c3d4e5f60718293a4b5c6d7e"
+- filename: test/integration/projects-get.test.ts
+  allowed_patterns:
+    - "a1b2c3d4e5f60718293a4b5c"
+    - "b2c3d4e5f60718293a4b5c6d"
+    - "c3d4e5f60718293a4b5c6d7e"
+- filename: test/integration/projects-list.test.ts
+  allowed_patterns:
+    - "a1b2c3d4e5f60718293a4b5c"
+    - "b2c3d4e5f60718293a4b5c6d"
+    - "c3d4e5f60718293a4b5c6d7e"
 version: "1.0"
