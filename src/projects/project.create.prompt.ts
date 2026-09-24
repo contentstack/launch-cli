@@ -42,6 +42,10 @@ export function repositoryLabel(repository: GitRepository): string {
   return repository.fullName || repository.name || '';
 }
 
+export function findRepository(repositories: GitRepository[], wanted: string): GitRepository | undefined {
+  return repositories.find((repository) => repositoryLabel(repository) === wanted || repository.name === wanted);
+}
+
 export async function askNamespace(deps: CreatePromptDeps, org: string): Promise<string> {
   const page = await deps.api.git.namespaces({ org, limit: PICKER_PAGE_SIZE, skip: 0 });
   const named = page.namespaces.filter((namespace) => Boolean(namespace.name));
@@ -80,7 +84,16 @@ export async function askRepository(
     named.map((repository) => ({ name: repositoryLabel(repository), value: repositoryLabel(repository) })),
   );
 
-  return named.find((repository) => repositoryLabel(repository) === picked) as GitRepository;
+  const match = findRepository(named, picked);
+
+  if (match === undefined) {
+    throw new UsageError(
+      `No repository named "${picked}" was found under "${params.namespace}". ` +
+        'Choose one from the list, or pass --repo.',
+    );
+  }
+
+  return match;
 }
 
 export async function askBranch(

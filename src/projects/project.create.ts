@@ -16,7 +16,15 @@ import type { CreateEnvironmentInput, Environment, FrameworkPreset } from '../en
 import { SERVER_COMMAND_FRAMEWORKS } from '../environments/types';
 import { GIT_PROVIDER_GITHUB, GitRepository } from '../git/types';
 import { archiveDirectory } from './project.archive';
-import { askBranch, askChoice, askNamespace, askRepository, askText, repositoryLabel } from './project.create.prompt';
+import {
+  askBranch,
+  askChoice,
+  askNamespace,
+  askRepository,
+  askText,
+  findRepository,
+  repositoryLabel,
+} from './project.create.prompt';
 import { deploymentFailureMessage, projectCreatedFields } from './project.presenter';
 import { PROJECT_TYPE_BY_CHOICE, PROJECT_TYPE_CHOICES, ProjectTypeChoice, projectTypeChoiceOf } from './project.inputs';
 import { uploadArchive } from './project.upload';
@@ -322,9 +330,7 @@ export class ProjectCreator {
       limit: 100,
       skip: 0,
     });
-    const match = page.repositories.find(
-      (repository) => repositoryLabel(repository) === request.repo || repository.name === request.repo,
-    );
+    const match = findRepository(page.repositories, request.repo);
 
     if (match === undefined) {
       throw new UsageError(`No repository named "${request.repo}" was found under "${namespace}".`);

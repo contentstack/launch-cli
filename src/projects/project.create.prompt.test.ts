@@ -143,6 +143,29 @@ describe('project create prompts', () => {
     expect(requested[0]).toEqual({ ...GIT, limit: 100, skip: 0 });
   });
 
+  it('accepts the bare repository name typed at the picker, not only the label it shows', async () => {
+    const other = { fullName: 'my-org/other', name: 'other' };
+    const repository = { fullName: 'my-org/my-repo', name: 'my-repo' };
+    const { deps: d, asked } = deps(['my-repo'], {
+      repositories: { pagination: { count: 2, limit: 100 }, repositories: [other, repository] },
+    });
+
+    await expect(askRepository(d, GIT)).resolves.toBe(repository);
+    expect(asked).toHaveLength(1);
+  });
+
+  it('refuses a repository typed at the picker that matches nothing it offered', async () => {
+    const { deps: d, asked } = deps(['my-rep', 'my-rep'], {
+      repositories: { pagination: { count: 1, limit: 100 }, repositories: [{ fullName: 'my-org/my-repo', name: 'my-repo' }] },
+    });
+
+    await expect(askRepository(d, GIT)).rejects.toThrow(UsageError);
+    await expect(askRepository(d, GIT)).rejects.toThrow(
+      'No repository named "my-rep" was found under "my-org". Choose one from the list, or pass --repo.',
+    );
+    expect(asked).toHaveLength(2);
+  });
+
   it('labels a repository by its full name, falling back to its bare name', () => {
     expect(repositoryLabel({ fullName: 'my-org/my-repo', name: 'my-repo' })).toBe('my-org/my-repo');
     expect(repositoryLabel({ name: 'my-repo' })).toBe('my-repo');
