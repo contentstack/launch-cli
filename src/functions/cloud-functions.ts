@@ -13,7 +13,7 @@ import {
   CLOUD_FUNCTIONS_SUPPORTED_EXTENSION,
   ENV_FILE_NAME,
 } from './constants';
-import { FunctionsDirectoryNotFoundError } from './function.errors';
+import { FunctionsDirectoryNotFoundError, PortInUseError } from './function.errors';
 import { walkFileSystem, checkIfDirectoryExists } from './os-helper';
 import { CloudFunctionResource } from './types';
 
@@ -68,12 +68,27 @@ export class CloudFunctions {
 
     dotenv.config({ path: path.join(this.pathToSourceCode, ENV_FILE_NAME) });
 
-    this.startServer(app, servingPort);
+    await this.startServer(app, servingPort);
   }
 
-  private startServer(app: Express, servingPort: number): Server {
-    return app.listen(servingPort, () => {
-      console.log(`Serving on port ${servingPort}`);
+  private startServer(app: Express, servingPort: number): Promise<Server> {
+    return new Promise<Server>((resolve, reject) => {
+      let listening = false;
+
+      const server = app.listen(servingPort, () => {
+        listening = true;
+        console.log(`Serving on port ${servingPort}`);
+        resolve(server);
+      });
+
+      server.on('error', (error: NodeJS.ErrnoException) => {
+        if (listening) {
+          console.error(error);
+          return;
+        }
+
+        reject(error.code === 'EADDRINUSE' ? new PortInUseError(servingPort) : error);
+      });
     });
   }
 

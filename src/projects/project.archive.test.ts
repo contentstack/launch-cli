@@ -1,5 +1,5 @@
 import AdmZip from 'adm-zip';
-import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -116,6 +116,50 @@ describe('project archive', () => {
       `Nothing to upload from "${root}" once ${UPLOAD_EXCLUDED_NAMES.join(', ')} are excluded. ` +
         'Pass --data-dir with the folder you want to upload.',
     );
+  });
+
+  it('refuses with a usage error naming a file it could not read', () => {
+    file('index.html');
+    file('secret.txt');
+    chmodSync(join(root, 'secret.txt'), 0o000);
+
+    const failure = (() => {
+      try {
+        archiveDirectory(root);
+        return undefined;
+      } catch (error) {
+        return error;
+      }
+    })();
+
+    chmodSync(join(root, 'secret.txt'), 0o644);
+
+    expect(failure).toBeInstanceOf(UsageError);
+    expect((failure as UsageError).exitCode).toBe(2);
+    expect((failure as UsageError).message).toContain('secret.txt');
+    expect((failure as UsageError).message).toContain('could not be read');
+  });
+
+  it('refuses with a usage error naming a directory it could not list', () => {
+    file('index.html');
+    mkdirSync(join(root, 'locked'));
+    file('locked/a.txt');
+    chmodSync(join(root, 'locked'), 0o000);
+
+    const failure = (() => {
+      try {
+        archiveDirectory(root);
+        return undefined;
+      } catch (error) {
+        return error;
+      }
+    })();
+
+    chmodSync(join(root, 'locked'), 0o755);
+
+    expect(failure).toBeInstanceOf(UsageError);
+    expect((failure as UsageError).message).toContain('locked');
+    expect((failure as UsageError).message).toContain('could not be read');
   });
 
   it('names every path the story requires it to exclude', () => {

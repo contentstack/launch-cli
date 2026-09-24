@@ -5,7 +5,8 @@ enum CloudFunctionErrorTypes {
   INVALID_FILEPATH_NAMING_ERROR = 'InvalidFilepathNamingError',
   INDISTINCT_DYNAMIC_ROUTE_NAMES_IN_PATH_ERROR = 'IndistinctDynamicRouteNamesInPathError',
   EXISTING_DYNAMIC_ROUTE_AT_SAME_LEVEL_ERROR = 'ExistingDynamicRouteAtSameLevelError',
-  FUNCTIONS_DIRECTORY_NOT_FOUND = 'FunctionsDirectoryNotFound'
+  FUNCTIONS_DIRECTORY_NOT_FOUND = 'FunctionsDirectoryNotFound',
+  PORT_IN_USE_ERROR = 'PortInUseError'
 }
 
 export class TopLevelDynamicRouteError extends Error {
@@ -41,5 +42,12 @@ export class FunctionsDirectoryNotFoundError extends Error {
   constructor(sourceDirectoryPath: string) {
     super(`No ${CLOUD_FUNCTIONS_DIRECTORY} directory found at '${sourceDirectoryPath}'.`);
     this.name = CloudFunctionErrorTypes.FUNCTIONS_DIRECTORY_NOT_FOUND;
+  }
+}
+
+export class PortInUseError extends Error {
+  constructor(port: number) {
+    super(`Port ${port} is already in use. Pass --port with a free port, or stop whatever is serving on ${port}.`);
+    this.name = CloudFunctionErrorTypes.PORT_IN_USE_ERROR;
   }
 }

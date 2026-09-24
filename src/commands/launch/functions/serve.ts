@@ -2,6 +2,7 @@ import { Command } from '@oclif/core';
 
 import { EXIT_USAGE } from '../../../core/constants';
 import Contentfly from '../../../functions';
+import { PortInUseError } from '../../../functions/function.errors';
 import { isValidPort, serveFlags } from '../../../functions/function.inputs';
 
 export default class Functions extends Command {
@@ -33,6 +34,14 @@ export default class Functions extends Command {
   }
 
   async run(): Promise<void> {
-    await new Contentfly(this.sharedConfig.projectBasePath).serveCloudFunctions(this.sharedConfig.port);
+    try {
+      await new Contentfly(this.sharedConfig.projectBasePath).serveCloudFunctions(this.sharedConfig.port);
+    } catch (error) {
+      if (error instanceof PortInUseError) {
+        this.error(error.message, { exit: EXIT_USAGE });
+      }
+
+      throw error;
+    }
   }
 }

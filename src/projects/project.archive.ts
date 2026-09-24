@@ -32,14 +32,31 @@ function directoryStats(root: string) {
   }
 }
 
+function unreadable(relative: string): UsageError {
+  return new UsageError(
+    `The file "${relative}" could not be read, so the upload was not attempted. ` +
+      'Fix its permissions, or pass --data-dir with a folder the CLI can read.',
+  );
+}
+
+function readable<T>(relative: string, read: () => T): T {
+  try {
+    return read();
+  } catch {
+    throw unreadable(relative);
+  }
+}
+
 function collect(root: string, prefix: string, found: string[]): void {
-  for (const entry of readdirSync(join(root, prefix))) {
+  const listing = readable(prefix === '' ? '.' : prefix, () => readdirSync(join(root, prefix)));
+
+  for (const entry of listing) {
     if (isExcludedName(entry)) {
       continue;
     }
 
     const relative = prefix === '' ? entry : `${prefix}/${entry}`;
-    const stats = lstatSync(join(root, relative));
+    const stats = readable(relative, () => lstatSync(join(root, relative)));
 
     if (stats.isDirectory()) {
       collect(root, relative, found);
@@ -76,7 +93,7 @@ export function archiveDirectory(root: string): ArchivedDirectory {
   const zip = new AdmZip();
 
   for (const entry of entries) {
-    zip.addFile(entry, readFileSync(join(root, entry)));
+    zip.addFile(entry, readable(entry, () => readFileSync(join(root, entry))));
   }
 
   return { buffer: zip.toBuffer(), entries };

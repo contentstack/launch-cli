@@ -2,6 +2,7 @@ import { Parser } from '@oclif/core';
 
 import { EXIT_USAGE } from '../../../core/constants';
 import Contentfly from '../../../functions/index';
+import { PortInUseError } from '../../../functions/function.errors';
 import Functions from './serve';
 
 jest.mock('../../../functions');
@@ -149,6 +150,20 @@ describe('launch:functions:serve run', () => {
     await command.run();
 
     expect(servedPorts).toEqual([0]);
+  });
+
+  it('reports a port already in use as a usage error rather than a stack trace', async () => {
+    serveResult = async () => {
+      throw new PortInUseError(4000);
+    };
+    const command = new Functions([], {} as never);
+    command['sharedConfig'] = { projectBasePath: '/data', port: 4000 };
+
+    const failure = await command.run().catch((error: Error & { oclif?: { exit?: number } }) => error);
+
+    expect(failure).toMatchObject({ oclif: { exit: EXIT_USAGE } });
+    expect((failure as Error).message).toContain('Port 4000 is already in use');
+    expect((failure as Error).message).toContain('--port');
   });
 
   it('propagates a rejection raised while serving', async () => {

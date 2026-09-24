@@ -7,6 +7,7 @@ import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 
 import { CloudFunctions } from './cloud-functions';
+import { PortInUseError } from './function.errors';
 import { loadDataURL } from './load-data-url';
 
 interface HttpResponse {
@@ -17,11 +18,10 @@ interface HttpResponse {
 
 const originalStartServer = (CloudFunctions.prototype as never as Record<string, unknown>).startServer as (
   ...args: unknown[]
-) => Server;
+) => Promise<Server>;
 
 let workspace: string;
 let startedServers: Server[];
-let serverErrors: NodeJS.ErrnoException[];
 let loggedLines: string[];
 let loggedErrors: unknown[];
 let exitCodes: (number | undefined)[];
@@ -76,7 +76,6 @@ async function waitFor(condition: () => boolean): Promise<void> {
 beforeEach(() => {
   workspace = mkdtempSync(join(tmpdir(), 'launch-cloud-functions-'));
   startedServers = [];
-  serverErrors = [];
   loggedLines = [];
   loggedErrors = [];
   exitCodes = [];
@@ -94,12 +93,9 @@ beforeEach(() => {
 
   jest
     .spyOn(CloudFunctions.prototype as never as Record<string, unknown>, 'startServer' as never)
-    .mockImplementation(function (this: CloudFunctions, ...args: unknown[]) {
-      const server = originalStartServer.apply(this, args);
+    .mockImplementation(async function (this: CloudFunctions, ...args: unknown[]) {
+      const server = await originalStartServer.apply(this, args);
       startedServers.push(server);
-      server.on('error', (error: NodeJS.ErrnoException) => {
-        serverErrors.push(error);
-      });
       return server;
     } as never);
 });
@@ -336,16 +332,27 @@ describe('CloudFunctions serve failures', () => {
     await expect(new CloudFunctions(workspace).serve(await freePort())).rejects.toThrow();
   });
 
-  it('surfaces an address-in-use error on the server it started', async () => {
+  it('refuses with a port-in-use error rather than an unhandled error event', async () => {
     writeFunctionFile('hello.js', 'export default function hello(request, response) { response.send("hi"); }');
     const port = await freePort();
     const blocker = createServer();
     await new Promise<void>((resolve) => blocker.listen(port, () => resolve()));
 
-    await new CloudFunctions(workspace).serve(port);
-    await waitFor(() => serverErrors.length > 0);
+    const failure = await new CloudFunctions(workspace).serve(port).catch((error: Error) => error);
 
-    expect(serverErrors[0].code).toBe('EADDRINUSE');
     await new Promise<void>((resolve) => blocker.close(() => resolve()));
+
+    expect(failure).toBeInstanceOf(PortInUseError);
+    expect((failure as Error).message).toContain(String(port));
+    expect((failure as Error).message).toContain('--port');
+  });
+
+  it('propagates a listen failure that is not a port clash', async () => {
+    writeFunctionFile('hello.js', 'export default function hello(request, response) { response.send("hi"); }');
+
+    const failure = await new CloudFunctions(workspace).serve(-1).catch((error: Error) => error);
+
+    expect((failure as Error).name).toBe('RangeError');
+    expect(failure).not.toBeInstanceOf(PortInUseError);
   });
 });
