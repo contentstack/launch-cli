@@ -28,7 +28,7 @@ export async function promptForOrganization(deps: OrganizationPromptDeps): Promi
     throw new UsageError('Your account belongs to no organization, so there is none to choose from.');
   }
 
-  const chosen = await deps.ux.inquire<string | undefined>({
+  const chosen = await deps.ux.inquire<string | null | undefined>({
     type: 'search-list',
     name: 'organization',
     message: 'Choose an organization',
