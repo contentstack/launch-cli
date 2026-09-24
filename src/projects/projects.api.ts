@@ -107,7 +107,7 @@ export class ProjectsApi {
       query: { limit: params.limit, skip: params.skip },
     });
 
-    assertPage(response, 'projects', 'a project list');
+    assertPage(response, 'projects', 'project list');
 
     return response;
   }
@@ -147,7 +147,7 @@ export class ProjectsApi {
       projectUid: params.project,
     });
 
-    return unwrap<Project>(response, 'project', 'a project response');
+    return unwrap<Project>(response, 'project', 'project response');
   }
 
   async update(params: UpdateProjectParams): Promise<Project> {
@@ -159,7 +159,7 @@ export class ProjectsApi {
       body: suppliedFields(params.update),
     });
 
-    return unwrap<Project>(response, 'project', 'a project response');
+    return unwrap<Project>(response, 'project', 'project response');
   }
 
   async create(params: CreateProjectParams): Promise<Project> {
@@ -170,7 +170,7 @@ export class ProjectsApi {
       body: params.input,
     });
 
-    return unwrap<Project>(response, 'project', 'a project response');
+    return unwrap<Project>(response, 'project', 'project response');
   }
 
   async signedUploadUrl(params: SignedUploadUrlParams): Promise<SignedUploadUrl> {

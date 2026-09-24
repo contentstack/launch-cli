@@ -28,7 +28,7 @@ export class EnvironmentsApi {
       query: { limit: params.limit, skip: params.skip },
     });
 
-    assertPage(response, 'environments', 'an environment list');
+    assertPage(response, 'environments', 'environment list');
 
     return response;
   }

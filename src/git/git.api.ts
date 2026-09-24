@@ -36,7 +36,7 @@ export class GitApi {
   private async page<T>(req: RestRequest, key: string): Promise<T> {
     const response = await this.request<T>(req);
 
-    assertArray(response, key, `a ${key} response`);
+    assertArray(response, key, `${key} response`);
 
     return response;
   }

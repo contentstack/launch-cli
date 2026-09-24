@@ -10,13 +10,13 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function article(noun: string): string {
-  return /^[aeiou]/i.test(noun) ? 'an' : 'a';
+function withArticle(noun: string): string {
+  return `${/^[aeiou]/i.test(noun) ? 'an' : 'a'} ${noun}`;
 }
 
 export function unwrap<T>(response: unknown, key: string, subject: string): T {
   if (!isRecord(response) || !isRecord(response[key])) {
-    throw malformed(`The Launch API returned ${subject} without ${article(key)} ${key}.`);
+    throw malformed(`The Launch API returned ${withArticle(subject)} without ${withArticle(key)}.`);
   }
 
   return response[key] as T;
@@ -24,7 +24,7 @@ export function unwrap<T>(response: unknown, key: string, subject: string): T {
 
 export function assertArray(response: unknown, key: string, subject: string): void {
   if (!isRecord(response) || !Array.isArray(response[key])) {
-    throw malformed(`The Launch API returned ${subject} without ${article(key)} ${key} array.`);
+    throw malformed(`The Launch API returned ${withArticle(subject)} without ${withArticle(key)} array.`);
   }
 }
 
@@ -32,6 +32,6 @@ export function assertPage(response: unknown, key: string, subject: string): voi
   assertArray(response, key, subject);
 
   if (!isRecord((response as Record<string, unknown>).pagination)) {
-    throw malformed(`The Launch API returned ${subject} without a pagination block.`);
+    throw malformed(`The Launch API returned ${withArticle(subject)} without a pagination block.`);
   }
 }

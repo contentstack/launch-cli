@@ -40,7 +40,7 @@ export class DeploymentsApi {
       query: { limit: params.limit, skip: params.skip },
     });
 
-    assertPage(response, 'deployments', 'a deployment list');
+    assertPage(response, 'deployments', 'deployment list');
 
     return response;
   }
@@ -53,7 +53,7 @@ export class DeploymentsApi {
       projectUid: params.project,
     });
 
-    return unwrap<Deployment>(response, 'deployment', 'a deployment response');
+    return unwrap<Deployment>(response, 'deployment', 'deployment response');
   }
 
   async latest(params: DeploymentScope): Promise<Deployment | undefined> {

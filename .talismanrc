@@ -41,4 +41,16 @@ fileignoreconfig:
 - filename: test/integration/project-upload.test.ts
   allowed_patterns:
     - "key: 'Content-Type'"
+- filename: src/environments/environments.api.ts
+  ignore_detectors:
+    - filename
+- filename: src/transport/envelope.ts
+  ignore_detectors:
+    - filename
+- filename: src/transport/envelope.test.ts
+  ignore_detectors:
+    - filename
+- filename: src/git/git.api.ts
+  allowed_patterns:
+    - "assertArray\\(response, key, `\\$\\{key\\} response`\\)"
 version: "1.0"

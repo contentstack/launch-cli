@@ -36,7 +36,7 @@ describe('response envelope', () => {
   });
 
   it('returns the member the envelope carries', () => {
-    expect(unwrap<{ uid: string }>({ project: { uid: 'p1' } }, 'project', 'a project response')).toEqual({ uid: 'p1' });
+    expect(unwrap<{ uid: string }>({ project: { uid: 'p1' } }, 'project', 'project response')).toEqual({ uid: 'p1' });
   });
 
   it.each([
@@ -47,32 +47,44 @@ describe('response envelope', () => {
     [{ project: null }],
     [{ project: 'p1' }],
   ])('refuses %p as an envelope that carries no project', (response) => {
-    const error = failureFrom(() => unwrap(response, 'project', 'a project response'));
+    const error = failureFrom(() => unwrap(response, 'project', 'project response'));
 
     expect(error.code).toBe(MALFORMED_CODE);
     expect(error.message).toBe('The Launch API returned a project response without a project.');
   });
 
   it('chooses the article from the key so the wording reads correctly', () => {
-    expect(failureFrom(() => unwrap({}, 'environment', 'an environment response')).message).toBe(
+    expect(failureFrom(() => unwrap({}, 'environment', 'environment response')).message).toBe(
       'The Launch API returned an environment response without an environment.',
     );
-    expect(failureFrom(() => assertArray({}, 'environments', 'an environment list')).message).toBe(
+    expect(failureFrom(() => assertArray({}, 'environments', 'environment list')).message).toBe(
       'The Launch API returned an environment list without an environments array.',
     );
-    expect(failureFrom(() => assertArray({}, 'deployments', 'a deployment list')).message).toBe(
+    expect(failureFrom(() => assertArray({}, 'deployments', 'deployment list')).message).toBe(
       'The Launch API returned a deployment list without a deployments array.',
     );
   });
 
+  it('chooses each article on its own, so a vowel-initial array name reads correctly', () => {
+    expect(failureFrom(() => assertArray({}, 'environments', 'environments response')).message).toBe(
+      'The Launch API returned an environments response without an environments array.',
+    );
+    expect(failureFrom(() => assertArray({}, 'environments', 'deployment list')).message).toBe(
+      'The Launch API returned a deployment list without an environments array.',
+    );
+    expect(failureFrom(() => assertPage({ uploads: [] }, 'uploads', 'upload list')).message).toBe(
+      'The Launch API returned an upload list without a pagination block.',
+    );
+  });
+
   it('accepts a page that carries both the array and the pagination block', () => {
-    expect(() => assertPage({ projects: [], pagination: {} }, 'projects', 'a project list')).not.toThrow();
+    expect(() => assertPage({ projects: [], pagination: {} }, 'projects', 'project list')).not.toThrow();
   });
 
   it.each([[undefined], [null], ['a string'], [{}], [{ projects: {} }], [{ projects: 'no' }]])(
     'refuses %p as a page that carries no projects array',
     (response) => {
-      const error = failureFrom(() => assertPage(response, 'projects', 'a project list'));
+      const error = failureFrom(() => assertPage(response, 'projects', 'project list'));
 
       expect(error.code).toBe(MALFORMED_CODE);
       expect(error.message).toBe('The Launch API returned a project list without a projects array.');
@@ -82,7 +94,7 @@ describe('response envelope', () => {
   it.each([[{ projects: [] }], [{ projects: [], pagination: null }], [{ projects: [], pagination: 'no' }]])(
     'refuses %p as a page that carries no pagination block',
     (response) => {
-      const error = failureFrom(() => assertPage(response, 'projects', 'a project list'));
+      const error = failureFrom(() => assertPage(response, 'projects', 'project list'));
 
       expect(error.message).toBe('The Launch API returned a project list without a pagination block.');
     },
