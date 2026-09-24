@@ -30,6 +30,7 @@ function capturingHttpClient(statuses: number[], captured: CapturedCall[]) {
       return client;
     };
     client.interceptors = { response: { use: () => 0 } };
+    client.requestConfig = () => ({});
     client.asJson = () => client;
     client.headers = (headers: Record<string, string>) => {
       call.headers = headers;

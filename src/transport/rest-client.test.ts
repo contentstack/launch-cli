@@ -13,6 +13,7 @@ interface RecordedCall {
   baseUrl?: string;
   query?: object;
   body?: unknown;
+  json?: boolean;
 }
 
 function fakeHttpClient(responses: ({ status: number; data: unknown } | Error)[]) {
@@ -27,7 +28,10 @@ function fakeHttpClient(responses: ({ status: number; data: unknown } | Error)[]
         call.baseUrl = url;
         return client;
       },
-      asJson: () => client,
+      asJson: () => {
+        call.json = true;
+        return client;
+      },
       headers: (h) => {
         call.headers = h;
         return client;
@@ -107,6 +111,7 @@ describe('RestApiClient', () => {
     expect(http.calls[0].path).toBe('/projects');
     expect(http.calls[0].query).toEqual({ limit: 50 });
     expect(http.calls[0].body).toEqual({ name: 'site' });
+    expect(http.calls[0].json).toBe(true);
     expect(http.calls[0].headers).toEqual({
       'X-CS-CLI': 'cli/2.0.0',
       'x-cs-api-version': API_VERSION,
@@ -153,6 +158,7 @@ describe('RestApiClient', () => {
     expect(http.calls[0].method).toBe('GET');
     expect(http.calls[0].path).toBe('/projects');
     expect(http.calls[0].query).toBeUndefined();
+    expect(http.calls[0].json).toBeUndefined();
     expect(http.calls[0].body).toBeUndefined();
     expect(http.calls[0].headers['x-organization-uid']).toBeUndefined();
     expect(http.calls[0].headers['x-project-uid']).toBeUndefined();
@@ -170,6 +176,7 @@ describe('RestApiClient', () => {
 
     expect(http.calls).toHaveLength(1);
     expect(http.calls[0].body).toBe(body);
+    expect(http.calls[0].json).toBe(true);
   });
 
   it('omits the payload only when the body is undefined', async () => {
@@ -178,6 +185,7 @@ describe('RestApiClient', () => {
     await buildClient(http).request({ method: 'POST', path: '/projects', body: undefined });
 
     expect(http.calls[0].body).toBeUndefined();
+    expect(http.calls[0].json).toBeUndefined();
   });
 
   it('refreshes auth once on 401 and retries', async () => {
@@ -657,6 +665,7 @@ describe('RestApiClient', () => {
     };
     fakeClient.baseUrl = () => fakeClient;
     fakeClient.asJson = () => fakeClient;
+    fakeClient.requestConfig = () => ({});
     fakeClient.headers = () => fakeClient;
     fakeClient.queryParams = () => fakeClient;
     fakeClient.payload = () => fakeClient;

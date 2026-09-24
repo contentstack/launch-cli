@@ -125,14 +125,14 @@ export class RestApiClient {
     scopeHeader(headers, 'x-organization-uid', req.orgUid);
     scopeHeader(headers, 'x-project-uid', req.projectUid);
 
-    client.baseUrl(this.options.baseUrl).asJson().headers(headers);
+    client.baseUrl(this.options.baseUrl).headers(headers);
 
     if (req.query) {
       client.queryParams(pruneUndefined(req.query));
     }
 
     if (req.body !== undefined) {
-      client.payload(req.body);
+      client.asJson().payload(req.body);
     }
 
     try {

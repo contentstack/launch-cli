@@ -7,6 +7,16 @@ export function disarmResponseInterceptors(client: HttpClient): HttpClient {
   return client;
 }
 
+export function withoutDefaultContentType(client: HttpClient): HttpClient {
+  const { headers } = client.requestConfig();
+
+  if (headers) {
+    delete headers['Content-Type'];
+  }
+
+  return client;
+}
+
 export function createUtilityHttpClient(): HttpClientLike {
-  return disarmResponseInterceptors(HttpClient.create());
+  return withoutDefaultContentType(disarmResponseInterceptors(HttpClient.create()));
 }

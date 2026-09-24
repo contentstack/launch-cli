@@ -15,6 +15,7 @@ const LAUNCH_HUB_URL = 'https://launch-api.integration.test';
 const ORG_UID = 'blt4d9e2a7c1f6b3085';
 const PROJECT_UID = 'a1b2c3d4e5f60718293a4b5c';
 const DATA_DIR = tmpdir();
+const BODYLESS = { badheaders: ['content-type'] };
 
 const CONFIG: Record<string, unknown> = {
   authorisationType: 'BASIC',
@@ -70,7 +71,7 @@ describe('integration: launch:projects:delete on the wire', () => {
 
   it('deletes the project and reports it by name when --yes was passed', async () => {
     const lookup = nock(LAUNCH_HUB_URL).get(`/manage/projects/${PROJECT_UID}`).query({}).reply(200, getFixture);
-    const removal = nock(LAUNCH_HUB_URL).delete(`/manage/projects/${PROJECT_UID}`).query({}).reply(204);
+    const removal = nock(LAUNCH_HUB_URL, BODYLESS).delete(`/manage/projects/${PROJECT_UID}`).query({}).reply(204);
 
     const { error, stdout } = await runCommand(
       ['launch:projects:delete', '--org', ORG_UID, '--project', PROJECT_UID, '--yes', '--data-dir', DATA_DIR],
@@ -90,7 +91,7 @@ describe('integration: launch:projects:delete on the wire', () => {
       .query({ limit: '100', skip: '0' })
       .reply(200, listFixture);
     const fetch = nock(LAUNCH_HUB_URL).get(`/manage/projects/${PROJECT_UID}`).query({}).reply(200, getFixture);
-    const removal = nock(LAUNCH_HUB_URL).delete(`/manage/projects/${PROJECT_UID}`).query({}).reply(204);
+    const removal = nock(LAUNCH_HUB_URL, BODYLESS).delete(`/manage/projects/${PROJECT_UID}`).query({}).reply(204);
 
     const { error, stdout } = await runCommand(
       ['launch:projects:delete', '--org', ORG_UID, '--project', 'sample-project', '--yes', '--data-dir', DATA_DIR],
@@ -106,7 +107,7 @@ describe('integration: launch:projects:delete on the wire', () => {
 
   it('exits 2 naming the project and --yes, and never sends the delete, without a terminal and without --yes', async () => {
     const lookup = nock(LAUNCH_HUB_URL).get(`/manage/projects/${PROJECT_UID}`).query({}).reply(200, getFixture);
-    const removal = nock(LAUNCH_HUB_URL).delete(`/manage/projects/${PROJECT_UID}`).query({}).reply(204);
+    const removal = nock(LAUNCH_HUB_URL, BODYLESS).delete(`/manage/projects/${PROJECT_UID}`).query({}).reply(204);
 
     const { error } = await runCommand(
       ['launch:projects:delete', '--org', ORG_UID, '--project', PROJECT_UID, '--data-dir', DATA_DIR],
@@ -127,7 +128,7 @@ describe('integration: launch:projects:delete on the wire', () => {
   it('resolves a project name and names it in the refusal, and never sends the delete, without --yes', async () => {
     const scan = nock(LAUNCH_HUB_URL).get('/manage/projects').query({ limit: '100', skip: '0' }).reply(200, listFixture);
     const lookup = nock(LAUNCH_HUB_URL).get(`/manage/projects/${PROJECT_UID}`).query({}).reply(200, getFixture);
-    const removal = nock(LAUNCH_HUB_URL).delete(`/manage/projects/${PROJECT_UID}`).query({}).reply(204);
+    const removal = nock(LAUNCH_HUB_URL, BODYLESS).delete(`/manage/projects/${PROJECT_UID}`).query({}).reply(204);
 
     const { error } = await runCommand(
       ['launch:projects:delete', '--org', ORG_UID, '--project', 'sample-project', '--data-dir', DATA_DIR],
@@ -145,7 +146,7 @@ describe('integration: launch:projects:delete on the wire', () => {
 
   it('exits 3 and never sends the delete when the user declines the prompt', async () => {
     const lookup = nock(LAUNCH_HUB_URL).get(`/manage/projects/${PROJECT_UID}`).query({}).reply(200, getFixture);
-    const removal = nock(LAUNCH_HUB_URL).delete(`/manage/projects/${PROJECT_UID}`).query({}).reply(204);
+    const removal = nock(LAUNCH_HUB_URL, BODYLESS).delete(`/manage/projects/${PROJECT_UID}`).query({}).reply(204);
     const restore = pretendTerminal();
     const inquired: unknown[] = [];
     jest.spyOn(cliux, 'inquire').mockImplementation(async (payload: unknown) => {
@@ -192,7 +193,7 @@ describe('integration: launch:projects:delete on the wire', () => {
 
   it('exits 1 when the API refuses the delete for want of permission', async () => {
     nock(LAUNCH_HUB_URL).get(`/manage/projects/${PROJECT_UID}`).query({}).reply(200, getFixture);
-    nock(LAUNCH_HUB_URL)
+    nock(LAUNCH_HUB_URL, BODYLESS)
       .delete(`/manage/projects/${PROJECT_UID}`)
       .query({})
       .reply(403, { errors: [{ code: 'launch.FORBIDDEN', message: 'Forbidden Resource' }] });

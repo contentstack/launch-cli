@@ -199,11 +199,11 @@ describe('integration: the organization prompt', () => {
       .get(`/manage/projects/${PROJECT_UID}`)
       .query({})
       .reply(200, getFixture);
-    const remove = nock(LAUNCH_HUB_URL)
+    const remove = nock(LAUNCH_HUB_URL, { badheaders: ['content-type'] })
       .matchHeader('x-organization-uid', ORG_UID)
       .delete(`/manage/projects/${PROJECT_UID}`)
       .query({})
-      .reply(200, {});
+      .reply(204);
 
     const { error } = await onTerminal([
       'launch:projects:delete',

@@ -2,7 +2,7 @@ import axios from 'axios';
 
 import { HttpClient } from '@contentstack/cli-utilities';
 
-import { createUtilityHttpClient, disarmResponseInterceptors } from './utility-http-client';
+import { createUtilityHttpClient, disarmResponseInterceptors, withoutDefaultContentType } from './utility-http-client';
 
 describe('disarmResponseInterceptors', () => {
   it('turns response interceptor registration into a no-op and leaves the handler list empty', () => {
@@ -79,5 +79,28 @@ describe('createUtilityHttpClient', () => {
     expect(typeof client.queryParams).toBe('function');
     expect(typeof client.payload).toBe('function');
     expect(typeof client.send).toBe('function');
+  });
+});
+
+describe('withoutDefaultContentType', () => {
+  it('drops the JSON content type the utility client sets in its constructor and keeps every other header', () => {
+    const client = HttpClient.create().headers({ authtoken: 'kept' });
+
+    withoutDefaultContentType(client);
+
+    expect(client.requestConfig().headers).toEqual({ authtoken: 'kept' });
+  });
+
+  it('leaves a client with no headers at all untouched and returns that same client', () => {
+    const client = { requestConfig: () => ({}) } as unknown as HttpClient;
+
+    expect(withoutDefaultContentType(client)).toBe(client);
+    expect(client.requestConfig()).toEqual({});
+  });
+
+  it('is applied to every client createUtilityHttpClient builds', () => {
+    const client = createUtilityHttpClient() as unknown as HttpClient;
+
+    expect(client.requestConfig().headers).toEqual({});
   });
 });
