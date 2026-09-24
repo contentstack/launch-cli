@@ -57,7 +57,7 @@ export interface CreateEnvironmentInput {
   description?: string;
   gitBranch?: string;
   uploadUid?: string;
-  buildCommand: string;
+  buildCommand?: string;
   outputDirectory: string;
   serverCommand?: string;
   frameworkPreset: FrameworkPreset;

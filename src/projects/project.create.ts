@@ -20,6 +20,7 @@ import {
   askBranch,
   askChoice,
   askNamespace,
+  askOptionalText,
   askRepository,
   askText,
   findRepository,
@@ -106,7 +107,7 @@ export class ProjectCreator {
       gitBranch: source.branch,
       uploadUid: source.uploadUid,
       buildCommand: await this.need('build-cmd', request.buildCmd, () =>
-        askText(this.services.ux, 'Build command', source.detected.buildCommand),
+        askOptionalText(this.services.ux, 'Build command', source.detected.buildCommand),
       ),
       outputDirectory: await this.need('output-dir', request.outputDir, () =>
         askText(this.services.ux, 'Output directory', source.detected.outputDirectory ?? DEFAULT_OUTPUT_DIRECTORY),
@@ -387,7 +388,7 @@ export class ProjectCreator {
     }
 
     return this.services.isTTY
-      ? askText(this.services.ux, 'Server command', detected.serverCommand)
+      ? askOptionalText(this.services.ux, 'Server command', detected.serverCommand)
       : undefined;
   }
 
@@ -404,7 +405,11 @@ export class ProjectCreator {
     return mode === RESPONSE_MODES[1];
   }
 
-  private async need(flag: string, supplied: string | undefined, ask: () => Promise<string>): Promise<string> {
+  private async need<T extends string | undefined>(
+    flag: string,
+    supplied: string | undefined,
+    ask: () => Promise<T>,
+  ): Promise<string | T> {
     if (supplied !== undefined) {
       return supplied;
     }

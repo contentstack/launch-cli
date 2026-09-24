@@ -26,6 +26,13 @@ export async function askText(ux: UxLike, message: string, initial?: string): Pr
   return chosen(await ux.inquire<string | undefined>({ type: 'input', name: 'value', message, default: initial }));
 }
 
+export async function askOptionalText(ux: UxLike, message: string, initial?: string): Promise<string | undefined> {
+  const answer = await ux.inquire<string | undefined>({ type: 'input', name: 'value', message, default: initial });
+  const text = typeof answer === 'string' ? answer.trim() : '';
+
+  return text === '' ? undefined : text;
+}
+
 export async function askChoice(ux: UxLike, message: string, choices: Choice[], initial?: string): Promise<string> {
   return chosen(
     await ux.inquire<string | undefined>({ type: 'search-list', name: 'value', message, choices, default: initial }),

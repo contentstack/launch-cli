@@ -529,6 +529,41 @@ describe('ProjectCreator on the FileUpload path', () => {
     expect(printed[0]).toBe(`Uploading 1 files from ${dataDir}`);
   });
 
+  it('creates the project with no server command when the optional prompt is left empty', async () => {
+    for (const answer of ['', '   ', undefined, null]) {
+      (uploadArchive as jest.Mock).mockClear();
+      const { creator, created, asked } = harness({ isTTY: true, answers: [answer] });
+
+      await creator.create(uploadRequest({ framework: 'Other', serverCmd: undefined }));
+
+      expect(asked).toEqual(['Server command']);
+      expect(uploadArchive).toHaveBeenCalledTimes(1);
+      expect(created).toHaveLength(1);
+      expect((bodyOf(created).environment as Record<string, unknown>).serverCommand).toBeUndefined();
+    }
+  });
+
+  it('creates the project with no build command when the optional prompt is left empty', async () => {
+    for (const answer of ['', '   ', undefined, null]) {
+      const { creator, created, asked, askedPayloads } = harness({ isTTY: true, answers: [answer] });
+
+      await creator.create(uploadRequest({ buildCmd: undefined, serverCmd: 'npm start' }));
+
+      expect(asked).toEqual(['Build command']);
+      expect(askedPayloads[0].default).toBeUndefined();
+      expect(created).toHaveLength(1);
+      expect((bodyOf(created).environment as Record<string, unknown>).buildCommand).toBeUndefined();
+    }
+  });
+
+  it('trims a build command and a server command typed at their optional prompts', async () => {
+    const { creator, created } = harness({ isTTY: true, answers: ['  npm run build  ', ' npm start '] });
+
+    await creator.create(uploadRequest({ buildCmd: undefined, serverCmd: undefined }));
+
+    expect(bodyOf(created).environment).toMatchObject({ buildCommand: 'npm run build', serverCommand: 'npm start' });
+  });
+
   it('exits 2 naming --data-dir rather than uploading the wrong contents', async () => {
     const { creator } = harness();
 
