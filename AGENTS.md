@@ -35,15 +35,28 @@ the gate as a floor, never as evidence of correctness.
 8. **No coverage exclusions.** If a path is too awkward to test, that is a design signal. Fencing
    it out of `collectCoverageFrom` makes the 100% gate report a number about a subset of the
    source, which is worse than no gate.
+9. **A green run must be a run that could have failed.** Before adding a case, name the one-line
+   source change that turns it red; if you cannot, do not add it. A parametrised case whose body
+   can only assert what the compiler already guarantees, an expectation computed by re-running the
+   implementation's own expression, and a fake whose recorded arguments no assertion reads are all
+   coverage without a verdict. Prove numeric and timing contracts by mutation: flip one comparison
+   or delete one line and show the case that goes red. This rule exists because
+   `src/deployments/deployment.watcher.ts` reported 100% on all four metrics under both coverage
+   engines while its tests killed 1 of 6 targeted mutants - the error-path fake discarded the delay
+   it was handed, and nothing read the documented `now() + delay >= deadline` boundary.
 
 **Dynamic imports under Jest — read before adding a `loadDataURL` test.** `loadDataURL` uses
 `new Function('u', 'return import(u)')` so the dynamic import survives the commonjs build; a plain
 `import()` is rewritten by `tsc` into `require()`, which cannot load a `data:` URL and silently
 broke every cloud function in `dist`. The cost is that Jest's default VM cannot service that import,
-so the suite runs under `--experimental-vm-modules`, and **only one test file per process may
-trigger a sandboxed dynamic import — a second one hangs the run rather than failing it**. Every
-`loadDataURL` case therefore lives in `src/functions/cloud-functions.test.ts`. Add new
-ones there. A hanging suite with no failing test is this constraint, not a flake.
+so the suite runs under `--experimental-vm-modules`. A second test file triggering a sandboxed
+dynamic import in the same process was re-tested and did **not** hang (27 of 27 passed). What it did
+do in this repo was **cost 327 seconds of wall time, silently** - no failure, no warning, just a
+suite that took minutes instead of seconds. Remember that a `jest.mock()` **without a factory still
+loads the real module** to build its automock, so an automock of anything that reaches
+`loadDataURL` pays that cost as surely as a real import does. Keep every `loadDataURL` case in
+`src/functions/cloud-functions.test.ts`, and if bare `npm test` jumps well past a minute with every
+test green, look here first.
 
 **Integration tests.** `test/integration/` drives real code with only the network faked by `nock`.
 `projects-list-command.test.ts` runs whole commands through `@oclif/test`'s `runCommand`, which
@@ -64,13 +77,23 @@ the life of a file; `test/credential-guard.setup.ts` re-installs its guard each 
 `projects-command-flows.test.ts` drives the flows that only exist end to end: the
 project-folder flow (no flags, `.cs-launch.json` supplying org and project), `--config` at
 an arbitrary path, an OAUTH session asserted on the wire including 401 -> refresh -> 200,
-and the interactive picker. The picker needs `process.stdin.isTTY` set for the duration of
-the run, because jest's stdin is not a terminal and `LaunchCommand` reads it to decide
-whether prompting is allowed; restore it afterwards. Set it through a property descriptor,
-not by assignment: once another suite in the same process has turned stdin into a real
-stream, `process.stdin.isTTY = true` throws, and jest orders test files by their previous
-runtime, so that shows up as an intermittent failure rather than a stable one. Fake the
-network with `nock`, never `RestApiClient`.
+and the interactive picker. Fake the network with `nock`, never `RestApiClient`.
+
+**Driving a prompt.** Use `test/support/terminal.ts`, never a local copy. `pretendTerminal()` (or
+`onTerminal(run)`) makes `process.stdin.isTTY` report true for the run and restores it, because jest's
+stdin is not a terminal and `LaunchCommand` reads it to decide whether prompting is allowed;
+`stdinReportingTTY(value)` sets any other value, `undefined` included. It sets the property through a
+descriptor, not by assignment: once another suite in the same process has turned stdin into a real
+stream, `process.stdin.isTTY = true` throws, and jest orders test files by their previous runtime, so
+that shows up as an intermittent failure rather than a stable one. `answerPrompts({ message: answer })`
+installs the `cliux.inquire` spy, records every prompt's message and payload in order, and throws on a
+prompt it was not given an answer for. `projects-create.test.ts` uses the three together to drive all
+eleven GitHub prompts through `launch:projects:create`, asserting their order, their offered defaults
+and the submitted body, and to prove that a flag-supplied value is never asked for.
+
+Every Launch interceptor in `projects-create.test.ts` goes through `hub()`, which requires
+`x-organization-uid`: a request sent under the wrong organization then fails instead of being
+absorbed. Scope a new command's interceptors the same way.
 
 `projects-delete.test.ts` drives the confirm gate end to end - `launch:projects:delete` is the
 first shipped command declaring `yes: {}`, so exit 3 and the no-TTY refusal are now reachable
@@ -84,7 +107,7 @@ call count would not have caught a request the command made through a different 
 ```
 src/
   core/         the command framework: LaunchCommand, the resolver engine, errors,
-                exit codes, the global flag catalog, region derivation, the
+                exit codes, the core flag catalog (coreFlags), region derivation, the
                 .cs-launch.json store, and the output primitives
   transport/    RestApiClient, the retry policy, auth strategies, proxy detection,
                 and LaunchApiError / LaunchNetworkError - no CLI wording lives here
@@ -107,7 +130,9 @@ src/
 `core` and `transport` never import a resource except through `resources.ts`, and they
 never import each other's wording. A resource imports `core` and `transport` freely.
 `src/core/layering.test.ts` asserts this rather than leaving it to review: it reads every
-non-test source in `core/` and `transport/` and fails on an import of a resource folder.
+source in `core/` and `transport/`, tests included, and fails on an import of a resource folder,
+and it collects every cross-resource import in the non-test resource sources and fails on one the
+allow-list does not name.
 That is why `Pagination` lives in `src/core/render.ts` beside `renderPagination` and
 `src/projects/types.ts` re-exports it, not the other way round.
 `resources.ts` is the only file every resource touches; everything else about projects
@@ -133,6 +158,15 @@ A new resource - environments, variables, deployments, logs, cache - is a folder
    partial answer: paging past `MAX_PAGES` raises `ProjectScanLimitError`, because
    returning quietly made the resolver report "No project named X found in this
    organization" about a scan that never completed.
+
+   Response types declare what can **arrive**, not what the service's DTO promises: `Project.uid`,
+   `Project.name`, `Environment.uid`, `Deployment.uid` and `Pagination.count` are optional. Where a
+   caller genuinely needs an id, the repository checks it with `hasUid` from
+   `src/transport/envelope.ts` and raises a malformed-response error rather than hand back an entity
+   nothing can address - `ProjectsApi.create`, `EnvironmentsApi.first` and `DeploymentsApi.latest`
+   return `IdentifiedProject` / `IdentifiedEnvironment` / `IdentifiedDeployment`. A list consumer
+   skips an entry with no uid. The envelope helpers take the bare noun phrase (`'project list'`) and
+   choose both articles themselves.
 2. **`src/<resource>/<resource>.errors.ts`** - a `Record<code, message>` of the
    `launch.<RESOURCE>.*` codes this resource rewords. The transport never knows a
    message; it parses a body into a status, a code and the API's own text, and the
@@ -165,7 +199,11 @@ that renders choices and nothing more.
 
 **Typed resolved values.** `this.resolved.<flag>` carries the flag's own type, derived
 from the catalog entry: `Flags.string` gives `string`, `Flags.integer` gives `number`,
-`Flags.boolean` gives `boolean`. It widens to `| undefined` only when the input is
+`Flags.boolean` gives `boolean`. When the spec's `normalize` narrows the value, the narrower type is
+what lands: a spec written `satisfies ResolutionSpec<string, never, FrameworkPreset>` makes
+`this.resolved.framework` a `FrameworkPreset`, and `type`, `res-mode`, `auto-deploy` and `cs-auth`
+arrive as `ProjectTypeChoice`, `ResponseMode` and `ToggleValue` the same way. It widens to
+`| undefined` only when the input is
 neither declared `required: true` nor given a `default` in its resolution spec. A command
 should contain no casts at all; if one seems necessary, the type is wrong somewhere
 above it.
@@ -192,8 +230,10 @@ If a new resource needs a change in `src/core/` or `src/transport/`, that is a s
 worth raising rather than a routine edit.
 
 **Confirm gate.** A destructive command opts in by adding `yes: {}` to its `inputs` - `--yes`
-is deliberately not a global flag - and `await this.confirm('<question>')` in `run()` before the first
-request that changes anything.
+is deliberately not a global flag: it sits in `coreFlags` like `org` or `limit`, and only
+`LaunchCommand.baseFlags` (`--config`, `--data-dir`) reaches every command - and
+`await this.confirm('<question>')` in `run()` before the first request that changes anything. Reads
+before it are expected: `projects:delete` fetches the project so the question can name it.
 It returns silently when `--yes` was passed, prompts on a TTY, exits 2 when there is neither, and
 exits 3 when the user declines. Never assume a yes yourself.
 
@@ -315,12 +355,20 @@ CLI wording and a `retryable` flag, and `RetryPolicy.shouldRetryTransportError` 
 only on an idempotent method, on the same budget as a 429. `test/integration/transport-socket-hangup.test.ts`
 proves on a real socket that a POST is put on the wire exactly once.
 
+An API error body is untrusted input. `parseErrorEnvelope` reads it entry by entry and keeps only a
+string `code` and a string `message` from each, so a malformed body falls back to the status wording
+rather than surfacing `[object Object]` or a code of the wrong type.
+
 **The `.cs-launch.json` file.** `ProjectConfigStore` owns it. `load()` returns a typed
 `ProjectConfig`, applying the v1 rule that several branch blocks are usable only when they
 agree on one project. A resolution spec addresses it by a key of `ProjectConfig`, never a
-dotted string. `save()` has one caller, `projects:create`, which records the project it created.
-It merges into every branch block, and it **never overwrites a file it cannot parse as a config
-object**: invalid JSON, an array or any other non-object root, or a path it cannot read is a
+dotted string. `load()` keeps only the three keys a resolution spec can read - `uid`,
+`organizationUid` and `name` - and only when each is a string or `null`, so a number in the file is
+absent rather than a value that reaches a request header. `save()` has one caller, `projects:create`,
+which records the project it created. It merges into every branch block, keeping every other key it
+finds there; it writes a single `project` block into a missing file or one holding an empty object; it refuses, as a
+`UsageError`, to overwrite a block that already names a different project; and it **never
+overwrites a file it cannot parse as a config object**: invalid JSON, an array or any other non-object root, or a path it cannot read is a
 `UsageError` ending "It was left unchanged.", whether or not the user named the path. The create
 reports that line and still exits 0, because the project exists; losing a user's file to recover
 from a typo in it is the wrong trade. A missing file is simply written fresh.
@@ -403,19 +451,25 @@ wants to pick the framework interactively simply does not pass `--server-cmd`, a
 one when the framework supports it.
 
 **Deployment failure is a partial success, and the wording says so.** The project and environment are
-real and are **not** rolled back. `deploymentFailureMessage` names the status, the project and
+real and are **not** rolled back. Everything after `POST /projects` - finding the first environment,
+finding its first deployment, and the wait itself - goes through the same wording when it fails, so a
+502 from a lookup still tells the user what exists. `deploymentFailureMessage` names the status, the project and
 environment that survived, and both follow-up commands with their scope already filled in -
 `deployments:create` to retry and `logs:get` to inspect. It exits **1**, not 2: nothing about the
 invocation was wrong.
 
 **The FileUpload archive.** `src/projects/project.archive.ts` owns the exclusion list
 (`node_modules`, `.git`, `.env`, `.env.local`, `.next`, `logs`, `.vscode`, `.cs-launch.json`) and
-applies it at **every** depth, not just the root. It skips symbolic links rather than following one
+applies it at **every** depth, not just the root. It also leaves out the file `--config` named when
+that file lives inside the data dir, compared after path resolution, so a config kept under another
+name is not deployed with the site. It skips symbolic links rather than following one
 into a loop. A path that is not a directory, and a directory that is empty once the exclusions apply,
 are both `UsageError` naming `--data-dir` - uploading an empty or wrong archive silently is worse
 than refusing. `src/projects/project.upload.ts` splits into `prepareUpload` (pure: raw body, or
-multipart when the signed URL carries form fields) and `uploadArchive` (the socket), and it uses
-`node:http`/`node:https` rather than `fetch` so `nock` can intercept it - nock 13 does not see
+multipart when the signed URL carries form fields) and `uploadArchive` (the socket). A blank
+`Content-Type` supplied by the presign is absent, as blank values are everywhere else, so the zip
+content type is sent; anything outside 200-299, a 3xx redirect included, is an `UploadFailedError`.
+It uses `node:http`/`node:https` rather than `fetch` so `nock` can intercept it - nock 13 does not see
 undici's `fetch`.
 
 **Environment variables and argv.** `environmentVariables` is always `[]` on create: the variable
@@ -427,8 +481,9 @@ request to prove the body is unchanged. **No secret may reach argv** (FR30, G16)
 oclif's native `exclusive` / `relationships` on the flag definition, where it also shows in `--help` -
 and a simple range does too: `limit` and `skip` carry oclif's own `min`/`max` rather than being
 checked later. A rule that must read a *resolved* value (one that config, a prompt or a default may
-have supplied) belongs in `src/core/rules.ts` - `exactlyOneOf` and `onlyWithValueOf` are the two so far -
-declared as a `static rules = [...]` array on the command. `resolveInputs` evaluates them after resolution,
+have supplied) belongs in `src/core/rules.ts` - there are three: `atLeastOneOf` (used by
+`projects:update`), `onlyWithValueOf` (used by `projects:create`) and `exactlyOneOf` (no consumer yet;
+see "Built ahead of use" below) - declared as a `static rules = [...]` array on the command. `resolveInputs` evaluates them after resolution,
 and a failing rule is a usage error (exit 2).
 
 A rule asks what the **user supplied**, never what a default filled in. `resolveInputs` hands each rule
@@ -439,6 +494,17 @@ Without that, `skip`'s default of 0 made `exactlyOneOf('limit', 'skip')` reject 
 gate value `onlyWithValueOf` reads is a value, not a "was it supplied?" question, so it is read
 wherever it came from. Write the next rule when a command needs it; a rule
 kept alive only by its own test proves nothing.
+
+**Built ahead of use.** Four pieces of production code have no caller yet, on purpose, each held
+for a named ticket whose shape it already fits. Nothing else in `src` is uncalled; add to this list
+rather than leave an orphan unexplained.
+
+| Code | Held for | Why its API fits |
+|---|---|---|
+| `EnvironmentsApi.list` | CL-7168 (`environments:*`) | `{org, project, limit, skip}` -> `EnvironmentsPage`, the paging every list command renders |
+| `DeploymentsApi.list` | CL-7170 (`deployments:*`) | a `DeploymentScope` plus paging -> `DeploymentsPage` |
+| `src/core/redact.ts` | CL-7169 (variables) | see below |
+| `exactlyOneOf` | CL-7172 (`cache:purge`) | "purge these paths, or everything, not both" - and it judges what the user supplied, not defaults |
 
 **Redaction.** `src/core/redact.ts` (`REDACTED`, `redactedColumn`) has no caller yet; it is kept
 ahead of its first use on purpose, so the easy path for the first presenter that renders an
@@ -467,10 +533,14 @@ naive `toUpperCase()` round trip in reverse. Both are explicit tables, and a tes
 framework table is a bijection onto the service enum so a preset cannot be added on one side only.
 
 **Flag names come from the "All flags" tables (ruling D9).** Where the Commands Details per-command
-rows disagree with its §"All flags" tables, the tables win: `--org` not `--organization`,
-`--build-cmd` not `--build-command`, `--server-cmd` not `--server-command`, `--output-dir` not
-`--output-directory`, `--res-mode` not `--response-mode`. `--env-name` is the environment created
-alongside a project; `--name` stays the project name.
+rows disagree with its §"All flags" tables, the tables win. That is why the CLI ships `--build-cmd`
+and `--server-cmd`: the rows say `--build-command` / `--server-command`, the tables say the short
+forms. Three shipped names are **not** what the tables say, and that is a known deviation awaiting a
+decision before 2.0.0 leaves beta, not something D9 justifies: the tables name `--organization`
+(alias `--org`), `--output-directory` (alias `--out-dir`) and `--response-mode` (alias `--res-mode`),
+while the CLI ships only `--org`, `--output-dir` (neither the table name nor its alias) and
+`--res-mode`, with no aliases declared. `--env-name` is the environment created alongside a project;
+`--name` stays the project name.
 
 **`this.dataDir`.** `LaunchCommand` already computed the data directory to find `.cs-launch.json`;
 it now exposes it, because `projects:create` has to zip that same directory and `--data-dir` is a
