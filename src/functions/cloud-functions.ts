@@ -3,7 +3,7 @@ import express, {
   Request,
   Response,
 } from 'express';
-import { Express } from 'express-serve-static-core';
+import type { Express } from 'express-serve-static-core';
 import { Server } from 'http';
 import path from 'path';
 
