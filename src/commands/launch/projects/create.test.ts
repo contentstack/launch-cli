@@ -1,13 +1,11 @@
 import {
   DEPLOYMENT_WAIT_TIMEOUT_MS,
   ProjectCreator,
+  defaultWatchTiming,
   serverCommandFrameworkGate,
 } from '../../../projects/project.create';
-import {
-  DEPLOYMENT_MAX_BACKOFF_STEPS,
-  DEPLOYMENT_POLL_DELAY_MS,
-  WatchTiming,
-} from '../../../deployments/deployment.watcher';
+
+type WatchTiming = ReturnType<typeof defaultWatchTiming>;
 import ProjectsCreate from './create';
 
 function commandUnderTest(resolved: Record<string, unknown>, dataDir = '/tmp/site') {
@@ -148,8 +146,9 @@ describe('launch:projects:create', () => {
 
     expect(timings).toHaveLength(1);
     expect(timings[0].timeoutMs).toBe(DEPLOYMENT_WAIT_TIMEOUT_MS);
-    expect(timings[0].pollDelayMs).toBe(DEPLOYMENT_POLL_DELAY_MS);
-    expect(timings[0].maxBackoffSteps).toBe(DEPLOYMENT_MAX_BACKOFF_STEPS);
+    expect(DEPLOYMENT_WAIT_TIMEOUT_MS).toBe(20 * 60 * 1000);
+    expect(timings[0].pollDelayMs).toBe(2000);
+    expect(timings[0].maxBackoffSteps).toBe(5);
     expect(timings[0].now()).toBeGreaterThanOrEqual(before);
   });
 
