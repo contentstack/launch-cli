@@ -13,6 +13,7 @@ import { LaunchApiError } from '../transport/errors';
 import { UxLike } from './render';
 import { LaunchCommand, resolveLaunchContext } from './launch-command';
 import * as serviceContext from './service-context';
+import { pretendTerminal, stdinReportingTTY } from '../../test/support/terminal';
 
 class Probe extends LaunchCommand {
   static flags = {};
@@ -259,8 +260,7 @@ describe('LaunchCommand.init', () => {
   it('parses using the declared flags and base flags, and wires the hub url into the built client', async () => {
     const instance = probe();
     const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
-    const originalIsTTY = process.stdin.isTTY;
-    Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true });
+    const restoreTTY = pretendTerminal();
     Object.defineProperty(instance, 'launchRegion', {
       value: { launchHubUrl: 'https://launch-api.test' },
       configurable: true,
@@ -284,7 +284,7 @@ describe('LaunchCommand.init', () => {
 
     createSpy.mockRestore();
     authSpy.mockRestore();
-    Object.defineProperty(process.stdin, 'isTTY', { value: originalIsTTY, configurable: true });
+    restoreTTY();
   });
 
   it('derives the hub url from the configured region cma when the region declares no launch hub url', async () => {
@@ -379,8 +379,7 @@ describe('LaunchCommand.init terminal detection', () => {
   it.each([[false], [undefined]])('resolves isTTY to false when process.stdin.isTTY is %p', async (isTTY) => {
     const instance = probe();
     const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
-    const originalIsTTY = process.stdin.isTTY;
-    Object.defineProperty(process.stdin, 'isTTY', { value: isTTY, configurable: true });
+    const restoreTTY = stdinReportingTTY(isTTY);
     Object.defineProperty(instance, 'launchRegion', {
       value: { launchHubUrl: 'https://launch-api.test' },
       configurable: true,
@@ -393,7 +392,7 @@ describe('LaunchCommand.init terminal detection', () => {
     expect(instance['services'].isTTY).toBe(false);
 
     authSpy.mockRestore();
-    Object.defineProperty(process.stdin, 'isTTY', { value: originalIsTTY, configurable: true });
+    restoreTTY();
   });
 
   it('sends the oclif user agent as the analytics header on the requests the context makes', async () => {

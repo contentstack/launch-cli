@@ -3,10 +3,12 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { authHandler, cliux, configHandler } from '@contentstack/cli-utilities';
+import { authHandler, configHandler } from '@contentstack/cli-utilities';
 import { Config, Interfaces, Plugin } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
+
+import { answerPrompts, onTerminal } from '../support/terminal';
 
 const LAUNCH_HUB_URL = 'https://launch-api.integration.test';
 const UPLOAD_HOST = 'https://uploads.integration.test';
@@ -33,6 +35,10 @@ const CREATED_PROJECT = { uid: PROJECT_UID, name: 'My Site', projectType: 'GITPR
 let config: Interfaces.Config;
 let onWire: string[];
 let dataDir: string;
+
+function hub(): nock.Scope {
+  return nock(LAUNCH_HUB_URL).matchHeader('x-organization-uid', ORG_UID);
+}
 
 function recordWire(): void {
   onWire = [];
@@ -72,7 +78,7 @@ function gitFlags(): string[] {
 }
 
 function stubGitLookups(): void {
-  nock(LAUNCH_HUB_URL)
+  hub()
     .get('/manage/git-repositories')
     .query({ provider: 'GitHub', namespace: 'my-org', search: 'my-org/my-repo', limit: 100, skip: 0 })
     .reply(200, {
@@ -82,14 +88,14 @@ function stubGitLookups(): void {
       ],
     });
 
-  nock(LAUNCH_HUB_URL)
+  hub()
     .get('/manage/projects/framework')
     .query({ provider: 'GitHub', repoName: 'my-org/my-repo', branchName: 'main', namespace: 'my-org' })
     .reply(200, { framework: 'NEXTJS', buildCommand: 'npm run build', outputDirectory: '.next' });
 }
 
 function stubFollowUp(status: string): void {
-  nock(LAUNCH_HUB_URL)
+  hub()
     .get(`/manage/projects/${PROJECT_UID}/environments`)
     .query({ limit: 1, skip: 0 })
     .reply(200, {
@@ -97,7 +103,7 @@ function stubFollowUp(status: string): void {
       environments: [{ uid: ENVIRONMENT_UID, name: 'Default', domains: [{ url: 'my-site.example.test' }] }],
     });
 
-  nock(LAUNCH_HUB_URL)
+  hub()
     .get(`/manage/projects/${PROJECT_UID}/environments/${ENVIRONMENT_UID}/deployments`)
     .query({ limit: 1, skip: 0 })
     .reply(200, {
@@ -105,7 +111,7 @@ function stubFollowUp(status: string): void {
       deployments: [{ uid: DEPLOYMENT_UID, deploymentNumber: 1, status: 'QUEUED' }],
     });
 
-  nock(LAUNCH_HUB_URL)
+  hub()
     .get(`/manage/projects/${PROJECT_UID}/environments/${ENVIRONMENT_UID}/deployments/${DEPLOYMENT_UID}`)
     .query({})
     .reply(200, {
@@ -148,7 +154,7 @@ describe('integration: launch:projects:create on the wire', () => {
   it('posts the create body to /manage/projects, waits for LIVE and exits 0 printing the site url', async () => {
     let body: unknown;
     stubGitLookups();
-    const create = nock(LAUNCH_HUB_URL)
+    const create = hub()
       .post('/manage/projects', (sent: unknown) => {
         body = sent;
         return true;
@@ -191,7 +197,7 @@ describe('integration: launch:projects:create on the wire', () => {
 
   it('exits 1 on a failed deployment, saying the project survived and naming both follow-up commands', async () => {
     stubGitLookups();
-    nock(LAUNCH_HUB_URL).post('/manage/projects').query({}).reply(201, { project: CREATED_PROJECT });
+    hub().post('/manage/projects').query({}).reply(201, { project: CREATED_PROJECT });
     stubFollowUp('FAILED');
 
     const { error } = await runCommand(gitFlags(), config);
@@ -209,7 +215,7 @@ describe('integration: launch:projects:create on the wire', () => {
   });
 
   it('refuses --server-cmd on an unsupported framework with exit 2 before any request', async () => {
-    const create = nock(LAUNCH_HUB_URL).post('/manage/projects').query({}).reply(201, { project: CREATED_PROJECT });
+    const create = hub().post('/manage/projects').query({}).reply(201, { project: CREATED_PROJECT });
 
     const { error } = await runCommand([...gitFlags(), '--server-cmd', 'npm-start'], config);
 
@@ -223,7 +229,7 @@ describe('integration: launch:projects:create on the wire', () => {
   });
 
   it('refuses a framework outside the documented set with exit 2 before any request', async () => {
-    const create = nock(LAUNCH_HUB_URL).post('/manage/projects').query({}).reply(201, { project: CREATED_PROJECT });
+    const create = hub().post('/manage/projects').query({}).reply(201, { project: CREATED_PROJECT });
     const args = gitFlags();
     args[args.indexOf('NextJs')] = 'Svelte';
 
@@ -237,7 +243,7 @@ describe('integration: launch:projects:create on the wire', () => {
   it('uploads the zipped data dir and creates a FILEUPLOAD project from the upload uid', async () => {
     let body: unknown;
     let uploaded = '';
-    const signed = nock(LAUNCH_HUB_URL)
+    const signed = hub()
       .get('/manage/projects/upload/signed_url')
       .query({})
       .reply(200, { uploadUrl: `${UPLOAD_HOST}/bucket`, uploadUid: 'upload-uid', method: 'PUT' });
@@ -247,11 +253,11 @@ describe('integration: launch:projects:create on the wire', () => {
         uploaded = String(sent);
         return '';
       });
-    const detect = nock(LAUNCH_HUB_URL)
+    const detect = hub()
       .get('/manage/projects/file-framework')
       .query({ uploadUid: 'upload-uid' })
       .reply(200, { framework: 'OTHER' });
-    const create = nock(LAUNCH_HUB_URL)
+    const create = hub()
       .post('/manage/projects', (sent: unknown) => {
         body = sent;
         return true;
@@ -299,7 +305,7 @@ describe('integration: launch:projects:create on the wire', () => {
   });
 
   it('exits 2 naming --data-dir when there is no local project directory to upload', async () => {
-    const signed = nock(LAUNCH_HUB_URL).get('/manage/projects/upload/signed_url').query({}).reply(200, {});
+    const signed = hub().get('/manage/projects/upload/signed_url').query({}).reply(200, {});
 
     const { error } = await runCommand(
       [
@@ -333,8 +339,7 @@ describe('integration: launch:projects:create on the wire', () => {
   });
 
   it('asks on a terminal in the pinned order: type, organization, project name, environment name, then the build', async () => {
-    const inquired: string[] = [];
-    const answers: Record<string, unknown> = {
+    const prompts = answerPrompts({
       'Project type': 'FileUpload',
       'Choose an organization': ORG_UID,
       'Project name': 'My Site',
@@ -343,47 +348,32 @@ describe('integration: launch:projects:create on the wire', () => {
       'Build command': 'npm run build',
       'Output directory': './public',
       'Response mode': 'buffered',
-    };
-    jest.spyOn(cliux, 'inquire').mockImplementation(async (payload: unknown) => {
-      const { message } = payload as { message: string };
-      inquired.push(message);
-      return answers[message] as never;
     });
     const organizations = nock('https://cma.integration.test')
       .get('/v3/organizations')
       .query({ limit: '100', asc: 'name', include_count: 'true', skip: '0' })
       .reply(200, { organizations: [{ uid: ORG_UID, name: 'Acme' }], count: 1 });
-    nock(LAUNCH_HUB_URL)
-      .matchHeader('x-organization-uid', ORG_UID)
+    hub()
       .get('/manage/projects/upload/signed_url')
       .query({})
       .reply(200, { uploadUrl: `${UPLOAD_HOST}/bucket`, uploadUid: 'upload-uid', method: 'PUT' });
     nock(UPLOAD_HOST).put('/bucket').reply(200, '');
-    nock(LAUNCH_HUB_URL)
+    hub()
       .get('/manage/projects/file-framework')
       .query({ uploadUid: 'upload-uid' })
       .reply(200, { framework: 'GATSBY' });
-    const create = nock(LAUNCH_HUB_URL)
-      .matchHeader('x-organization-uid', ORG_UID)
+    const create = hub()
       .post('/manage/projects')
       .query({})
       .reply(201, { project: { ...CREATED_PROJECT, projectType: 'FILEUPLOAD' } });
     stubFollowUp('DEPLOYED');
-    const descriptor = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
-    Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true, writable: true });
 
-    const { error } = await runCommand(['launch:projects:create', '--data-dir', dataDir], config).finally(() => {
-      if (descriptor === undefined) {
-        delete (process.stdin as unknown as { isTTY?: boolean }).isTTY;
-      } else {
-        Object.defineProperty(process.stdin, 'isTTY', descriptor);
-      }
-    });
+    const { error } = await onTerminal(() => runCommand(['launch:projects:create', '--data-dir', dataDir], config));
 
     expect(error).toBeUndefined();
     expect(organizations.isDone()).toBe(true);
     expect(create.isDone()).toBe(true);
-    expect(inquired).toEqual([
+    expect(prompts.messages).toEqual([
       'Project type',
       'Choose an organization',
       'Project name',
@@ -393,6 +383,127 @@ describe('integration: launch:projects:create on the wire', () => {
       'Output directory',
       'Response mode',
     ]);
+    expect(onWire).toEqual([]);
+  });
+
+  it('asks all eleven GitHub prompts in the pinned order and submits exactly what was answered', async () => {
+    let body: unknown;
+    const prompts = answerPrompts({
+      'Project type': 'GitHub',
+      'Choose an organization': ORG_UID,
+      'Project name': 'My Site',
+      'Environment name': 'Default',
+      'Choose a Git namespace': 'my-org',
+      'Choose a repository': 'my-org/my-repo',
+      'Choose a branch': 'main',
+      'Framework preset': 'NextJs',
+      'Build command': 'npm run build',
+      'Output directory': '.next',
+      'Response mode': 'streaming',
+    });
+    nock('https://cma.integration.test')
+      .get('/v3/organizations')
+      .query({ limit: '100', asc: 'name', include_count: 'true', skip: '0' })
+      .reply(200, { organizations: [{ uid: ORG_UID, name: 'Acme' }], count: 1 });
+    const namespaces = hub()
+      .get('/manage/git-namespaces')
+      .query({ limit: 100, skip: 0 })
+      .reply(200, { pagination: { count: 1, limit: 100, skip: null }, namespaces: [{ name: 'my-org' }] });
+    const repositories = hub()
+      .get('/manage/git-repositories')
+      .query({ provider: 'GitHub', namespace: 'my-org', limit: 100, skip: 0 })
+      .reply(200, {
+        pagination: { count: 1, limit: 100, skip: null },
+        repositories: [
+          { fullName: 'my-org/my-repo', url: 'https://github.com/my-org/my-repo', defaultBranch: 'main' },
+        ],
+      });
+    const branches = hub()
+      .get('/manage/git-branches')
+      .query({ provider: 'GitHub', repoName: 'my-org/my-repo', namespace: 'my-org', limit: 100, skip: 0 })
+      .reply(200, { pagination: { count: 1, limit: 100, skip: null }, branches: [{ name: 'main' }] });
+    hub()
+      .get('/manage/projects/framework')
+      .query({ provider: 'GitHub', repoName: 'my-org/my-repo', branchName: 'main', namespace: 'my-org' })
+      .reply(200, { framework: 'NEXTJS', buildCommand: 'npm run build', outputDirectory: '.next' });
+    const create = hub()
+      .post('/manage/projects', (sent: unknown) => {
+        body = sent;
+        return true;
+      })
+      .query({})
+      .reply(201, { project: CREATED_PROJECT });
+    stubFollowUp('LIVE');
+
+    const { error } = await onTerminal(() => runCommand(['launch:projects:create', '--data-dir', dataDir], config));
+
+    expect(error).toBeUndefined();
+    expect([namespaces.isDone(), repositories.isDone(), branches.isDone(), create.isDone()]).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
+    expect(prompts.messages).toEqual([
+      'Project type',
+      'Choose an organization',
+      'Project name',
+      'Environment name',
+      'Choose a Git namespace',
+      'Choose a repository',
+      'Choose a branch',
+      'Framework preset',
+      'Build command',
+      'Output directory',
+      'Response mode',
+    ]);
+    expect(prompts.payloads.map((payload) => payload.default)).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'main',
+      'NextJs',
+      'npm run build',
+      '.next',
+      'buffered',
+    ]);
+    expect(body).toEqual({
+      name: 'My Site',
+      projectType: 'GITPROVIDER',
+      environment: {
+        name: 'Default',
+        gitBranch: 'main',
+        buildCommand: 'npm run build',
+        outputDirectory: '.next',
+        frameworkPreset: 'NEXTJS',
+        environmentVariables: [],
+        isStreamingEnabled: true,
+      },
+      repository: {
+        repositoryName: 'my-org/my-repo',
+        username: 'my-org',
+        repositoryUrl: 'https://github.com/my-org/my-repo',
+        gitProviderMetadata: { gitProvider: 'GitHub' },
+      },
+    });
+    expect(onWire).toEqual([]);
+  });
+
+  it('asks on a terminal only for what argv left out, and nothing that a flag supplied', async () => {
+    const prompts = answerPrompts({ 'Framework preset': 'NextJs' });
+    stubGitLookups();
+    const create = hub().post('/manage/projects').query({}).reply(201, { project: CREATED_PROJECT });
+    stubFollowUp('LIVE');
+    const args = gitFlags().filter((arg) => arg !== '--framework' && arg !== 'NextJs');
+
+    const { error } = await onTerminal(() => runCommand(args, config));
+
+    expect(error).toBeUndefined();
+    expect(prompts.messages).toEqual(['Framework preset']);
+    expect(create.isDone()).toBe(true);
     expect(onWire).toEqual([]);
   });
 

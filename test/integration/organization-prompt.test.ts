@@ -6,6 +6,8 @@ import { Config, Interfaces, Plugin } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
+import { pretendTerminal } from '../support/terminal';
+
 import getFixture from '../fixtures/project-get.json';
 import listFixture from '../fixtures/projects-list.json';
 
@@ -69,21 +71,6 @@ function answering(answers: unknown[]): unknown[] {
   });
 
   return inquired;
-}
-
-function pretendTerminal(): () => void {
-  const descriptor = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
-
-  Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true, writable: true });
-
-  return () => {
-    if (descriptor === undefined) {
-      delete (process.stdin as unknown as { isTTY?: boolean }).isTTY;
-      return;
-    }
-
-    Object.defineProperty(process.stdin, 'isTTY', descriptor);
-  };
 }
 
 async function onTerminal(args: string[]) {
