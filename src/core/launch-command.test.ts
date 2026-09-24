@@ -57,7 +57,17 @@ function probe(): Probe & { error: jest.Mock } {
   return instance;
 }
 
-function fakeHttpClient(onBaseUrl: (url: string) => void, onHeaders: (headers: Record<string, string>) => void = () => undefined) {
+interface Wire {
+  queries: unknown[];
+  bodies: unknown[];
+  sent: [string, string][];
+}
+
+function fakeHttpClient(
+  onBaseUrl: (url: string) => void,
+  onHeaders: (headers: Record<string, string>) => void = () => undefined,
+  wire: Wire = { queries: [], bodies: [], sent: [] },
+) {
   const client: Record<string, unknown> = {};
   client.baseUrl = (url: string) => {
     onBaseUrl(url);
@@ -69,9 +79,21 @@ function fakeHttpClient(onBaseUrl: (url: string) => void, onHeaders: (headers: R
     onHeaders(headers);
     return client;
   };
-  client.queryParams = () => client;
-  client.payload = () => client;
-  client.send = async () => ({ status: 200, data: { projects: [], pagination: { count: 0, limit: 0, skip: 0 } } });
+  client.queryParams = (query: unknown) => {
+    wire.queries.push(query);
+    return client;
+  };
+  client.payload = (body: unknown) => {
+    wire.bodies.push(body);
+    return client;
+  };
+  client.send = async (method: string, path: string) => {
+    wire.sent.push([method, path]);
+    return {
+      status: 200,
+      data: { projects: [], pagination: { count: 0, limit: 0, skip: 0 }, project: { uid: 'p1', name: 'Renamed' } },
+    };
+  };
   return client as unknown as ReturnType<typeof HttpClient.create>;
 }
 
@@ -395,7 +417,7 @@ describe('LaunchCommand.init terminal detection', () => {
     restoreTTY();
   });
 
-  it('sends the oclif user agent as the analytics header on the requests the context makes', async () => {
+  it('sends the oclif user agent, the query and the body on the requests the context makes', async () => {
     const instance = probe();
     const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
     Object.defineProperty(instance, 'launchRegion', {
@@ -405,19 +427,28 @@ describe('LaunchCommand.init terminal detection', () => {
     Object.defineProperty(instance, 'config', { value: { userAgent: 'csdx-cli/2.0.0 darwin-arm64' }, configurable: true });
     (instance as unknown as { parse: jest.Mock }).parse = jest.fn().mockResolvedValue({ flags: {} });
     let capturedHeaders: Record<string, string> | undefined;
+    const wire: Wire = { queries: [], bodies: [], sent: [] };
     const createSpy = jest.spyOn(HttpClient, 'create').mockReturnValue(
       fakeHttpClient(
         () => undefined,
         (headers) => {
           capturedHeaders = headers;
         },
+        wire,
       ),
     );
 
     await instance.init();
-    await instance['services'].api.projects.list({ org: 'org1' });
+    await instance['services'].api.projects.list({ org: 'org1', limit: 5, skip: 10 });
+    await instance['services'].api.projects.update({ org: 'org1', project: 'p1', update: { name: 'Renamed' } });
 
     expect(capturedHeaders?.['X-CS-CLI']).toBe('csdx-cli/2.0.0 darwin-arm64');
+    expect(wire.sent).toEqual([
+      ['GET', '/projects'],
+      ['PUT', '/projects/p1'],
+    ]);
+    expect(wire.queries).toEqual([{ limit: 5, skip: 10 }]);
+    expect(wire.bodies).toEqual([{ name: 'Renamed' }]);
 
     createSpy.mockRestore();
     authSpy.mockRestore();

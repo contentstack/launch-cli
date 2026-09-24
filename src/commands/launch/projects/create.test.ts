@@ -3,6 +3,11 @@ import {
   ProjectCreator,
   serverCommandFrameworkGate,
 } from '../../../projects/project.create';
+import {
+  DEPLOYMENT_MAX_BACKOFF_STEPS,
+  DEPLOYMENT_POLL_DELAY_MS,
+  WatchTiming,
+} from '../../../deployments/deployment.watcher';
 import ProjectsCreate from './create';
 
 function commandUnderTest(resolved: Record<string, unknown>, dataDir = '/tmp/site') {
@@ -132,8 +137,20 @@ describe('launch:projects:create', () => {
     }
   });
 
-  it('waits on a real clock bounded by the declared deployment timeout', () => {
-    expect(DEPLOYMENT_WAIT_TIMEOUT_MS).toBe(20 * 60 * 1000);
+  it('hands the creator the real clock, bounded by the declared deployment timeout', async () => {
+    const timings: WatchTiming[] = [];
+    jest.spyOn(ProjectCreator.prototype, 'create').mockImplementation(async function (this: ProjectCreator) {
+      timings.push((this as unknown as { timing: WatchTiming }).timing);
+    });
+    const before = Date.now();
+
+    await commandUnderTest({}).run();
+
+    expect(timings).toHaveLength(1);
+    expect(timings[0].timeoutMs).toBe(DEPLOYMENT_WAIT_TIMEOUT_MS);
+    expect(timings[0].pollDelayMs).toBe(DEPLOYMENT_POLL_DELAY_MS);
+    expect(timings[0].maxBackoffSteps).toBe(DEPLOYMENT_MAX_BACKOFF_STEPS);
+    expect(timings[0].now()).toBeGreaterThanOrEqual(before);
   });
 
   it('describes itself and shows both paths in its examples', () => {

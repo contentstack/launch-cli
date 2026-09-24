@@ -53,11 +53,10 @@ function deps(answers: unknown[], pages: Record<string, unknown> = {}) {
 
 describe('project create prompts', () => {
   it('asks for free text and returns what was typed', async () => {
-    const { deps: d, asked, ux } = deps(['My Site']);
+    const { asked, ux } = deps(['My Site']);
 
     await expect(askText(ux, 'Project name', 'suggested')).resolves.toBe('My Site');
-    expect(asked[0]).toEqual({ type: 'input', name: 'value', message: 'Project name', default: 'suggested' });
-    expect(d.api).toBeDefined();
+    expect(asked).toEqual([{ type: 'input', name: 'value', message: 'Project name', default: 'suggested' }]);
   });
 
   it('cancels rather than accepting nothing at a text prompt', async () => {
