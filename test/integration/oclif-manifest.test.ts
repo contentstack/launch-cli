@@ -1,12 +1,31 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 interface Manifest {
   oclif: {
     topics?: Record<string, { description?: string }>;
+    plugins?: string[];
     commands: string;
     topicSeparator: string;
   };
+  dependencies: Record<string, string>;
+  devDependencies: Record<string, string>;
+  csdxConfig: { shortCommandName: Record<string, string> };
+}
+
+function commandIdsUnder(directory: string, prefix: string[]): string[] {
+  return readdirSync(join(process.cwd(), directory), { withFileTypes: true }).flatMap((entry) => {
+    if (entry.isDirectory()) {
+      return commandIdsUnder(join(directory, entry.name), [...prefix, entry.name]);
+    }
+
+    if (!entry.name.endsWith('.ts') || entry.name.endsWith('.test.ts')) {
+      return [];
+    }
+
+    const base = entry.name.replace(/\.ts$/, '');
+    return [(base === 'index' ? prefix : [...prefix, base]).join(':')];
+  });
 }
 
 const manifest = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')) as Manifest;
@@ -30,5 +49,23 @@ describe('integration: the oclif manifest in package.json', () => {
       expect(topic.description).not.toBe('');
       expect(name).toMatch(/^launch(:[a-z-]+)*$/);
     }
+  });
+
+  it('names every declared oclif plugin in a dependency list, so a clean install can load it', () => {
+    const declared = manifest.oclif.plugins ?? [];
+    const installable = { ...manifest.dependencies, ...manifest.devDependencies };
+
+    expect(declared.length).toBeGreaterThan(0);
+    for (const plugin of declared) {
+      expect(Object.keys(installable)).toContain(plugin);
+    }
+  });
+
+  it('gives every command the CLI registers a short analytics name and invents none', () => {
+    const commands = commandIdsUnder(join('src', 'commands'), []).sort();
+
+    expect(commands).toContain('launch:projects:list');
+    expect(commands).toContain('launch:functions:serve');
+    expect(Object.keys(manifest.csdxConfig.shortCommandName).sort()).toEqual(commands);
   });
 });
