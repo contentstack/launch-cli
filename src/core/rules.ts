@@ -1,12 +1,16 @@
 import { UsageError } from './errors';
+import type { InputSource } from './resolution';
+import { isAbsent } from './values';
 import { FlagKey } from '../resources';
 
 export type ResolvedValues = Record<string, unknown>;
 
-export type Rule = (resolved: ResolvedValues) => void;
+export type InputSources = Partial<Record<string, InputSource>>;
 
-function isSupplied(value: unknown): boolean {
-  return value !== undefined && value !== null && value !== false;
+export type Rule = (resolved: ResolvedValues, sources: InputSources) => void;
+
+function isSupplied(value: unknown, source: InputSource | undefined): boolean {
+  return source !== undefined && source !== 'default' && !isAbsent(value) && value !== false;
 }
 
 function list(keys: string[]): string {
@@ -14,8 +18,8 @@ function list(keys: string[]): string {
 }
 
 export function exactlyOneOf(...keys: FlagKey[]): Rule {
-  return (resolved) => {
-    const supplied = keys.filter((key) => isSupplied(resolved[key]));
+  return (resolved, sources) => {
+    const supplied = keys.filter((key) => isSupplied(resolved[key], sources[key]));
 
     if (supplied.length === 1) {
       return;
@@ -27,8 +31,8 @@ export function exactlyOneOf(...keys: FlagKey[]): Rule {
 }
 
 export function onlyWithValueOf(key: FlagKey, gate: FlagKey, allowed: readonly string[]): Rule {
-  return (resolved) => {
-    if (!isSupplied(resolved[key])) {
+  return (resolved, sources) => {
+    if (!isSupplied(resolved[key], sources[key])) {
       return;
     }
 
@@ -45,8 +49,8 @@ export function onlyWithValueOf(key: FlagKey, gate: FlagKey, allowed: readonly s
 }
 
 export function atLeastOneOf(...keys: FlagKey[]): Rule {
-  return (resolved) => {
-    if (keys.some((key) => isSupplied(resolved[key]))) {
+  return (resolved, sources) => {
+    if (keys.some((key) => isSupplied(resolved[key], sources[key]))) {
       return;
     }
 

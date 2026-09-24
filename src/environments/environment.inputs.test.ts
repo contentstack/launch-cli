@@ -27,6 +27,8 @@ function normalize(key: keyof typeof environmentResolution, value: string): Prom
   return spec.normalize(value, { services: services(), resolved: {}, source: 'flag' });
 }
 
+const FROM_FLAGS = { 'server-cmd': 'flag', framework: 'flag' } as const;
+
 describe('environment inputs', () => {
   it('names each flag as the Commands Details "All flags" tables name it', () => {
     expect(Object.keys(environmentFlags)).toEqual([
@@ -129,8 +131,8 @@ describe('environment inputs', () => {
 
   it('gates --server-cmd on exactly the frameworks the service supports it for', () => {
     expect(SERVER_COMMAND_FRAMEWORKS).toEqual(['ANALOG', 'ANGULAR', 'NUXT', 'ASTRO', 'REMIX', 'OTHER']);
-    expect(() => serverCommandFrameworkGate({ 'server-cmd': 'npm start', framework: 'REMIX' })).not.toThrow();
-    expect(() => serverCommandFrameworkGate({ 'server-cmd': 'npm start', framework: 'GATSBY' })).toThrow(
+    expect(() => serverCommandFrameworkGate({ 'server-cmd': 'npm start', framework: 'REMIX' }, FROM_FLAGS)).not.toThrow();
+    expect(() => serverCommandFrameworkGate({ 'server-cmd': 'npm start', framework: 'GATSBY' }, FROM_FLAGS)).toThrow(
       '--server-cmd is only supported when --framework is one of ANALOG, ANGULAR, NUXT, ASTRO, REMIX, OTHER; ' +
         '--framework is GATSBY.',
     );

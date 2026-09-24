@@ -3,15 +3,8 @@ import { InputDependencyError, MissingInputError } from './errors';
 import { FlagKey, resolutionTable } from '../resources';
 import { AnyInputs, InputKeys, Resolved } from './inputs';
 import { AnyResolutionSpec, InputSource, ResolveServices } from './resolution';
-import { Rule } from './rules';
-
-function isAbsent(value: unknown): boolean {
-  if (value === undefined || value === null) {
-    return true;
-  }
-
-  return typeof value === 'string' && value.trim() === '';
-}
+import { InputSources, Rule } from './rules';
+import { isAbsent } from './values';
 
 export function resolutionOrder<K extends FlagKey>(keys: K[]): K[] {
   const ordered: K[] = [];
@@ -62,6 +55,7 @@ export interface ResolveArgs {
 
 export async function resolveInputs<S extends AnyInputs>(spec: S, args: ResolveArgs): Promise<Resolved<S>> {
   const resolved = {} as Resolved<S>;
+  const sources: InputSources = {};
 
   type K = InputKeys<S>;
   const declared = (Object.keys(resolutionTable) as K[]).filter((candidate) => candidate in spec);
@@ -106,13 +100,15 @@ export async function resolveInputs<S extends AnyInputs>(spec: S, args: ResolveA
       }
 
       value = undefined;
+    } else {
+      sources[key] = source;
     }
 
     resolved[key] = value as Resolved<S>[K];
   }
 
   for (const rule of args.rules ?? []) {
-    rule(resolved);
+    rule(resolved, sources);
   }
 
   return resolved;

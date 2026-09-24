@@ -393,7 +393,15 @@ and a simple range does too: `limit` and `skip` carry oclif's own `min`/`max` ra
 checked later. A rule that must read a *resolved* value (one that config, a prompt or a default may
 have supplied) belongs in `src/core/rules.ts` - `exactlyOneOf` and `onlyWithValueOf` are the two so far -
 declared as a `static rules = [...]` array on the command. `resolveInputs` evaluates them after resolution,
-and a failing rule is a usage error (exit 2). Write the next rule when a command needs it; a rule
+and a failing rule is a usage error (exit 2).
+
+A rule asks what the **user supplied**, never what a default filled in. `resolveInputs` hands each rule
+the resolved values and, beside them, the source of every present value (`flag`, `config`, `prompt` or
+`default`). An input counts as supplied only when its source is not `default`, its value is not absent
+by the resolver's own `isAbsent` (in `src/core/values.ts`, shared by both), and it is not `false`.
+Without that, `skip`'s default of 0 made `exactlyOneOf('limit', 'skip')` reject `--limit 10` alone. The
+gate value `onlyWithValueOf` reads is a value, not a "was it supplied?" question, so it is read
+wherever it came from. Write the next rule when a command needs it; a rule
 kept alive only by its own test proves nothing.
 
 **Redaction.** `src/core/redact.ts` (`REDACTED`, `redactedColumn`) has no caller yet; it is kept

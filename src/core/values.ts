@@ -1,5 +1,13 @@
 import { UsageError } from './errors';
 
+export function isAbsent(value: unknown): boolean {
+  if (value === undefined || value === null) {
+    return true;
+  }
+
+  return typeof value === 'string' && value.trim() === '';
+}
+
 export async function withinLength(flag: string, value: string, max: number): Promise<string> {
   if (value.length > max) {
     throw new UsageError(`--${flag} must be ${max} characters or fewer; that value is ${value.length} characters.`);

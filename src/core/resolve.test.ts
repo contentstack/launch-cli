@@ -6,7 +6,7 @@ import { InputsSpec, inputs } from './inputs';
 import * as resolutionModule from '../resources';
 import { AnyResolutionSpec } from './resolution';
 import { resolveInputs } from './resolve';
-import { exactlyOneOf } from './rules';
+import { atLeastOneOf, exactlyOneOf } from './rules';
 
 function withResolution<T>(replacement: Record<string, AnyResolutionSpec>, run: () => Promise<T>): Promise<T> {
   const holder = resolutionModule as unknown as { resolutionTable: Record<string, AnyResolutionSpec> };
@@ -700,6 +700,74 @@ describe('resolveInputs cross-flag rules', () => {
 
     await expect(promise).rejects.toBeInstanceOf(UsageError);
     await expect(promise).rejects.toThrow('Pass exactly one of --org, --limit; --org, --limit were supplied.');
+  });
+});
+
+describe('resolveInputs cross-flag rules and where a value came from', () => {
+  it('does not count an input that only its default filled in as supplied', async () => {
+    const resolved = await resolveInputs(inputs({ limit: {}, skip: {} }), {
+      parsed: { limit: 10 },
+      projectConfig: {},
+      services: services(),
+      rules: [exactlyOneOf('limit', 'skip')],
+    });
+
+    expect(resolved).toEqual({ limit: 10, skip: 0 });
+  });
+
+  it('counts an input the user typed as supplied even when it equals the default', async () => {
+    const promise = resolveInputs(inputs({ limit: {}, skip: {} }), {
+      parsed: { limit: 10, skip: 0 },
+      projectConfig: {},
+      services: services(),
+      rules: [exactlyOneOf('limit', 'skip')],
+    });
+
+    await expect(promise).rejects.toThrow('Pass exactly one of --limit, --skip; --limit, --skip were supplied.');
+  });
+
+  it('reports none supplied when every named input came from its default', async () => {
+    const promise = resolveInputs(inputs({ limit: {}, skip: {} }), {
+      parsed: {},
+      projectConfig: {},
+      services: services(),
+      rules: [atLeastOneOf('limit', 'skip')],
+    });
+
+    await expect(promise).rejects.toThrow('Pass at least one of --limit, --skip; none was supplied.');
+  });
+
+  it('counts a value from the config file as supplied', async () => {
+    const promise = resolveInputs(inputs({ org: {}, limit: {} }), {
+      parsed: { limit: 10 },
+      projectConfig: { organizationUid: 'org1' },
+      services: services(),
+      rules: [exactlyOneOf('org', 'limit')],
+    });
+
+    await expect(promise).rejects.toThrow('--org, --limit were supplied.');
+  });
+
+  it('counts a value the user answered at a prompt as supplied', async () => {
+    const promise = resolveInputs(inputs({ org: { required: true }, project: {} }), {
+      parsed: { org: 'org1' },
+      projectConfig: {},
+      services: services({ isTTY: true, answer: PROJECT_UID }),
+      rules: [exactlyOneOf('org', 'project')],
+    });
+
+    await expect(promise).rejects.toThrow('--org, --project were supplied.');
+  });
+
+  it('does not count a string that resolved to nothing as supplied', async () => {
+    const resolved = await resolveInputs(inputs({ org: {}, limit: {} }), {
+      parsed: { org: '   ', limit: 10 },
+      projectConfig: {},
+      services: services(),
+      rules: [exactlyOneOf('org', 'limit')],
+    });
+
+    expect(resolved).toEqual({ org: undefined, limit: 10 });
   });
 });
 
