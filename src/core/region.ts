@@ -18,11 +18,7 @@ export function resolveLaunchHubUrl(region: RegionLike | undefined): string {
     throw new UsageError('Region not configured. Please set the region with command $ csdx config:set:region');
   }
 
-  let host = cma.replace('api', 'launch-api');
-
-  if (host.startsWith('http')) {
-    host = host.split('//')[1];
-  }
+  let host = cma.replace('api', 'launch-api').replace(/^[a-z][a-z0-9+.-]*:\/\//i, '');
 
   if (host.startsWith('dev11')) {
     host = host.replace('dev11', 'dev');

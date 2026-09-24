@@ -38,6 +38,10 @@ describe('resolveLaunchHubUrl', () => {
     );
   });
 
+  it('derives the hub url from a cma host that merely begins with http rather than crashing on it', () => {
+    expect(resolveLaunchHubUrl({ cma: 'httpapi.example.test' })).toBe('https://httplaunch-api.example.test');
+  });
+
   it('rewrites a trailing io to com, because the launch hub is only served on the com domain', () => {
     expect(resolveLaunchHubUrl({ cma: 'eu-api.contentstack.io' })).toBe('https://eu-launch-api.contentstack.com');
   });
