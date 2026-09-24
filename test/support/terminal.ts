@@ -29,6 +29,8 @@ export async function onTerminal<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
+export const CTRL_C = Symbol('Ctrl-C');
+
 export interface AnsweredPrompts {
   messages: string[];
   payloads: Record<string, unknown>[];
@@ -45,6 +47,11 @@ export function answerPrompts(answers: Record<string, unknown>): AnsweredPrompts
 
     if (!(message in answers)) {
       throw new Error(`Unexpected prompt: ${message}`);
+    }
+
+    if (answers[message] === CTRL_C) {
+      setImmediate(() => process.emit('SIGINT'));
+      return new Promise<never>(() => undefined);
     }
 
     return answers[message] as never;

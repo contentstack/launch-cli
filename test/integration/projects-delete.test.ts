@@ -5,7 +5,7 @@ import { Config, Interfaces, Plugin } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
-import { pretendTerminal } from '../support/terminal';
+import { CTRL_C, answerPrompts, onTerminal, pretendTerminal } from '../support/terminal';
 
 import getFixture from '../fixtures/project-get.json';
 import listFixture from '../fixtures/projects-list.json';
@@ -177,6 +177,25 @@ describe('integration: launch:projects:delete on the wire', () => {
     } finally {
       restore();
     }
+  });
+
+  it('exits 3 as cancelled, not 130, and never sends the delete when Ctrl-C is pressed at the confirmation', async () => {
+    const lookup = nock(LAUNCH_HUB_URL).get(`/manage/projects/${PROJECT_UID}`).query({}).reply(200, getFixture);
+    const removal = nock(LAUNCH_HUB_URL, BODYLESS).delete(`/manage/projects/${PROJECT_UID}`).query({}).reply(204);
+    const question = `Delete project "sample-project" (${PROJECT_UID})? This cannot be undone.`;
+    const prompts = answerPrompts({ [question]: CTRL_C });
+
+    const { error } = await onTerminal(() =>
+      runCommand(['launch:projects:delete', '--org', ORG_UID, '--project', PROJECT_UID, '--data-dir', DATA_DIR], config),
+    );
+
+    expect(error?.oclif?.exit).toBe(3);
+    expect(error?.message).toBe('Cancelled. Nothing was changed.');
+    expect(prompts.messages).toEqual([question]);
+    expect(lookup.isDone()).toBe(true);
+    expect(removal.isDone()).toBe(false);
+    expect(onWire).toEqual([]);
+    expect(process.listenerCount('SIGINT')).toBe(0);
   });
 
   it('exits 2 naming a project that does not exist in the organization', async () => {

@@ -8,7 +8,7 @@ import { Config, Interfaces, Plugin } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
-import { answerPrompts, onTerminal } from '../support/terminal';
+import { CTRL_C, answerPrompts, onTerminal } from '../support/terminal';
 
 const LAUNCH_HUB_URL = 'https://launch-api.integration.test';
 const UPLOAD_HOST = 'https://uploads.integration.test';
@@ -433,6 +433,42 @@ describe('integration: launch:projects:create on the wire', () => {
       'Response mode',
     ]);
     expect(onWire).toEqual([]);
+  });
+
+  it('exits 3 as cancelled, not 130, and creates nothing when Ctrl-C is pressed at the last create prompt', async () => {
+    const prompts = answerPrompts({
+      'Project type': 'FileUpload',
+      'Choose an organization': ORG_UID,
+      'Project name': 'My Site',
+      'Environment name': 'Default',
+      'Framework preset': 'Gatsby',
+      'Build command': 'npm run build',
+      'Output directory': './public',
+      'Response mode': CTRL_C,
+    });
+    nock('https://cma.integration.test')
+      .get('/v3/organizations')
+      .query({ limit: '100', asc: 'name', include_count: 'true', skip: '0' })
+      .reply(200, { organizations: [{ uid: ORG_UID, name: 'Acme' }], count: 1 });
+    hub().get('/manage/projects/upload/signed_url').query({}).reply(200, azureSignedUpload());
+    nock(UPLOAD_HOST).put('/bucket').reply(201, '');
+    hub()
+      .get('/manage/projects/file-framework')
+      .query({ uploadUid: 'upload-uid' })
+      .reply(200, { framework: 'GATSBY' });
+    const create = hub()
+      .post('/manage/projects')
+      .query({})
+      .reply(201, { project: { ...CREATED_PROJECT, projectType: 'FILEUPLOAD' } });
+
+    const { error } = await onTerminal(() => runCommand(['launch:projects:create', '--data-dir', dataDir], config));
+
+    expect(error?.oclif?.exit).toBe(3);
+    expect(error?.message).toBe('Cancelled. Nothing was changed.');
+    expect(prompts.messages.at(-1)).toBe('Response mode');
+    expect(create.isDone()).toBe(false);
+    expect(onWire).toEqual([]);
+    expect(process.listenerCount('SIGINT')).toBe(0);
   });
 
   it('asks all eleven GitHub prompts in the pinned order and submits exactly what was answered', async () => {

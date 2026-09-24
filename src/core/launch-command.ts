@@ -11,6 +11,7 @@ import { catalog, FlagKey } from '../resources';
 import { AnyInputs, Resolved } from './inputs';
 import { resolveInputs } from './resolve';
 import { Rule } from './rules';
+import { cancelOnInterrupt } from './interruptible-ux';
 import { UxLike } from './render';
 import { registerSearchList } from './search-list';
 import { ServiceContext, buildServiceContext } from './service-context';
@@ -76,7 +77,7 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
   protected resolved!: Resolved<S>;
   protected dataDir!: string;
   protected configPath!: string;
-  protected ux: UxLike = cliux;
+  protected ux: UxLike = cancelOnInterrupt(cliux);
 
   protected get launchRegion(): RegionLike | undefined {
     return configHandler.get('region') as RegionLike | undefined;
