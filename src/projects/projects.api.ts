@@ -1,6 +1,6 @@
 import { MAX_PAGES } from '../core/constants';
 import { UsageError } from '../core/errors';
-import { LaunchApiError } from '../transport/errors';
+import { assertPage, isRecord, malformed, unwrap } from '../transport/envelope';
 import { RestApiClient, RestRequest } from '../transport/rest-client';
 import { PROJECT_ERROR_MESSAGES } from './project.errors';
 import {
@@ -17,14 +17,8 @@ export * from './types';
 
 export const PROJECT_SCAN_PAGE_SIZE = 100;
 
-const MALFORMED_CODE = 'launch.RESPONSE.MALFORMED';
-
-function malformed(message: string): LaunchApiError {
-  return new LaunchApiError(200, [{ code: MALFORMED_CODE, message }]);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+function isSignedUploadUrl(value: unknown): value is SignedUploadUrl {
+  return isRecord(value) && typeof value.uploadUrl === 'string' && typeof value.uploadUid === 'string';
 }
 
 export interface ListProjectsParams {
@@ -113,13 +107,7 @@ export class ProjectsApi {
       query: { limit: params.limit, skip: params.skip },
     });
 
-    if (!isRecord(response) || !Array.isArray(response.projects)) {
-      throw malformed('The Launch API returned a project list without a projects array.');
-    }
-
-    if (!isRecord(response.pagination)) {
-      throw malformed('The Launch API returned a project list without a pagination block.');
-    }
+    assertPage(response, 'projects', 'a project list');
 
     return response;
   }
@@ -159,11 +147,7 @@ export class ProjectsApi {
       projectUid: params.project,
     });
 
-    if (!isRecord(response) || !isRecord(response.project)) {
-      throw malformed('The Launch API returned a project response without a project.');
-    }
-
-    return response.project as Project;
+    return unwrap<Project>(response, 'project', 'a project response');
   }
 
   async update(params: UpdateProjectParams): Promise<Project> {
@@ -175,11 +159,7 @@ export class ProjectsApi {
       body: suppliedFields(params.update),
     });
 
-    if (!isRecord(response) || !isRecord(response.project)) {
-      throw malformed('The Launch API returned a project response without a project.');
-    }
-
-    return response.project as Project;
+    return unwrap<Project>(response, 'project', 'a project response');
   }
 
   async create(params: CreateProjectParams): Promise<Project> {
@@ -190,11 +170,7 @@ export class ProjectsApi {
       body: params.input,
     });
 
-    if (!isRecord(response) || !isRecord(response.project)) {
-      throw malformed('The Launch API returned a project response without a project.');
-    }
-
-    return response.project as Project;
+    return unwrap<Project>(response, 'project', 'a project response');
   }
 
   async signedUploadUrl(params: SignedUploadUrlParams): Promise<SignedUploadUrl> {
@@ -204,11 +180,11 @@ export class ProjectsApi {
       orgUid: params.org,
     });
 
-    if (!isRecord(response) || typeof response.uploadUrl !== 'string' || typeof response.uploadUid !== 'string') {
+    if (!isSignedUploadUrl(response)) {
       throw malformed('The Launch API returned an upload response without an upload URL and uid.');
     }
 
-    return response as unknown as SignedUploadUrl;
+    return response;
   }
 
   gitFramework(params: GitFrameworkParams): Promise<DetectedFramework> {

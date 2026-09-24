@@ -1,19 +1,9 @@
-import { LaunchApiError } from '../transport/errors';
+import { assertArray } from '../transport/envelope';
 import { RestApiClient, RestRequest } from '../transport/rest-client';
 import { GIT_ERROR_MESSAGES } from './git.errors';
 import { GitBranchesPage, GitNamespacesPage, GitRepositoriesPage } from './types';
 
 export * from './types';
-
-const MALFORMED_CODE = 'launch.RESPONSE.MALFORMED';
-
-function malformed(message: string): LaunchApiError {
-  return new LaunchApiError(200, [{ code: MALFORMED_CODE, message }]);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
 
 export interface GitPageParams {
   org: string;
@@ -46,9 +36,7 @@ export class GitApi {
   private async page<T>(req: RestRequest, key: string): Promise<T> {
     const response = await this.request<T>(req);
 
-    if (!isRecord(response) || !Array.isArray(response[key])) {
-      throw malformed(`The Launch API returned a ${key} response without a ${key} array.`);
-    }
+    assertArray(response, key, `a ${key} response`);
 
     return response;
   }

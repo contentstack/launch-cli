@@ -1,19 +1,9 @@
-import { LaunchApiError } from '../transport/errors';
+import { assertPage } from '../transport/envelope';
 import { RestApiClient, RestRequest } from '../transport/rest-client';
 import { ENVIRONMENT_ERROR_MESSAGES } from './environment.errors';
 import { Environment, EnvironmentsPage } from './types';
 
 export * from './types';
-
-const MALFORMED_CODE = 'launch.RESPONSE.MALFORMED';
-
-function malformed(message: string): LaunchApiError {
-  return new LaunchApiError(200, [{ code: MALFORMED_CODE, message }]);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
 
 export interface ListEnvironmentsParams {
   org: string;
@@ -38,13 +28,7 @@ export class EnvironmentsApi {
       query: { limit: params.limit, skip: params.skip },
     });
 
-    if (!isRecord(response) || !Array.isArray(response.environments)) {
-      throw malformed('The Launch API returned an environment list without an environments array.');
-    }
-
-    if (!isRecord(response.pagination)) {
-      throw malformed('The Launch API returned an environment list without a pagination block.');
-    }
+    assertPage(response, 'environments', 'an environment list');
 
     return response;
   }

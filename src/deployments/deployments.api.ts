@@ -1,19 +1,9 @@
-import { LaunchApiError } from '../transport/errors';
+import { assertPage, unwrap } from '../transport/envelope';
 import { RestApiClient, RestRequest } from '../transport/rest-client';
 import { DEPLOYMENT_ERROR_MESSAGES } from './deployment.errors';
 import { Deployment, DeploymentResponse, DeploymentsPage } from './types';
 
 export * from './types';
-
-const MALFORMED_CODE = 'launch.RESPONSE.MALFORMED';
-
-function malformed(message: string): LaunchApiError {
-  return new LaunchApiError(200, [{ code: MALFORMED_CODE, message }]);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
 
 export interface DeploymentScope {
   org: string;
@@ -50,13 +40,7 @@ export class DeploymentsApi {
       query: { limit: params.limit, skip: params.skip },
     });
 
-    if (!isRecord(response) || !Array.isArray(response.deployments)) {
-      throw malformed('The Launch API returned a deployment list without a deployments array.');
-    }
-
-    if (!isRecord(response.pagination)) {
-      throw malformed('The Launch API returned a deployment list without a pagination block.');
-    }
+    assertPage(response, 'deployments', 'a deployment list');
 
     return response;
   }
@@ -69,11 +53,7 @@ export class DeploymentsApi {
       projectUid: params.project,
     });
 
-    if (!isRecord(response) || !isRecord(response.deployment)) {
-      throw malformed('The Launch API returned a deployment response without a deployment.');
-    }
-
-    return response.deployment as Deployment;
+    return unwrap<Deployment>(response, 'deployment', 'a deployment response');
   }
 
   async latest(params: DeploymentScope): Promise<Deployment | undefined> {
