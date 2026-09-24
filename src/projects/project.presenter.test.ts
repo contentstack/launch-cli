@@ -1,3 +1,4 @@
+import type { Project } from './types';
 import {
   deploymentFailureMessage,
   projectCreatedFields,
@@ -7,9 +8,15 @@ import {
 } from './project.presenter';
 
 describe('projectDeleteQuestion', () => {
-  it('names the project it is about to delete and says the change is permanent', () => {
-    expect(projectDeleteQuestion('a1b2c3d4e5f60718293a4b5c')).toBe(
-      'Delete project "a1b2c3d4e5f60718293a4b5c"? This cannot be undone.',
+  it('names the project by its name and the resolved uid and says the change is permanent', () => {
+    expect(projectDeleteQuestion({ name: 'marketing-site' } as Project, 'a1b2c3d4e5f60718293a4b5c')).toBe(
+      'Delete project "marketing-site" (a1b2c3d4e5f60718293a4b5c)? This cannot be undone.',
+    );
+  });
+
+  it.each([[undefined], ['']])('falls back to the reference given when the name is %p', (name) => {
+    expect(projectDeleteQuestion({ uid: 'p1', name: name as string }, 'p1')).toBe(
+      'Delete project "p1"? This cannot be undone.',
     );
   });
 });

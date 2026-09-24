@@ -19,9 +19,9 @@ export default class ProjectsDelete extends LaunchCommand<typeof deleteInputs> {
   async run(): Promise<void> {
     const { org, project } = this.resolved;
 
-    await this.confirm(projectDeleteQuestion(project));
-
     const found = await this.services.api.projects.get({ org, project });
+
+    await this.confirm(projectDeleteQuestion(found, project));
 
     await this.services.api.projects.delete({ org, project });
 

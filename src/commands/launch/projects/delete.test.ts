@@ -66,7 +66,7 @@ function commandUnderTest(harness: Harness) {
 }
 
 describe('launch:projects:delete', () => {
-  it('confirms, deletes the resolved project and reports it by name', async () => {
+  it('fetches the project, confirms naming it, deletes it and reports it by name', async () => {
     const { command, lines, inquired, calls, got, deleted } = commandUnderTest({ answer: true });
 
     await command.run();
@@ -75,7 +75,7 @@ describe('launch:projects:delete', () => {
       {
         type: 'confirm',
         name: 'confirm',
-        message: `Delete project "${PROJECT_UID}"? This cannot be undone.`,
+        message: `Delete project "sample-project" (${PROJECT_UID})? This cannot be undone.`,
         default: false,
       },
     ]);
@@ -95,31 +95,44 @@ describe('launch:projects:delete', () => {
     expect(lines).toEqual(['✔ Project "sample-project" deleted.']);
   });
 
-  it('exits 3 without touching the API when the user declines', async () => {
-    const { command, lines, calls } = commandUnderTest({ answer: false });
+  it('exits 3 without sending the delete when the user declines', async () => {
+    const { command, lines, calls, deleted } = commandUnderTest({ answer: false });
 
     const error = (await command.run().catch((thrown: unknown) => thrown)) as CancelledError;
 
     expect(error).toBeInstanceOf(CancelledError);
     expect(error.exitCode).toBe(3);
     expect(error.message).toBe('Cancelled. Nothing was changed.');
-    expect(calls).toEqual([]);
+    expect(calls).toEqual(['get']);
+    expect(deleted).toEqual([]);
     expect(lines).toEqual([]);
   });
 
-  it('exits 2 naming --yes without touching the API when there is no terminal to prompt on', async () => {
-    const { command, lines, inquired, calls } = commandUnderTest({ isTTY: false });
+  it('exits 2 naming the project and --yes without sending the delete when there is no terminal', async () => {
+    const { command, lines, inquired, calls, deleted } = commandUnderTest({ isTTY: false });
 
     const error = (await command.run().catch((thrown: unknown) => thrown)) as UsageError;
 
     expect(error).toBeInstanceOf(UsageError);
     expect(error.exitCode).toBe(2);
     expect(error.message).toBe(
-      `Delete project "${PROJECT_UID}"? This cannot be undone. Pass --yes to confirm without an interactive terminal.`,
+      `Delete project "sample-project" (${PROJECT_UID})? This cannot be undone. ` +
+        'Pass --yes to confirm without an interactive terminal.',
     );
     expect(inquired).toEqual([]);
-    expect(calls).toEqual([]);
+    expect(calls).toEqual(['get']);
+    expect(deleted).toEqual([]);
     expect(lines).toEqual([]);
+  });
+
+  it('names the project by the resolved reference in the question when the API returned no name', async () => {
+    const { command, inquired } = commandUnderTest({ answer: true, project: { uid: PROJECT_UID } });
+
+    await command.run();
+
+    expect((inquired[0] as { message: string }).message).toBe(
+      `Delete project "${PROJECT_UID}"? This cannot be undone.`,
+    );
   });
 
   it('falls back to the resolved reference when the deleted project carried no name', async () => {
@@ -130,13 +143,14 @@ describe('launch:projects:delete', () => {
     expect(lines).toEqual([`✔ Project "${PROJECT_UID}" deleted.`]);
   });
 
-  it('propagates a failure from the lookup without deleting anything', async () => {
+  it('propagates a failure from the lookup without asking or deleting anything', async () => {
     const failure = new Error('lookup exploded');
-    const { command, lines, calls } = commandUnderTest({ yes: true, getFails: failure });
+    const { command, lines, calls, inquired } = commandUnderTest({ answer: true, getFails: failure });
 
     await expect(command.run()).rejects.toBe(failure);
 
     expect(calls).toEqual(['get']);
+    expect(inquired).toEqual([]);
     expect(lines).toEqual([]);
   });
 

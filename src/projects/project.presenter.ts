@@ -17,8 +17,10 @@ export function projectDetailFields(project: Project): [string, string][] {
   ];
 }
 
-export function projectDeleteQuestion(reference: string): string {
-  return `Delete project "${reference}"? This cannot be undone.`;
+export function projectDeleteQuestion(project: Project, reference: string): string {
+  const named = project.name ? `"${project.name}" (${reference})` : `"${reference}"`;
+
+  return `Delete project ${named}? This cannot be undone.`;
 }
 
 export function projectDeletedLine(project: Project, reference: string): string {
