@@ -47,6 +47,7 @@ function advancingTiming(): WatchTiming {
 
 interface Scenario {
   isTTY?: boolean;
+  outputIsTTY?: boolean;
   answers?: unknown[];
   statuses?: string[];
   environments?: unknown[];
@@ -202,7 +203,7 @@ function harness(scenario: Scenario = {}) {
     },
   } as unknown as ApiSurface;
 
-  const services: ServiceContext = { api, ux, isTTY: scenario.isTTY ?? false };
+  const services: ServiceContext = { api, ux, isTTY: scenario.isTTY ?? false, outputIsTTY: scenario.outputIsTTY };
 
   return {
     creator: new ProjectCreator(services, advancingTiming()),
@@ -733,6 +734,31 @@ describe('ProjectCreator waiting on the first deployment', () => {
       '→ Deployment #1 is DEPLOYING',
       '✔ Deployment #1 is LIVE',
     ]);
+  });
+
+  it('draws no heartbeat when the output is redirected, even though the prompts could reach a terminal', async () => {
+    const { creator, printed } = harness({ isTTY: true, outputIsTTY: false, statuses: ['QUEUED', 'QUEUED', 'LIVE'] });
+
+    await creator.create(gitRequest());
+
+    expect(printed.slice(0, 2)).toEqual(['→ Deployment #1 is QUEUED', '✔ Deployment #1 is LIVE']);
+    expect(printed.join('\n')).not.toContain('still');
+  });
+
+  it('draws the heartbeat when the output goes to a terminal, even though stdin is not one', async () => {
+    const { creator, printed } = harness({ isTTY: false, outputIsTTY: true, statuses: ['QUEUED', 'QUEUED', 'LIVE'] });
+
+    await creator.create(gitRequest());
+
+    expect(printed.slice(0, 3)).toEqual(['→ Deployment #1 is QUEUED', '  … still QUEUED', '✔ Deployment #1 is LIVE']);
+  });
+
+  it('draws no heartbeat when the service context does not say where the output goes', async () => {
+    const { creator, printed } = harness({ statuses: ['QUEUED', 'QUEUED', 'LIVE'] });
+
+    await creator.create(gitRequest());
+
+    expect(printed.slice(0, 2)).toEqual(['→ Deployment #1 is QUEUED', '✔ Deployment #1 is LIVE']);
   });
 
   it('treats DEPLOYED as a success as well as LIVE', async () => {

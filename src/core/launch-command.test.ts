@@ -14,7 +14,7 @@ import { UxLike } from './render';
 import { LaunchCommand, resolveLaunchContext } from './launch-command';
 import * as serviceContext from './service-context';
 import { SearchListClass, utilitiesLoader } from './search-list';
-import { pretendTerminal, stdinReportingTTY } from '../../test/support/terminal';
+import { pretendTerminal, stdinReportingTTY, stdoutReportingTTY } from '../../test/support/terminal';
 
 class Probe extends LaunchCommand {
   static flags = {};
@@ -441,6 +441,37 @@ describe('LaunchCommand.init terminal detection', () => {
     authSpy.mockRestore();
     restoreTTY();
   });
+
+  it.each([
+    [true, false],
+    [false, true],
+    [true, undefined],
+  ])(
+    'takes whether output reaches a terminal from stdout, not stdin (stdin %p, stdout %p)',
+    async (stdin, stdout) => {
+      const instance = probe();
+      const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
+      const restoreStdin = stdinReportingTTY(stdin);
+      const restoreStdout = stdoutReportingTTY(stdout);
+      Object.defineProperty(instance, 'launchRegion', {
+        value: { launchHubUrl: 'https://launch-api.test' },
+        configurable: true,
+      });
+      Object.defineProperty(instance, 'config', { value: { userAgent: 'cli/2.0.0' }, configurable: true });
+      (instance as unknown as { parse: jest.Mock }).parse = jest.fn().mockResolvedValue({ flags: {} });
+
+      try {
+        await instance.init();
+      } finally {
+        restoreStdout();
+        restoreStdin();
+        authSpy.mockRestore();
+      }
+
+      expect(instance['services'].isTTY).toBe(stdin);
+      expect(instance['services'].outputIsTTY).toBe(stdout === true);
+    },
+  );
 
   it('sends the oclif user agent, the query and the body on the requests the context makes', async () => {
     const instance = probe();

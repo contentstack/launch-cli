@@ -11,12 +11,14 @@ export interface ServiceContextOptions {
   analyticsInfo: string;
   ux: UxLike;
   isTTY: boolean;
+  outputIsTTY?: boolean;
 }
 
 export interface ServiceContext {
   api: ApiSurface;
   ux: UxLike;
   isTTY: boolean;
+  outputIsTTY?: boolean;
 }
 
 export function buildServiceContext(options: ServiceContextOptions): ServiceContext {
@@ -28,5 +30,10 @@ export function buildServiceContext(options: ServiceContextOptions): ServiceCont
 
   const cma = createCmaSession({ cma: options.cma, analyticsInfo: options.analyticsInfo });
 
-  return { api: buildApi(client, cma), ux: options.ux, isTTY: options.isTTY };
+  return {
+    api: buildApi(client, cma),
+    ux: options.ux,
+    isTTY: options.isTTY,
+    outputIsTTY: options.outputIsTTY === true,
+  };
 }

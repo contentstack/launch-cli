@@ -20,7 +20,7 @@ export interface WatchTiming {
 export interface DeploymentWatchDeps extends WatchTiming {
   poll(): Promise<Deployment>;
   ux: UxLike;
-  isTTY: boolean;
+  outputIsTTY: boolean;
 }
 
 export type DeploymentOutcomeKind = 'success' | 'failure' | 'timed-out';
@@ -71,7 +71,7 @@ export async function watchDeployment(deps: DeploymentWatchDeps): Promise<Deploy
     const kind = classifyStatus(deployment.status);
 
     if (status === reported) {
-      if (deps.isTTY) {
+      if (deps.outputIsTTY) {
         deps.ux.print(deploymentHeartbeatLine(status));
       }
     } else {

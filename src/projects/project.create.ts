@@ -229,7 +229,7 @@ export class ProjectCreator {
       watchDeployment({
         ...this.timing,
         ux: this.services.ux,
-        isTTY: this.services.isTTY,
+        outputIsTTY: this.services.outputIsTTY === true,
         poll: () =>
           this.services.api.deployments.get({
             org,

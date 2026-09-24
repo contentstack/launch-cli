@@ -73,6 +73,26 @@ describe('buildServiceContext', () => {
     configSpy.mockRestore();
   });
 
+  it.each([
+    [true, true],
+    [false, false],
+    [undefined, false],
+  ])('carries outputIsTTY %p through as %p, separately from isTTY', (outputIsTTY, expected) => {
+    const configSpy = basicSession();
+
+    const built = buildServiceContext({
+      launchHubUrl: 'https://launch-api.test',
+      analyticsInfo: 'cli/2.0.0',
+      ux: UX,
+      isTTY: !expected,
+      outputIsTTY,
+    });
+
+    expect(built.outputIsTTY).toBe(expected);
+    expect(built.isTTY).toBe(!expected);
+    configSpy.mockRestore();
+  });
+
   it('carries isTTY: false through unchanged', () => {
     const configSpy = basicSession();
 

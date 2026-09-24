@@ -25,6 +25,7 @@ export interface ResolveLaunchContextArgs<S extends AnyInputs> {
   analyticsInfo: string;
   ux: UxLike;
   isTTY: boolean;
+  outputIsTTY?: boolean;
 }
 
 export interface ResolveLaunchContextResult<S extends AnyInputs> {
@@ -47,6 +48,7 @@ export async function resolveLaunchContext<S extends AnyInputs>(
     analyticsInfo: args.analyticsInfo,
     ux: args.ux,
     isTTY: args.isTTY,
+    outputIsTTY: args.outputIsTTY,
   });
 
   const resolved = await resolveInputs(args.inputs, {
@@ -105,6 +107,7 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
       analyticsInfo: this.config.userAgent,
       ux: this.ux,
       isTTY: Boolean(process.stdin.isTTY),
+      outputIsTTY: Boolean(process.stdout.isTTY),
     });
 
     this.services = services;

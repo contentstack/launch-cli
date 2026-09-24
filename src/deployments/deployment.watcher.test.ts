@@ -13,7 +13,7 @@ import { Deployment } from './types';
 
 const UID = randomBytes(12).toString('hex');
 
-function harness(statuses: (string | undefined)[], options: { isTTY?: boolean; timeoutMs?: number } = {}) {
+function harness(statuses: (string | undefined)[], options: { outputIsTTY?: boolean; timeoutMs?: number } = {}) {
   const lines: string[] = [];
   const slept: number[] = [];
   let clock = 0;
@@ -33,7 +33,7 @@ function harness(statuses: (string | undefined)[], options: { isTTY?: boolean; t
       return { uid: UID, deploymentNumber: 4, status: statuses[index], deploymentUrl: 'site.example.test' };
     },
     ux,
-    isTTY: options.isTTY ?? false,
+    outputIsTTY: options.outputIsTTY ?? false,
     sleep: async (ms: number) => {
       slept.push(ms);
       clock += ms;
@@ -72,7 +72,7 @@ function failingHarness(outcomes: (string | Error)[], options: { timeoutMs?: num
       return { uid: UID, deploymentNumber: 4, status: step, deploymentUrl: 'site.example.test' };
     },
     ux,
-    isTTY: false,
+    outputIsTTY: false,
     sleep: async (ms: number) => {
       slept.push(ms);
       clock += ms;
@@ -285,7 +285,7 @@ describe('deployment wait loop', () => {
   });
 
   it('adds a heartbeat line on a terminal and keeps escape codes out of it', async () => {
-    const { deps, lines } = harness(['DEPLOYING', 'DEPLOYING', 'LIVE'], { isTTY: true });
+    const { deps, lines } = harness(['DEPLOYING', 'DEPLOYING', 'LIVE'], { outputIsTTY: true });
 
     await watchDeployment(deps);
 

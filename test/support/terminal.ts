@@ -1,18 +1,26 @@
 import { cliux } from '@contentstack/cli-utilities';
 
-export function stdinReportingTTY(isTTY: boolean | undefined): () => void {
-  const descriptor = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
+function streamReportingTTY(stream: NodeJS.ReadStream | NodeJS.WriteStream, isTTY: boolean | undefined): () => void {
+  const descriptor = Object.getOwnPropertyDescriptor(stream, 'isTTY');
 
-  Object.defineProperty(process.stdin, 'isTTY', { value: isTTY, configurable: true, writable: true });
+  Object.defineProperty(stream, 'isTTY', { value: isTTY, configurable: true, writable: true });
 
   return () => {
     if (descriptor === undefined) {
-      delete (process.stdin as unknown as { isTTY?: boolean }).isTTY;
+      delete (stream as unknown as { isTTY?: boolean }).isTTY;
       return;
     }
 
-    Object.defineProperty(process.stdin, 'isTTY', descriptor);
+    Object.defineProperty(stream, 'isTTY', descriptor);
   };
+}
+
+export function stdinReportingTTY(isTTY: boolean | undefined): () => void {
+  return streamReportingTTY(process.stdin, isTTY);
+}
+
+export function stdoutReportingTTY(isTTY: boolean | undefined): () => void {
+  return streamReportingTTY(process.stdout, isTTY);
 }
 
 export function pretendTerminal(): () => void {
