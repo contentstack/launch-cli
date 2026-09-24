@@ -131,16 +131,21 @@ function gitFlags(): string[] {
   ];
 }
 
+const MY_REPO = {
+  id: '24567',
+  name: 'my-repo',
+  fullName: 'my-org/my-repo',
+  url: 'https://github.com/my-org/my-repo',
+  defaultBranch: 'main',
+  updatedAt: '2026-06-20T10:00:00.000Z',
+  isPrivate: false,
+};
+
 function stubGitLookups(): void {
   hub()
     .get('/manage/git-repositories')
-    .query({ provider: 'GitHub', namespace: 'my-org', search: 'my-org/my-repo', limit: 100, skip: 0 })
-    .reply(200, {
-      pagination: { count: 1, limit: 100, skip: null },
-      repositories: [
-        { fullName: 'my-org/my-repo', url: 'https://github.com/my-org/my-repo', defaultBranch: 'main' },
-      ],
-    });
+    .query({ provider: 'GitHub', namespace: 'my-org', search: 'my-repo', limit: 100, skip: 0 })
+    .reply(200, { pagination: { count: 1, limit: 100, skip: null }, repositories: [MY_REPO] });
 
   hub()
     .get('/manage/projects/framework')
@@ -246,6 +251,47 @@ describe('integration: launch:projects:create on the wire', () => {
     expect(stdout).toContain('type  GITPROVIDER');
     expect(stdout).toContain('url   https://my-site.example.test');
     expect(stdout).not.toContain('test-authtoken');
+    expect(onWire).toEqual([]);
+  });
+
+  it('finds the repository from the bare name as well as from <namespace>/<repository>', async () => {
+    let body: unknown;
+    stubGitLookups();
+    const create = hub()
+      .post('/manage/projects', (sent: unknown) => {
+        body = sent;
+        return true;
+      })
+      .query({})
+      .reply(201, { project: CREATED_PROJECT });
+    stubFollowUp('LIVE');
+    const args = gitFlags();
+    args[args.indexOf('my-org/my-repo')] = 'my-repo';
+
+    const { error } = await runCommand(args, config);
+
+    expect(error).toBeUndefined();
+    expect(create.isDone()).toBe(true);
+    expect(body).toMatchObject({
+      repository: { repositoryName: 'my-org/my-repo', repositoryUrl: 'https://github.com/my-org/my-repo' },
+    });
+    expect(onWire).toEqual([]);
+  });
+
+  it('exits 2 naming the repository when <namespace>/<repository> names a namespace other than --namespace', async () => {
+    hub()
+      .get('/manage/git-repositories')
+      .query({ provider: 'GitHub', namespace: 'my-org', search: 'my-repo', limit: 100, skip: 0 })
+      .reply(200, { pagination: { count: 1, limit: 100, skip: null }, repositories: [MY_REPO] });
+    const create = hub().post('/manage/projects').query({}).reply(201, { project: CREATED_PROJECT });
+    const args = gitFlags();
+    args[args.indexOf('my-org/my-repo')] = 'other-org/my-repo';
+
+    const { error } = await runCommand(args, config);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe('No repository named "other-org/my-repo" was found under "my-org".');
+    expect(create.isDone()).toBe(false);
     expect(onWire).toEqual([]);
   });
 
@@ -497,12 +543,7 @@ describe('integration: launch:projects:create on the wire', () => {
     const repositories = hub()
       .get('/manage/git-repositories')
       .query({ provider: 'GitHub', namespace: 'my-org', limit: 100, skip: 0 })
-      .reply(200, {
-        pagination: { count: 1, limit: 100, skip: null },
-        repositories: [
-          { fullName: 'my-org/my-repo', url: 'https://github.com/my-org/my-repo', defaultBranch: 'main' },
-        ],
-      });
+      .reply(200, { pagination: { count: 1, limit: 100, skip: null }, repositories: [MY_REPO] });
     const branches = hub()
       .get('/manage/git-branches')
       .query({ provider: 'GitHub', repoName: 'my-org/my-repo', namespace: 'my-org', limit: 100, skip: 0 })

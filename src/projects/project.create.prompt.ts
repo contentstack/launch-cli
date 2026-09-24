@@ -49,6 +49,10 @@ export function repositoryLabel(repository: GitRepository): string {
   return repository.fullName || repository.name || '';
 }
 
+export function repositorySearchTerm(wanted: string): string {
+  return wanted.slice(wanted.lastIndexOf('/') + 1);
+}
+
 export function findRepository(repositories: GitRepository[], wanted: string): GitRepository | undefined {
   return repositories.find((repository) => repositoryLabel(repository) === wanted || repository.name === wanted);
 }

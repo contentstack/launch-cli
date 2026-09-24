@@ -181,7 +181,14 @@ function harness(scenario: Scenario = {}) {
         return {
           pagination: { count: 1, limit: 100 },
           repositories: scenario.repositories ?? [
-            { fullName: 'my-org/my-repo', url: 'https://github.com/my-org/my-repo', defaultBranch: 'main' },
+            {
+              id: '24567',
+              name: 'my-repo',
+              fullName: 'my-org/my-repo',
+              url: 'https://github.com/my-org/my-repo',
+              defaultBranch: 'main',
+              isPrivate: false,
+            },
           ],
         };
       },
@@ -378,6 +385,25 @@ describe('ProjectCreator on the GitHub path', () => {
       'No repository named "my-org/missing" was found under "my-org".',
     );
   });
+
+  it.each([['my-org/my-repo'], ['my-repo']])(
+    'searches the namespace by the repository name alone when --repo is %p, as the Git provider matches bare names',
+    async (repo) => {
+      const { creator, gitCalls, created } = harness();
+
+      await creator.create(gitRequest({ repo }));
+
+      expect(gitCalls[0]).toEqual({
+        org: ORG,
+        provider: 'GitHub',
+        namespace: 'my-org',
+        search: 'my-repo',
+        limit: 100,
+        skip: 0,
+      });
+      expect((bodyOf(created).repository as Record<string, string>).repositoryName).toBe('my-org/my-repo');
+    },
+  );
 
   it('accepts a --repo given as the bare repository name', async () => {
     const { creator, created } = harness({ repositories: [{ name: 'my-repo', url: 'https://github.com/x/my-repo' }] });

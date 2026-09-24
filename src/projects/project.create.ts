@@ -26,6 +26,7 @@ import {
   askText,
   findRepository,
   repositoryLabel,
+  repositorySearchTerm,
 } from './project.create.prompt';
 import { deploymentFailureMessage, projectCreatedFields } from './project.presenter';
 import { PROJECT_TYPE_BY_CHOICE, ProjectTypeChoice, askProjectType, projectTypeChoiceOf } from './project.inputs';
@@ -323,7 +324,7 @@ export class ProjectCreator {
       org: request.org,
       provider: GIT_PROVIDER_GITHUB,
       namespace,
-      search: request.repo,
+      search: repositorySearchTerm(request.repo),
       limit: 100,
       skip: 0,
     });

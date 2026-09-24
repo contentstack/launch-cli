@@ -214,7 +214,7 @@ FLAGS
       --namespace=<value>    Git namespace — the user or organization the repository belongs to
       --org=<value>          Organization UID
       --output-dir=<value>   Output directory
-      --repo=<value>         Repository name, as <namespace>/<repository>
+      --repo=<value>         Repository, as <namespace>/<repository> or the bare repository name
       --res-mode=<value>     Response mode (buffered | streaming)
       --server-cmd=<value>   Server command
       --type=<value>         Project type (GitHub | FileUpload)
