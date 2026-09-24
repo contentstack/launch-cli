@@ -77,6 +77,17 @@ describe('project archive', () => {
     expect(namesIn(archived.buffer)).toHaveLength(250);
   });
 
+  it('leaves out a file it was told to exclude, however its path was spelled, and nothing else of that name', () => {
+    file('launch.json', '{"uid":"p1"}');
+    file('nested/launch.json');
+    file('index.html');
+
+    const archive = archiveDirectory(root, [join(root, 'nested', '..', 'launch.json')]);
+
+    expect(archive.entries).toEqual(['index.html', 'nested/launch.json']);
+    expect(namesIn(archive.buffer)).toEqual(['index.html', 'nested/launch.json']);
+  });
+
   it('skips a symbolic link rather than following it into a loop', () => {
     file('index.html');
     symlinkSync(root, join(root, 'self'));

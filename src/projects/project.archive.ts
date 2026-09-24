@@ -1,6 +1,6 @@
 import AdmZip from 'adm-zip';
 import { lstatSync, readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 
 import { UsageError } from '../core/errors';
 
@@ -47,7 +47,7 @@ function readable<T>(relative: string, read: () => T): T {
   }
 }
 
-function collect(root: string, prefix: string, found: string[]): void {
+function collect(root: string, prefix: string, found: string[], skipped: readonly string[]): void {
   const listing = readable(prefix === '' ? '.' : prefix, () => readdirSync(join(root, prefix)));
 
   for (const entry of listing) {
@@ -56,10 +56,15 @@ function collect(root: string, prefix: string, found: string[]): void {
     }
 
     const relative = prefix === '' ? entry : `${prefix}/${entry}`;
+
+    if (skipped.includes(resolve(root, relative))) {
+      continue;
+    }
+
     const stats = readable(relative, () => lstatSync(join(root, relative)));
 
     if (stats.isDirectory()) {
-      collect(root, relative, found);
+      collect(root, relative, found, skipped);
       continue;
     }
 
@@ -69,7 +74,7 @@ function collect(root: string, prefix: string, found: string[]): void {
   }
 }
 
-export function archiveDirectory(root: string): ArchivedDirectory {
+export function archiveDirectory(root: string, excludedFiles: readonly string[] = []): ArchivedDirectory {
   const stats = directoryStats(root);
 
   if (stats === undefined || !stats.isDirectory()) {
@@ -79,7 +84,12 @@ export function archiveDirectory(root: string): ArchivedDirectory {
   }
 
   const entries: string[] = [];
-  collect(root, '', entries);
+  collect(
+    root,
+    '',
+    entries,
+    excludedFiles.map((path) => resolve(path)),
+  );
 
   if (entries.length === 0) {
     throw new UsageError(
@@ -87,8 +97,6 @@ export function archiveDirectory(root: string): ArchivedDirectory {
         'Pass --data-dir with the folder you want to upload.',
     );
   }
-
-  entries.sort();
 
   const zip = new AdmZip();
 

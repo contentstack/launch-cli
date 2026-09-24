@@ -337,7 +337,7 @@ export class ProjectCreator {
   }
 
   private async selectUploadSource(request: CreateRequest): Promise<SourceSelection> {
-    const archive = archiveDirectory(request.dataDir);
+    const archive = archiveDirectory(request.dataDir, request.configPath === undefined ? [] : [request.configPath]);
     const signed = await this.services.api.projects.signedUploadUrl({ org: request.org });
 
     this.services.ux.print(`Uploading ${archive.entries.length} files from ${request.dataDir}`);

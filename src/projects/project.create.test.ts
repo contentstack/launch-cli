@@ -589,6 +589,16 @@ describe('ProjectCreator on the FileUpload path', () => {
     expect(printed[0]).toBe(`Uploading 1 files from ${dataDir}`);
   });
 
+  it('leaves a --config file that lives inside the data dir out of the upload', async () => {
+    const configPath = join(dataDir, 'launch.json');
+    writeFileSync(configPath, JSON.stringify({ project: { uid: 'p0', organizationUid: ORG } }));
+    const { creator, printed } = harness({ createdProject: { uid: 'p0', name: 'My Site' } });
+
+    await creator.create(uploadRequest({ configPath }));
+
+    expect(printed[0]).toBe(`Uploading 1 files from ${dataDir}`);
+  });
+
   it('creates the project with no server command when the optional prompt is left empty', async () => {
     for (const answer of ['', '   ', undefined, null]) {
       (uploadArchive as jest.Mock).mockClear();
