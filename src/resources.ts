@@ -18,9 +18,9 @@ export type Catalog = typeof catalog;
 export type FlagKey = keyof Catalog;
 
 export const resolution = {
+  ...projectResolution,
   ...organizationResolution,
   ...globalResolution,
-  ...projectResolution,
   ...environmentResolution,
   ...gitResolution,
 };

@@ -1,9 +1,11 @@
 import { Flags } from '@contentstack/cli-utilities';
 
+import type { UxLike } from '../core/render';
 import type { ResolutionSpec } from '../core/resolution';
 import { oneOf, withinLength } from '../core/values';
 import { ProjectRef } from './project-ref';
 import type { ProjectType } from './types';
+import { askChoice } from './project.create.prompt';
 import { promptForProject } from './project.prompt';
 import { ProjectResolver } from './project.resolver';
 
@@ -21,6 +23,14 @@ export const PROJECT_TYPE_BY_CHOICE: Record<ProjectTypeChoice, ProjectType> = {
 
 export function projectTypeChoiceOf(value: string): ProjectTypeChoice {
   return oneOf('type', value, PROJECT_TYPE_CHOICES);
+}
+
+export function askProjectType(ux: UxLike): Promise<string> {
+  return askChoice(
+    ux,
+    'Project type',
+    PROJECT_TYPE_CHOICES.map((value) => ({ name: value, value })),
+  );
 }
 
 export const projectFlags = {
@@ -52,6 +62,7 @@ export const projectResolution = {
     normalize: (value) => withinLength('description', value, PROJECT_DESCRIPTION_MAX_LENGTH),
   } satisfies ResolutionSpec<string>,
   type: {
+    prompt: ({ services }) => askProjectType(services.ux),
     normalize: async (value) => projectTypeChoiceOf(value) as string,
   } satisfies ResolutionSpec<string>,
 };

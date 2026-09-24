@@ -172,8 +172,11 @@ above it.
 
 A resolution entry declares what it needs resolved before it: the project spec carries
 `dependsOn: PROJECT_DEPENDENCIES.project` (`['org']`) because its `prompt` and `normalize`
-read `resolved.org`. `resolveInputs` resolves in dependency order, not in the order the
-`resolution` literal happens to be written, so reordering that file changes nothing.
+read `resolved.org`. `resolveInputs` resolves in dependency order, and between inputs with no dependency on each other,
+in the order the `resolution` literal is written. That second rule is load-bearing in exactly one
+place: `projectResolution` is spread before `organizationResolution`, so `projects:create` asks the
+project type before the organization, as the pinned interactive order requires.
+`test/integration/projects-create.test.ts` pins that order on the wire.
 Declaring a dependency is the whole contract: a command that puts `project` in its
 `inputs` without `org` is a **compile error** at the `inputs(...)` call (`Property 'org'
 is missing`), and a spec that reaches `resolveInputs` cast past that check throws an
@@ -378,9 +381,11 @@ and nothing more.
 
 Interactive order is pinned by a test against the order a real `csdx launch` run prompts in: type ->
 organization -> project name -> environment name -> (GitHub only: namespace -> repository -> branch)
--> framework -> build command -> output directory -> response mode. Those prompts are **not**
-resolution-spec prompts, because which of them run depends on `--type`, and the resolution engine has
-no conditional dependency. What the specs do own is `normalize`, so a value from config is validated
+-> framework -> build command -> output directory -> response mode. Type and organization are
+resolution-spec prompts, because both are always asked and every command that declares `org` needs
+its picker. The rest are **not**, because which of them run depends on `--type`, and the resolution
+engine has no conditional dependency. Build command and server command are optional: an empty answer
+at either means none, and the field is left out of the body. What the specs do own is `normalize`, so a value from config is validated
 exactly like one from argv.
 
 The framework gate is the declarative rule `onlyWithValueOf('server-cmd', 'framework', ...)`,

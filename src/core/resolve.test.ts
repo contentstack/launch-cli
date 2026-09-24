@@ -568,7 +568,7 @@ describe('resolveInputs dependency ordering', () => {
     );
 
     await expect(promise).rejects.toBeInstanceOf(InputDependencyError);
-    await expect(promise).rejects.toThrow('--org -> --project -> --org is a dependency cycle.');
+    await expect(promise).rejects.toThrow('--project -> --org -> --project is a dependency cycle.');
   });
 
   it('refuses to normalise a value whose declared dependency resolved to nothing', async () => {

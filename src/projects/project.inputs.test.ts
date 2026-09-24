@@ -1,9 +1,12 @@
 import { UsageError } from '../core/errors';
+import type { UxLike } from '../core/render';
+import type { ApiSurface } from '../resources';
 import {
   PROJECT_DESCRIPTION_MAX_LENGTH,
   PROJECT_NAME_MAX_LENGTH,
   PROJECT_TYPE_BY_CHOICE,
   PROJECT_TYPE_CHOICES,
+  askProjectType,
   projectFlags,
   projectResolution,
   projectTypeChoiceOf,
@@ -97,5 +100,46 @@ describe('the --type flag', () => {
     await expect(spec.normalize('fileupload', { services: {}, resolved: {}, source: 'config' })).resolves.toBe(
       'FileUpload',
     );
+  });
+
+  it('asks for the project type as a choice of the two doc values and returns the one picked', async () => {
+    const asked: unknown[] = [];
+    const ux: UxLike = {
+      print: () => undefined,
+      inquire: async (payload: unknown) => {
+        asked.push(payload);
+        return 'FileUpload' as never;
+      },
+    };
+
+    await expect(askProjectType(ux)).resolves.toBe('FileUpload');
+    expect(asked).toEqual([
+      {
+        type: 'search-list',
+        name: 'value',
+        message: 'Project type',
+        choices: [
+          { name: 'GitHub', value: 'GitHub' },
+          { name: 'FileUpload', value: 'FileUpload' },
+        ],
+        default: undefined,
+      },
+    ]);
+  });
+
+  it('prompts for the project type through the resolution chain with the command services', async () => {
+    const asked: unknown[] = [];
+    const ux: UxLike = {
+      print: () => undefined,
+      inquire: async (payload: unknown) => {
+        asked.push((payload as { message: string }).message);
+        return 'GitHub' as never;
+      },
+    };
+
+    await expect(
+      projectResolution.type.prompt({ services: { api: {} as ApiSurface, ux, isTTY: true }, resolved: {} }),
+    ).resolves.toBe('GitHub');
+    expect(asked).toEqual(['Project type']);
   });
 });

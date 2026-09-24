@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { authHandler, configHandler } from '@contentstack/cli-utilities';
+import { authHandler, cliux, configHandler } from '@contentstack/cli-utilities';
 import { Config, Interfaces, Plugin } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
@@ -329,6 +329,70 @@ describe('integration: launch:projects:create on the wire', () => {
     expect(error?.oclif?.exit).toBe(2);
     expect(error?.message).toContain('--data-dir');
     expect(signed.isDone()).toBe(false);
+    expect(onWire).toEqual([]);
+  });
+
+  it('asks on a terminal in the pinned order: type, organization, project name, environment name, then the build', async () => {
+    const inquired: string[] = [];
+    const answers: Record<string, unknown> = {
+      'Project type': 'FileUpload',
+      'Choose an organization': ORG_UID,
+      'Project name': 'My Site',
+      'Environment name': 'Default',
+      'Framework preset': 'Gatsby',
+      'Build command': 'npm run build',
+      'Output directory': './public',
+      'Response mode': 'buffered',
+    };
+    jest.spyOn(cliux, 'inquire').mockImplementation(async (payload: unknown) => {
+      const { message } = payload as { message: string };
+      inquired.push(message);
+      return answers[message] as never;
+    });
+    const organizations = nock('https://cma.integration.test')
+      .get('/v3/organizations')
+      .query({ limit: '100', asc: 'name', include_count: 'true', skip: '0' })
+      .reply(200, { organizations: [{ uid: ORG_UID, name: 'Acme' }], count: 1 });
+    nock(LAUNCH_HUB_URL)
+      .matchHeader('x-organization-uid', ORG_UID)
+      .get('/manage/projects/upload/signed_url')
+      .query({})
+      .reply(200, { uploadUrl: `${UPLOAD_HOST}/bucket`, uploadUid: 'upload-uid', method: 'PUT' });
+    nock(UPLOAD_HOST).put('/bucket').reply(200, '');
+    nock(LAUNCH_HUB_URL)
+      .get('/manage/projects/file-framework')
+      .query({ uploadUid: 'upload-uid' })
+      .reply(200, { framework: 'GATSBY' });
+    const create = nock(LAUNCH_HUB_URL)
+      .matchHeader('x-organization-uid', ORG_UID)
+      .post('/manage/projects')
+      .query({})
+      .reply(201, { project: { ...CREATED_PROJECT, projectType: 'FILEUPLOAD' } });
+    stubFollowUp('DEPLOYED');
+    const descriptor = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
+    Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true, writable: true });
+
+    const { error } = await runCommand(['launch:projects:create', '--data-dir', dataDir], config).finally(() => {
+      if (descriptor === undefined) {
+        delete (process.stdin as unknown as { isTTY?: boolean }).isTTY;
+      } else {
+        Object.defineProperty(process.stdin, 'isTTY', descriptor);
+      }
+    });
+
+    expect(error).toBeUndefined();
+    expect(organizations.isDone()).toBe(true);
+    expect(create.isDone()).toBe(true);
+    expect(inquired).toEqual([
+      'Project type',
+      'Choose an organization',
+      'Project name',
+      'Environment name',
+      'Framework preset',
+      'Build command',
+      'Output directory',
+      'Response mode',
+    ]);
     expect(onWire).toEqual([]);
   });
 

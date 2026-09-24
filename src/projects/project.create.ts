@@ -27,7 +27,7 @@ import {
   repositoryLabel,
 } from './project.create.prompt';
 import { deploymentFailureMessage, projectCreatedFields } from './project.presenter';
-import { PROJECT_TYPE_BY_CHOICE, PROJECT_TYPE_CHOICES, ProjectTypeChoice, projectTypeChoiceOf } from './project.inputs';
+import { PROJECT_TYPE_BY_CHOICE, ProjectTypeChoice, askProjectType, projectTypeChoiceOf } from './project.inputs';
 import { uploadArchive } from './project.upload';
 import type { CreateProjectInput, DetectedFramework, Project } from './types';
 
@@ -284,13 +284,7 @@ export class ProjectCreator {
   }
 
   private async projectType(request: CreateRequest): Promise<ProjectTypeChoice> {
-    const supplied = await this.need('type', request.type, () =>
-      askChoice(
-        this.services.ux,
-        'Project type',
-        PROJECT_TYPE_CHOICES.map((value) => ({ name: value, value })),
-      ),
-    );
+    const supplied = await this.need('type', request.type, () => askProjectType(this.services.ux));
 
     return projectTypeChoiceOf(supplied);
   }
