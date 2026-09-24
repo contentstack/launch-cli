@@ -17,10 +17,6 @@ import { FunctionsDirectoryNotFoundError, PortInUseError } from './function.erro
 import { walkFileSystem, checkIfDirectoryExists } from './os-helper';
 import { CloudFunctionResource } from './types';
 
-import rollup from 'rollup';
-import { nodeResolve } from '@rollup/plugin-node-resolve';
-import commonjs from '@rollup/plugin-commonjs';
-import json from '@rollup/plugin-json';
 import { loadDataURL } from './load-data-url';
 
 export function listenFailure(error: NodeJS.ErrnoException, servingPort: number): Error {
@@ -213,7 +209,13 @@ export class CloudFunctions {
   }
 
   private async buildHandlerForFilepath(cloudFunctionFilePath: string) {
-    const bundle = await rollup.rollup({
+    const [{ rollup }, { nodeResolve }, { default: commonjs }, { default: json }] = await Promise.all([
+      import('rollup'),
+      import('@rollup/plugin-node-resolve'),
+      import('@rollup/plugin-commonjs'),
+      import('@rollup/plugin-json'),
+    ]);
+    const bundle = await rollup({
       input: cloudFunctionFilePath,
       plugins: [nodeResolve({ preferBuiltins: true }), commonjs(), json()],
     });
