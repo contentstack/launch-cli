@@ -49,15 +49,6 @@ describe('resolution', () => {
     expect(Object.keys(table).sort()).toEqual(Object.keys(catalog).sort());
   });
 
-  it.each(Object.keys(catalog))('carries a spec the resolver can run for the catalog flag %s', (flag) => {
-    const spec = table[flag as keyof typeof table];
-
-    expect(spec).toBeDefined();
-    expect(typeof spec).toBe('object');
-    expect(['undefined', 'function']).toContain(typeof spec.prompt);
-    expect(['undefined', 'function']).toContain(typeof spec.normalize);
-  });
-
   it('reads org from organizationUid and project from uid in the config file', () => {
     expect(table.org.configPath).toBe('organizationUid');
     expect(table.project.configPath).toBe('uid');

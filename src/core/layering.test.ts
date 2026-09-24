@@ -105,17 +105,21 @@ describe('layering', () => {
 });
 
 describe('layering between resources', () => {
-  it.each(RESOURCES.flatMap((resource) => filesUnder(resource)))(
-    '%s reaches only the resources its allow-list names',
-    (relativePath) => {
+  it('finds no resource source reaching a resource its allow-list does not name', () => {
+    const checked = RESOURCES.flatMap((resource) => sourceFilesIn(resource));
+    const violations = checked.flatMap((relativePath) => {
       const owner = relativePath.split(sep)[0];
 
-      expect(RESOURCE_EDGES[owner]).toBeDefined();
-      for (const target of crossResourceEdges(relativePath)) {
-        expect(RESOURCE_EDGES[owner]).toContain(target);
-      }
-    },
-  );
+      return crossResourceEdges(relativePath)
+        .filter((target) => !RESOURCE_EDGES[owner].includes(target))
+        .map((target) => `${relativePath} -> ${target}`);
+    });
+
+    expect(checked).toContain(join('projects', 'project.create.ts'));
+    expect(checked).toContain(join('organizations', 'organizations.api.ts'));
+    expect(checked.filter((path) => path.endsWith('.test.ts'))).toEqual([]);
+    expect(violations).toEqual([]);
+  });
 
   it('declares an allow-list entry for every resource and invents none', () => {
     expect(Object.keys(RESOURCE_EDGES).sort()).toEqual([...RESOURCES].sort());

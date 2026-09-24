@@ -5,10 +5,7 @@ export async function* walkFileSystem(directory: string): any {
   const fileSystemIterator = await fs.promises.opendir(directory);
 
   for await (const fileSystemElement of fileSystemIterator) {
-    const filePath = normalize(join(directory, fileSystemElement.name)).replace(
-      /^(\.\.(\/|\\|$))+/,
-      ''
-    );
+    const filePath = normalize(join(directory, fileSystemElement.name));
 
     if (fileSystemElement.isDirectory()) {
       yield* walkFileSystem(filePath);

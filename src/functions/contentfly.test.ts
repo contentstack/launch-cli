@@ -1,4 +1,4 @@
-import { join } from 'path';
+import { dirname, join } from 'path';
 
 import { CloudFunctions } from './cloud-functions';
 import { Contentfly } from './contentfly';
@@ -53,10 +53,10 @@ describe('Contentfly', () => {
     expect(constructedWith).toEqual([process.cwd()]);
   });
 
-  it('strips leading parent traversal segments from a relative directory', () => {
+  it('resolves leading parent segments against the current working directory rather than stripping them', () => {
     new Contentfly('../../escape');
 
-    expect(constructedWith).toEqual([join(process.cwd(), '..', '..', 'escape').replace(/^(\.\.(\/|\\|$))+/, '')]);
+    expect(constructedWith).toEqual([join(dirname(dirname(process.cwd())), 'escape')]);
   });
 
   it('forwards the serving port to the cloud functions server', async () => {

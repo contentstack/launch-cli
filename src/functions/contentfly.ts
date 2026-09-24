@@ -7,12 +7,7 @@ export class Contentfly {
   private cloudFunctions: CloudFunctions;
 
   constructor(dirPath: string) {
-    this.pathToSourceCode = isAbsolute(dirPath)
-      ? dirPath
-      : normalize(join(process.cwd(), dirPath)).replace(
-        /^(\.\.(\/|\\|$))+/,
-        ''
-      );
+    this.pathToSourceCode = isAbsolute(dirPath) ? dirPath : normalize(join(process.cwd(), dirPath));
     this.cloudFunctions = new CloudFunctions(this.pathToSourceCode);
   }
 
