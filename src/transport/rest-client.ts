@@ -4,6 +4,7 @@ import { ErrorMessages, diagnoseTransportError, parseErrorEnvelope } from './err
 import { HttpMethod, RetryPolicy } from './retry-policy';
 import { createUtilityHttpClient } from './utility-http-client';
 
+export { HTTP_METHODS } from './retry-policy';
 export type { HttpMethod } from './retry-policy';
 
 export interface RestRequest {

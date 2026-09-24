@@ -1,6 +1,8 @@
 import { LaunchNetworkError } from './errors';
 
-export type HttpMethod = 'GET' | 'HEAD' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+export const HTTP_METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'PATCH'] as const;
+
+export type HttpMethod = (typeof HTTP_METHODS)[number];
 
 export const DEFAULT_MAX_RETRIES = 3;
 export const DEFAULT_RETRY_DELAY_MS = 1000;

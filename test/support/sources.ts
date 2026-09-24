@@ -61,3 +61,39 @@ export function balancedCall(text: string, openParen: number): string {
 
   return text.slice(openParen + 1);
 }
+
+export function lineOf(text: string, index: number): number {
+  return text.slice(0, index).split('\n').length;
+}
+
+export function enclosingObject(text: string, at: number): string {
+  let depth = 0;
+  let open = 0;
+
+  for (let index = at; index >= 0; index -= 1) {
+    if (text[index] === '}') {
+      depth += 1;
+    } else if (text[index] === '{') {
+      if (depth === 0) {
+        open = index;
+        break;
+      }
+
+      depth -= 1;
+    }
+  }
+
+  for (let index = open, nested = 0; index < text.length; index += 1) {
+    if (text[index] === '{') {
+      nested += 1;
+    } else if (text[index] === '}') {
+      nested -= 1;
+
+      if (nested === 0) {
+        return text.slice(open, index + 1);
+      }
+    }
+  }
+
+  return text.slice(open);
+}
