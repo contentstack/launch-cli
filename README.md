@@ -143,7 +143,7 @@ USAGE
 
 FLAGS
   -d, --data-dir=<value>  Current working directory
-  -p, --port=<value>      [default: 3000, env: PORT] Port number
+  -p, --port=<value>      [default: 3000] Port number
 
 DESCRIPTION
   Serve cloud functions

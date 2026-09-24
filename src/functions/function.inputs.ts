@@ -6,7 +6,6 @@ export const serveFlags = {
   port: Flags.string({
     char: 'p',
     default: DEFAULT_SERVE_PORT,
-    env: 'PORT',
     description: 'Port number',
   }),
   'data-dir': Flags.string({
