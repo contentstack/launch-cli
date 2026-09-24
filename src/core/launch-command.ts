@@ -1,7 +1,7 @@
 import { resolve as resolvePath } from 'node:path';
 
 import { Command } from '@contentstack/cli-command';
-import { FlagInput, cliux, configHandler, isAuthenticated } from '@contentstack/cli-utilities';
+import { cliux, configHandler, isAuthenticated } from '@contentstack/cli-utilities';
 
 import { EXIT_RUNTIME, PROJECT_CONFIG_FILE } from './constants';
 import { ProjectConfigStore } from './project-config';
@@ -75,7 +75,7 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
   protected resolved!: Resolved<S>;
   protected dataDir!: string;
   protected configPath!: string;
-  protected ux: UxLike = cliux as unknown as UxLike;
+  protected ux: UxLike = cliux;
 
   protected get launchRegion(): RegionLike | undefined {
     return configHandler.get('region') as RegionLike | undefined;
@@ -86,8 +86,8 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
     this.requireAuth();
 
     const { flags } = await this.parse({
-      flags: this.contract.flags as FlagInput,
-      baseFlags: LaunchCommand.baseFlags as FlagInput,
+      flags: this.contract.flags,
+      baseFlags: LaunchCommand.baseFlags,
       strict: true,
     });
 
@@ -113,7 +113,7 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
   protected async confirm(message: string): Promise<void> {
     const inputs = this.contract.inputs;
 
-    if (!inputs || !('yes' in inputs)) {
+    if (!('yes' in inputs)) {
       throw new Error(`${this.constructor.name} calls confirm() but does not declare yes: {} in its static inputs.`);
     }
 

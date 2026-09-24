@@ -8,5 +8,5 @@ export function disarmResponseInterceptors(client: HttpClient): HttpClient {
 }
 
 export function createUtilityHttpClient(): HttpClientLike {
-  return disarmResponseInterceptors(HttpClient.create()) as unknown as HttpClientLike;
+  return disarmResponseInterceptors(HttpClient.create());
 }

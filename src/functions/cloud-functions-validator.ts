@@ -56,7 +56,7 @@ export class CloudFunctionsValidator {
 
   private hasIndistinctDynamicRouteNamesInPath(filepath: string): boolean {
     const matchDistinctDynamicRoutesInPath = /\[(.*?)\]/g;
-    const dynamicRouteNames = filepath.match(matchDistinctDynamicRoutesInPath) as string[];
+    const dynamicRouteNames = filepath.match(matchDistinctDynamicRoutesInPath);
 
     if (dynamicRouteNames === null) {
       return false;

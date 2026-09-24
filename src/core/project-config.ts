@@ -2,16 +2,10 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
 import { UsageError } from './errors';
 
-export interface ProjectEnvironment {
-  uid?: string;
-  name?: string;
-}
-
 export interface ProjectConfig {
   uid?: string | null;
   organizationUid?: string | null;
   name?: string | null;
-  environments?: ProjectEnvironment[] | null;
 }
 
 export type ProjectConfigKey = keyof ProjectConfig;
@@ -40,11 +34,30 @@ function disagreement(entries: [string, unknown][]): UsageError {
   );
 }
 
-function agreedBlock(entries: [string, unknown][]): Record<string, unknown> {
-  const identities = new Set(entries.map(([, block]) => identityOf(block)));
+function textOrNull(value: unknown): string | null | undefined {
+  return typeof value === 'string' || value === null ? value : undefined;
+}
 
-  if (identities.size === 1 && !identities.has(undefined)) {
-    return entries[0][1] as Record<string, unknown>;
+function configFrom(block: Record<string, unknown>): ProjectConfig {
+  const config: ProjectConfig = {};
+
+  for (const field of ['uid', 'organizationUid', 'name'] as const) {
+    const value = textOrNull(block[field]);
+
+    if (value !== undefined) {
+      config[field] = value;
+    }
+  }
+
+  return config;
+}
+
+function agreedBlock(entries: [string, unknown][]): ProjectConfig {
+  const identities = new Set(entries.map(([, block]) => identityOf(block)));
+  const [[, first]] = entries;
+
+  if (identities.size === 1 && !identities.has(undefined) && isBlock(first)) {
+    return configFrom(first);
   }
 
   throw disagreement(entries);
@@ -60,14 +73,12 @@ export class ProjectConfigStore {
     const entries = Object.entries(this.blocks());
 
     if (entries.length > 1) {
-      return agreedBlock(entries) as ProjectConfig;
+      return agreedBlock(entries);
     }
 
-    if (entries.length === 1 && isBlock(entries[0][1])) {
-      return entries[0][1] as ProjectConfig;
-    }
+    const [only] = entries;
 
-    return {};
+    return only !== undefined && isBlock(only[1]) ? configFrom(only[1]) : {};
   }
 
   save(config: ProjectConfig): void {

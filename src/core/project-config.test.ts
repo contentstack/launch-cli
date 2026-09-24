@@ -370,16 +370,43 @@ describe('ProjectConfigStore.save', () => {
 
   it('writes the file so that a later load reads back exactly what was saved', () => {
     const store = new ProjectConfigStore(tempPath());
-    const config = {
-      uid: 'p1',
-      organizationUid: 'org1',
-      name: 'my-site',
-      environments: [{ uid: 'e1', name: 'Default' }],
-    };
+    const config = { uid: 'p1', organizationUid: 'org1', name: 'my-site' };
 
     store.save(config);
 
     expect(store.load()).toEqual(config);
     expect(readFileSync(store.path, 'utf8').endsWith('\n')).toBe(true);
+  });
+
+  it('loads only the string or null values it knows, and leaves everything else in the file alone', () => {
+    const path = tempPath();
+    writeFileSync(
+      path,
+      JSON.stringify({
+        project: { uid: 42, organizationUid: null, name: 'my-site', environments: [{ uid: 'e1' }], extra: true },
+      }),
+    );
+    const store = new ProjectConfigStore(path);
+
+    const loaded = store.load();
+    store.save({ name: 'renamed' });
+
+    expect(loaded).toEqual({ organizationUid: null, name: 'my-site' });
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({
+      project: { uid: 42, organizationUid: null, name: 'renamed', environments: [{ uid: 'e1' }], extra: true },
+    });
+  });
+
+  it('loads only the known values from branch blocks that agree on one project', () => {
+    const path = tempPath();
+    writeFileSync(
+      path,
+      JSON.stringify({
+        main: { uid: 'p1', organizationUid: 'org1', environments: [] },
+        dev: { uid: 'p1', organizationUid: 'org1', name: { not: 'text' } },
+      }),
+    );
+
+    expect(new ProjectConfigStore(path).load()).toEqual({ uid: 'p1', organizationUid: 'org1' });
   });
 });
