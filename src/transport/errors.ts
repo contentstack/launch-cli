@@ -3,8 +3,8 @@ import { LaunchError } from '../core/errors';
 import { proxyUrl } from './proxy';
 
 export interface ApiErrorEntry {
-  code: string;
-  message: string;
+  code?: string;
+  message?: string;
 }
 
 export type ErrorMessages = Record<string, string>;
@@ -21,7 +21,7 @@ export class LaunchApiError extends LaunchError {
   readonly errors: ApiErrorEntry[];
 
   constructor(status: number, errors: ApiErrorEntry[], messages: ErrorMessages = {}) {
-    const primary = errors[0];
+    const [primary] = errors;
     super(
       messageForCode(messages, primary?.code) ?? primary?.message ?? `Launch API request failed with status ${status}.`,
     );
@@ -32,9 +32,28 @@ export class LaunchApiError extends LaunchError {
   }
 }
 
+function entryFrom(value: unknown): ApiErrorEntry {
+  const entry: ApiErrorEntry = {};
+
+  if (typeof value !== 'object' || value === null) {
+    return entry;
+  }
+
+  if ('code' in value && typeof value.code === 'string') {
+    entry.code = value.code;
+  }
+
+  if ('message' in value && typeof value.message === 'string') {
+    entry.message = value.message;
+  }
+
+  return entry;
+}
+
 export function parseErrorEnvelope(status: number, body: unknown, messages: ErrorMessages = {}): LaunchApiError {
-  const errors = (body as { errors?: unknown })?.errors;
-  return new LaunchApiError(status, Array.isArray(errors) ? (errors as ApiErrorEntry[]) : [], messages);
+  const errors = typeof body === 'object' && body !== null && 'errors' in body ? body.errors : undefined;
+
+  return new LaunchApiError(status, Array.isArray(errors) ? errors.map(entryFrom) : [], messages);
 }
 
 export const PROXY_ERROR_CODES: readonly string[] = ['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'ERR_BAD_RESPONSE'];

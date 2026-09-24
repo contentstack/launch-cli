@@ -41,6 +41,33 @@ describe('parseErrorEnvelope', () => {
     expect(error.status).toBe(409);
   });
 
+  it.each([[null], ['a string'], [42]])('falls back to the status when the whole body is %p', (body) => {
+    const error = parseErrorEnvelope(502, body, MESSAGES);
+
+    expect(error.message).toBe('Launch API request failed with status 502.');
+    expect(error.code).toBe('launch.UNKNOWN');
+    expect(error.errors).toEqual([]);
+  });
+
+  it('keeps only string codes and messages from an untrusted errors array', () => {
+    const error = parseErrorEnvelope(
+      400,
+      { errors: [{ code: 7, message: { nested: true } }, null, 'text', { code: 'launch.X', message: 'second' }] },
+      MESSAGES,
+    );
+
+    expect(error.message).toBe('Launch API request failed with status 400.');
+    expect(error.code).toBe('launch.UNKNOWN');
+    expect(error.errors).toEqual([{}, {}, {}, { code: 'launch.X', message: 'second' }]);
+  });
+
+  it('uses a string message even when the code beside it is not a string', () => {
+    const error = parseErrorEnvelope(400, { errors: [{ code: ['launch.X'], message: 'readable' }] }, MESSAGES);
+
+    expect(error.message).toBe('readable');
+    expect(error.code).toBe('launch.UNKNOWN');
+  });
+
   it('falls back to the status when the body carries no errors array', () => {
     const error = parseErrorEnvelope(502, { nope: true }, MESSAGES);
 
