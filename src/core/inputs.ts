@@ -6,8 +6,6 @@ export interface InputSpec {
   required?: boolean;
 }
 
-export type InputsSpec<K extends FlagKey> = { [P in K]: InputSpec };
-
 export type AnyInputs = { readonly [key: string]: InputSpec };
 
 export type InputKeys<S> = Extract<keyof S, FlagKey>;
@@ -18,6 +16,12 @@ export type ValueOf<F> = F extends Interfaces.OptionFlag<infer T>
     ? B
     : never;
 
+export type NormalizedValueOf<P extends FlagKey> = Resolution[P] extends {
+  normalize: (...args: never[]) => Promise<infer R>;
+}
+  ? R
+  : ValueOf<Catalog[P]>;
+
 type HasDefault<P extends FlagKey> = 'default' extends keyof Resolution[P] ? true : false;
 
 type IsCertain<S, P extends FlagKey> = P extends keyof S
@@ -27,7 +31,7 @@ type IsCertain<S, P extends FlagKey> = P extends keyof S
   : false;
 
 export type Resolved<S> = {
-  [P in InputKeys<S>]: IsCertain<S, P> extends true ? ValueOf<Catalog[P]> : ValueOf<Catalog[P]> | undefined;
+  [P in InputKeys<S>]: IsCertain<S, P> extends true ? NormalizedValueOf<P> : NormalizedValueOf<P> | undefined;
 };
 
 export type MissingDependencies<S> = {

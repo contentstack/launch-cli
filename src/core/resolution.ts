@@ -30,11 +30,11 @@ export interface LooseArgs {
   resolved: Partial<Record<FlagKey, unknown>>;
 }
 
-export interface ResolutionSpec<T, D extends FlagKey = never> {
+export interface ResolutionSpec<T, D extends FlagKey = never, R extends T = T> {
   configPath?: ProjectConfigKey;
   dependsOn?: readonly D[];
   prompt?(args: PromptArgs<D>): Promise<T>;
-  normalize?(value: T, args: NormalizeArgs<D>): Promise<T>;
+  normalize?(value: T, args: NormalizeArgs<D>): Promise<R>;
   default?: T;
 }
 

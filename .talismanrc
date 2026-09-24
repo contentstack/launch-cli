@@ -56,4 +56,14 @@ fileignoreconfig:
 - filename: src/git/git.api.ts
   allowed_patterns:
     - "assertArray\\(response, key, `\\$\\{key\\} response`\\)"
+- filename: src/environments/environment.inputs.ts
+  ignore_detectors:
+    - filename
+- filename: src/core/inputs.ts
+  allowed_patterns:
+    - "FlagKey"
+    - "InputKeys"
+- filename: src/core/resolution.ts
+  allowed_patterns:
+    - "FlagKey"
 version: "1.0"

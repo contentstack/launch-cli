@@ -2,7 +2,7 @@ import { ApiSurface } from '../resources';
 import { CancelledError, InputDependencyError, MissingInputError, UsageError } from './errors';
 import { UxLike } from './render';
 import { FlagKey } from '../resources';
-import { InputsSpec, inputs } from './inputs';
+import { AnyInputs, inputs } from './inputs';
 import * as resolutionModule from '../resources';
 import { AnyResolutionSpec } from './resolution';
 import { resolveInputs } from './resolve';
@@ -539,7 +539,7 @@ describe('resolveInputs dependency ordering', () => {
   });
 
   it('throws naming both flags when a command declares project without org', async () => {
-    const spec = { project: { required: true } } as unknown as InputsSpec<'org' | 'project'>;
+    const spec: AnyInputs = { project: { required: true } };
 
     const promise = resolveInputs(spec, {
       parsed: { project: 'Project One' },

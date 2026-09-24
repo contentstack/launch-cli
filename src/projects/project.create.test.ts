@@ -219,7 +219,7 @@ function gitRequest(overrides: Partial<CreateRequest> = {}): CreateRequest {
     namespace: 'my-org',
     repo: 'my-org/my-repo',
     branch: 'main',
-    framework: 'NextJs',
+    framework: 'NEXTJS',
     buildCmd: 'npm run build',
     outputDir: '.next',
     resMode: 'buffered',
@@ -234,7 +234,7 @@ function uploadRequest(overrides: Partial<CreateRequest> = {}): CreateRequest {
     type: 'FileUpload',
     name: 'My Site',
     envName: 'Default',
-    framework: 'Other',
+    framework: 'OTHER',
     buildCmd: 'npm run build',
     outputDir: './',
     resMode: 'buffered',
@@ -413,7 +413,7 @@ describe('ProjectCreator prompting order and refusals', () => {
     ]);
   });
 
-  it.each([
+  it.each<[string, Partial<CreateRequest>]>([
     ['type', {}],
     ['name', { type: 'GitHub' }],
     ['env-name', { type: 'GitHub', name: 'My Site' }],
@@ -459,7 +459,7 @@ describe('ProjectCreator prompting order and refusals', () => {
       detected: { framework: 'OTHER', buildCommand: 'npm run build' },
     });
 
-    await creator.create(uploadRequest({ outputDir: undefined, framework: 'Gatsby' }));
+    await creator.create(uploadRequest({ outputDir: undefined, framework: 'GATSBY' }));
 
     expect((bodyOf(created).environment as Record<string, unknown>).outputDirectory).toBe('./');
   });
@@ -526,13 +526,13 @@ describe('ProjectCreator prompting order and refusals', () => {
 
   it('asks for a server command only for a framework that supports one', async () => {
     const supported = harness({ isTTY: true, answers: ['npm start'] });
-    await supported.creator.create(gitRequest({ framework: 'Remix', serverCmd: undefined }));
+    await supported.creator.create(gitRequest({ framework: 'REMIX', serverCmd: undefined }));
 
     expect(supported.asked).toEqual(['Server command']);
     expect((bodyOf(supported.created).environment as Record<string, unknown>).serverCommand).toBe('npm start');
 
     const unsupported = harness({ isTTY: true, answers: [] });
-    await unsupported.creator.create(gitRequest({ framework: 'NextJs', serverCmd: undefined }));
+    await unsupported.creator.create(gitRequest({ framework: 'NEXTJS', serverCmd: undefined }));
 
     expect(unsupported.asked).toEqual([]);
     expect((bodyOf(unsupported.created).environment as Record<string, unknown>).serverCommand).toBeUndefined();
@@ -541,7 +541,7 @@ describe('ProjectCreator prompting order and refusals', () => {
   it('sends a supplied server command for a supported framework without asking', async () => {
     const { creator, asked, created } = harness({ isTTY: true });
 
-    await creator.create(gitRequest({ framework: 'Nuxt', serverCmd: 'npm run start' }));
+    await creator.create(gitRequest({ framework: 'NUXT', serverCmd: 'npm run start' }));
 
     expect(asked).toEqual([]);
     expect((bodyOf(created).environment as Record<string, unknown>).serverCommand).toBe('npm run start');
@@ -550,7 +550,7 @@ describe('ProjectCreator prompting order and refusals', () => {
   it('sends no server command for a supported framework when there is no terminal to ask on', async () => {
     const { creator, created } = harness();
 
-    await creator.create(gitRequest({ framework: 'Other', serverCmd: undefined }));
+    await creator.create(gitRequest({ framework: 'OTHER', serverCmd: undefined }));
 
     expect((bodyOf(created).environment as Record<string, unknown>).serverCommand).toBeUndefined();
   });
@@ -594,7 +594,7 @@ describe('ProjectCreator on the FileUpload path', () => {
       (uploadArchive as jest.Mock).mockClear();
       const { creator, created, asked } = harness({ isTTY: true, answers: [answer] });
 
-      await creator.create(uploadRequest({ framework: 'Other', serverCmd: undefined }));
+      await creator.create(uploadRequest({ framework: 'OTHER', serverCmd: undefined }));
 
       expect(asked).toEqual(['Server command']);
       expect(uploadArchive).toHaveBeenCalledTimes(1);

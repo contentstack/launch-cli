@@ -63,6 +63,6 @@ export const projectResolution = {
   } satisfies ResolutionSpec<string>,
   type: {
     prompt: ({ services }) => askProjectType(services.ux),
-    normalize: async (value) => projectTypeChoiceOf(value) as string,
-  } satisfies ResolutionSpec<string>,
+    normalize: async (value) => projectTypeChoiceOf(value),
+  } satisfies ResolutionSpec<string, never, ProjectTypeChoice>,
 };

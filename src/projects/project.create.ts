@@ -9,7 +9,8 @@ import type { Deployment } from '../deployments/types';
 import {
   FRAMEWORK_CHOICES,
   RESPONSE_MODES,
-  TOGGLE_VALUES,
+  ResponseMode,
+  ToggleValue,
   frameworkPresetOf,
 } from '../environments/environment.inputs';
 import type { CreateEnvironmentInput, Environment, FrameworkPreset } from '../environments/types';
@@ -49,20 +50,20 @@ export interface CreateRequest {
   org: string;
   dataDir: string;
   configPath?: string;
-  type?: string;
+  type?: ProjectTypeChoice;
   name?: string;
   description?: string;
   envName?: string;
   namespace?: string;
   repo?: string;
   branch?: string;
-  framework?: string;
+  framework?: FrameworkPreset;
   buildCmd?: string;
   outputDir?: string;
   serverCmd?: string;
-  resMode?: string;
-  autoDeploy?: string;
-  csAuth?: string;
+  resMode?: ResponseMode;
+  autoDeploy?: ToggleValue;
+  csAuth?: ToggleValue;
 }
 
 interface Survivors {
@@ -128,11 +129,11 @@ export class ProjectCreator {
     };
 
     if (request.autoDeploy !== undefined) {
-      environment.autoDeployOnPush = request.autoDeploy === TOGGLE_VALUES[0];
+      environment.autoDeployOnPush = request.autoDeploy === 'enable';
     }
 
     if (request.csAuth !== undefined) {
-      environment.isContentstackAuthenticationEnabled = request.csAuth === TOGGLE_VALUES[0];
+      environment.isContentstackAuthenticationEnabled = request.csAuth === 'enable';
     }
 
     const input: CreateProjectInput = {
@@ -282,9 +283,11 @@ export class ProjectCreator {
   }
 
   private async projectType(request: CreateRequest): Promise<ProjectTypeChoice> {
-    const supplied = await this.need('type', request.type, () => askProjectType(this.services.ux));
+    if (request.type !== undefined) {
+      return request.type;
+    }
 
-    return projectTypeChoiceOf(supplied);
+    return projectTypeChoiceOf(await this.need('type', undefined, () => askProjectType(this.services.ux)));
   }
 
   private async selectGitSource(request: CreateRequest): Promise<SourceSelection> {
@@ -350,7 +353,7 @@ export class ProjectCreator {
 
   private async selectFramework(request: CreateRequest, detected: DetectedFramework): Promise<FrameworkPreset> {
     if (request.framework !== undefined) {
-      return frameworkPresetOf(request.framework);
+      return request.framework;
     }
 
     if (!this.services.isTTY) {
@@ -395,7 +398,7 @@ export class ProjectCreator {
       ),
     );
 
-    return mode === RESPONSE_MODES[1];
+    return mode === ('streaming' satisfies ResponseMode);
   }
 
   private async need<T extends string | undefined>(

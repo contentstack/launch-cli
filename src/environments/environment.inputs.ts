@@ -71,18 +71,18 @@ export const environmentResolution = {
   } satisfies ResolutionSpec<string>,
   branch: {} satisfies ResolutionSpec<string>,
   framework: {
-    normalize: async (value) => frameworkPresetOf(value) as string,
-  } satisfies ResolutionSpec<string>,
+    normalize: async (value) => frameworkPresetOf(value),
+  } satisfies ResolutionSpec<string, never, FrameworkPreset>,
   'build-cmd': {} satisfies ResolutionSpec<string>,
   'server-cmd': {} satisfies ResolutionSpec<string>,
   'output-dir': {} satisfies ResolutionSpec<string>,
   'res-mode': {
-    normalize: async (value) => oneOf('res-mode', value, RESPONSE_MODES) as string,
-  } satisfies ResolutionSpec<string>,
+    normalize: async (value) => oneOf('res-mode', value, RESPONSE_MODES),
+  } satisfies ResolutionSpec<string, never, ResponseMode>,
   'auto-deploy': {
-    normalize: async (value) => oneOf('auto-deploy', value, TOGGLE_VALUES) as string,
-  } satisfies ResolutionSpec<string>,
+    normalize: async (value) => oneOf('auto-deploy', value, TOGGLE_VALUES),
+  } satisfies ResolutionSpec<string, never, ToggleValue>,
   'cs-auth': {
-    normalize: async (value) => oneOf('cs-auth', value, TOGGLE_VALUES) as string,
-  } satisfies ResolutionSpec<string>,
+    normalize: async (value) => oneOf('cs-auth', value, TOGGLE_VALUES),
+  } satisfies ResolutionSpec<string, never, ToggleValue>,
 };
