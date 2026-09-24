@@ -4,7 +4,7 @@ import { renderDetail } from '../core/render';
 import type { ServiceContext } from '../core/service-context';
 import { DeploymentUnsuccessfulError } from '../deployments/deployment.errors';
 import { deploymentUrlOf } from '../deployments/deployment.presenter';
-import { DeploymentOutcome, WatchTiming, watchDeployment } from '../deployments/deployment.watcher';
+import { WatchTiming, watchDeployment } from '../deployments/deployment.watcher';
 import type { Deployment } from '../deployments/types';
 import {
   FRAMEWORK_CHOICES,
@@ -63,6 +63,14 @@ export interface CreateRequest {
   resMode?: string;
   autoDeploy?: string;
   csAuth?: string;
+}
+
+interface Survivors {
+  org: string;
+  project: Project;
+  envName: string;
+  environment?: Environment;
+  deployment?: Deployment;
 }
 
 interface SourceSelection {
@@ -197,26 +205,26 @@ export class ProjectCreator {
   }
 
   private async follow(org: string, project: Project, envName: string): Promise<void> {
-    const environment = await this.appearing(() =>
-      this.services.api.environments.first({ org, project: project.uid }),
+    const environment = await this.explaining({ org, project, envName }, () =>
+      this.appearing(() => this.services.api.environments.first({ org, project: project.uid })),
     );
 
     if (environment === undefined) {
       throw this.unsuccessful({ org, project, envName, status: NO_DEPLOYMENT_STATUS });
     }
 
-    const deployment = await this.appearing(() =>
-      this.services.api.deployments.latest({ org, project: project.uid, environment: environment.uid }),
+    const deployment = await this.explaining({ org, project, envName, environment }, () =>
+      this.appearing(() =>
+        this.services.api.deployments.latest({ org, project: project.uid, environment: environment.uid }),
+      ),
     );
 
     if (deployment === undefined) {
       throw this.unsuccessful({ org, project, envName, environment, status: NO_DEPLOYMENT_STATUS });
     }
 
-    let outcome: DeploymentOutcome;
-
-    try {
-      outcome = await watchDeployment({
+    const outcome = await this.explaining({ org, project, envName, environment, deployment }, () =>
+      watchDeployment({
         ...this.timing,
         ux: this.services.ux,
         isTTY: this.services.isTTY,
@@ -227,18 +235,8 @@ export class ProjectCreator {
             environment: environment.uid,
             deployment: deployment.uid,
           }),
-      });
-    } catch (error) {
-      throw this.unsuccessful({
-        org,
-        project,
-        envName,
-        environment,
-        deployment,
-        status: NO_DEPLOYMENT_STATUS,
-        reason: reasonOf(error),
-      });
-    }
+      }),
+    );
 
     if (outcome.kind === 'success') {
       renderDetail(this.services.ux, projectCreatedFields(project, this.siteUrl(outcome.deployment, environment)));
@@ -248,15 +246,15 @@ export class ProjectCreator {
     throw this.unsuccessful({ org, project, envName, environment, deployment, status: outcome.status });
   }
 
-  private unsuccessful(failure: {
-    org: string;
-    project: Project;
-    envName: string;
-    status: string;
-    environment?: Environment;
-    deployment?: Deployment;
-    reason?: string;
-  }): DeploymentUnsuccessfulError {
+  private async explaining<T>(survivors: Survivors, step: () => Promise<T>): Promise<T> {
+    try {
+      return await step();
+    } catch (error) {
+      throw this.unsuccessful({ ...survivors, status: NO_DEPLOYMENT_STATUS, reason: reasonOf(error) });
+    }
+  }
+
+  private unsuccessful(failure: Survivors & { status: string; reason?: string }): DeploymentUnsuccessfulError {
     return new DeploymentUnsuccessfulError(
       deploymentFailureMessage({
         reason: failure.reason,

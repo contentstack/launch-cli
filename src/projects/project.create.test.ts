@@ -7,6 +7,7 @@ import { UxLike } from '../core/render';
 import { ServiceContext } from '../core/service-context';
 import { DeploymentUnsuccessfulError } from '../deployments/deployment.errors';
 import { WatchTiming } from '../deployments/deployment.watcher';
+import { LaunchApiError } from '../transport/errors';
 import { ApiSurface } from '../resources';
 import { CreateRequest, ProjectCreator } from './project.create';
 import { UploadFailedError } from './project.errors';
@@ -49,6 +50,9 @@ interface Scenario {
   detected?: unknown;
   createFails?: Error;
   pollFails?: Error;
+  signedUrlFails?: Error;
+  environmentFails?: Error;
+  latestFails?: Error;
   createdProject?: unknown;
 }
 
@@ -60,6 +64,14 @@ function harness(scenario: Scenario = {}) {
   const askedPayloads: Record<string, unknown>[] = [];
   const created: unknown[] = [];
   const gitCalls: unknown[] = [];
+  const calls: Record<'signedUploadUrl' | 'environments' | 'latest' | 'get' | 'namespaces' | 'branches', unknown[]> = {
+    signedUploadUrl: [],
+    environments: [],
+    latest: [],
+    get: [],
+    namespaces: [],
+    branches: [],
+  };
   let answerIndex = 0;
   let pollIndex = 0;
   let latestIndex = 0;
@@ -91,7 +103,15 @@ function harness(scenario: Scenario = {}) {
 
         return scenario.createdProject ?? { uid: PROJECT_UID, name: 'My Site', projectType: 'GITPROVIDER' };
       },
-      signedUploadUrl: async () => ({ uploadUrl: 'https://uploads.example.test/x', uploadUid: 'upload-uid' }),
+      signedUploadUrl: async (params: unknown) => {
+        calls.signedUploadUrl.push(params);
+
+        if (scenario.signedUrlFails) {
+          throw scenario.signedUrlFails;
+        }
+
+        return { uploadUrl: 'https://uploads.example.test/x', uploadUid: 'upload-uid' };
+      },
       gitFramework: async (params: unknown) => {
         gitCalls.push(params);
         return scenario.detected ?? { framework: 'NEXTJS', buildCommand: 'npm run build', outputDirectory: '.next' };
@@ -102,7 +122,13 @@ function harness(scenario: Scenario = {}) {
       },
     },
     environments: {
-      first: async () => {
+      first: async (params: unknown) => {
+        calls.environments.push(params);
+
+        if (scenario.environmentFails) {
+          throw scenario.environmentFails;
+        }
+
         const list = scenario.environments ?? [{ uid: ENVIRONMENT_UID, name: 'Default', domains: [] }];
         const found = list[Math.min(environmentIndex, list.length - 1)];
         environmentIndex += 1;
@@ -110,13 +136,21 @@ function harness(scenario: Scenario = {}) {
       },
     },
     deployments: {
-      latest: async () => {
+      latest: async (params: unknown) => {
+        calls.latest.push(params);
+
+        if (scenario.latestFails) {
+          throw scenario.latestFails;
+        }
+
         const list = scenario.deployments ?? [{ uid: DEPLOYMENT_UID, deploymentNumber: 1 }];
         const found = list[Math.min(latestIndex, list.length - 1)];
         latestIndex += 1;
         return found;
       },
-      get: async () => {
+      get: async (params: unknown) => {
+        calls.get.push(params);
+
         if (scenario.pollFails) {
           pollIndex += 1;
           throw scenario.pollFails;
@@ -128,10 +162,13 @@ function harness(scenario: Scenario = {}) {
       },
     },
     git: {
-      namespaces: async () => ({
-        pagination: { count: 1, limit: 100 },
-        namespaces: scenario.namespaces ?? [{ name: 'my-org' }],
-      }),
+      namespaces: async (params: unknown) => {
+        calls.namespaces.push(params);
+        return {
+          pagination: { count: 1, limit: 100 },
+          namespaces: scenario.namespaces ?? [{ name: 'my-org' }],
+        };
+      },
       repositories: async (params: unknown) => {
         gitCalls.push(params);
         return {
@@ -141,16 +178,27 @@ function harness(scenario: Scenario = {}) {
           ],
         };
       },
-      branches: async () => ({
-        pagination: { count: 1, limit: 100 },
-        branches: scenario.branches ?? [{ name: 'main' }],
-      }),
+      branches: async (params: unknown) => {
+        calls.branches.push(params);
+        return {
+          pagination: { count: 1, limit: 100 },
+          branches: scenario.branches ?? [{ name: 'main' }],
+        };
+      },
     },
   } as unknown as ApiSurface;
 
   const services: ServiceContext = { api, ux, isTTY: scenario.isTTY ?? false };
 
-  return { creator: new ProjectCreator(services, advancingTiming()), printed, asked, askedPayloads, created, gitCalls };
+  return {
+    creator: new ProjectCreator(services, advancingTiming()),
+    printed,
+    asked,
+    askedPayloads,
+    created,
+    gitCalls,
+    calls,
+  };
 }
 
 function configPathIn(dir: string): string {
@@ -209,10 +257,17 @@ describe('ProjectCreator on the GitHub path', () => {
   });
 
   it('sends the documented create body and reports the created project with its site url', async () => {
-    const { creator, created, printed } = harness();
+    const { creator, created, printed, calls } = harness();
 
     await creator.create(gitRequest());
 
+    expect((created[0] as { org: string }).org).toBe(ORG);
+    expect(calls.environments).toEqual([{ org: ORG, project: PROJECT_UID }]);
+    expect(calls.latest).toEqual([{ org: ORG, project: PROJECT_UID, environment: ENVIRONMENT_UID }]);
+    expect(calls.get).toEqual([
+      { org: ORG, project: PROJECT_UID, environment: ENVIRONMENT_UID, deployment: DEPLOYMENT_UID },
+    ]);
+    expect(calls.signedUploadUrl).toEqual([]);
     expect(bodyOf(created)).toEqual({
       name: 'My Site',
       projectType: 'GITPROVIDER',
@@ -514,11 +569,16 @@ describe('ProjectCreator on the FileUpload path', () => {
   });
 
   it('zips the data dir, uploads it, and creates the project with the upload uid', async () => {
-    const { creator, created, printed, gitCalls } = harness();
+    const { creator, created, printed, gitCalls, calls } = harness();
 
     await creator.create(uploadRequest());
 
+    expect(calls.signedUploadUrl).toEqual([{ org: ORG }]);
     expect(uploadArchive).toHaveBeenCalledTimes(1);
+    expect((uploadArchive as jest.Mock).mock.calls[0][0]).toEqual({
+      uploadUrl: 'https://uploads.example.test/x',
+      uploadUid: 'upload-uid',
+    });
     expect(bodyOf(created)).toMatchObject({
       projectType: 'FILEUPLOAD',
       fileUpload: { uploadUid: 'upload-uid' },
@@ -596,6 +656,19 @@ describe('ProjectCreator on the FileUpload path', () => {
 
     expect(failure).toBeInstanceOf(UploadFailedError);
     expect((failure as UploadFailedError).exitCode).toBe(1);
+    expect(created).toEqual([]);
+  });
+
+  it('propagates a failure to get a signed upload url without uploading or creating anything', async () => {
+    const refused = new LaunchApiError(403, [{ code: 'launch.FORBIDDEN', message: 'Not allowed here.' }]);
+    const { creator, created, calls } = harness({ signedUrlFails: refused });
+
+    const failure = await creator.create(uploadRequest()).catch((error: Error) => error);
+
+    expect(failure).toBe(refused);
+    expect((failure as LaunchApiError).exitCode).toBe(1);
+    expect(calls.signedUploadUrl).toEqual([{ org: ORG }]);
+    expect(uploadArchive).not.toHaveBeenCalled();
     expect(created).toEqual([]);
   });
 });
@@ -682,6 +755,33 @@ describe('ProjectCreator waiting on the first deployment', () => {
     await creator.create(gitRequest());
 
     expect(printed).toContain('✔ Deployment #1 is LIVE');
+  });
+
+  it('exits 1 disclosing the project when looking up its first environment failed', async () => {
+    const { creator, calls } = harness({ environmentFails: new LaunchApiError(502, []) });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
+    expect((failure as DeploymentUnsuccessfulError).exitCode).toBe(1);
+    expect((failure as Error).message).toContain('Launch API request failed with status 502.');
+    expect((failure as Error).message).toContain('The project "My Site" (p1)');
+    expect((failure as Error).message).toContain('have not been rolled back');
+    expect((failure as Error).message).not.toContain('--environment');
+    expect(calls.latest).toEqual([]);
+  });
+
+  it('exits 1 disclosing the project and environment when looking up the first deployment failed', async () => {
+    const { creator, calls } = harness({ latestFails: new Error('socket hang up') });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
+    expect((failure as DeploymentUnsuccessfulError).exitCode).toBe(1);
+    expect((failure as Error).message).toContain('socket hang up.');
+    expect((failure as Error).message).toContain('--org org1 --project p1 --environment e1');
+    expect((failure as Error).message).not.toContain('--deployment');
+    expect(calls.get).toEqual([]);
   });
 
   it('exits 1 disclosing what survived when the wait itself failed outright', async () => {
