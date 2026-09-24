@@ -52,7 +52,7 @@ function fileNames(): string[] {
 beforeEach(() => {
   projectBasePath = mkdtempSync(join(tmpdir(), 'launch-serve-log-'));
   stdout = [];
-  jest.spyOn(process.stdout, 'write').mockImplementation((chunk: string | Uint8Array) => {
+  jest.spyOn((console as unknown as { _stdout: NodeJS.WriteStream })._stdout, 'write').mockImplementation((chunk: string | Uint8Array) => {
     stdout.push(String(chunk));
     return true;
   });

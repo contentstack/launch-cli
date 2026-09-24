@@ -1,4 +1,8 @@
+import { cliux } from '@contentstack/cli-utilities';
 import { Parser } from '@oclif/core';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { EXIT_USAGE } from '../../../core/constants';
 import Contentfly from '../../../functions/index';
@@ -15,6 +19,35 @@ const servedPorts: number[] = [];
 let serveResult: () => Promise<void>;
 let originalParse: (typeof Functions.prototype)['parse'];
 const originalPort = process.env.PORT;
+const temporaryDirectories: string[] = [];
+let stdout: string[];
+
+function temporaryDirectory(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'launch-serve-'));
+  temporaryDirectories.push(dir);
+  return dir;
+}
+
+function logFiles(dir: string): string[] {
+  const logs = join(dir, 'logs');
+  return existsSync(logs) ? readdirSync(logs).sort() : [];
+}
+
+function readLog(dir: string, name: string): string {
+  const path = join(dir, 'logs', name);
+  return existsSync(path) ? readFileSync(path, 'utf8') : '';
+}
+
+async function eventually(check: () => boolean): Promise<void> {
+  const deadline = Date.now() + 5000;
+  while (!check()) {
+    if (Date.now() > deadline) {
+      throw new Error('condition never became true');
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
 
 function commandWithFlags(flags: Record<string, unknown>): Functions {
   Functions.prototype['parse'] = jest.fn().mockResolvedValue({ flags });
@@ -28,6 +61,11 @@ beforeEach(() => {
   serveResult = async () => undefined;
   originalParse = Functions.prototype['parse'];
   delete process.env.PORT;
+  stdout = [];
+  jest.spyOn((console as unknown as { _stdout: NodeJS.WriteStream })._stdout, 'write').mockImplementation((chunk: string | Uint8Array) => {
+    stdout.push(String(chunk));
+    return true;
+  });
 
   jest.spyOn(Functions.prototype, 'log').mockImplementation((message?: string) => {
     loggedMessages.push(message as string);
@@ -44,7 +82,15 @@ beforeEach(() => {
   });
 });
 
-afterEach(() => {
+afterEach(async () => {
+  for (const dir of temporaryDirectories.splice(0)) {
+    if (existsSync(join(dir, 'logs'))) {
+      await eventually(() => logFiles(dir).length === 2);
+    }
+
+    rmSync(dir, { recursive: true, force: true });
+  }
+
   Functions.prototype['parse'] = originalParse;
   if (originalPort === undefined) {
     delete process.env.PORT;
@@ -74,13 +120,19 @@ describe('launch:functions:serve flag definitions', () => {
 });
 
 describe('launch:functions:serve init', () => {
-  it('stores the supplied data directory and port', async () => {
-    const command = commandWithFlags({ 'data-dir': '/path/to/data/dir', port: '4000' });
+  it('stores the supplied data directory and port and creates the project log files there', async () => {
+    const dataDir = temporaryDirectory();
+    const command = commandWithFlags({ 'data-dir': dataDir, port: '4000' });
 
     await command.init();
 
     expect(Functions.prototype['parse']).toHaveBeenCalledWith(Functions);
-    expect(command['sharedConfig']).toEqual({ projectBasePath: '/path/to/data/dir', port: 4000 });
+    expect(command['sharedConfig']).toEqual({ projectBasePath: dataDir, port: 4000 });
+    expect(existsSync(join(dataDir, 'logs'))).toBe(true);
+    await eventually(() => logFiles(dataDir).length === 2);
+    expect(logFiles(dataDir)).toEqual(['error.log', 'info.log']);
+    expect(readLog(dataDir, 'error.log')).toBe('');
+    expect(stdout).toEqual([]);
   });
 
   it.each([
@@ -88,39 +140,72 @@ describe('launch:functions:serve init', () => {
     ['null', null],
     ['an empty string', ''],
   ])('falls back to the working directory when data-dir is %s', async (_label, dataDir) => {
+    const workingDirectory = temporaryDirectory();
+    jest.spyOn(process, 'cwd').mockReturnValue(workingDirectory);
     const command = commandWithFlags({ 'data-dir': dataDir, port: '3000' });
 
     await command.init();
 
-    expect(command['sharedConfig']).toEqual({ projectBasePath: process.cwd(), port: 3000 });
+    expect(command['sharedConfig']).toEqual({ projectBasePath: workingDirectory, port: 3000 });
+    expect(existsSync(join(workingDirectory, 'logs'))).toBe(true);
   });
 
   it.each(['0', '1', '3000', '65535'])('accepts the boundary port %s', async (port) => {
-    const command = commandWithFlags({ 'data-dir': '/data', port });
+    const dataDir = temporaryDirectory();
+    const command = commandWithFlags({ 'data-dir': dataDir, port });
 
     await command.init();
 
-    expect(command['sharedConfig']).toEqual({ projectBasePath: '/data', port: Number(port) });
-    expect(loggedMessages).toEqual([]);
+    expect(command['sharedConfig']).toEqual({ projectBasePath: dataDir, port: Number(port) });
+    await eventually(() => logFiles(dataDir).length === 2);
+    expect(readLog(dataDir, 'error.log')).toBe('');
+    expect(stdout).toEqual([]);
   });
 
-  it.each(['-1', '65536', '3000.5', 'abc', 'NaN', '1e400'])('rejects the invalid port %p as a usage error', async (port) => {
-    const command = commandWithFlags({ 'data-dir': '/data', port });
-    const failure = await command.init().catch((error: Error & { oclif?: { exit?: number } }) => error);
+  it.each(['-1', '65536', '3000.5', 'abc', 'NaN', '1e400', '', '   '])(
+    'rejects the invalid port %p as a usage error and records it in the project error log',
+    async (port) => {
+      const dataDir = temporaryDirectory();
+      const command = commandWithFlags({ 'data-dir': dataDir, port });
 
-    expect(failure).toMatchObject({ oclif: { exit: EXIT_USAGE } });
-    expect((failure as Error).message).toBe(INVALID_PORT_MESSAGE);
-    expect(loggedMessages).toEqual([]);
+      const failure = await command.init().catch((error: Error & { oclif?: { exit?: number } }) => error);
+
+      expect(failure).toMatchObject({ oclif: { exit: EXIT_USAGE } });
+      expect((failure as Error).message).toBe(INVALID_PORT_MESSAGE);
+      expect(command['sharedConfig']).toBeUndefined();
+      expect(stdout).toEqual([`\u001b[31merror: ${INVALID_PORT_MESSAGE}\u001b[39m\n`]);
+      await eventually(() => readLog(dataDir, 'error.log') !== '');
+      expect(readLog(dataDir, 'error.log')).toBe(`{"level":"error","message":"${INVALID_PORT_MESSAGE}"}\n`);
+      expect(readLog(dataDir, 'info.log')).toBe('');
+    },
+  );
+
+  it('exits 1 with the invalid base path error before validating the port when the data directory does not exist', async () => {
+    const exit = jest.spyOn(process, 'exit').mockImplementation(((code: number) => {
+      throw new Error(`exit ${code}`);
+    }) as never);
+    const missing = join(temporaryDirectory(), 'no-such-dir');
+    const command = commandWithFlags({ 'data-dir': missing, port: '99999' });
+
+    await expect(command.init()).rejects.toThrow('exit 1');
+
+    expect(exit).toHaveBeenCalledTimes(1);
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(stdout).toEqual(['\u001b[31merror: Provided base path is not valid\u001b[39m\n']);
+    expect(existsSync(missing)).toBe(false);
     expect(command['sharedConfig']).toBeUndefined();
   });
 
-  it.each(['', '   '])('rejects the blank port %p rather than binding an ephemeral port', async (port) => {
-    const command = commandWithFlags({ 'data-dir': '/data', port });
+  it('routes the command log through the project logger', async () => {
+    const dataDir = temporaryDirectory();
+    const print = jest.spyOn(cliux, 'print').mockImplementation(() => undefined);
+    const command = commandWithFlags({ 'data-dir': dataDir, port: '3000' });
+    await command.init();
 
-    await expect(command.init()).rejects.toMatchObject({ oclif: { exit: EXIT_USAGE } });
+    command.log('plain');
 
+    expect(print.mock.calls).toEqual([['plain', {}]]);
     expect(loggedMessages).toEqual([]);
-    expect(command['sharedConfig']).toBeUndefined();
   });
 
   it('propagates a rejection raised while parsing', async () => {
@@ -129,6 +214,7 @@ describe('launch:functions:serve init', () => {
 
     await expect(command.init()).rejects.toThrow('parse failed');
     expect(loggedMessages).toEqual([]);
+    expect(stdout).toEqual([]);
   });
 });
 

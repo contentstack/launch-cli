@@ -1,4 +1,6 @@
+import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { authHandler, configHandler } from '@contentstack/cli-utilities';
 import { Config, Interfaces, Plugin } from '@oclif/core';
@@ -101,11 +103,21 @@ describe('integration: retired V1 command names', () => {
   });
 
   it('leaves the live child of the retired functions topic reachable', async () => {
-    const { error } = await runCommand(['launch:functions:serve', '--port', '70000'], config);
+    const projectDir = mkdtempSync(join(tmpdir(), 'launch-retired-serve-'));
+
+    const { error } = await runCommand(['launch:functions:serve', '--port', '70000', '--data-dir', projectDir], config);
 
     expect(error?.oclif?.exit).toBe(2);
     expect(error?.message).toBe('Invalid port number. Please provide a valid port number between 0 and 65535.');
     expect(error?.message).not.toContain('was removed in Launch CLI v2');
+    const logs = join(projectDir, 'logs');
+    const deadline = Date.now() + 5000;
+    while ((!existsSync(logs) || readdirSync(logs).length < 2) && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    expect(readdirSync(logs).sort()).toEqual(['error.log', 'info.log']);
+    rmSync(projectDir, { recursive: true, force: true });
   });
 
   it('lists the V2 topics under launch --help', async () => {

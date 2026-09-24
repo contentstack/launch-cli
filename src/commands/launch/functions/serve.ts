@@ -4,6 +4,7 @@ import { EXIT_USAGE } from '../../../core/constants';
 import Contentfly from '../../../functions';
 import { PortInUseError } from '../../../functions/function.errors';
 import { isValidPort, serveFlags } from '../../../functions/function.inputs';
+import { Logger } from '../../../functions/function.logger';
 
 export default class Functions extends Command {
   static description = 'Serve cloud functions';
@@ -23,8 +24,13 @@ export default class Functions extends Command {
     const currentWorkingDirectory = process.cwd();
     const projectBasePath = flags['data-dir'] || currentWorkingDirectory;
 
+    const logger = new Logger({ projectBasePath });
+    this.log = logger.log.bind(logger);
+
     if (!isValidPort(flags.port)) {
-      this.error('Invalid port number. Please provide a valid port number between 0 and 65535.', { exit: EXIT_USAGE });
+      const message = 'Invalid port number. Please provide a valid port number between 0 and 65535.';
+      this.log(message, 'error');
+      this.error(message, { exit: EXIT_USAGE });
     }
 
     this.sharedConfig = {
