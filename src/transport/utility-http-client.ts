@@ -11,7 +11,7 @@ export function withoutDefaultContentType(client: HttpClient): HttpClient {
   const { headers } = client.requestConfig();
 
   if (headers) {
-    delete headers['Content-Type'];
+    headers['Content-Type'] = false;
   }
 
   return client;

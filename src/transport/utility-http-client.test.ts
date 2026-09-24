@@ -83,12 +83,12 @@ describe('createUtilityHttpClient', () => {
 });
 
 describe('withoutDefaultContentType', () => {
-  it('drops the JSON content type the utility client sets in its constructor and keeps every other header', () => {
+  it('suppresses the JSON content type the utility client sets in its constructor and keeps every other header', () => {
     const client = HttpClient.create().headers({ authtoken: 'kept' });
 
     withoutDefaultContentType(client);
 
-    expect(client.requestConfig().headers).toEqual({ authtoken: 'kept' });
+    expect(client.requestConfig().headers).toEqual({ authtoken: 'kept', 'Content-Type': false });
   });
 
   it('leaves a client with no headers at all untouched and returns that same client', () => {
@@ -101,6 +101,6 @@ describe('withoutDefaultContentType', () => {
   it('is applied to every client createUtilityHttpClient builds', () => {
     const client = createUtilityHttpClient() as unknown as HttpClient;
 
-    expect(client.requestConfig().headers).toEqual({});
+    expect(client.requestConfig().headers).toEqual({ 'Content-Type': false });
   });
 });
