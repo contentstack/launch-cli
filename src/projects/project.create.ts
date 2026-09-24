@@ -4,7 +4,7 @@ import { renderDetail } from '../core/render';
 import type { ServiceContext } from '../core/service-context';
 import { DeploymentUnsuccessfulError } from '../deployments/deployment.errors';
 import { deploymentUrlOf } from '../deployments/deployment.presenter';
-import { WatchTiming, watchDeployment } from '../deployments/deployment.watcher';
+import { DeploymentOutcome, WatchTiming, watchDeployment } from '../deployments/deployment.watcher';
 import type { Deployment } from '../deployments/types';
 import {
   FRAMEWORK_CHOICES,
@@ -24,6 +24,13 @@ import type { CreateProjectInput, DetectedFramework, Project } from './types';
 
 export const DEFAULT_OUTPUT_DIRECTORY = './';
 export const NO_DEPLOYMENT_STATUS = 'NONE';
+export const FIRST_LOOKUP_ATTEMPTS = 3;
+
+export function reasonOf(error: unknown): string {
+  const text = (error instanceof Error ? error.message : String(error)).trim();
+
+  return text.endsWith('.') ? text : `${text}.`;
+}
 
 export interface CreateRequest {
   org: string;
@@ -55,6 +62,16 @@ interface SourceSelection {
 
 function emptyEnvironmentVariables(): [] {
   return [];
+}
+
+export function frameworkLabelOf(detected: unknown): string | undefined {
+  if (typeof detected !== 'string') {
+    return undefined;
+  }
+
+  const wanted = detected.trim().toLowerCase();
+
+  return FRAMEWORK_CHOICES.find((label) => label.toLowerCase() === wanted);
 }
 
 export class ProjectCreator {
@@ -152,35 +169,61 @@ export class ProjectCreator {
     }
   }
 
+  private async appearing<T>(lookup: () => Promise<T | undefined>): Promise<T | undefined> {
+    for (let attempt = 1; ; attempt += 1) {
+      const found = await lookup();
+
+      if (found !== undefined || attempt >= FIRST_LOOKUP_ATTEMPTS) {
+        return found;
+      }
+
+      await this.timing.sleep(this.timing.pollDelayMs);
+    }
+  }
+
   private async follow(org: string, project: Project, envName: string): Promise<void> {
-    const environment = await this.services.api.environments.first({ org, project: project.uid });
+    const environment = await this.appearing(() =>
+      this.services.api.environments.first({ org, project: project.uid }),
+    );
 
     if (environment === undefined) {
       throw this.unsuccessful({ org, project, envName, status: NO_DEPLOYMENT_STATUS });
     }
 
-    const deployment = await this.services.api.deployments.latest({
-      org,
-      project: project.uid,
-      environment: environment.uid,
-    });
+    const deployment = await this.appearing(() =>
+      this.services.api.deployments.latest({ org, project: project.uid, environment: environment.uid }),
+    );
 
     if (deployment === undefined) {
       throw this.unsuccessful({ org, project, envName, environment, status: NO_DEPLOYMENT_STATUS });
     }
 
-    const outcome = await watchDeployment({
-      ...this.timing,
-      ux: this.services.ux,
-      isTTY: this.services.isTTY,
-      poll: () =>
-        this.services.api.deployments.get({
-          org,
-          project: project.uid,
-          environment: environment.uid,
-          deployment: deployment.uid,
-        }),
-    });
+    let outcome: DeploymentOutcome;
+
+    try {
+      outcome = await watchDeployment({
+        ...this.timing,
+        ux: this.services.ux,
+        isTTY: this.services.isTTY,
+        poll: () =>
+          this.services.api.deployments.get({
+            org,
+            project: project.uid,
+            environment: environment.uid,
+            deployment: deployment.uid,
+          }),
+      });
+    } catch (error) {
+      throw this.unsuccessful({
+        org,
+        project,
+        envName,
+        environment,
+        deployment,
+        status: NO_DEPLOYMENT_STATUS,
+        reason: reasonOf(error),
+      });
+    }
 
     if (outcome.kind === 'success') {
       renderDetail(this.services.ux, projectCreatedFields(project, this.siteUrl(outcome.deployment, environment)));
@@ -197,9 +240,11 @@ export class ProjectCreator {
     status: string;
     environment?: Environment;
     deployment?: Deployment;
+    reason?: string;
   }): DeploymentUnsuccessfulError {
     return new DeploymentUnsuccessfulError(
       deploymentFailureMessage({
+        reason: failure.reason,
         org: failure.org,
         projectName: failure.project.name ?? failure.project.uid,
         projectUid: failure.project.uid,
@@ -307,14 +352,12 @@ export class ProjectCreator {
       throw new MissingInputError('framework');
     }
 
-    const suggested = detected.framework === undefined ? undefined : frameworkPresetOf(detected.framework);
-
     return frameworkPresetOf(
       await askChoice(
         this.services.ux,
         'Framework preset',
         FRAMEWORK_CHOICES.map((label) => ({ name: label, value: label })),
-        suggested,
+        frameworkLabelOf(detected.framework),
       ),
     );
   }

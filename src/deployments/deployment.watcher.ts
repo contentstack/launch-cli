@@ -7,6 +7,7 @@ import type { Deployment } from './types';
 export const DEPLOYMENT_POLL_DELAY_MS = 2000;
 export const DEPLOYMENT_MAX_BACKOFF_STEPS = 5;
 export const DEPLOYMENT_WAIT_TIMEOUT_MS = 20 * 60 * 1000;
+export const DEPLOYMENT_MAX_POLL_ERRORS = 3;
 
 export interface WatchTiming {
   sleep(ms: number): Promise<void>;
@@ -45,9 +46,27 @@ export async function watchDeployment(deps: DeploymentWatchDeps): Promise<Deploy
   const deadline = deps.now() + deps.timeoutMs;
   let reported: string | undefined;
   let attempt = 0;
+  let consecutiveErrors = 0;
 
   for (;;) {
-    const deployment = await deps.poll();
+    let deployment: Deployment;
+
+    try {
+      deployment = await deps.poll();
+      consecutiveErrors = 0;
+    } catch (error) {
+      consecutiveErrors += 1;
+      attempt += 1;
+      const retryIn = backoff.delayFor(Math.min(attempt, deps.maxBackoffSteps));
+
+      if (consecutiveErrors >= DEPLOYMENT_MAX_POLL_ERRORS || deps.now() + retryIn >= deadline) {
+        throw error;
+      }
+
+      await deps.sleep(retryIn);
+      continue;
+    }
+
     const status = normalizeStatus(deployment.status);
     const kind = classifyStatus(deployment.status);
 

@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { UxLike } from '../core/render';
 import {
   DEPLOYMENT_MAX_BACKOFF_STEPS,
+  DEPLOYMENT_MAX_POLL_ERRORS,
   DEPLOYMENT_POLL_DELAY_MS,
   DEPLOYMENT_WAIT_TIMEOUT_MS,
   defaultWatchTiming,
@@ -45,6 +46,85 @@ function harness(statuses: (string | undefined)[], options: { isTTY?: boolean; t
 
   return { deps, lines, slept, pollCount: () => polls };
 }
+
+function failingHarness(outcomes: (string | Error)[], options: { timeoutMs?: number } = {}) {
+  const lines: string[] = [];
+  let clock = 0;
+  let polls = 0;
+
+  const ux: UxLike = {
+    print: (message: string) => {
+      lines.push(message);
+    },
+    inquire: async () => undefined as never,
+  };
+
+  const deps = {
+    poll: async (): Promise<Deployment> => {
+      const step = outcomes[Math.min(polls, outcomes.length - 1)];
+      polls += 1;
+
+      if (step instanceof Error) {
+        throw step;
+      }
+
+      return { uid: UID, deploymentNumber: 4, status: step, deploymentUrl: 'site.example.test' };
+    },
+    ux,
+    isTTY: false,
+    sleep: async (ms: number) => {
+      clock += ms;
+    },
+    now: () => clock,
+    pollDelayMs: 1000,
+    maxBackoffSteps: 3,
+    timeoutMs: options.timeoutMs ?? 60_000,
+  };
+
+  return { deps, lines, pollCount: () => polls };
+}
+
+describe('deployment wait loop surviving a failing poll', () => {
+  it('keeps waiting through a transient poll failure and reports the terminal status', async () => {
+    const blip = new Error('502 Bad Gateway');
+    const { deps, lines, pollCount } = failingHarness(['QUEUED', blip, 'DEPLOYING', 'LIVE']);
+
+    const outcome = await watchDeployment(deps);
+
+    expect(outcome.kind).toBe('success');
+    expect(outcome.status).toBe('LIVE');
+    expect(pollCount()).toBe(4);
+    expect(lines.some((line) => line.includes('502 Bad Gateway'))).toBe(false);
+  });
+
+  it('resets its patience after a poll that succeeded between failures', async () => {
+    const blip = new Error('503 Service Unavailable');
+    const { deps, pollCount } = failingHarness([blip, blip, 'DEPLOYING', blip, blip, 'LIVE']);
+
+    const outcome = await watchDeployment(deps);
+
+    expect(outcome.kind).toBe('success');
+    expect(pollCount()).toBe(6);
+  });
+
+  it('propagates the error once the poll has failed DEPLOYMENT_MAX_POLL_ERRORS times in a row', async () => {
+    const outage = new Error('500 Internal Server Error');
+    const { deps, pollCount } = failingHarness([outage]);
+
+    await expect(watchDeployment(deps)).rejects.toThrow('500 Internal Server Error');
+
+    expect(pollCount()).toBe(DEPLOYMENT_MAX_POLL_ERRORS);
+  });
+
+  it('propagates the error rather than waiting when the deadline is already behind it', async () => {
+    const outage = new Error('500 Internal Server Error');
+    const { deps, pollCount } = failingHarness([outage], { timeoutMs: 0 });
+
+    await expect(watchDeployment(deps)).rejects.toThrow('500 Internal Server Error');
+
+    expect(pollCount()).toBe(1);
+  });
+});
 
 describe('deployment wait loop', () => {
   it('stops at LIVE and reports it as a success', async () => {
@@ -119,14 +199,14 @@ describe('deployment wait loop', () => {
     expect(lines).toEqual(['→ Deployment #4 is UNKNOWN']);
   });
 
-  it('terminates by propagating an error raised mid-poll', async () => {
+  it('terminates by propagating an error that every retry raised again', async () => {
     const { deps, lines } = harness(['DEPLOYING']);
     const boom = new Error('The Launch API could not be reached.');
     let polls = 0;
     deps.poll = async () => {
       polls += 1;
 
-      if (polls === 2) {
+      if (polls >= 2) {
         throw boom;
       }
 
@@ -134,7 +214,7 @@ describe('deployment wait loop', () => {
     };
 
     await expect(watchDeployment(deps)).rejects.toBe(boom);
-    expect(polls).toBe(2);
+    expect(polls).toBe(1 + DEPLOYMENT_MAX_POLL_ERRORS);
     expect(lines).toEqual(['→ Deployment #4 is DEPLOYING']);
   });
 

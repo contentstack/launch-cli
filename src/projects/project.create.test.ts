@@ -48,6 +48,7 @@ interface Scenario {
   branches?: unknown[];
   detected?: unknown;
   createFails?: Error;
+  pollFails?: Error;
   createdProject?: unknown;
 }
 
@@ -56,10 +57,13 @@ let dataDir: string;
 function harness(scenario: Scenario = {}) {
   const printed: string[] = [];
   const asked: unknown[] = [];
+  const askedPayloads: Record<string, unknown>[] = [];
   const created: unknown[] = [];
   const gitCalls: unknown[] = [];
   let answerIndex = 0;
   let pollIndex = 0;
+  let latestIndex = 0;
+  let environmentIndex = 0;
 
   const statuses = scenario.statuses ?? ['LIVE'];
 
@@ -69,6 +73,7 @@ function harness(scenario: Scenario = {}) {
     },
     inquire: async (payload: unknown) => {
       asked.push((payload as { message: string }).message);
+      askedPayloads.push(payload as Record<string, unknown>);
       const answer = (scenario.answers ?? [])[answerIndex];
       answerIndex += 1;
       return answer as never;
@@ -97,12 +102,26 @@ function harness(scenario: Scenario = {}) {
       },
     },
     environments: {
-      first: async () =>
-        (scenario.environments ?? [{ uid: ENVIRONMENT_UID, name: 'Default', domains: [] }])[0],
+      first: async () => {
+        const list = scenario.environments ?? [{ uid: ENVIRONMENT_UID, name: 'Default', domains: [] }];
+        const found = list[Math.min(environmentIndex, list.length - 1)];
+        environmentIndex += 1;
+        return found;
+      },
     },
     deployments: {
-      latest: async () => (scenario.deployments ?? [{ uid: DEPLOYMENT_UID, deploymentNumber: 1 }])[0],
+      latest: async () => {
+        const list = scenario.deployments ?? [{ uid: DEPLOYMENT_UID, deploymentNumber: 1 }];
+        const found = list[Math.min(latestIndex, list.length - 1)];
+        latestIndex += 1;
+        return found;
+      },
       get: async () => {
+        if (scenario.pollFails) {
+          pollIndex += 1;
+          throw scenario.pollFails;
+        }
+
         const status = statuses[Math.min(pollIndex, statuses.length - 1)];
         pollIndex += 1;
         return { uid: DEPLOYMENT_UID, deploymentNumber: 1, status, deploymentUrl: 'my-site.example.test' };
@@ -131,7 +150,7 @@ function harness(scenario: Scenario = {}) {
 
   const services: ServiceContext = { api, ux, isTTY: scenario.isTTY ?? false };
 
-  return { creator: new ProjectCreator(services, advancingTiming()), printed, asked, created, gitCalls };
+  return { creator: new ProjectCreator(services, advancingTiming()), printed, asked, askedPayloads, created, gitCalls };
 }
 
 function configPathIn(dir: string): string {
@@ -390,6 +409,49 @@ describe('ProjectCreator prompting order and refusals', () => {
     expect((bodyOf(created).environment as Record<string, unknown>).outputDirectory).toBe('./');
   });
 
+  it('offers the detected framework as a default the picker can actually match', async () => {
+    const { creator, askedPayloads } = harness({
+      isTTY: true,
+      answers: ['Gatsby'],
+      detected: { framework: 'NEXTJS', buildCommand: 'npm run build', outputDirectory: '.next' },
+    });
+
+    await creator.create(gitRequest({ framework: undefined }));
+
+    const choices = askedPayloads[0].choices as { value: string }[];
+
+    expect(askedPayloads[0].default).toBe('NextJs');
+    expect(choices.map((choice) => choice.value)).toContain(askedPayloads[0].default);
+  });
+
+  it.each([['SvelteKit'], ['SolidStart'], ['Qwik'], ['']])(
+    'suggests nothing and still creates the project when the service detected the unknown framework %p',
+    async (framework) => {
+      const { creator, askedPayloads, created } = harness({
+        isTTY: true,
+        answers: ['Gatsby'],
+        detected: { framework, buildCommand: 'npm run build', outputDirectory: 'dist' },
+      });
+
+      await creator.create(gitRequest({ framework: undefined }));
+
+      expect(askedPayloads[0].default).toBeUndefined();
+      expect((bodyOf(created).environment as Record<string, unknown>).frameworkPreset).toBe('GATSBY');
+    },
+  );
+
+  it('suggests nothing when the service detected a framework that is not a string', async () => {
+    const { creator, askedPayloads } = harness({
+      isTTY: true,
+      answers: ['Gatsby'],
+      detected: { framework: 42, buildCommand: 'npm run build', outputDirectory: 'dist' },
+    });
+
+    await creator.create(gitRequest({ framework: undefined }));
+
+    expect(askedPayloads[0].default).toBeUndefined();
+  });
+
   it('offers no framework default when the service detected nothing', async () => {
     const { creator, created } = harness({ isTTY: true, answers: ['Other', 'npm start'], detected: {} });
 
@@ -567,6 +629,48 @@ describe('ProjectCreator waiting on the first deployment', () => {
     expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
     expect((failure as Error).message).toContain('its last status was NONE');
     expect((failure as Error).message).not.toContain('--deployment');
+  });
+
+  it('waits for the first deployment to appear rather than calling an empty page a failure', async () => {
+    const { creator, printed } = harness({ deployments: [undefined, { uid: DEPLOYMENT_UID, deploymentNumber: 1 }] });
+
+    await creator.create(gitRequest());
+
+    expect(printed).toContain('✔ Deployment #1 is LIVE');
+  });
+
+  it('waits for the first environment to appear rather than calling an empty page a failure', async () => {
+    const { creator, printed } = harness({
+      environments: [undefined, { uid: ENVIRONMENT_UID, name: 'Default', domains: [] }],
+    });
+
+    await creator.create(gitRequest());
+
+    expect(printed).toContain('✔ Deployment #1 is LIVE');
+  });
+
+  it('exits 1 disclosing what survived when the wait itself failed outright', async () => {
+    const { creator } = harness({ pollFails: new Error('The Launch API answered 502 Bad Gateway.') });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
+    expect((failure as DeploymentUnsuccessfulError).exitCode).toBe(1);
+    expect((failure as Error).message).toContain('The Launch API answered 502 Bad Gateway.');
+    expect((failure as Error).message).toContain('have not been rolled back');
+    expect((failure as Error).message).toContain('--org org1 --project p1');
+    expect((failure as Error).message).toContain('--environment e1');
+    expect((failure as Error).message).toContain('--deployment d1');
+  });
+
+  it('exits 1 disclosing what survived when the wait failed with something that is not an Error', async () => {
+    const { creator } = harness({ pollFails: 'socket hang up' as unknown as Error });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
+    expect((failure as Error).message).toContain('socket hang up.');
+    expect((failure as Error).message).toContain('have not been rolled back');
   });
 
   it('exits 1 naming no environment when the API reported none either', async () => {

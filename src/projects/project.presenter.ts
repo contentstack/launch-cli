@@ -33,6 +33,7 @@ export interface PartialCreateFailure {
   org: string;
   environmentUid?: string;
   deploymentUid?: string;
+  reason?: string;
 }
 
 export function projectCreatedFields(project: Project, siteUrl?: string): [string, string][] {
@@ -49,8 +50,13 @@ export function deploymentFailureMessage(failure: PartialCreateFailure): string 
   const environment = failure.environmentUid === undefined ? '' : ` --environment ${failure.environmentUid}`;
   const deployment = failure.deploymentUid === undefined ? '' : ` --deployment ${failure.deploymentUid}`;
 
+  const opening =
+    failure.reason === undefined
+      ? `The deployment did not succeed; its last status was ${failure.status}. `
+      : `The deployment could not be followed to completion: ${failure.reason} `;
+
   return (
-    `The deployment did not succeed; its last status was ${failure.status}. ` +
+    opening +
     `The project "${failure.projectName}" (${failure.projectUid}) and its environment ` +
     `"${failure.environmentName}" were created and have not been rolled back. ` +
     `Run csdx launch:deployments:create ${scope}${environment} to try the deployment again, ` +
