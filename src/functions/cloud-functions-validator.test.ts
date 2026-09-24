@@ -77,6 +77,33 @@ describe('CloudFunctionsValidator', () => {
     expect(error?.name).toBe('TopLevelDynamicRouteError');
   });
 
+  it('rejects a long filepath with a disallowed character in bounded time', () => {
+    const longName = 'a'.repeat(40);
+    const started = Date.now();
+
+    const error = new CloudFunctionsValidator(resourcesFor(`/${longName}!`)).validate();
+
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(error?.name).toBe('InvalidFilepathNamingError');
+    expect(error?.message).toContain(`Rename: /${longName}!.`);
+  });
+
+  it('rejects a long dynamic route name with a disallowed character in bounded time', () => {
+    const longName = 'a'.repeat(40);
+    const started = Date.now();
+
+    const error = new CloudFunctionsValidator(resourcesFor(`/api/[${longName}.value]`)).validate();
+
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(error?.name).toBe('InvalidFilepathNamingError');
+  });
+
+  it('accepts a long word run, a bracket group and a trailing word run in one segment', () => {
+    const validator = new CloudFunctionsValidator(resourcesFor(`/api/${'a'.repeat(40)}[id]tail`));
+
+    expect(validator.validate()).toBeUndefined();
+  });
+
   it('rejects an empty api resource uri', () => {
     const error = new CloudFunctionsValidator(resourcesFor('')).validate();
 
