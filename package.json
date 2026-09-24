@@ -81,7 +81,7 @@
     "build": "npm run clean && npm run compile",
     "clean": "rm -rf ./dist tsconfig.build.tsbuildinfo",
     "compile": "tsc -b tsconfig.json",
-    "lint": "eslint 'src/**/*.{js,ts}'",
+    "lint": "eslint 'src/**/*.{js,ts}' 'test/**/*.{js,ts}'",
     "lint-staged": "lint-staged",
     "postpack": "shx rm -f oclif.manifest.json",
     "prepack": "npm run build && oclif manifest && oclif readme",

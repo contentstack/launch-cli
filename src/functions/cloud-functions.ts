@@ -106,7 +106,7 @@ export class CloudFunctions {
         app.use(express.json());
         app.use(express.urlencoded({ extended: true }));
 
-        app.use((request: Request, response: Response, next) => {
+        app.use((_request: Request, response: Response, next) => {
           if (!response.getHeader('cache-control')) {
             response.setHeader('cache-control', 'no-store');
           }
@@ -117,7 +117,7 @@ export class CloudFunctions {
           cloudFunctionResource.apiResourceURI,
           async (request: Request, response: Response) => {
             try {
-              return await cloudFunctionResource.handler(request, response);
+              await cloudFunctionResource.handler(request, response);
             } catch (error) {
               console.error(error);
               response.status(500).send();

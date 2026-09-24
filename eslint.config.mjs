@@ -51,11 +51,6 @@ export default tseslint.config(
     },
     rules: {
       'max-len': 'off',
-      // chai assertions (e.g. expect(x).to.be.true) read as unused expressions
-      '@typescript-eslint/no-unused-expressions': 'off',
-      // test files use @ts-nocheck and scaffolding vars that aren't all referenced
-      '@typescript-eslint/ban-ts-comment': 'off',
-      '@typescript-eslint/no-unused-vars': 'off',
     },
   },
 );
