@@ -11,16 +11,20 @@ enum CloudFunctionErrorTypes {
 
 export class TopLevelDynamicRouteError extends Error {
   constructor(filepath: string) {
-    // eslint-disable-next-line max-len
-    super(`Top level dynamic route keys are not supported. Please move them to a sub directory Example: ${filepath} -> /api${filepath}`);
+    super(
+      'Top level dynamic route keys are not supported. ' +
+        `Please move them to a sub directory Example: ${filepath} -> /api${filepath}`,
+    );
     this.name = CloudFunctionErrorTypes.TOP_LEVEL_DYNAMIC_ROUTE_ERROR;
   }
 }
 
 export class InvalidFilepathNamingError extends Error {
   constructor(filepath: string) {
-    // eslint-disable-next-line max-len
-    super(`Rename: ${filepath}. Only alphanumeric characters, hyphens, underscores and [param] should be used in the naming of function and its parent directory.`);
+    super(
+      `Rename: ${filepath}. Only alphanumeric characters, hyphens, underscores and [param] ` +
+        'should be used in the naming of function and its parent directory.',
+    );
     this.name = CloudFunctionErrorTypes.INVALID_FILEPATH_NAMING_ERROR;
   }
 }

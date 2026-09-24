@@ -94,7 +94,7 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
     const region = this.launchRegion ?? {};
 
     const { services, resolved, dataDir, configPath } = await resolveLaunchContext<S>({
-      flags: flags as Partial<Record<FlagKey, unknown>>,
+      flags,
       inputs: this.contract.inputs as S,
       rules: this.contract.rules,
       launchHubUrl: resolveLaunchHubUrl(region),
