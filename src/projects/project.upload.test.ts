@@ -1,10 +1,12 @@
 import { UPLOAD_CONTENT_TYPE, UPLOAD_FILE_NAME, prepareUpload } from './project.upload';
-import type { SignedUploadField } from './types';
+import type { SignedUploadFormField, SignedUploadHeader } from './types';
 
-function pair(name: string, contents: string): SignedUploadField {
-  const field: SignedUploadField = { value: contents };
-  field.key = name;
-  return field;
+function header(name: string, contents: string): SignedUploadHeader {
+  return { key: name, value: contents };
+}
+
+function formField(name: string, contents: string): SignedUploadFormField {
+  return { formFieldKey: name, formFieldValue: contents };
 }
 
 function contentTypeNames(headers: Record<string, string>): string[] {
@@ -50,7 +52,7 @@ describe('signed upload preparation', () => {
 
   it.each([[''], ['   ']])('sends the zip content type when the signed url supplied a blank one (%p)', (blank) => {
     const prepared = prepareUpload(
-      { uploadUrl: UPLOAD_URL, uploadUid: UPLOAD_UID, headers: [pair('Content-Type', blank)] },
+      { uploadUrl: UPLOAD_URL, uploadUid: UPLOAD_UID, headers: [header('Content-Type', blank)] },
       ARCHIVE,
     );
 
@@ -65,7 +67,7 @@ describe('signed upload preparation', () => {
       {
         uploadUrl: UPLOAD_URL,
         uploadUid: UPLOAD_UID,
-        headers: [pair('Content-Type', 'application/octet-stream')],
+        headers: [header('Content-Type', 'application/octet-stream')],
       },
       ARCHIVE,
     );
@@ -81,7 +83,7 @@ describe('signed upload preparation', () => {
       {
         uploadUrl: UPLOAD_URL,
         uploadUid: UPLOAD_UID,
-        headers: [pair('X-Ms-Blob-Type', 'BlockBlob'), pair('Content-Length', '9999')],
+        headers: [header('X-Ms-Blob-Type', 'BlockBlob'), header('Content-Length', '9999')],
       },
       ARCHIVE,
     );
@@ -98,8 +100,8 @@ describe('signed upload preparation', () => {
       {
         uploadUrl: UPLOAD_URL,
         uploadUid: UPLOAD_UID,
-        headers: [pair('Content-Type', 'application/octet-stream')],
-        fields: [pair('acl', 'private')],
+        headers: [header('Content-Type', 'application/octet-stream')],
+        fields: [formField('acl', 'private')],
       },
       ARCHIVE,
     );
@@ -127,8 +129,8 @@ describe('signed upload preparation', () => {
         uploadUrl: UPLOAD_URL,
         uploadUid: UPLOAD_UID,
         fields: [
-          { key: 'key', value: 'uploads/project.zip' },
-          { key: 'policy', value: 'a-policy' },
+          formField('key', 'uploads/project.zip'),
+          formField('policy', 'a-policy'),
         ],
       },
       ARCHIVE,
@@ -148,7 +150,7 @@ describe('signed upload preparation', () => {
 
   it('keeps the method the signed url asked for even when it carries form fields', () => {
     const prepared = prepareUpload(
-      { uploadUrl: UPLOAD_URL, uploadUid: UPLOAD_UID, method: 'PUT', fields: [{ key: 'key', value: 'k' }] },
+      { uploadUrl: UPLOAD_URL, uploadUid: UPLOAD_UID, method: 'PUT', fields: [formField('key', 'k')] },
       ARCHIVE,
     );
 
@@ -157,7 +159,7 @@ describe('signed upload preparation', () => {
   });
 
   it('gives each upload its own boundary rather than a fixed one', () => {
-    const target = { uploadUrl: UPLOAD_URL, uploadUid: UPLOAD_UID, fields: [{ key: 'key', value: 'k' }] };
+    const target = { uploadUrl: UPLOAD_URL, uploadUid: UPLOAD_UID, fields: [formField('key', 'k')] };
 
     const first = prepareUpload(target, ARCHIVE).headers['content-type'];
     const second = prepareUpload(target, ARCHIVE).headers['content-type'];
@@ -170,7 +172,7 @@ describe('signed upload preparation', () => {
       {
         uploadUrl: UPLOAD_URL,
         uploadUid: UPLOAD_UID,
-        fields: [{ key: 'acl' }, { value: 'orphan' }, { key: '', value: 'blank' }],
+        fields: [{ formFieldKey: 'acl' }, { formFieldValue: 'orphan' }, { formFieldKey: '', formFieldValue: 'blank' }],
         headers: [{ value: 'headerless' }],
       },
       ARCHIVE,
@@ -188,5 +190,32 @@ describe('signed upload preparation', () => {
 
     expect(prepared.method).toBe('PUT');
     expect(prepared.body).toBe(ARCHIVE);
+  });
+
+  it('treats the null fields and headers the service may send as none at all', () => {
+    const prepared = prepareUpload({ uploadUrl: UPLOAD_URL, uploadUid: UPLOAD_UID, fields: null, headers: null }, ARCHIVE);
+
+    expect(prepared.method).toBe('PUT');
+    expect(prepared.body).toBe(ARCHIVE);
+    expect(prepared.headers).toEqual({
+      'content-type': UPLOAD_CONTENT_TYPE,
+      'content-length': String(ARCHIVE.length),
+    });
+  });
+
+  it('reads a form field by formFieldKey and formFieldValue as the signed-url contract names them', () => {
+    const prepared = prepareUpload(
+      {
+        uploadUrl: UPLOAD_URL,
+        uploadUid: UPLOAD_UID,
+        method: 'POST',
+        fields: [formField('X-Amz-Signature', 'signed-value')],
+      },
+      ARCHIVE,
+    );
+    const body = prepared.body.toString('binary');
+
+    expect(prepared.method).toBe('POST');
+    expect(body).toContain('Content-Disposition: form-data; name="X-Amz-Signature"\r\n\r\nsigned-value\r\n');
   });
 });

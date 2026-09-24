@@ -58,7 +58,7 @@ describe('integration: uploading the project archive on the wire', () => {
       {
         uploadUrl: `${HOST}/bucket`,
         uploadUid: 'upload-uid',
-        fields: [{ key: 'key', value: 'uploads/project.zip' }],
+        fields: [{ formFieldKey: 'key', formFieldValue: 'uploads/project.zip' }],
       },
       ARCHIVE,
     );

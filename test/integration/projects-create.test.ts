@@ -32,6 +32,60 @@ const CONFIG: Record<string, unknown> = {
 
 const CREATED_PROJECT = { uid: PROJECT_UID, name: 'My Site', projectType: 'GITPROVIDER' };
 
+const S3_FORM_FIELD_KEYS = [
+  'bucket',
+  'X-Amz-Algorithm',
+  'X-Amz-Credential',
+  'X-Amz-Date',
+  'X-Amz-Security-Token',
+  'key',
+  'Policy',
+  'X-Amz-Signature',
+];
+
+function awsSignedUpload() {
+  return {
+    uploadUrl: `${UPLOAD_HOST}/bucket`,
+    expiresIn: 600,
+    uploadUid: 'upload-uid',
+    method: 'POST',
+    fields: S3_FORM_FIELD_KEYS.map((formFieldKey) => ({
+      formFieldKey,
+      formFieldValue: randomBytes(6).toString('hex'),
+    })),
+  };
+}
+
+function azureSignedUpload() {
+  return {
+    uploadUrl: `${UPLOAD_HOST}/bucket`,
+    expiresIn: Date.now() + 600_000,
+    uploadUid: 'upload-uid',
+    method: 'PUT',
+    headers: [
+      { key: 'x-ms-blob-type', value: 'BlockBlob' },
+      { key: 'Content-Type', value: 'application/zip' },
+    ],
+  };
+}
+
+function asSent(body: unknown): string {
+  const text = String(body);
+
+  return /^[0-9a-f]+$/.test(text) ? Buffer.from(text, 'hex').toString('binary') : text;
+}
+
+function carriesEveryFormField(signed: ReturnType<typeof awsSignedUpload>, body: unknown): boolean {
+  const sent = asSent(body);
+
+  return (
+    signed.fields.every(
+      ({ formFieldKey, formFieldValue }) =>
+        sent.includes(`name="${formFieldKey}"\r\n\r\n${formFieldValue}\r\n`),
+    ) && sent.includes('name="file"; filename="project.zip"')
+  );
+}
+
 let config: Interfaces.Config;
 let onWire: string[];
 let dataDir: string;
@@ -242,17 +296,12 @@ describe('integration: launch:projects:create on the wire', () => {
 
   it('uploads the zipped data dir and creates a FILEUPLOAD project from the upload uid', async () => {
     let body: unknown;
-    let uploaded = '';
-    const signed = hub()
-      .get('/manage/projects/upload/signed_url')
-      .query({})
-      .reply(200, { uploadUrl: `${UPLOAD_HOST}/bucket`, uploadUid: 'upload-uid', method: 'PUT' });
+    const signedUpload = awsSignedUpload();
+    const signed = hub().get('/manage/projects/upload/signed_url').query({}).reply(200, signedUpload);
     const upload = nock(UPLOAD_HOST)
-      .put('/bucket')
-      .reply(200, function (_uri: string, sent: unknown) {
-        uploaded = String(sent);
-        return '';
-      });
+      .matchHeader('content-type', /^multipart\/form-data; boundary=\S+$/)
+      .post('/bucket', (sent: unknown) => carriesEveryFormField(signedUpload, sent))
+      .reply(204);
     const detect = hub()
       .get('/manage/projects/file-framework')
       .query({ uploadUid: 'upload-uid' })
@@ -293,7 +342,6 @@ describe('integration: launch:projects:create on the wire', () => {
 
     expect(error).toBeUndefined();
     expect([signed.isDone(), upload.isDone(), detect.isDone(), create.isDone()]).toEqual([true, true, true, true]);
-    expect(uploaded.length).toBeGreaterThan(0);
     expect(body).toMatchObject({
       projectType: 'FILEUPLOAD',
       fileUpload: { uploadUid: 'upload-uid' },
@@ -305,7 +353,7 @@ describe('integration: launch:projects:create on the wire', () => {
   });
 
   it('exits 2 naming --data-dir when there is no local project directory to upload', async () => {
-    const signed = hub().get('/manage/projects/upload/signed_url').query({}).reply(200, {});
+    const signed = hub().get('/manage/projects/upload/signed_url').query({}).reply(200, awsSignedUpload());
 
     const { error } = await runCommand(
       [
@@ -353,11 +401,12 @@ describe('integration: launch:projects:create on the wire', () => {
       .get('/v3/organizations')
       .query({ limit: '100', asc: 'name', include_count: 'true', skip: '0' })
       .reply(200, { organizations: [{ uid: ORG_UID, name: 'Acme' }], count: 1 });
-    hub()
-      .get('/manage/projects/upload/signed_url')
-      .query({})
-      .reply(200, { uploadUrl: `${UPLOAD_HOST}/bucket`, uploadUid: 'upload-uid', method: 'PUT' });
-    nock(UPLOAD_HOST).put('/bucket').reply(200, '');
+    hub().get('/manage/projects/upload/signed_url').query({}).reply(200, azureSignedUpload());
+    nock(UPLOAD_HOST)
+      .matchHeader('x-ms-blob-type', 'BlockBlob')
+      .matchHeader('content-type', 'application/zip')
+      .put('/bucket')
+      .reply(201, '');
     hub()
       .get('/manage/projects/file-framework')
       .query({ uploadUid: 'upload-uid' })

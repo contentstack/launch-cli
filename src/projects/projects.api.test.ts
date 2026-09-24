@@ -527,7 +527,13 @@ describe('ProjectsApi create and detection endpoints', () => {
   });
 
   it('asks for a signed upload url as an org-scoped GET', async () => {
-    const signed = { uploadUrl: 'https://uploads.example.test/x', uploadUid: 'upload-uid', method: 'PUT' };
+    const signed = {
+      uploadUrl: 'https://uploads.example.test/x',
+      expiresIn: 600,
+      uploadUid: 'upload-uid',
+      method: 'POST',
+      fields: [{ formFieldKey: 'bucket', formFieldValue: 'launch-uploads' }],
+    };
     const { client, requests } = fakeRestClient(signed);
 
     const result = await new ProjectsApi(client).signedUploadUrl({ org: 'org1' });

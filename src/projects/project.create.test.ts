@@ -23,6 +23,13 @@ const ORG = 'org1';
 const PROJECT_UID = 'p1';
 const ENVIRONMENT_UID = 'e1';
 const DEPLOYMENT_UID = 'd1';
+const SIGNED_UPLOAD = {
+  uploadUrl: 'https://uploads.example.test/x',
+  expiresIn: 600,
+  uploadUid: 'upload-uid',
+  method: 'POST',
+  fields: [{ formFieldKey: 'bucket', formFieldValue: 'launch-uploads' }],
+};
 
 function advancingTiming(): WatchTiming {
   let clock = 0;
@@ -110,7 +117,7 @@ function harness(scenario: Scenario = {}) {
           throw scenario.signedUrlFails;
         }
 
-        return { uploadUrl: 'https://uploads.example.test/x', uploadUid: 'upload-uid' };
+        return SIGNED_UPLOAD;
       },
       gitFramework: async (params: unknown) => {
         gitCalls.push(params);
@@ -575,10 +582,7 @@ describe('ProjectCreator on the FileUpload path', () => {
 
     expect(calls.signedUploadUrl).toEqual([{ org: ORG }]);
     expect(uploadArchive).toHaveBeenCalledTimes(1);
-    expect((uploadArchive as jest.Mock).mock.calls[0][0]).toEqual({
-      uploadUrl: 'https://uploads.example.test/x',
-      uploadUid: 'upload-uid',
-    });
+    expect((uploadArchive as jest.Mock).mock.calls[0][0]).toBe(SIGNED_UPLOAD);
     expect(bodyOf(created)).toMatchObject({
       projectType: 'FILEUPLOAD',
       fileUpload: { uploadUid: 'upload-uid' },

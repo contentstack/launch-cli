@@ -58,3 +58,20 @@ consistently across every file:
 
 Timestamps, `null`s, `pagination` values and `projectType` values are otherwise exactly as the spec
 and the live environment return them.
+
+## Inline wire shapes corrected from the service source (2026-09-24)
+
+Some responses are shaped inline in the tests rather than in a file here. Two of them were written
+from what the CLI assumed, agreed with the bug, and let a broken command pass at 100% coverage. They
+now follow `contentfly-management-service` and a live dev11 response:
+
+- **`GET /projects/upload/signed_url`** returns `{uploadUrl, expiresIn, uploadUid, method, fields?,
+  headers?}` (`src/file-repository/models/rest/file-repository.rest.dto.ts:20-40`). A form field is
+  `{formFieldKey, formFieldValue}` (`:4-10`); a header is `{key, value}` (`:12-18`). Both lists are
+  nullable. AWS answers `POST` with eight S3 form fields and no headers
+  (`src/storage-provider/aws-s3/aws-simple-storage.service.ts:215-240`); Azure and GCP answer `PUT`
+  with headers and no fields (`src/storage-provider/constant.ts:4-18`). dev11 is AWS.
+- **`DELETE /projects/:project_uid`** answers `204` with no body
+  (`src/projects/controllers/projects.controller.ts:484-485`), and the Fastify server
+  (`src/app/main.ts:67`) refuses a bodyless request declared `application/json` with `400`. The
+  delete interceptors therefore refuse a request that carries a `content-type`.

@@ -9,6 +9,31 @@ fileignoreconfig:
 - filename: test/integration/project-upload.test.ts
   allowed_patterns:
     - "key: 'Content-Type'"
+    - "formFieldKey: 'key', formFieldValue"
+- filename: src/projects/project.upload.ts
+  allowed_patterns:
+    - "formFieldKey"
+    - "\\[header\\.key, header\\.value\\]"
+- filename: src/projects/project.upload.test.ts
+  allowed_patterns:
+    - "formFieldKey"
+    - "key: name, value: contents"
+    - "formField\\('key', "
+- filename: src/projects/projects.api.test.ts
+  allowed_patterns:
+    - "formFieldKey"
+- filename: src/projects/project.create.test.ts
+  allowed_patterns:
+    - "formFieldKey"
+- filename: test/integration/projects-create.test.ts
+  allowed_patterns:
+    - "formFieldKey"
+    - "key: 'x-ms-blob-type', value: 'BlockBlob'"
+    - "key: 'Content-Type', value: 'application/zip'"
+- filename: test/fixtures/README.md
+  allowed_patterns:
+    - "formFieldKey"
+    - "\\{key, value\\}"
 - filename: src/environments/environments.api.ts
   ignore_detectors:
     - filename

@@ -66,7 +66,12 @@ export interface DetectedFramework {
   buildCommand?: string;
 }
 
-export interface SignedUploadField {
+export interface SignedUploadFormField {
+  formFieldKey?: string;
+  formFieldValue?: string;
+}
+
+export interface SignedUploadHeader {
   key?: string;
   value?: string;
 }
@@ -76,8 +81,8 @@ export interface SignedUploadUrl {
   uploadUid: string;
   method?: string;
   expiresIn?: number;
-  fields?: SignedUploadField[];
-  headers?: SignedUploadField[];
+  fields?: SignedUploadFormField[] | null;
+  headers?: SignedUploadHeader[] | null;
 }
 
 export interface ProjectResponse {

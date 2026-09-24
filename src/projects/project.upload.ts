@@ -5,7 +5,7 @@ import { URL } from 'node:url';
 
 import { isAbsent } from '../core/values';
 import { UploadFailedError } from './project.errors';
-import type { SignedUploadField, SignedUploadUrl } from './types';
+import type { SignedUploadFormField, SignedUploadHeader, SignedUploadUrl } from './types';
 
 export const UPLOAD_FILE_NAME = 'project.zip';
 export const UPLOAD_CONTENT_TYPE = 'application/zip';
@@ -16,10 +16,18 @@ export interface PreparedUpload {
   body: Buffer;
 }
 
-function pairs(fields: SignedUploadField[] | undefined): [string, string][] {
-  return (fields ?? [])
-    .filter((field) => typeof field.key === 'string' && field.key !== '')
-    .map((field) => [field.key as string, field.value ?? ''] as [string, string]);
+function named(entries: [string | undefined, string | undefined][]): [string, string][] {
+  return entries
+    .filter(([name]) => typeof name === 'string' && name !== '')
+    .map(([name, value]) => [name as string, value ?? ''] as [string, string]);
+}
+
+function headerPairs(headers: SignedUploadHeader[] | null | undefined): [string, string][] {
+  return named((headers ?? []).map((header) => [header.key, header.value]));
+}
+
+function formFieldPairs(fields: SignedUploadFormField[] | null | undefined): [string, string][] {
+  return named((fields ?? []).map((field) => [field.formFieldKey, field.formFieldValue]));
 }
 
 function multipart(fields: [string, string][], archive: Buffer): { boundary: string; body: Buffer } {
@@ -43,14 +51,14 @@ function multipart(fields: [string, string][], archive: Buffer): { boundary: str
 }
 
 export function prepareUpload(target: SignedUploadUrl, archive: Buffer): PreparedUpload {
-  const supplied = pairs(target.headers);
+  const supplied = headerPairs(target.headers);
   const headers: Record<string, string> = {};
 
   for (const [key, value] of supplied) {
     headers[key.toLowerCase()] = value;
   }
 
-  const fields = pairs(target.fields);
+  const fields = formFieldPairs(target.fields);
 
   if (fields.length === 0) {
     if (isAbsent(headers['content-type'])) {
