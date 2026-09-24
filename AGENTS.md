@@ -56,8 +56,9 @@ file and line that broke its rule, and each was proven red by reintroducing its 
 | Guard | Rule it enforces | Found by |
 |---|---|---|
 | `src/core/prompt-types.guard.test.ts` | Every prompt call in `src` names a literal `type`, and every such type is registered with the real inquirer `cliux.inquire` uses once `LaunchCommand.init` has run. inquirer silently turns an unregistered type into a plain text box. | D1: `search-list` used, never registered |
-| `test/integration/transport-content-type.test.ts` | For every method in `HTTP_METHODS`, a bodyless request carries no content type and a request with a body carries `application/json`, asserted on the wire. Bodyless POST, PUT and PATCH still go out as `application/x-www-form-urlencoded` - recorded with `it.failing`, and until the transport is fixed a source check forbids a POST, PUT or PATCH request literal with no `body`. Only `utility-http-client.ts` builds an `HttpClient` and only `rest-client.ts` sets the JSON type. | D5: every DELETE sent `Content-Type: application/json` |
+| `test/integration/transport-content-type.test.ts` | For every method in `HTTP_METHODS`, a bodyless request carries no content type and a request with a body carries `application/json`, asserted on the wire. `withoutDefaultContentType` suppresses the utility client's default, so a bodyless POST, PUT or PATCH (for example `deployments:cancel`) no longer goes out as `application/x-www-form-urlencoded`. Only `utility-http-client.ts` builds an `HttpClient` and only `rest-client.ts` sets the JSON type. | D5: every DELETE sent `Content-Type: application/json` |
 | `src/core/tty-streams.guard.test.ts` | `stdin.isTTY`, and the `isTTY` it becomes on the service context, are read only to decide whether the CLI may prompt (a read next to a prompt or a refusal to prompt) or on the plumbing lines that carry it there. Anything deciding what to draw reads `outputIsTTY` / `process.stdout.isTTY`. | D6: heartbeat drawn into a redirected file |
+| `test/integration/retired-commands.test.ts` (named commands) | Every `launch:…` command named anywhere in `src` - a retirement message, a failure hint, an example - is either a registered command or on `PLANNED_COMMANDS` with the ticket that builds it, and a command drops off that list once it ships. | Review: retirement messages and hints pointed at commands the beta does not have |
 | `src/core/prompt-funnel.guard.test.ts` | Every prompt goes through `LaunchCommand`'s `ux`, built once as `cancelOnInterrupt(cliux)`, so Ctrl-C at any prompt exits 3. No source calls `cliux.inquire` / `prompt` / `confirm` under any name, hands `cliux` on as a value, or imports a prompt library; `search-list.ts` may register a type but never prompt. | D2: Ctrl-C exited 130 |
 
 A new prompt, request, render path or command is covered by these guards without being listed in
@@ -249,7 +250,7 @@ If a new resource needs a change in `src/core/` or `src/transport/`, that is a s
 worth raising rather than a routine edit.
 
 **Confirm gate.** A destructive command opts in by adding `yes: {}` to its `inputs` - `--yes`
-is deliberately not a global flag: it sits in `coreFlags` like `org` or `limit`, and only
+is deliberately not a global flag: it sits in `coreFlags` like `limit` (`org` lives in `src/organizations/`), and only
 `LaunchCommand.baseFlags` (`--config`, `--data-dir`) reaches every command - and
 `await this.confirm('<question>')` in `run()` before the first request that changes anything. Reads
 before it are expected: `projects:delete` fetches the project so the question can name it.
@@ -379,7 +380,10 @@ cli-utilities' own `isAuthenticated()`. Nothing else may read `authorisationType
 
 A refresh is triggered by an HTTP 401 **or** by a non-2xx body whose `error_message`
 contains `access token is invalid or expired`, which is the shape some Contentstack
-services answer with; either way it happens at most once per request.
+services answer with; either way it happens at most once per request. A 401 whose error code is in
+the `launch.GIT_PROVIDER.` namespace is **not** a session problem - `POST /projects` answers 401 when
+Launch cannot reach the user's GitHub account - so it never triggers a refresh or a resend, and it is
+reported with the CLI's own GitHub wording rather than "run csdx auth:login".
 
 **Transport failures.** `createUtilityHttpClient` disarms the cli-utilities response
 interceptor, which carried four behaviours, so our layer owns all four. The proxy
@@ -391,9 +395,24 @@ CLI wording and a `retryable` flag, and `RetryPolicy.shouldRetryTransportError` 
 only on an idempotent method, on the same budget as a 429. `test/integration/transport-socket-hangup.test.ts`
 proves on a real socket that a POST is put on the wire exactly once.
 
+Every request carries a timeout (`DEFAULT_REQUEST_TIMEOUT_MS`, 60 s; `requestTimeoutMs` overrides it),
+so a server that accepts the connection and never answers cannot hang a command or push the deployment
+watcher past its deadline; the abandoned request is a retryable `LaunchNetworkError` for GET/HEAD and a
+one-shot failure for anything else. GET and HEAD are also retried on 502, 503 and 504, never a
+mutation, because the server may already have acted on it. A `Retry-After` given in whole seconds
+lengthens the wait up to `MAX_RETRY_AFTER_MS` (30 s); an HTTP date or anything unparseable falls back
+to the policy's own backoff.
+
+A proxy URL shown in a diagnostic has its `user:…@` part removed first (`withoutCredentials`), and
+`https_proxy`/`http_proxy` are read as well as the uppercase names.
+
 An API error body is untrusted input. `parseErrorEnvelope` reads it entry by entry and keeps only a
 string `code` and a string `message` from each, so a malformed body falls back to the status wording
-rather than surfacing `[object Object]` or a code of the wrong type.
+rather than surfacing `[object Object]` or a code of the wrong type. The management service sends a
+validation failure **field-named** - `errors: [{ "<field>": { code, message } }]`
+(`all-http-exception.filter.ts`) - and an entry with exactly one key whose value is an object is read
+that way, keeping the field name; without it every validation 400 read "request failed with status
+400".
 
 **The `.cs-launch.json` file.** `ProjectConfigStore` owns it. `load()` returns a typed
 `ProjectConfig`, applying the v1 rule that several branch blocks are usable only when they
@@ -409,6 +428,10 @@ overwrites a file it cannot parse as a config object**: invalid JSON, an array o
 reports that line and still exits 0, because the project exists; losing a user's file to recover
 from a typo in it is the wrong trade. A missing file is simply written fresh.
 
+`LaunchCommand` reads the default-location file only when a resolution spec first needs a value from
+it (`projectConfigLoader`), so a V1 file whose branch blocks disagree does not block a command whose
+flags already supply everything; a file named with `--config` is still read at once.
+
 The store's second constructor argument says whether the path was one the **user named**.
 At the implicit default path a missing or unreadable file is simply an empty config; at a
 path the user passed with `--config` it is a `UsageError` naming the path, because silence
@@ -423,7 +446,7 @@ there is **no server-side maximum at all**.
 | Constant | Value | What it is |
 |---|---|---|
 | `DEFAULT_LIMIT` | 100 | what `limit` resolves to when nobody passed it. `projects:list` fetches one page and stops - it does not loop - so the default is one high page |
-| `CLIENT_MAX_LIMIT` | 1000 | an honest **client-side sanity guard** on `--limit`, not a mirror of a server rule. There is no server rule to mirror. Do not "correct" it back to 100 because a doc table says 0-100 |
+| `CLIENT_MAX_LIMIT` | 1000 | an honest **client-side sanity guard** on `--limit`, not a mirror of a server rule. There is no server rule to mirror. Do not "correct" it back to 100 because a doc table says 0-100. The **floor is 1**: the service sends `limit=0` straight to MongoDB, which reads it as no limit, so `--limit 0` would return the whole organization |
 | `PICKER_PAGE_SIZE` | 100 | the page the interactive project picker fetches. It is separate from `CLIENT_MAX_LIMIT` on purpose: raising the client cap must never dump 1000 choices into a prompt |
 | `MAX_PAGES` | 100 | how many pages a name-to-uid scan will walk before raising `ProjectScanLimitError` |
 
@@ -479,12 +502,22 @@ at either means none, and the field is left out of the body. What the specs do o
 exactly like one from argv.
 
 The framework gate is the declarative rule `onlyWithValueOf('server-cmd', 'framework', ...)`,
-exported as `serverCommandFrameworkGate` and declared in `static rules`. It therefore fires after the
-resolution chain and **before any request**, which is the point: passing `--server-cmd` with a
-framework that has no server command costs exit 2 and nothing on the wire. The contract that falls
-out of running as a rule is that `--server-cmd` on argv requires `--framework` on argv; a user who
-wants to pick the framework interactively simply does not pass `--server-cmd`, and is prompted for
-one when the framework supports it.
+exported as `serverCommandFrameworkGate` and declared in `static rules` with `gitOnlyFlagRules`
+(`--branch`, `--namespace`, `--repo` only with `--type GitHub`). A rule judges its gate only when the
+user supplied the gate: with `--framework` on argv, a bad pairing costs exit 2 and nothing on the
+wire. When the framework is prompted or detected later, `ProjectCreator` applies the same check
+(`requireValueOf`) once it knows the framework, still before `POST /projects`.
+
+**Without a terminal, create uses what it can infer.** The framework is the detected one (exit 2 naming
+`--framework` when nothing was detected); the build and server commands are the detected ones, or none;
+the output directory is the detected one, or the framework's V1 default (`OUTPUT_DIRECTORY_BY_FRAMEWORK`:
+`./.next` for NEXTJS, `./build` for CRA and REMIX, and so on); the response mode is `buffered`. Each
+inferred value is printed with the flag that overrides it. On a terminal the same values are the
+prompt defaults. Type, project name and environment name have nothing to infer and stay required.
+
+**A folder already linked to a project is refused up front.** If the `.cs-launch.json` create would
+record into already names a project, create exits 2 before uploading or posting anything, naming that
+project and `--config`.
 
 **Deployment failure is a partial success, and the wording says so.** The project and environment are
 real and are **not** rolled back. Everything after `POST /projects` - finding the first environment,
@@ -492,14 +525,19 @@ finding its first deployment, and the wait itself - goes through the same wordin
 502 from a lookup still tells the user what exists. `deploymentFailureMessage` names the status, the project and
 environment that survived, and both follow-up commands with their scope already filled in -
 `deployments:create` to retry and `logs:get` to inspect. It exits **1**, not 2: nothing about the
-invocation was wrong.
+invocation was wrong. A wait that runs out is worded differently: the deployment may still finish, so
+the message says not to start another one and names `deployments:get` and `logs:get` instead of
+`deployments:create`.
 
 **The FileUpload archive.** `src/projects/project.archive.ts` owns the exclusion list
 (`node_modules`, `.git`, `.env`, `.env.local`, `.next`, `logs`, `.vscode`, `.cs-launch.json`) and
-applies it at **every** depth, not just the root. It also leaves out the file `--config` named when
+applies it at **every** depth, except `logs`, which is left out only at the root (the CLI's own log
+folder, as in V1) because a nested `logs/` is source such as a Next.js route. A `.zip` file at the root
+is also left out, as V1 did. Each file keeps its permissions, so an executable script stays
+executable. It also leaves out the file `--config` named when
 that file lives inside the data dir, compared after path resolution, so a config kept under another
 name is not deployed with the site. It skips symbolic links rather than following one
-into a loop. A path that is not a directory, and a directory that is empty once the exclusions apply,
+into a loop or out of the folder, and create prints which ones it skipped. A path that is not a directory, and a directory that is empty once the exclusions apply,
 are both `UsageError` naming `--data-dir` - uploading an empty or wrong archive silently is worse
 than refusing. `src/projects/project.upload.ts` splits into `prepareUpload` (pure: raw body, or
 multipart when the signed URL carries form fields) and `uploadArchive` (the socket). A blank
@@ -568,15 +606,21 @@ the management service is the wire contract, and for two flags they differ:
 naive `toUpperCase()` round trip in reverse. Both are explicit tables, and a test asserts the
 framework table is a bijection onto the service enum so a preset cannot be added on one side only.
 
-**Flag names come from the "All flags" tables (ruling D9).** Where the Commands Details per-command
-rows disagree with its §"All flags" tables, the tables win. That is why the CLI ships `--build-cmd`
-and `--server-cmd`: the rows say `--build-command` / `--server-command`, the tables say the short
-forms. Three shipped names are **not** what the tables say, and that is a known deviation awaiting a
-decision before 2.0.0 leaves beta, not something D9 justifies: the tables name `--organization`
-(alias `--org`), `--output-directory` (alias `--out-dir`) and `--response-mode` (alias `--res-mode`),
-while the CLI ships only `--org`, `--output-dir` (neither the table name nor its alias) and
-`--res-mode`, with no aliases declared. `--env-name` is the environment created alongside a project;
-`--name` stays the project name.
+**Flag names are the short forms the code ships.** `--org`, `--env`, `--env-name`, `--build-cmd`,
+`--server-cmd`, `--output-dir` and `--res-mode`, with no long-form aliases. The Commands Details page
+(Confluence) still shows long forms in places (`--organization`, `--environment`) and is not edited
+from here: each story ticket records its own differences from the page in a "Read first - skeleton
+alignment" section, and the code outranks the page. `--env-name` is the environment created alongside
+a project; `--name` stays the project name.
+
+**Consumers still on V1.** The deployment agent (`contentfly-deployment-agent`) starts Azure and GCP
+functions with `npx launch launch:functions` from a vendored `cli-launch@1.6.0` tarball
+(`internal/cloudfunctionops/local-packages/`, `SERVER_COMMAND` in
+`internal/cloudfunctionops/constants.go`). In 2.x `launch:functions` is a retired name that exits 2,
+and the agent would then wait forever for a port that never opens. Never replace that tarball with a
+2.x build without changing `SERVER_COMMAND` to `launch:functions:serve` in the same change. The same
+applies to any customer `package.json` script that runs `launch:functions`: it is a release-note line
+for 2.0, and the umbrella `@contentstack/cli` must keep pinning `cli-launch@^1` until 2.0 is GA.
 
 **`this.dataDir`.** `LaunchCommand` already computed the data directory to find `.cs-launch.json`;
 it now exposes it, because `projects:create` has to zip that same directory and `--data-dir` is a

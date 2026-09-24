@@ -31,7 +31,7 @@ $ npm run build
 $ csdx plugins:link <plugin path>
 
 NPM installation steps:
-$ csdx plugins:install @contentstack/cli-launch@2
+$ csdx plugins:install @contentstack/cli-launch@beta
 $ csdx launch:projects:list --org <org-uid>
 ```
 
@@ -290,7 +290,7 @@ USAGE
 FLAGS
   -c, --config=<value>    Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>  Current working directory
-      --limit=<value>     Number of records to fetch (0-1000)
+      --limit=<value>     Number of records to fetch (1-1000)
       --org=<value>       Organization UID
       --skip=<value>      Number of records to skip
 
