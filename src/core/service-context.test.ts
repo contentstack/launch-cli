@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 
 import { HttpClient, authHandler, configHandler } from '@contentstack/cli-utilities';
 
-import { ProjectsApi } from '../projects/projects.api';
 import { SessionExpiredError, UnauthenticatedError } from './errors';
 import { UxLike } from './render';
 import { buildServiceContext } from './service-context';
@@ -66,7 +65,8 @@ describe('buildServiceContext', () => {
       isTTY: true,
     });
 
-    expect(built.api.projects).toBeInstanceOf(ProjectsApi);
+    expect(typeof built.api.projects.list).toBe('function');
+    expect(typeof built.api.projects.get).toBe('function');
     expect(built.ux).toBe(UX);
     expect(built.isTTY).toBe(true);
     configSpy.mockRestore();

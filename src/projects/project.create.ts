@@ -22,6 +22,9 @@ import { PROJECT_TYPE_BY_CHOICE, PROJECT_TYPE_CHOICES, ProjectTypeChoice, projec
 import { uploadArchive } from './project.upload';
 import type { CreateProjectInput, DetectedFramework, Project } from './types';
 
+export { DEPLOYMENT_WAIT_TIMEOUT_MS, defaultWatchTiming } from '../deployments/deployment.watcher';
+export { serverCommandFrameworkGate } from '../environments/environment.inputs';
+
 export const DEFAULT_OUTPUT_DIRECTORY = './';
 export const NO_DEPLOYMENT_STATUS = 'NONE';
 export const FIRST_LOOKUP_ATTEMPTS = 3;
@@ -170,15 +173,17 @@ export class ProjectCreator {
   }
 
   private async appearing<T>(lookup: () => Promise<T | undefined>): Promise<T | undefined> {
-    for (let attempt = 1; ; attempt += 1) {
+    for (let attempt = 1; attempt < FIRST_LOOKUP_ATTEMPTS; attempt += 1) {
       const found = await lookup();
 
-      if (found !== undefined || attempt >= FIRST_LOOKUP_ATTEMPTS) {
+      if (found !== undefined) {
         return found;
       }
 
       await this.timing.sleep(this.timing.pollDelayMs);
     }
+
+    return lookup();
   }
 
   private async follow(org: string, project: Project, envName: string): Promise<void> {

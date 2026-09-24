@@ -1,6 +1,8 @@
-import { DEPLOYMENT_WAIT_TIMEOUT_MS } from '../../../deployments/deployment.watcher';
-import { ProjectCreator } from '../../../projects/project.create';
-import { serverCommandFrameworkGate } from '../../../environments/environment.inputs';
+import {
+  DEPLOYMENT_WAIT_TIMEOUT_MS,
+  ProjectCreator,
+  serverCommandFrameworkGate,
+} from '../../../projects/project.create';
 import ProjectsCreate from './create';
 
 function commandUnderTest(resolved: Record<string, unknown>, dataDir = '/tmp/site') {

@@ -6,7 +6,7 @@ import { AddressInfo } from 'net';
 import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 
-import { CloudFunctions } from './cloud-functions';
+import { CloudFunctions, listenFailure } from './cloud-functions';
 import { PortInUseError } from './function.errors';
 import { loadDataURL } from './load-data-url';
 
@@ -345,6 +345,41 @@ describe('CloudFunctions serve failures', () => {
     expect(failure).toBeInstanceOf(PortInUseError);
     expect((failure as Error).message).toContain(String(port));
     expect((failure as Error).message).toContain('--port');
+  });
+
+  it('maps a port clash to a port-in-use error naming the port', () => {
+    const clash = Object.assign(new Error('listen EADDRINUSE'), { code: 'EADDRINUSE' });
+
+    const mapped = listenFailure(clash, 4321);
+
+    expect(mapped).toBeInstanceOf(PortInUseError);
+    expect(mapped.message).toContain('4321');
+  });
+
+  it('passes a listen failure that is not a port clash through untouched', () => {
+    const other = Object.assign(new Error('listen EACCES'), { code: 'EACCES' });
+
+    const mapped = listenFailure(other, 4321);
+
+    expect(mapped).toBe(other);
+    expect(mapped).not.toBeInstanceOf(PortInUseError);
+  });
+
+  it('logs an error raised after the server is already listening rather than rejecting', async () => {
+    writeFunctionFile('hello.js', 'export default function hello(request, response) { response.send("hi"); }');
+    const logged: unknown[] = [];
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation((value: unknown) => {
+      logged.push(value);
+    });
+    const server = (await new CloudFunctions(workspace).serve(await freePort())) as Server;
+    const late = new Error('late failure');
+
+    server.emit('error', late);
+
+    expect(logged).toEqual([late]);
+
+    errorSpy.mockRestore();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
   it('propagates a listen failure that is not a port clash', async () => {

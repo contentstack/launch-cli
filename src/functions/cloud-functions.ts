@@ -23,6 +23,10 @@ import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import { loadDataURL } from './load-data-url';
 
+export function listenFailure(error: NodeJS.ErrnoException, servingPort: number): Error {
+  return error.code === 'EADDRINUSE' ? new PortInUseError(servingPort) : error;
+}
+
 export class CloudFunctions {
   private cloudFunctionsDirectoryPath: string;
   private pathToSourceCode: string;
@@ -35,7 +39,7 @@ export class CloudFunctions {
     this.pathToSourceCode = pathToSourceCode;
   }
 
-  async serve(servingPort: number): Promise<void> {
+  async serve(servingPort: number): Promise<Server | undefined> {
     const directoryExists = checkIfDirectoryExists(
       this.cloudFunctionsDirectoryPath
     );
@@ -68,7 +72,7 @@ export class CloudFunctions {
 
     dotenv.config({ path: path.join(this.pathToSourceCode, ENV_FILE_NAME) });
 
-    await this.startServer(app, servingPort);
+    return this.startServer(app, servingPort);
   }
 
   private startServer(app: Express, servingPort: number): Promise<Server> {
@@ -87,7 +91,7 @@ export class CloudFunctions {
           return;
         }
 
-        reject(error.code === 'EADDRINUSE' ? new PortInUseError(servingPort) : error);
+        reject(listenFailure(error, servingPort));
       });
     });
   }
