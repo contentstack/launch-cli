@@ -3,7 +3,7 @@ import { join } from 'path';
 import { CloudFunctions } from './cloud-functions';
 import { Contentfly } from './contentfly';
 
-jest.mock('./cloud-functions');
+jest.mock('./cloud-functions', () => ({ CloudFunctions: jest.fn() }));
 
 const constructedWith: string[] = [];
 const servedPorts: number[] = [];
