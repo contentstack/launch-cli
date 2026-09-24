@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -222,14 +222,60 @@ describe('ProjectConfigStore.save', () => {
     expect(fileAt(store)).toEqual({ [DEFAULT_BLOCK_KEY]: { uid: 'p1', organizationUid: 'org1' } });
   });
 
-  it('writes a single default block when the existing file is not valid JSON', () => {
+  it.each([['{ not json '], ['not json'], ['']])(
+    'refuses to overwrite a file whose contents %p are not valid JSON, leaving it byte for byte',
+    (contents) => {
+      const path = tempPath();
+      writeFileSync(path, contents);
+      const store = new ProjectConfigStore(path);
+
+      const failure = (() => {
+        try {
+          store.save({ uid: 'p1', organizationUid: 'org1' });
+          return undefined;
+        } catch (error) {
+          return error;
+        }
+      })();
+
+      expect(failure).toBeInstanceOf(UsageError);
+      expect((failure as UsageError).message).toBe(
+        `The config file at '${path}' is not valid JSON. It was left unchanged.`,
+      );
+      expect(readFileSync(path, 'utf8')).toBe(contents);
+    },
+  );
+
+  it.each([['[{"keep":"me"}]'], ['[]'], ['null'], ['42'], ['"string"'], ['true']])(
+    'refuses to overwrite a file whose root %s is not a config object, leaving it byte for byte',
+    (contents) => {
+      const path = tempPath();
+      writeFileSync(path, contents);
+      const store = new ProjectConfigStore(path);
+
+      expect(() => store.save({ uid: 'p1', organizationUid: 'org1' })).toThrow(
+        new UsageError(`The config file at '${path}' does not hold a project config. It was left unchanged.`),
+      );
+      expect(readFileSync(path, 'utf8')).toBe(contents);
+    },
+  );
+
+  it('refuses to write to a path that exists but cannot be read as a file', () => {
     const path = tempPath();
-    writeFileSync(path, 'not json');
+    mkdirSync(path);
     const store = new ProjectConfigStore(path);
 
-    store.save({ uid: 'p1', organizationUid: 'org1' });
+    expect(() => store.save({ uid: 'p1', organizationUid: 'org1' })).toThrow(
+      new UsageError(`Could not read the config file at '${path}'. It was left unchanged.`),
+    );
+  });
 
-    expect(fileAt(store)).toEqual({ [DEFAULT_BLOCK_KEY]: { uid: 'p1', organizationUid: 'org1' } });
+  it('refuses an unparseable file the same way whether or not the user named the path', () => {
+    const path = tempPath();
+    writeFileSync(path, '{ not json ');
+
+    expect(() => new ProjectConfigStore(path, true).save({ uid: 'p1' })).toThrow('It was left unchanged.');
+    expect(readFileSync(path, 'utf8')).toBe('{ not json ');
   });
 
   it('merges into the sole existing block rather than replacing it', () => {

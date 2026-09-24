@@ -860,6 +860,22 @@ describe('ProjectCreator writing the project config', () => {
     );
   });
 
+  it('reports the miss and leaves an unparseable config file untouched, still completing the create', async () => {
+    writeFileSync(configPathIn(dataDir), '{ not json ');
+    const { creator, printed, created } = harness();
+
+    await expect(creator.create(gitRequest({ configPath: configPathIn(dataDir) }))).resolves.toBeUndefined();
+
+    expect(readFileSync(configPathIn(dataDir), 'utf8')).toBe('{ not json ');
+    expect(created).toHaveLength(1);
+    expect(printed).toContain(
+      `Could not record this project in ${configPathIn(dataDir)}: ` +
+        `The config file at '${configPathIn(dataDir)}' is not valid JSON. It was left unchanged. ` +
+        'Pass --org and --project explicitly when you run Launch commands in this folder.',
+    );
+    expect(printed.some((line) => line.includes(PROJECT_UID))).toBe(true);
+  });
+
   it('reports the miss and still reports the created project when the file cannot be written', async () => {
     const unwritable = join(dataDir, 'no-such-folder', '.cs-launch.json');
     const { creator, printed } = harness();

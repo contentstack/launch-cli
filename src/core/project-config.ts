@@ -71,7 +71,7 @@ export class ProjectConfigStore {
   }
 
   save(config: ProjectConfig): void {
-    const blocks = this.blocks();
+    const blocks = this.existingBlocks();
     const entries = Object.entries(blocks);
 
     if (entries.length > 1) {
@@ -110,6 +110,16 @@ export class ProjectConfigStore {
     }
   }
 
+  private existingBlocks(): Blocks {
+    const read = this.read();
+
+    if (typeof read === 'string') {
+      throw new UsageError(`${read} It was left unchanged.`);
+    }
+
+    return read ?? {};
+  }
+
   private unusable(reason: string): Blocks {
     if (this.required) {
       throw new UsageError(reason);
@@ -119,8 +129,18 @@ export class ProjectConfigStore {
   }
 
   private blocks(): Blocks {
-    if (!existsSync(this.path)) {
+    const read = this.read();
+
+    if (read === undefined) {
       return this.unusable(`No config file found at '${this.path}'. Pass --config with a path that exists.`);
+    }
+
+    return typeof read === 'string' ? this.unusable(read) : read;
+  }
+
+  private read(): Blocks | string | undefined {
+    if (!existsSync(this.path)) {
+      return undefined;
     }
 
     let contents: string;
@@ -128,7 +148,7 @@ export class ProjectConfigStore {
     try {
       contents = readFileSync(this.path, 'utf8');
     } catch {
-      return this.unusable(`Could not read the config file at '${this.path}'.`);
+      return `Could not read the config file at '${this.path}'.`;
     }
 
     let parsed: unknown;
@@ -136,11 +156,9 @@ export class ProjectConfigStore {
     try {
       parsed = JSON.parse(contents);
     } catch {
-      return this.unusable(`The config file at '${this.path}' is not valid JSON.`);
+      return `The config file at '${this.path}' is not valid JSON.`;
     }
 
-    return isBlock(parsed)
-      ? parsed
-      : this.unusable(`The config file at '${this.path}' does not hold a project config.`);
+    return isBlock(parsed) ? parsed : `The config file at '${this.path}' does not hold a project config.`;
   }
 }

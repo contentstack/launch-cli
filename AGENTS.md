@@ -284,9 +284,12 @@ proves on a real socket that a POST is put on the wire exactly once.
 **The `.cs-launch.json` file.** `ProjectConfigStore` owns it. `load()` returns a typed
 `ProjectConfig`, applying the v1 rule that several branch blocks are usable only when they
 agree on one project. A resolution spec addresses it by a key of `ProjectConfig`, never a
-dotted string. There is no `save()` yet: it had no production caller, and its
-write-into-every-branch-block semantics are a design question the first command that needs
-to write the file should settle.
+dotted string. `save()` has one caller, `projects:create`, which records the project it created.
+It merges into every branch block, and it **never overwrites a file it cannot parse as a config
+object**: invalid JSON, an array or any other non-object root, or a path it cannot read is a
+`UsageError` ending "It was left unchanged.", whether or not the user named the path. The create
+reports that line and still exits 0, because the project exists; losing a user's file to recover
+from a typo in it is the wrong trade. A missing file is simply written fresh.
 
 The store's second constructor argument says whether the path was one the **user named**.
 At the implicit default path a missing or unreadable file is simply an empty config; at a
