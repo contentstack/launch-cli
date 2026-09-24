@@ -319,11 +319,28 @@ promoting these to `src/core/catalog.ts` now.
 | 3 | `EXIT_CANCELLED` | the user declined a confirmation or chose nothing at a picker (`CancelledError`) |
 
 `launch:functions:serve` is deliberately a plain oclif `Command` rather than a
-`LaunchCommand`, because it talks to no API and needs no auth gate - but it is inside the
-same contract: a bad port is `this.error(..., { exit: EXIT_USAGE })` on stderr, and its
-`--port` flag declares `env: 'PORT'` so oclif applies the usual precedence (argv, then the
-environment, then the default) and shows it in `--help`. Never read `process.env` ahead of
-a parsed flag.
+`LaunchCommand`, because it talks to no API and needs no auth gate, and it is **outside**
+this contract on purpose: the product owner's instruction is no functional difference from
+V1 in `serve`. Its port handling is V1's, byte for byte:
+
+- The port is `process.env.PORT || flags.port`, applied by the command after parsing. A set
+  `PORT` beats an explicit `--port`, and an empty `PORT` falls through to the flag. The
+  `--port` flag therefore does **not** declare `env: 'PORT'` - oclif's precedence (argv
+  first) is the opposite of V1's, and restoring it would be a behaviour change.
+- An invalid port prints `Invalid port number. Please provide a valid port number between 0
+  and 65535.` **once**, through the restored V1 logger (`src/functions/function.logger.ts`),
+  which writes every level - `error` included - to **stdout**, as winston's `Console`
+  transport does without `stderrLevels`, and records it in `logs/error.log`. The command
+  then calls `this.exit(EXIT_RUNTIME)`: exit **1**, and nothing on stderr. Do not add a
+  `this.error(...)` after the log line - that was a second print and an exit 2.
+
+Three V1 defects stay fixed and are the only approved differences: an empty or whitespace
+port, from either `--port` or `PORT`, is rejected through that same one-message exit-1 path
+(V1 accepted it because `Number('') === 0` and served on a random port); a busy port raises
+`PortInUseError` and exits 2 with a clean message (V1 crashed on an unhandled `error`
+event); and filepath validation is linear-time (V1's regex took 41 seconds on a plausible
+40-character filename). `test/integration/functions-serve-port.test.ts` pins the port
+precedence and the single message end to end.
 
 A declined confirmation is a deliberate "no", not a failure, so it does not share code 1 with an
 API 500 - a CI log has to be able to tell those apart. 130 would claim the process was killed by
