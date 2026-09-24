@@ -4,7 +4,7 @@ const config = {
   testEnvironment: 'node',
   restoreMocks: true,
   testMatch: ['**/src/**/*.test.ts', '**/test/integration/**/*.test.ts'],
-  setupFilesAfterEnv: ['<rootDir>/test/credential-guard.setup.ts'],
+  setupFilesAfterEnv: ['<rootDir>/test/credential-guard.setup.ts', '<rootDir>/test/no-terminal.setup.ts'],
   moduleNameMapper: {
     '^uuid$': '<rootDir>/test/uuid-shim.js',
   },
