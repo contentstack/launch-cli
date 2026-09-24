@@ -45,6 +45,25 @@ the gate as a floor, never as evidence of correctness.
    engines while its tests killed 1 of 6 targeted mutants - the error-path fake discarded the delay
    it was handed, and nothing read the documented `now() + delay >= deadline` boundary.
 
+**A defect the live harness finds is closed only with two tests.** When the live harness
+(`docs/launch-cli-manual-tests`) finds a defect, it gets (1) a regression test that fails on the old
+code and (2) a class-level test where one is feasible, before it is closed. The regression test pins
+that bug; the class test fails on the *next* bug of the same kind, in code that does not exist yet.
+Before writing a new class test, check the guards below: if the defect belongs to one of their
+classes, extend that guard rather than adding a second one beside it. Each guard fails naming the
+file and line that broke its rule, and each was proven red by reintroducing its defect.
+
+| Guard | Rule it enforces | Found by |
+|---|---|---|
+| `src/core/prompt-types.guard.test.ts` | Every prompt call in `src` names a literal `type`, and every such type is registered with the real inquirer `cliux.inquire` uses once `LaunchCommand.init` has run. inquirer silently turns an unregistered type into a plain text box. | D1: `search-list` used, never registered |
+| `test/integration/transport-content-type.test.ts` | For every method in `HTTP_METHODS`, a bodyless request carries no content type and a request with a body carries `application/json`, asserted on the wire. Bodyless POST, PUT and PATCH still go out as `application/x-www-form-urlencoded` - recorded with `it.failing`, and until the transport is fixed a source check forbids a POST, PUT or PATCH request literal with no `body`. Only `utility-http-client.ts` builds an `HttpClient` and only `rest-client.ts` sets the JSON type. | D5: every DELETE sent `Content-Type: application/json` |
+| `src/core/tty-streams.guard.test.ts` | `stdin.isTTY`, and the `isTTY` it becomes on the service context, are read only to decide whether the CLI may prompt (a read next to a prompt or a refusal to prompt) or on the plumbing lines that carry it there. Anything deciding what to draw reads `outputIsTTY` / `process.stdout.isTTY`. | D6: heartbeat drawn into a redirected file |
+| `src/core/prompt-funnel.guard.test.ts` | Every prompt goes through `LaunchCommand`'s `ux`, built once as `cancelOnInterrupt(cliux)`, so Ctrl-C at any prompt exits 3. No source calls `cliux.inquire` / `prompt` / `confirm` under any name, hands `cliux` on as a value, or imports a prompt library; `search-list.ts` may register a type but never prompt. | D2: Ctrl-C exited 130 |
+
+A new prompt, request, render path or command is covered by these guards without being listed in
+them. Do not add an exemption to a guard to make a new file pass: if a guard is wrong about a file,
+fix the rule and prove the fixed rule still goes red on the original defect.
+
 **Dynamic imports under Jest — read before adding a `loadDataURL` test.** `loadDataURL` uses
 `new Function('u', 'return import(u)')` so the dynamic import survives the commonjs build; a plain
 `import()` is rewritten by `tsc` into `require()`, which cannot load a `data:` URL and silently
