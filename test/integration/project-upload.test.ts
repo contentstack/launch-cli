@@ -1,7 +1,7 @@
 import nock from 'nock';
 
 import { UploadFailedError } from '../../src/projects/project.errors';
-import { uploadArchive } from '../../src/projects/project.upload';
+import { UPLOAD_IDLE_TIMEOUT_MS, uploadArchive } from '../../src/projects/project.upload';
 
 const HOST = 'https://uploads.integration.test';
 const ARCHIVE = Buffer.from('archive-bytes');
@@ -132,5 +132,22 @@ describe('integration: uploading the project archive on the wire', () => {
 
     expect(failure).toBeInstanceOf(UploadFailedError);
     expect((failure as Error).message).toBe('The upload of your project files failed: socket hang up');
+  });
+
+  it('gives up with exit 1 when the upload stalls, rather than hanging the command', async () => {
+    nock(HOST).put('/bucket').delayConnection(2000).reply(201);
+
+    const failure = await uploadArchive({ uploadUrl: `${HOST}/bucket`, uploadUid: 'u' }, ARCHIVE, 50).catch(
+      (error: Error) => error,
+    );
+
+    expect(failure).toBeInstanceOf(UploadFailedError);
+    expect((failure as Error).message).toBe(
+      'The upload of your project files stalled: nothing was sent or received for 0.05 seconds.',
+    );
+  });
+
+  it('waits up to two minutes of silence by default, a limit on idleness rather than on the size of the upload', () => {
+    expect(UPLOAD_IDLE_TIMEOUT_MS).toBe(120_000);
   });
 });

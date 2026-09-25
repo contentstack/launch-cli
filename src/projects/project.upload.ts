@@ -9,6 +9,7 @@ import type { SignedUploadFormField, SignedUploadHeader, SignedUploadUrl } from 
 
 export const UPLOAD_FILE_NAME = 'project.zip';
 export const UPLOAD_CONTENT_TYPE = 'application/zip';
+export const UPLOAD_IDLE_TIMEOUT_MS = 120_000;
 
 export interface PreparedUpload {
   method: string;
@@ -77,7 +78,11 @@ export function prepareUpload(target: SignedUploadUrl, archive: Buffer): Prepare
   return { method: target.method ?? 'POST', headers, body: form.body };
 }
 
-export function uploadArchive(target: SignedUploadUrl, archive: Buffer): Promise<void> {
+export function uploadArchive(
+  target: SignedUploadUrl,
+  archive: Buffer,
+  idleTimeoutMs = UPLOAD_IDLE_TIMEOUT_MS,
+): Promise<void> {
   const prepared = prepareUpload(target, archive);
   const url = new URL(target.uploadUrl);
   const send = url.protocol === 'http:' ? httpRequest : httpsRequest;
@@ -97,6 +102,15 @@ export function uploadArchive(target: SignedUploadUrl, archive: Buffer): Promise
 
     request.on('error', (error: Error) => {
       reject(new UploadFailedError(`The upload of your project files failed: ${error.message}`));
+    });
+
+    request.setTimeout(idleTimeoutMs, () => {
+      reject(
+        new UploadFailedError(
+          `The upload of your project files stalled: nothing was sent or received for ${idleTimeoutMs / 1000} seconds.`,
+        ),
+      );
+      request.destroy();
     });
 
     request.end(prepared.body);

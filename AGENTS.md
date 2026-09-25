@@ -542,7 +542,9 @@ are both `UsageError` naming `--data-dir` - uploading an empty or wrong archive 
 than refusing. `src/projects/project.upload.ts` splits into `prepareUpload` (pure: raw body, or
 multipart when the signed URL carries form fields) and `uploadArchive` (the socket). A blank
 `Content-Type` supplied by the presign is absent, as blank values are everywhere else, so the zip
-content type is sent; anything outside 200-299, a 3xx redirect included, is an `UploadFailedError`.
+content type is sent; anything outside 200-299, a 3xx redirect included, is an `UploadFailedError`,
+and so is a socket that sends and receives nothing for `UPLOAD_IDLE_TIMEOUT_MS` (120 s) - an idle limit,
+not a total one, so a large archive that is still moving is never cut off.
 It uses `node:http`/`node:https` rather than `fetch` so `nock` can intercept it - nock 13 does not see
 undici's `fetch`.
 
