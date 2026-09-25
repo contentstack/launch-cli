@@ -1,4 +1,5 @@
 import type { TableColumn } from '../core/render';
+import { styled } from '../core/style';
 import type { Project, ProjectUpdate } from './types';
 
 export const PROJECT_COLUMNS: TableColumn<Project>[] = [
@@ -37,6 +38,10 @@ export interface PartialCreateFailure {
   deploymentUid?: string;
   reason?: string;
   timedOut?: boolean;
+}
+
+export function deploymentUrlLine(url: string, outputIsTTY: boolean): string {
+  return `${styled('Deployment URL', 'bold', outputIsTTY)} ${styled(url, 'cyan', outputIsTTY)}`;
 }
 
 export function projectCreatedFields(project: Project, siteUrl?: string): [string, string][] {

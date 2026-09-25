@@ -5,6 +5,7 @@ import {
   DEPLOYMENT_MAX_BACKOFF_STEPS,
   DEPLOYMENT_MAX_POLL_ERRORS,
   DEPLOYMENT_POLL_DELAY_MS,
+  DEPLOYMENT_LOADER_MESSAGE,
   DEPLOYMENT_LOGS_FROM,
   DEPLOYMENT_WAIT_TIMEOUT_MS,
   defaultWatchTiming,
@@ -34,6 +35,7 @@ function harness(statuses: (string | undefined)[], options: { outputIsTTY?: bool
       return { uid: UID, deploymentNumber: 4, status: statuses[index], deploymentUrl: 'site.example.test' };
     },
     logs: async (): Promise<DeploymentLog[]> => [],
+    loader: { start: () => undefined, stop: () => undefined },
     ux,
     outputIsTTY: options.outputIsTTY ?? false,
     sleep: async (ms: number) => {
@@ -74,6 +76,7 @@ function failingHarness(outcomes: (string | Error)[], options: { timeoutMs?: num
       return { uid: UID, deploymentNumber: 4, status: step, deploymentUrl: 'site.example.test' };
     },
     logs: async (): Promise<DeploymentLog[]> => [],
+    loader: { start: () => undefined, stop: () => undefined },
     ux,
     outputIsTTY: false,
     sleep: async (ms: number) => {
@@ -188,11 +191,7 @@ describe('deployment wait loop', () => {
       deployment: { uid: UID, deploymentNumber: 4, status: 'LIVE', deploymentUrl: 'site.example.test' },
     });
     expect(pollCount()).toBe(3);
-    expect(lines).toEqual([
-      '→ Deployment #4 is QUEUED',
-      '→ Deployment #4 is DEPLOYING',
-      '✔ Deployment #4 is LIVE',
-    ]);
+    expect(lines).toEqual([]);
   });
 
   it('stops at DEPLOYED and reports it as a success', async () => {
@@ -236,7 +235,7 @@ describe('deployment wait loop', () => {
 
     expect(outcome.kind).toBe('timed-out');
     expect(outcome.status).toBe('ROLLING_BACK');
-    expect(lines).toEqual(['→ Deployment #4 is ROLLING_BACK']);
+    expect(lines).toEqual([]);
   });
 
   it('terminates when a status stops being reported at all', async () => {
@@ -246,7 +245,7 @@ describe('deployment wait loop', () => {
 
     expect(outcome.kind).toBe('timed-out');
     expect(outcome.status).toBe('UNKNOWN');
-    expect(lines).toEqual(['→ Deployment #4 is UNKNOWN']);
+    expect(lines).toEqual([]);
   });
 
   it('terminates by propagating an error that every retry raised again', async () => {
@@ -265,7 +264,7 @@ describe('deployment wait loop', () => {
 
     await expect(watchDeployment(deps)).rejects.toBe(boom);
     expect(polls).toBe(1 + DEPLOYMENT_MAX_POLL_ERRORS);
-    expect(lines).toEqual(['→ Deployment #4 is DEPLOYING']);
+    expect(lines).toEqual([]);
   });
 
   it('terminates by propagating the error raised when the deployment has vanished', async () => {
@@ -278,27 +277,16 @@ describe('deployment wait loop', () => {
     await expect(watchDeployment(deps)).rejects.toBe(gone);
   });
 
-  it('prints one line per status change and nothing more when there is no terminal', async () => {
-    const { deps, lines } = harness(['DEPLOYING', 'DEPLOYING', 'DEPLOYING', 'LIVE']);
+  it.each([[true], [false]])(
+    'prints nothing of its own while waiting, not even the terminal status (terminal: %s)',
+    async (outputIsTTY) => {
+      const { deps, lines } = harness(['QUEUED', 'QUEUED', 'DEPLOYING', 'DEPLOYING', 'LIVE'], { outputIsTTY });
 
-    await watchDeployment(deps);
+      await watchDeployment(deps);
 
-    expect(lines).toEqual(['→ Deployment #4 is DEPLOYING', '✔ Deployment #4 is LIVE']);
-    expect(lines.join('\n')).not.toContain('\u001b');
-  });
-
-  it('adds a heartbeat line on a terminal and keeps escape codes out of it', async () => {
-    const { deps, lines } = harness(['DEPLOYING', 'DEPLOYING', 'LIVE'], { outputIsTTY: true });
-
-    await watchDeployment(deps);
-
-    expect(lines).toEqual([
-      '→ Deployment #4 is DEPLOYING',
-      '  … still DEPLOYING',
-      '✔ Deployment #4 is LIVE',
-    ]);
-    expect(lines.join('\n')).not.toContain('\u001b');
-  });
+      expect(lines).toEqual([]);
+    },
+  );
 
   it('backs off between polls instead of looping tight, capping the delay it will wait', async () => {
     const { deps, slept } = harness(['DEPLOYING'], { timeoutMs: 20_000 });
@@ -377,7 +365,16 @@ function streamingHarness(
   pages: (DeploymentLog[] | Error)[],
   options: { outputIsTTY?: boolean } = {},
 ) {
-  const { deps, lines } = harness(statuses, options);
+  const { deps: base, lines } = harness(statuses, options);
+  const events: string[] = [];
+  const deps = {
+    ...base,
+    ux: { ...base.ux, print: (message: string) => { events.push(`print ${message}`); base.ux.print(message); } },
+    loader: {
+      start: (message: string) => events.push(`start ${message}`),
+      stop: () => events.push('stop'),
+    },
+  };
   const since: string[] = [];
   let fetches = 0;
 
@@ -393,11 +390,11 @@ function streamingHarness(
     return page;
   };
 
-  return { deps: { ...deps, logs }, lines, since };
+  return { deps: { ...deps, logs }, lines, since, events };
 }
 
 describe('deployment log streaming', () => {
-  it('prints each new log line with its timestamp between the status lines, as V1 did', async () => {
+  it('prints each new log line with its timestamp, as V1 did', async () => {
     const { deps, lines } = streamingHarness(
       ['DEPLOYING', 'LIVE'],
       [
@@ -413,11 +410,9 @@ describe('deployment log streaming', () => {
 
     expect(outcome.kind).toBe('success');
     expect(lines).toEqual([
-      '→ Deployment #4 is DEPLOYING',
       '2026-09-25 10:00:00.123:  Installing dependencies...',
       '2026-09-25 10:00:01.456:  Build started',
       '2026-09-25 10:00:09.000:  Deployed successfully',
-      '✔ Deployment #4 is LIVE',
     ]);
   });
 
@@ -446,23 +441,6 @@ describe('deployment log streaming', () => {
     expect(DEPLOYMENT_LOGS_FROM).toBe('1970-01-01T00:00:00.000Z');
   });
 
-  it('draws the heartbeat on a terminal only in a poll that brought no new log lines', async () => {
-    const { deps, lines } = streamingHarness(
-      ['DEPLOYING', 'DEPLOYING', 'DEPLOYING', 'LIVE'],
-      [[], [{ message: 'Compiling...', timestamp: '2026-09-25T10:00:03.000Z' }], [], []],
-      { outputIsTTY: true },
-    );
-
-    await watchDeployment(deps);
-
-    expect(lines).toEqual([
-      '→ Deployment #4 is DEPLOYING',
-      '2026-09-25 10:00:03.000:  Compiling...',
-      '  … still DEPLOYING',
-      '✔ Deployment #4 is LIVE',
-    ]);
-  });
-
   it('reports a failing log fetch once, keeps waiting on the deployment and resumes the logs where it left off', async () => {
     const { deps, lines, since } = streamingHarness(
       ['DEPLOYING', 'DEPLOYING', 'DEPLOYING', 'LIVE'],
@@ -478,10 +456,8 @@ describe('deployment log streaming', () => {
 
     expect(outcome).toEqual(expect.objectContaining({ kind: 'success', status: 'LIVE' }));
     expect(lines).toEqual([
-      '→ Deployment #4 is DEPLOYING',
       '  ! Could not read the deployment logs (Bad gateway). Still waiting on the deployment.',
       '2026-09-25 10:00:05.000:  Build complete',
-      '✔ Deployment #4 is LIVE',
     ]);
     expect(since).toEqual([
       DEPLOYMENT_LOGS_FROM,
@@ -509,6 +485,85 @@ describe('deployment log streaming', () => {
 
       expect(since).toEqual([DEPLOYMENT_LOGS_FROM, '2026-09-25T10:00:00.123Z']);
       expect(lines).toContain('two');
+    },
+  );
+
+  it.each([
+    [true, '\u001b[32m2026-09-25 10:00:00.123:  Installing dependencies...\u001b[39m'],
+    [false, '2026-09-25 10:00:00.123:  Installing dependencies...'],
+  ])('prints a log line in green only when the output is a terminal (terminal: %s)', async (outputIsTTY, line) => {
+    const { deps, lines } = streamingHarness(
+      ['LIVE'],
+      [[{ message: 'Installing dependencies...', timestamp: '2026-09-25T10:00:00.123Z' }]],
+      { outputIsTTY },
+    );
+
+    await watchDeployment(deps);
+
+    expect(lines).toEqual([line]);
+  });
+
+  it('shows the loader while it waits for more logs and stops it before printing anything', async () => {
+    const { deps, events } = streamingHarness(
+      ['DEPLOYING', 'DEPLOYING', 'LIVE'],
+      [[{ message: 'one', timestamp: '2026-09-25T10:00:00.000Z' }], [], [{ message: 'two', timestamp: '2026-09-25T10:00:01.000Z' }]],
+    );
+
+    await watchDeployment(deps);
+
+    expect(events).toEqual([
+      'stop',
+      'print 2026-09-25 10:00:00.000:  one',
+      `start ${DEPLOYMENT_LOADER_MESSAGE}`,
+      `start ${DEPLOYMENT_LOADER_MESSAGE}`,
+      'stop',
+      'print 2026-09-25 10:00:01.000:  two',
+      'stop',
+    ]);
+    expect(DEPLOYMENT_LOADER_MESSAGE).toBe('Loading deployment logs...');
+  });
+
+  it('leaves no loader running when the wait times out', async () => {
+    const { deps, events } = streamingHarness(['DEPLOYING'], [[]]);
+
+    const outcome = await watchDeployment({ ...deps, timeoutMs: 2500 });
+
+    expect(outcome.kind).toBe('timed-out');
+    expect(events.at(-1)).toBe('stop');
+  });
+
+  it('leaves no loader running when the poll gives up with an error', async () => {
+    const { deps, events } = streamingHarness(['DEPLOYING'], [[]]);
+    const gone = new Error('No deployment found with that UID.');
+    let polls = 0;
+    const failingLater = async () => {
+      polls += 1;
+
+      if (polls > 1) {
+        throw gone;
+      }
+
+      return { uid: UID, status: 'DEPLOYING' };
+    };
+
+    await expect(watchDeployment({ ...deps, poll: failingLater })).rejects.toBe(gone);
+    expect(events).toEqual([`start ${DEPLOYMENT_LOADER_MESSAGE}`, 'stop']);
+  });
+
+  it.each([
+    [true, '\u001b[32m2026-09-25 10:00:00.000:  —— Step 4: Packaging ——  [SERVER]  CPU: 0.5 vCPUs\u001b[39m'],
+    [false, '2026-09-25 10:00:00.000:  —— Step 4: Packaging ——  [SERVER]  CPU: 0.5 vCPUs'],
+  ])(
+    'drops the colours a log message carries so every line is one shade (terminal: %s)',
+    async (outputIsTTY, line) => {
+      const message = '\u001b[1m\u001b[92m—— Step 4: Packaging ——\u001b[0m  \u001b[34m[SERVER]\u001b[39m  CPU: 0.5 vCPUs';
+      const { deps, lines } = streamingHarness(['LIVE'], [[{ message, timestamp: '2026-09-25T10:00:00.000Z' }]], {
+        outputIsTTY,
+      });
+
+      await watchDeployment(deps);
+
+      expect(lines[0]).toBe(line);
     },
   );
 });

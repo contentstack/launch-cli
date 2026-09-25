@@ -126,6 +126,8 @@ function gitFlags(): string[] {
     '.next',
     '--res-mode',
     'buffered',
+    '--cs-auth',
+    'enable',
     '--data-dir',
     dataDir,
   ];
@@ -285,6 +287,7 @@ describe('integration: launch:projects:create on the wire', () => {
         frameworkPreset: 'NEXTJS',
         environmentVariables: [],
         isStreamingEnabled: false,
+        isContentstackAuthenticationEnabled: true,
       },
       repository: {
         repositoryName: 'my-org/my-repo',
@@ -293,7 +296,9 @@ describe('integration: launch:projects:create on the wire', () => {
         gitProviderMetadata: { gitProvider: 'GitHub' },
       },
     });
-    expect(stdout).toContain('✔ Deployment #1 is LIVE');
+    expect(stdout).toContain('Deployment URL https://my-site.example.test\n');
+    expect(stdout).not.toContain('Deployment #1 is');
+    expect(stdout).not.toContain('\u001b');
     expect(stdout).toContain(`uid   ${PROJECT_UID}`);
     expect(stdout).toContain('name  My Site');
     expect(stdout).toContain('type  GITPROVIDER');
@@ -318,7 +323,7 @@ describe('integration: launch:projects:create on the wire', () => {
     const first = lines.indexOf('2026-09-25 10:00:00.123:  Installing dependencies...');
     expect(first).toBeGreaterThan(-1);
     expect(lines[first + 1]).toBe('2026-09-25 10:00:09.000:  Deployed successfully');
-    expect(lines[first + 2]).toBe('✔ Deployment #1 is LIVE');
+    expect(lines[first + 2]).toBe('Deployment URL https://my-site.example.test');
     expect(stdout).not.toContain('Could not read the deployment logs');
     expect(onWire).toEqual([]);
   });
@@ -463,7 +468,7 @@ describe('integration: launch:projects:create on the wire', () => {
       environment: { uploadUid: 'upload-uid', frameworkPreset: 'OTHER', environmentVariables: [] },
     });
     expect(body).not.toHaveProperty('repository');
-    expect(stdout).toContain('✔ Deployment #1 is DEPLOYED');
+    expect(stdout).toContain('Deployment URL');
     expect(onWire).toEqual([]);
   });
 
@@ -501,7 +506,7 @@ describe('integration: launch:projects:create on the wire', () => {
     expect(onWire).toEqual([]);
   });
 
-  it('asks on a terminal in the pinned order: type, organization, project name, environment name, then the build', async () => {
+  it('asks on a terminal in the pinned order: type, organization, project name, environment name, then the build and Contentstack Authentication', async () => {
     const prompts = answerPrompts({
       'Project type': 'FileUpload',
       'Choose an organization': ORG_UID,
@@ -511,6 +516,7 @@ describe('integration: launch:projects:create on the wire', () => {
       'Build command': 'npm run build',
       'Output directory': './public',
       'Response mode': 'buffered',
+      'Contentstack Authentication': 'enable',
     });
     const organizations = nock('https://cma.integration.test')
       .get('/v3/organizations')
@@ -546,6 +552,7 @@ describe('integration: launch:projects:create on the wire', () => {
       'Build command',
       'Output directory',
       'Response mode',
+      'Contentstack Authentication',
     ]);
     expect(onWire).toEqual([]);
   });
@@ -559,7 +566,8 @@ describe('integration: launch:projects:create on the wire', () => {
       'Framework preset': 'Gatsby',
       'Build command': 'npm run build',
       'Output directory': './public',
-      'Response mode': CTRL_C,
+      'Response mode': 'buffered',
+      'Contentstack Authentication': CTRL_C,
     });
     nock('https://cma.integration.test')
       .get('/v3/organizations')
@@ -580,13 +588,13 @@ describe('integration: launch:projects:create on the wire', () => {
 
     expect(error?.oclif?.exit).toBe(3);
     expect(error?.message).toBe('Cancelled. Nothing was changed.');
-    expect(prompts.messages.at(-1)).toBe('Response mode');
+    expect(prompts.messages.at(-1)).toBe('Contentstack Authentication');
     expect(create.isDone()).toBe(false);
     expect(onWire).toEqual([]);
     expect(process.listenerCount('SIGINT')).toBe(0);
   });
 
-  it('asks all eleven GitHub prompts in the pinned order and submits exactly what was answered', async () => {
+  it('asks all twelve GitHub prompts in the pinned order and submits exactly what was answered', async () => {
     let body: unknown;
     const prompts = answerPrompts({
       'Project type': 'GitHub',
@@ -600,6 +608,7 @@ describe('integration: launch:projects:create on the wire', () => {
       'Build command': 'npm run build',
       'Output directory': '.next',
       'Response mode': 'streaming',
+      'Contentstack Authentication': 'disable',
     });
     nock('https://cma.integration.test')
       .get('/v3/organizations')
@@ -651,6 +660,7 @@ describe('integration: launch:projects:create on the wire', () => {
       'Build command',
       'Output directory',
       'Response mode',
+      'Contentstack Authentication',
     ]);
     expect(prompts.payloads.map((payload) => payload.default)).toEqual([
       undefined,
@@ -664,6 +674,7 @@ describe('integration: launch:projects:create on the wire', () => {
       'npm run build',
       '.next',
       'buffered',
+      'enable',
     ]);
     expect(body).toEqual({
       name: 'My Site',
@@ -676,6 +687,7 @@ describe('integration: launch:projects:create on the wire', () => {
         frameworkPreset: 'NEXTJS',
         environmentVariables: [],
         isStreamingEnabled: true,
+        isContentstackAuthenticationEnabled: false,
       },
       repository: {
         repositoryName: 'my-org/my-repo',

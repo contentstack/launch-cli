@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module';
 
 export interface SearchChoice {
+  name?: string;
   value: unknown;
 }
 
@@ -36,6 +37,16 @@ export function launchSearchList(SearchList: SearchListClass): SearchListClass {
 
     getCurrentValue(line?: unknown): unknown {
       return this.filterList.length > 0 ? this.filterList[this.pointer].value : String(line ?? '');
+    }
+
+    private echoed: unknown;
+
+    get selected(): unknown {
+      return this.echoed;
+    }
+
+    set selected(value: unknown) {
+      this.echoed = this.list?.find((choice) => choice.value === value)?.name ?? value;
     }
   };
 }

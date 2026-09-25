@@ -1,11 +1,11 @@
+import type { Loader } from '../core/loader';
 import type { UxLike } from '../core/render';
+import { styled } from '../core/style';
 import { RetryPolicy } from '../transport/retry-policy';
 import { classifyStatus, normalizeStatus } from './deployment.status';
 import {
-  deploymentHeartbeatLine,
   deploymentLogLine,
   deploymentLogsUnavailableLine,
-  deploymentStatusLine,
 } from './deployment.presenter';
 import type { Deployment, DeploymentLog } from './types';
 
@@ -14,6 +14,7 @@ export const DEPLOYMENT_MAX_BACKOFF_STEPS = 5;
 export const DEPLOYMENT_WAIT_TIMEOUT_MS = 20 * 60 * 1000;
 export const DEPLOYMENT_MAX_POLL_ERRORS = 3;
 export const DEPLOYMENT_LOGS_FROM = new Date(0).toISOString();
+export const DEPLOYMENT_LOADER_MESSAGE = 'Loading deployment logs...';
 
 export interface WatchTiming {
   sleep(ms: number): Promise<void>;
@@ -27,6 +28,7 @@ export interface DeploymentWatchDeps extends WatchTiming {
   poll(): Promise<Deployment>;
   logs(after: string): Promise<DeploymentLog[]>;
   ux: UxLike;
+  loader: Loader;
   outputIsTTY: boolean;
 }
 
@@ -49,9 +51,25 @@ export function defaultWatchTiming(): WatchTiming {
 }
 
 export async function watchDeployment(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
+  try {
+    return await waitFor({
+      ...deps,
+      ux: {
+        ...deps.ux,
+        print: (message: string) => {
+          deps.loader.stop();
+          deps.ux.print(message);
+        },
+      },
+    });
+  } finally {
+    deps.loader.stop();
+  }
+}
+
+async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
   const backoff = new RetryPolicy({ retryDelayMs: deps.pollDelayMs });
   const deadline = deps.now() + deps.timeoutMs;
-  let reported: string | undefined;
   let attempt = 0;
   let consecutiveErrors = 0;
   let logsAfter = DEPLOYMENT_LOGS_FROM;
@@ -79,12 +97,6 @@ export async function watchDeployment(deps: DeploymentWatchDeps): Promise<Deploy
     const status = normalizeStatus(deployment.status);
     const kind = classifyStatus(deployment.status);
     const terminal = kind === 'success' || kind === 'failure';
-    const changed = status !== reported;
-
-    if (changed && !terminal) {
-      deps.ux.print(deploymentStatusLine(deployment, status, kind));
-      reported = status;
-    }
 
     let logs: DeploymentLog[] = [];
 
@@ -98,7 +110,7 @@ export async function watchDeployment(deps: DeploymentWatchDeps): Promise<Deploy
     }
 
     for (const log of logs) {
-      deps.ux.print(deploymentLogLine(log));
+      deps.ux.print(styled(deploymentLogLine(log), 'green', deps.outputIsTTY));
 
       if (log.timestamp && !Number.isNaN(Date.parse(log.timestamp))) {
         logsAfter = log.timestamp;
@@ -106,12 +118,7 @@ export async function watchDeployment(deps: DeploymentWatchDeps): Promise<Deploy
     }
 
     if (terminal) {
-      deps.ux.print(deploymentStatusLine(deployment, status, kind));
       return { kind, status, deployment };
-    }
-
-    if (!changed && logs.length === 0 && deps.outputIsTTY) {
-      deps.ux.print(deploymentHeartbeatLine(status));
     }
 
     attempt += 1;
@@ -121,6 +128,7 @@ export async function watchDeployment(deps: DeploymentWatchDeps): Promise<Deploy
       return { kind: 'timed-out', status, deployment };
     }
 
+    deps.loader.start(DEPLOYMENT_LOADER_MESSAGE);
     await deps.sleep(delay);
   }
 }

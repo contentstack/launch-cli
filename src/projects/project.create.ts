@@ -3,6 +3,7 @@ import { ProjectConfig, ProjectConfigStore } from '../core/project-config';
 import { renderDetail } from '../core/render';
 import { requireValueOf } from '../core/rules';
 import type { ServiceContext } from '../core/service-context';
+import { Loader, silentLoader, terminalLoader } from '../core/loader';
 import { DeploymentUnsuccessfulError } from '../deployments/deployment.errors';
 import { deploymentUrlOf } from '../deployments/deployment.presenter';
 import { WatchTiming, watchDeployment } from '../deployments/deployment.watcher';
@@ -13,6 +14,7 @@ import {
   OUTPUT_DIRECTORY_BY_FRAMEWORK,
   RESPONSE_MODES,
   ResponseMode,
+  TOGGLE_VALUES,
   ToggleValue,
   frameworkPresetOf,
 } from '../environments/environment.inputs';
@@ -31,7 +33,7 @@ import {
   repositoryLabel,
   repositorySearchTerm,
 } from './project.create.prompt';
-import { deploymentFailureMessage, projectCreatedFields } from './project.presenter';
+import { deploymentFailureMessage, deploymentUrlLine, projectCreatedFields } from './project.presenter';
 import {
   GIT_ONLY_FLAGS,
   PROJECT_TYPE_BY_CHOICE,
@@ -39,7 +41,7 @@ import {
   askProjectType,
   projectTypeChoiceOf,
 } from './project.inputs';
-import { uploadArchive } from './project.upload';
+import { refuseOversizedArchive, uploadArchive } from './project.upload';
 import type { CreateProjectInput, DetectedFramework, IdentifiedProject } from './types';
 
 export { DEPLOYMENT_WAIT_TIMEOUT_MS, defaultWatchTiming } from '../deployments/deployment.watcher';
@@ -116,12 +118,12 @@ export class ProjectCreator {
 
     const choice = await this.projectType(request);
     this.refuseGitFlagsOffGitHub(request, choice);
+    const upload = choice === 'GitHub' ? undefined : await this.selectUploadSource(request);
     const name = await this.need('name', request.name, () => askText(this.services.ux, 'Project name'));
     const envName = await this.need('env-name', request.envName, () =>
       askText(this.services.ux, 'Environment name'),
     );
-    const source =
-      choice === 'GitHub' ? await this.selectGitSource(request) : await this.selectUploadSource(request);
+    const source = upload ?? (await this.selectGitSource(request));
     const framework = await this.selectFramework(request, source.detected);
 
     const environment: CreateEnvironmentInput = {
@@ -140,8 +142,10 @@ export class ProjectCreator {
       environment.autoDeployOnPush = request.autoDeploy === 'enable';
     }
 
-    if (request.csAuth !== undefined) {
-      environment.isContentstackAuthenticationEnabled = request.csAuth === 'enable';
+    const csAuth = await this.contentstackAuthentication(request);
+
+    if (csAuth !== undefined) {
+      environment.isContentstackAuthenticationEnabled = csAuth === 'enable';
     }
 
     const input: CreateProjectInput = {
@@ -234,13 +238,20 @@ export class ProjectCreator {
         ...this.timing,
         ux: this.services.ux,
         outputIsTTY: this.services.outputIsTTY === true,
+        loader: this.loader(),
         logs: (after) => this.services.api.deploymentLogs.after({ ...scope, timestamp: after }),
         poll: () => this.services.api.deployments.get(scope),
       }),
     );
 
     if (outcome.kind === 'success') {
-      renderDetail(this.services.ux, projectCreatedFields(project, this.siteUrl(outcome.deployment, environment)));
+      const url = this.siteUrl(outcome.deployment, environment);
+
+      if (url !== undefined) {
+        this.services.ux.print(deploymentUrlLine(url, this.services.outputIsTTY === true));
+      }
+
+      renderDetail(this.services.ux, projectCreatedFields(project, url));
       return;
     }
 
@@ -348,8 +359,11 @@ export class ProjectCreator {
   }
 
   private async selectUploadSource(request: CreateRequest): Promise<SourceSelection> {
-    const archive = archiveDirectory(request.dataDir, [request.configPath]);
-    const signed = await this.services.api.projects.signedUploadUrl({ org: request.org });
+    const loader = this.loader();
+    const archive = spinning(loader, 'Preparing zip file', () =>
+      archiveDirectory(request.dataDir, [request.configPath]),
+    );
+    refuseOversizedArchive(archive.buffer.length);
 
     if (archive.skippedLinks.length > 0) {
       this.services.ux.print(
@@ -358,8 +372,8 @@ export class ProjectCreator {
       );
     }
 
-    this.services.ux.print(`Uploading ${archive.entries.length} files from ${request.dataDir}`);
-    await uploadArchive(signed, archive.buffer);
+    const signed = await this.services.api.projects.signedUploadUrl({ org: request.org });
+    await spinning(loader, 'Starting file upload...', () => uploadArchive(signed, archive.buffer));
 
     const detected = await this.services.api.projects.fileFramework({
       org: request.org,
@@ -367,6 +381,10 @@ export class ProjectCreator {
     });
 
     return { detected, uploadUid: signed.uploadUid };
+  }
+
+  private loader(): Loader {
+    return this.services.outputIsTTY === true ? terminalLoader() : silentLoader;
   }
 
   private async selectFramework(request: CreateRequest, detected: DetectedFramework): Promise<FrameworkPreset> {
@@ -519,6 +537,23 @@ export class ProjectCreator {
     return false;
   }
 
+  private async contentstackAuthentication(request: CreateRequest): Promise<string | undefined> {
+    if (request.csAuth !== undefined) {
+      return request.csAuth;
+    }
+
+    if (this.services.isTTY) {
+      return askChoice(
+        this.services.ux,
+        'Contentstack Authentication',
+        TOGGLE_VALUES.map((value) => ({ name: value, value })),
+        'enable' satisfies ToggleValue,
+      );
+    }
+
+    return undefined;
+  }
+
   private async need<T extends string | undefined>(
     flag: string,
     supplied: string | undefined,
@@ -533,5 +568,24 @@ export class ProjectCreator {
     }
 
     return ask();
+  }
+}
+
+function spinning<T>(loader: Loader, message: string, step: () => T): T {
+  loader.start(message);
+
+  try {
+    const result = step();
+
+    if (result instanceof Promise) {
+      return result.finally(() => loader.stop()) as T;
+    }
+
+    loader.stop();
+
+    return result;
+  } catch (error) {
+    loader.stop();
+    throw error;
   }
 }

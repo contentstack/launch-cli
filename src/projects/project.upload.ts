@@ -3,6 +3,7 @@ import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import { URL } from 'node:url';
 
+import { UsageError } from '../core/errors';
 import { isAbsent } from '../core/values';
 import { UploadFailedError } from './project.errors';
 import type { SignedUploadFormField, SignedUploadHeader, SignedUploadUrl } from './types';
@@ -10,6 +11,21 @@ import type { SignedUploadFormField, SignedUploadHeader, SignedUploadUrl } from 
 export const UPLOAD_FILE_NAME = 'project.zip';
 export const UPLOAD_CONTENT_TYPE = 'application/zip';
 export const UPLOAD_IDLE_TIMEOUT_MS = 120_000;
+export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+
+const BYTES_PER_MB = 1024 * 1024;
+
+export function refuseOversizedArchive(bytes: number): void {
+  if (bytes <= MAX_UPLOAD_BYTES) {
+    return;
+  }
+
+  throw new UsageError(
+    `Your project files zip to ${(bytes / BYTES_PER_MB).toFixed(1)} MB, over the ` +
+      `${MAX_UPLOAD_BYTES / BYTES_PER_MB} MB Launch accepts for a file upload. ` +
+      'Pass --data-dir with a folder holding only the files to deploy.',
+  );
+}
 
 export interface PreparedUpload {
   method: string;

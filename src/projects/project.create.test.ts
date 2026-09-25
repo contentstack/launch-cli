@@ -1,3 +1,5 @@
+import AdmZip from 'adm-zip';
+import { cliux } from '@contentstack/cli-utilities';
 import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -17,7 +19,8 @@ jest.mock('./project.upload', () => ({
   uploadArchive: jest.fn(async () => undefined),
 }));
 
-import { uploadArchive } from './project.upload';
+import * as archiveModule from './project.archive';
+import { MAX_UPLOAD_BYTES, uploadArchive } from './project.upload';
 
 const ORG = 'org1';
 const PROJECT_UID = 'p1';
@@ -242,6 +245,7 @@ function gitRequest(overrides: Partial<CreateRequest> = {}): CreateRequest {
     buildCmd: 'npm run build',
     outputDir: '.next',
     resMode: 'buffered',
+    csAuth: 'enable',
     ...overrides,
   };
 }
@@ -258,6 +262,7 @@ function uploadRequest(overrides: Partial<CreateRequest> = {}): CreateRequest {
     buildCmd: 'npm run build',
     outputDir: './',
     resMode: 'buffered',
+    csAuth: 'enable',
     ...overrides,
   };
 }
@@ -301,6 +306,7 @@ describe('ProjectCreator on the GitHub path', () => {
         frameworkPreset: 'NEXTJS',
         environmentVariables: [],
         isStreamingEnabled: false,
+        isContentstackAuthenticationEnabled: true,
       },
       repository: {
         repositoryName: 'my-org/my-repo',
@@ -310,7 +316,7 @@ describe('ProjectCreator on the GitHub path', () => {
       },
     });
     expect(printed).toEqual([
-      '✔ Deployment #1 is LIVE',
+      'Deployment URL https://my-site.example.test',
       'uid   p1',
       'name  My Site',
       'type  GITPROVIDER',
@@ -337,7 +343,7 @@ describe('ProjectCreator on the GitHub path', () => {
   it('leaves the optional fields out of the body when they were not supplied', async () => {
     const { creator, created } = harness();
 
-    await creator.create(gitRequest());
+    await creator.create(gitRequest({ csAuth: undefined }));
     const body = bodyOf(created);
 
     expect(body).not.toHaveProperty('description');
@@ -430,10 +436,10 @@ describe('ProjectCreator prompting order and refusals', () => {
     rmSync(dataDir, { recursive: true, force: true });
   });
 
-  it('asks in the order the doc pins: type, project name, environment name, framework, build, output, response', async () => {
+  it('asks in the order the doc pins: type, project name, environment name, framework, build, output, response, Contentstack Authentication', async () => {
     const { creator, asked } = harness({
       isTTY: true,
-      answers: ['GitHub', 'My Site', 'Default', 'my-org', 'my-org/my-repo', 'main', 'NextJs', 'npm run build', '.next', 'buffered'],
+      answers: ['GitHub', 'My Site', 'Default', 'my-org', 'my-org/my-repo', 'main', 'NextJs', 'npm run build', '.next', 'buffered', 'enable'],
     });
 
     await creator.create({ org: ORG, dataDir, configPath: configPathIn(dataDir) });
@@ -449,7 +455,36 @@ describe('ProjectCreator prompting order and refusals', () => {
       'Build command',
       'Output directory',
       'Response mode',
+      'Contentstack Authentication',
     ]);
+  });
+
+  it('asks for Contentstack Authentication on a terminal, defaulting to enable, and sends the answer', async () => {
+    const { creator, asked, askedPayloads, created } = harness({ isTTY: true, answers: ['disable'] });
+
+    await creator.create(gitRequest({ csAuth: undefined }));
+
+    expect(asked).toEqual(['Contentstack Authentication']);
+    expect(askedPayloads[0]).toMatchObject({ default: 'enable' });
+    expect(bodyOf(created).environment).toMatchObject({ isContentstackAuthenticationEnabled: false });
+  });
+
+  it('zips and uploads the files right after the project type, before asking for any name, as V1 did', async () => {
+    (uploadArchive as jest.Mock).mockClear();
+    const { creator, asked } = harness({
+      isTTY: true,
+      answers: ['FileUpload', 'My Site', 'Default', 'NextJs', 'npm run build', '.next', 'buffered', 'enable'],
+    });
+    let askedBeforeUpload: unknown[] = [];
+    (uploadArchive as jest.Mock).mockImplementation(async () => {
+      askedBeforeUpload = [...asked];
+    });
+
+    await creator.create({ org: ORG, dataDir, configPath: configPathIn(dataDir) });
+
+    expect(uploadArchive).toHaveBeenCalledTimes(1);
+    expect(askedBeforeUpload).toEqual(['Project type']);
+    expect(asked.slice(1, 4)).toEqual(['Project name', 'Environment name', 'Framework preset']);
   });
 
   it.each<[string, Partial<CreateRequest>]>([
@@ -623,17 +658,68 @@ describe('ProjectCreator on the FileUpload path', () => {
     });
     expect(bodyOf(created)).not.toHaveProperty('repository');
     expect(gitCalls).toContainEqual({ org: ORG, uploadUid: 'upload-uid' });
-    expect(printed[0]).toBe(`Uploading 1 files from ${dataDir}`);
+    expect(printed.join('\n')).not.toContain('Uploading');
+  });
+
+  it.each([
+    [true, ['Preparing zip file', 'done', 'Starting file upload...', 'done']],
+    [false, []],
+    [undefined, []],
+  ])('draws the zip and upload spinners only when the output is a terminal (output terminal: %s)', async (outputIsTTY, drawn) => {
+    const spun: string[] = [];
+    jest.spyOn(cliux, 'loaderV2').mockImplementation(((message: string, running?: unknown) => {
+      spun.push(message);
+      return running === undefined ? {} : undefined;
+    }) as never);
+    const { creator } = harness({ outputIsTTY });
+
+    await creator.create(uploadRequest());
+
+    expect(spun.slice(0, 4)).toEqual(drawn);
+  });
+
+  it('stops the upload spinner when the upload fails', async () => {
+    const spun: string[] = [];
+    jest.spyOn(cliux, 'loaderV2').mockImplementation(((message: string, running?: unknown) => {
+      spun.push(message);
+      return running === undefined ? {} : undefined;
+    }) as never);
+    (uploadArchive as jest.Mock).mockImplementation(async () => {
+      throw new Error('upload refused');
+    });
+    const { creator } = harness({ outputIsTTY: true });
+
+    await expect(creator.create(uploadRequest())).rejects.toThrow('upload refused');
+
+    expect(spun).toEqual(['Preparing zip file', 'done', 'Starting file upload...', 'done']);
+  });
+
+  it('refuses a zip over the upload limit before asking for an upload url or any name', async () => {
+    jest.spyOn(archiveModule, 'archiveDirectory').mockReturnValue({
+      buffer: { length: MAX_UPLOAD_BYTES + 1 } as Buffer,
+      entries: ['index.html'],
+      skippedLinks: [],
+    });
+    const { creator, calls, asked } = harness({ isTTY: true, answers: ['FileUpload'] });
+
+    const failure = await creator.create({ org: ORG, dataDir, configPath: configPathIn(dataDir) }).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(UsageError);
+    expect((failure as Error).message).toContain('over the 100 MB Launch accepts for a file upload');
+    expect(calls.signedUploadUrl).toEqual([]);
+    expect(uploadArchive).not.toHaveBeenCalled();
+    expect(asked).toEqual(['Project type']);
   });
 
   it('leaves a --config file that lives inside the data dir out of the upload', async () => {
     const configPath = join(dataDir, 'launch.json');
     writeFileSync(configPath, JSON.stringify({ project: { organizationUid: ORG } }));
-    const { creator, printed } = harness({ createdProject: { uid: 'p0', name: 'My Site' } });
+    const { creator } = harness({ createdProject: { uid: 'p0', name: 'My Site' } });
 
     await creator.create(uploadRequest({ configPath }));
 
-    expect(printed[0]).toBe(`Uploading 1 files from ${dataDir}`);
+    const uploaded = new AdmZip((uploadArchive as jest.Mock).mock.calls[0][1]);
+    expect(uploaded.getEntries().map((entry) => entry.entryName)).toEqual(['index.html']);
   });
 
   it('says which symbolic links it left out of the upload before uploading', async () => {
@@ -642,10 +728,7 @@ describe('ProjectCreator on the FileUpload path', () => {
 
     await creator.create(uploadRequest());
 
-    expect(printed.slice(0, 2)).toEqual([
-      'Skipping 1 symbolic link(s), which are never uploaded: linked.html',
-      `Uploading 1 files from ${dataDir}`,
-    ]);
+    expect(printed[0]).toBe('Skipping 1 symbolic link(s), which are never uploaded: linked.html');
   });
 
   it('creates the project with no server command when the optional prompt is left empty', async () => {
@@ -744,49 +827,52 @@ describe('ProjectCreator waiting on the first deployment', () => {
     rmSync(dataDir, { recursive: true, force: true });
   });
 
-  it('streams every status change until the deployment is live', async () => {
-    const { creator, printed } = harness({ statuses: ['QUEUED', 'DEPLOYING', 'LIVE'] });
+  it.each([
+    [true, ['Loading deployment logs...', 'done']],
+    [false, []],
+    [undefined, []],
+  ])('draws the loading spinner only when the output is a terminal (output terminal: %s)', async (outputIsTTY, drawn) => {
+    const spun: string[] = [];
+    jest.spyOn(cliux, 'loaderV2').mockImplementation(((message: string, running?: unknown) => {
+      spun.push(message);
+      return running === undefined ? {} : undefined;
+    }) as never);
+    const { creator } = harness({ isTTY: true, outputIsTTY, statuses: ['DEPLOYING', 'LIVE'] });
 
     await creator.create(gitRequest());
 
-    expect(printed.slice(0, 3)).toEqual([
-      '→ Deployment #1 is QUEUED',
-      '→ Deployment #1 is DEPLOYING',
-      '✔ Deployment #1 is LIVE',
-    ]);
+    expect(spun).toEqual(drawn);
   });
 
-  it('draws no heartbeat when the output is redirected, even though the prompts could reach a terminal', async () => {
-    const { creator, printed } = harness({ isTTY: true, outputIsTTY: false, statuses: ['QUEUED', 'QUEUED', 'LIVE'] });
+  it('waits through every in-flight status without printing it', async () => {
+    const { creator, printed } = harness({ statuses: ['QUEUED', 'QUEUED', 'DEPLOYING', 'LIVE'] });
 
     await creator.create(gitRequest());
 
-    expect(printed.slice(0, 2)).toEqual(['→ Deployment #1 is QUEUED', '✔ Deployment #1 is LIVE']);
-    expect(printed.join('\n')).not.toContain('still');
+    expect(printed[0]).toBe('Deployment URL https://my-site.example.test');
   });
 
-  it('draws the heartbeat when the output goes to a terminal, even though stdin is not one', async () => {
-    const { creator, printed } = harness({ isTTY: false, outputIsTTY: true, statuses: ['QUEUED', 'QUEUED', 'LIVE'] });
+  it.each([
+    [true, false, 'Deployment URL https://my-site.example.test'],
+    [false, true, '\u001b[1mDeployment URL\u001b[22m \u001b[36mhttps://my-site.example.test\u001b[39m'],
+    [false, undefined, 'Deployment URL https://my-site.example.test'],
+  ])(
+    'styles the deployment url by where the output goes, not by stdin (stdin terminal: %s, output terminal: %s)',
+    async (isTTY, outputIsTTY, line) => {
+      const { creator, printed } = harness({ isTTY, outputIsTTY });
 
-    await creator.create(gitRequest());
+      await creator.create(gitRequest());
 
-    expect(printed.slice(0, 3)).toEqual(['→ Deployment #1 is QUEUED', '  … still QUEUED', '✔ Deployment #1 is LIVE']);
-  });
-
-  it('draws no heartbeat when the service context does not say where the output goes', async () => {
-    const { creator, printed } = harness({ statuses: ['QUEUED', 'QUEUED', 'LIVE'] });
-
-    await creator.create(gitRequest());
-
-    expect(printed.slice(0, 2)).toEqual(['→ Deployment #1 is QUEUED', '✔ Deployment #1 is LIVE']);
-  });
+      expect(printed[0]).toBe(line);
+    },
+  );
 
   it('treats DEPLOYED as a success as well as LIVE', async () => {
     const { creator, printed } = harness({ statuses: ['DEPLOYED'] });
 
     await creator.create(gitRequest());
 
-    expect(printed).toContain('✔ Deployment #1 is DEPLOYED');
+    expect(printed).toContain('Deployment URL https://my-site.example.test');
     expect(printed).toContain('url   https://my-site.example.test');
   });
 
@@ -832,7 +918,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed).toContain('✔ Deployment #1 is LIVE');
+    expect(printed).toContain('Deployment URL https://my-site.example.test');
   });
 
   it('waits for the first environment to appear rather than calling an empty page a failure', async () => {
@@ -842,7 +928,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed).toContain('✔ Deployment #1 is LIVE');
+    expect(printed).toContain('Deployment URL https://my-site.example.test');
   });
 
   it('exits 1 disclosing the project when looking up its first environment failed', async () => {
@@ -937,6 +1023,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
     await creator.create(gitRequest());
 
     expect(printed).not.toContain('url');
+    expect(printed.join('\n')).not.toContain('Deployment URL');
     expect(printed.join('\n')).not.toContain('undefined');
   });
 

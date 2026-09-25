@@ -470,7 +470,7 @@ The eight statuses in `contentfly-management-service`'s `DeploymentStatus` are *
 
 **Termination is proved, not assumed.** The loop ends three ways and no fourth: a success or failure
 status, an overall deadline (`DEPLOYMENT_WAIT_TIMEOUT_MS`), or an error thrown by the poll, which
-propagates. An **unknown** status is streamed verbatim and treated as in-flight rather than guessed
+propagates. An **unknown** status is treated as in-flight rather than guessed
 at, because a status the service adds is far more likely to be a new in-flight state than a new
 terminal one, and reporting a healthy deployment as failed is worse than waiting out the deadline.
 The deadline is what stops it, and the check is `now() + delay >= deadline` **before** sleeping, so
@@ -479,19 +479,30 @@ the loop never sleeps past its own deadline.
 Backoff reuses `RetryPolicy.delayFor` - do not introduce a second retry concept. The step is capped
 at `DEPLOYMENT_MAX_BACKOFF_STEPS` so a long deployment settles at a fixed poll interval.
 
-Output is one line per **status change**, always. The `  ... still <STATUS>` heartbeat is printed
-only when `isTTY`, and only in a poll that brought no new log lines, so a CI log gets one line per
-transition and **no escape codes at all** - a test asserts the absence of `\u001b`.
+While the deployment is in flight the loop prints **only the build logs** - no per-status line and
+no heartbeat and no terminal status line: success is shown by create's `Deployment URL` line and
+summary, failure by `deploymentFailureMessage`, which already names the last status. Between
+log batches it shows V1's `Loading deployment logs...` spinner through `cliux.loaderV2`
+(`terminalLoader` in `src/core/loader.ts`, which keeps at most one spinner and whose stop is safe to
+repeat); the watcher stops it before every line it prints and in a `finally`, so no exit leaves it
+spinning. Create hands the watcher `terminalLoader()` only when `outputIsTTY`, and `silentLoader` otherwise, so
+redirected output carries **no escape codes and no spinner at all**.
+The FileUpload path uses the same loader for V1's `Preparing zip file` and `Starting file upload...`
+spinners (in place of a printed `Uploading N files` line), each stopped even when its step throws.
 
-**The build logs stream between the status lines, as V1's did.** Every poll also reads
+**The build logs stream as V1's did.** Every poll also reads
 `GET /projects/:p/environments/:e/deployments/:d/logs/deployment-logs?timestamp=` from
 contentfly-logs-service (`DeploymentLogsApi`, on its own `RestApiClient` at `<launchHubUrl>/logs`,
-the prefix V1's `logs/graphql` used) and prints each line as V1 did, `YYYY-MM-DD HH:MM:SS.mmm:  message`.
+the prefix V1's `logs/graphql` used) and prints each line as V1 did, `YYYY-MM-DD HH:MM:SS.mmm:  message`, without V1's `info:` prefix, with
+any colour codes the build server put in the message stripped (`stripVTControlCharacters`) so every line is one
+shade, and in green when stdout is a terminal (`styled` in `src/core/style.ts`, plain ANSI codes gated on `outputIsTTY`;
+redirected output stays free of escape codes). On success create then prints V1's
+`Deployment URL <url>` line - label bold, url blue on a terminal - before the project summary.
 The first read asks from `DEPLOYMENT_LOGS_FROM` (the epoch) and every later one from the last
 parseable timestamp printed: with a `timestamp` the service returns what came strictly after it in
 ascending order, and without one it returns the newest page in **descending** order, so never let the
-cursor drop the query. An in-flight status line prints before that poll's logs and the terminal line
-after them, so the last lines of a build are never cut off by the `✔`/`✖`. The logs are auxiliary: a
+cursor drop the query. The poll that sees the terminal status still reads the logs once more before
+returning, so the last lines of a build are never lost. The logs are auxiliary: a
 failed read prints one `  ! Could not read the deployment logs (...)` notice for the whole wait, is
 retried from the same cursor on the next poll, and never changes the outcome - the status poll alone
 decides that.
@@ -506,8 +517,15 @@ the domain service, and `src/projects/project.create.prompt.ts` is a UI adapter 
 and nothing more.
 
 Interactive order is pinned by a test against the order a real `csdx launch` run prompts in: type ->
-organization -> project name -> environment name -> (GitHub only: namespace -> repository -> branch)
--> framework -> build command -> output directory -> response mode. Type and organization are
+organization -> (FileUpload only: zip + upload) -> project name -> environment name -> (GitHub only:
+namespace -> repository -> branch) -> framework -> build command -> output directory -> response mode
+-> Contentstack Authentication (defaults to `enable`, as the UI's toggle does).
+FileUpload zips and uploads straight after the organization, as V1 did, so a folder that cannot be
+archived or uploaded fails before the user answers anything else, and the framework detection that
+needs the upload uid is ready by the framework prompt. An archive over `MAX_UPLOAD_BYTES` (100 MB, the cap
+management-service's signed upload URL enforces as `MAX_FILE_SIZE_BYTES`) is refused with exit 2 by
+`refuseOversizedArchive` before the upload URL is even requested; the storage provider's own
+rejection stays as the fallback should the server limit ever drop below the CLI's copy. Type and organization are
 resolution-spec prompts, because both are always asked and every command that declares `org` needs
 its picker. The rest are **not**, because which of them run depends on `--type`, and the resolution
 engine has no conditional dependency. Build command and server command are optional: an empty answer
@@ -525,7 +543,8 @@ wire. When the framework is prompted or detected later, `ProjectCreator` applies
 `--framework` when nothing was detected); the build and server commands are the detected ones, or none;
 the output directory is the detected one, or the framework's V1 default (`OUTPUT_DIRECTORY_BY_FRAMEWORK`:
 `./.next` for NEXTJS, `./build` for CRA and REMIX, and so on); the response mode is `buffered`. Each
-inferred value is printed with the flag that overrides it. On a terminal the same values are the
+inferred value is printed with the flag that overrides it. Contentstack Authentication is the one
+exception: with no `--cs-auth` the field is left out of the body and the service's default applies. On a terminal the same values are the
 prompt defaults. Type, project name and environment name have nothing to infer and stay required.
 
 **A folder already linked to a project is refused up front.** If the `.cs-launch.json` create would

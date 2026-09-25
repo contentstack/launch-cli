@@ -1,4 +1,11 @@
-import { UPLOAD_CONTENT_TYPE, UPLOAD_FILE_NAME, prepareUpload } from './project.upload';
+import { UsageError } from '../core/errors';
+import {
+  MAX_UPLOAD_BYTES,
+  UPLOAD_CONTENT_TYPE,
+  UPLOAD_FILE_NAME,
+  prepareUpload,
+  refuseOversizedArchive,
+} from './project.upload';
 import type { SignedUploadFormField, SignedUploadHeader } from './types';
 
 function header(name: string, contents: string): SignedUploadHeader {
@@ -217,5 +224,26 @@ describe('signed upload preparation', () => {
 
     expect(prepared.method).toBe('POST');
     expect(body).toContain('Content-Disposition: form-data; name="X-Amz-Signature"\r\n\r\nsigned-value\r\n');
+  });
+});
+
+describe('refuseOversizedArchive', () => {
+  it('caps an upload at the 100 MB Launch accepts for a file upload', () => {
+    expect(MAX_UPLOAD_BYTES).toBe(100 * 1024 * 1024);
+  });
+
+  it('lets an archive of exactly the limit through', () => {
+    expect(() => refuseOversizedArchive(MAX_UPLOAD_BYTES)).not.toThrow();
+  });
+
+  it('refuses an archive one byte over the limit as a usage error', () => {
+    expect(() => refuseOversizedArchive(MAX_UPLOAD_BYTES + 1)).toThrow(UsageError);
+  });
+
+  it('names the archive size, the limit, and how to shrink the upload', () => {
+    expect(() => refuseOversizedArchive(150 * 1024 * 1024)).toThrow(
+      'Your project files zip to 150.0 MB, over the 100 MB Launch accepts for a file upload. ' +
+        'Pass --data-dir with a folder holding only the files to deploy.',
+    );
   });
 });

@@ -6,6 +6,7 @@ const SearchList = load('inquirer-search-list') as SearchListClass;
 interface Prompt {
   pointer: number;
   rl: { line: string };
+  selected: unknown;
   filterChoices(): void;
   getCurrentValue(line?: unknown): unknown;
 }
@@ -79,6 +80,26 @@ describe('launchSearchList', () => {
     prompt.rl.line = '';
 
     expect(prompt.getCurrentValue()).toBe('');
+  });
+
+  it('echoes the label of the chosen choice, not its value, once answered', () => {
+    const prompt = open({ choices: [{ name: 'Acme Corp', value: 'blt8ca9ce72e25d0172' }] });
+
+    prompt.selected = prompt.getCurrentValue();
+
+    expect(prompt.selected).toBe('Acme Corp');
+  });
+
+  it('echoes the submitted value itself when it is none of the choices', () => {
+    const prompt = open({});
+
+    prompt.selected = 'no-such-framework-9987';
+
+    expect(prompt.selected).toBe('no-such-framework-9987');
+  });
+
+  it('echoes nothing before a choice is made', () => {
+    expect(open({}).selected).toBe('');
   });
 });
 
