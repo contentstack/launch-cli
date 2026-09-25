@@ -14,11 +14,18 @@ fileignoreconfig:
   allowed_patterns:
     - "formFieldKey"
     - "\\[header\\.key, header\\.value\\]"
+    - "const \\[key, value\\] of"
 - filename: src/projects/project.upload.test.ts
   allowed_patterns:
     - "formFieldKey"
     - "key: name, value: contents"
     - "formField\\('key', "
+    - "headers: \\[\\{ key: '"
+    - 'name="key"'
+    - "drops a field with no key"
+- filename: src/projects/project.presenter.ts
+  allowed_patterns:
+    - "keyof ProjectUpdate"
 - filename: src/projects/projects.api.test.ts
   allowed_patterns:
     - "the caller passes neither"
