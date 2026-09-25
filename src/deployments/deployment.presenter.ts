@@ -1,5 +1,5 @@
 import type { StatusKind } from './deployment.status';
-import type { Deployment } from './types';
+import type { Deployment, DeploymentLog } from './types';
 
 const MARKERS: Record<StatusKind, string> = {
   'in-flight': '→',
@@ -30,4 +30,23 @@ export function deploymentUrlOf(deployment: Deployment): string | undefined {
   }
 
   return url.startsWith('http') ? url : `https://${url}`;
+}
+
+export function deploymentLogLine(log: DeploymentLog): string {
+  const time = Date.parse(log.timestamp ?? '');
+  const message = log.message ?? '';
+
+  if (Number.isNaN(time)) {
+    return message;
+  }
+
+  const stamp = `${new Date(time).toISOString().slice(0, 23).replace('T', ' ')}:`;
+
+  return message === '' ? stamp : `${stamp}  ${message}`;
+}
+
+export function deploymentLogsUnavailableLine(error: unknown): string {
+  const reason = error instanceof Error ? error.message : String(error);
+
+  return `  ! Could not read the deployment logs (${reason}). Still waiting on the deployment.`;
 }

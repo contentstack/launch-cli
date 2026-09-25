@@ -37,7 +37,7 @@ function buildDeps() {
   });
   const ux: UxLike = { print: () => undefined, inquire: async () => undefined as never };
 
-  return { api: buildApi(client, UNUSED_CMA), ux };
+  return { api: buildApi(client, UNUSED_CMA, {} as never), ux };
 }
 
 function projectsOfSize(size: number, prefix: string) {

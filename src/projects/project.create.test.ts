@@ -169,6 +169,9 @@ function harness(scenario: Scenario = {}) {
         return { uid: DEPLOYMENT_UID, deploymentNumber: 1, status, deploymentUrl: 'my-site.example.test' };
       },
     },
+    deploymentLogs: {
+      after: async () => [],
+    },
     git: {
       namespaces: async (params: unknown) => {
         calls.namespaces.push(params);

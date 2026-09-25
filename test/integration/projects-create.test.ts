@@ -153,7 +153,7 @@ function stubGitLookups(): void {
     .reply(200, { framework: 'NEXTJS', buildCommand: 'npm run build', outputDirectory: '.next' });
 }
 
-function stubFollowUp(status: string): void {
+function stubFollowUp(status: string, deploymentLogs: unknown[] = []): nock.Scope {
   hub()
     .get(`/manage/projects/${PROJECT_UID}/environments`)
     .query({ limit: 1, skip: 0 })
@@ -176,6 +176,12 @@ function stubFollowUp(status: string): void {
     .reply(200, {
       deployment: { uid: DEPLOYMENT_UID, deploymentNumber: 1, status, deploymentUrl: 'my-site.example.test' },
     });
+
+  return hub()
+    .get(`/logs/projects/${PROJECT_UID}/environments/${ENVIRONMENT_UID}/deployments/${DEPLOYMENT_UID}/logs/deployment-logs`)
+    .matchHeader('x-project-uid', PROJECT_UID)
+    .query({ timestamp: '1970-01-01T00:00:00.000Z' })
+    .reply(200, { deploymentLogs });
 }
 
 function withoutFlags(args: string[], ...names: string[]): string[] {
@@ -293,6 +299,27 @@ describe('integration: launch:projects:create on the wire', () => {
     expect(stdout).toContain('type  GITPROVIDER');
     expect(stdout).toContain('url   https://my-site.example.test');
     expect(stdout).not.toContain('test-authtoken');
+    expect(onWire).toEqual([]);
+  });
+
+  it('streams the deployment logs from the logs service before reporting the terminal status', async () => {
+    stubGitLookups();
+    hub().post('/manage/projects').query({}).reply(201, { project: CREATED_PROJECT });
+    const logs = stubFollowUp('LIVE', [
+      { deploymentUid: DEPLOYMENT_UID, message: 'Installing dependencies...', timestamp: '2026-09-25T10:00:00.123Z' },
+      { deploymentUid: DEPLOYMENT_UID, message: 'Deployed successfully', timestamp: '2026-09-25T10:00:09.000Z' },
+    ]);
+
+    const { error, stdout } = await runCommand(gitFlags(), config);
+
+    expect(error).toBeUndefined();
+    expect(logs.isDone()).toBe(true);
+    const lines = stdout.split('\n');
+    const first = lines.indexOf('2026-09-25 10:00:00.123:  Installing dependencies...');
+    expect(first).toBeGreaterThan(-1);
+    expect(lines[first + 1]).toBe('2026-09-25 10:00:09.000:  Deployed successfully');
+    expect(lines[first + 2]).toBe('✔ Deployment #1 is LIVE');
+    expect(stdout).not.toContain('Could not read the deployment logs');
     expect(onWire).toEqual([]);
   });
 

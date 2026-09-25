@@ -1,5 +1,5 @@
 import { UsageError } from './errors';
-import { getManageApiBaseUrl, resolveLaunchHubUrl } from './region';
+import { getLogsApiBaseUrl, getManageApiBaseUrl, resolveLaunchHubUrl } from './region';
 
 describe('getManageApiBaseUrl', () => {
   it('appends the manage API path to the launch hub url', () => {
@@ -17,6 +17,14 @@ describe('getManageApiBaseUrl', () => {
   it.each([['//'], ['///']])('tolerates %s at the end of the hub url', (slashes) => {
     expect(getManageApiBaseUrl(`https://launch-api.contentstack.com${slashes}`)).toBe(
       'https://launch-api.contentstack.com/manage',
+    );
+  });
+});
+
+describe('getLogsApiBaseUrl', () => {
+  it.each([[''], ['/'], ['//']])('appends the logs API path to the launch hub url ending in %j', (slashes) => {
+    expect(getLogsApiBaseUrl(`https://launch-api.contentstack.com${slashes}`)).toBe(
+      'https://launch-api.contentstack.com/logs',
     );
   });
 });

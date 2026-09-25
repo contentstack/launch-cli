@@ -1,6 +1,7 @@
 import { UsageError } from './errors';
 
 const MANAGE_API_PATH = 'manage';
+const LOGS_API_PATH = 'logs';
 
 export interface RegionLike {
   launchHubUrl?: string;
@@ -30,6 +31,14 @@ export function resolveLaunchHubUrl(region: RegionLike | undefined): string {
   return `https://${[onComDomain, ...path].join('/')}`;
 }
 
+function underHub(launchHubUrl: string, path: string): string {
+  return `${launchHubUrl.replace(/\/+$/, '')}/${path}`;
+}
+
 export function getManageApiBaseUrl(launchHubUrl: string): string {
-  return `${launchHubUrl.replace(/\/+$/, '')}/${MANAGE_API_PATH}`;
+  return underHub(launchHubUrl, MANAGE_API_PATH);
+}
+
+export function getLogsApiBaseUrl(launchHubUrl: string): string {
+  return underHub(launchHubUrl, LOGS_API_PATH);
 }

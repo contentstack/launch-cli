@@ -34,6 +34,12 @@ export interface Deployment {
 
 export type IdentifiedDeployment = Deployment & { uid: string };
 
+export interface DeploymentLog {
+  message?: string;
+  timestamp?: string;
+  stage?: string;
+}
+
 export interface DeploymentResponse {
   deployment: Deployment;
 }

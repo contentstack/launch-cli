@@ -45,10 +45,14 @@ export class DeploymentsApi {
     return response;
   }
 
+  static pathOf(params: GetDeploymentParams): string {
+    return `${DeploymentsApi.base(params)}/${params.deployment}`;
+  }
+
   async get(params: GetDeploymentParams): Promise<Deployment> {
     const response = await this.request<DeploymentResponse>({
       method: 'GET',
-      path: `${DeploymentsApi.base(params)}/${params.deployment}`,
+      path: DeploymentsApi.pathOf(params),
       orgUid: params.org,
       projectUid: params.project,
     });

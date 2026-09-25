@@ -1,5 +1,6 @@
 import { ApiSurface, DEPENDENCIES, buildApi, catalog, resolutionTable } from './resources';
 import { DeploymentsApi } from './deployments/deployments.api';
+import { DeploymentLogsApi } from './deployments/deployment-logs.api';
 import { EnvironmentsApi } from './environments/environments.api';
 import { GitApi } from './git/git.api';
 import { ProjectsApi } from './projects/projects.api';
@@ -9,6 +10,7 @@ import * as organizationPrompt from './organizations/organization.prompt';
 import { OrganizationsApi } from './organizations/organizations.api';
 import { ProjectResolver } from './projects/project.resolver';
 import type { CmaSession } from './transport/cma-client';
+import type { RestApiClient, RestRequest } from './transport/rest-client';
 
 const UNUSED_CMA: CmaSession = {
   fetchOrganizations: async () => {
@@ -145,14 +147,45 @@ describe('resolution', () => {
 describe('the api surface', () => {
   it('assembles one repository per resource from the single client', () => {
     const client = {} as never;
-    const api = buildApi(client, UNUSED_CMA);
+    const api = buildApi(client, UNUSED_CMA, {} as never);
 
-    expect(Object.keys(api).sort()).toEqual(['deployments', 'environments', 'git', 'organizations', 'projects']);
+    expect(Object.keys(api).sort()).toEqual([
+      'deploymentLogs',
+      'deployments',
+      'environments',
+      'git',
+      'organizations',
+      'projects',
+    ]);
+    expect(api.deploymentLogs).toBeInstanceOf(DeploymentLogsApi);
     expect(api.organizations).toBeInstanceOf(OrganizationsApi);
     expect(api.projects).toBeInstanceOf(ProjectsApi);
     expect(api.environments).toBeInstanceOf(EnvironmentsApi);
     expect(api.deployments).toBeInstanceOf(DeploymentsApi);
     expect(api.git).toBeInstanceOf(GitApi);
+  });
+
+  it('sends deployment log reads through the logs client and nothing else through it', async () => {
+    const sent = { manage: [] as RestRequest[], logs: [] as RestRequest[] };
+    const recording = (into: RestRequest[], body: unknown) =>
+      ({
+        request: async (req: RestRequest) => {
+          into.push(req);
+          return body;
+        },
+      }) as unknown as RestApiClient;
+    const api = buildApi(
+      recording(sent.manage, { deployment: { uid: 'd1', status: 'LIVE' } }),
+      UNUSED_CMA,
+      recording(sent.logs, { deploymentLogs: [] }),
+    );
+    const scope = { org: 'o1', project: 'p1', environment: 'e1', deployment: 'd1' };
+
+    await api.deploymentLogs.after({ ...scope, timestamp: '2026-09-25T10:00:00.000Z' });
+    await api.deployments.get(scope);
+
+    expect(sent.logs.map((req) => req.path)).toEqual(['/projects/p1/environments/e1/deployments/d1/logs/deployment-logs']);
+    expect(sent.manage.map((req) => req.path)).toEqual(['/projects/p1/environments/e1/deployments/d1']);
   });
 
   it('hands the organizations repository the CMA session it was given', async () => {
@@ -166,7 +199,7 @@ describe('the api surface', () => {
       scopedOrganizationUid: () => 'org7',
     };
 
-    const available = await buildApi({} as never, cma).organizations.available();
+    const available = await buildApi({} as never, cma, {} as never).organizations.available();
 
     expect(fetched).toEqual(['org7']);
     expect(available).toEqual({ organizations: [{ uid: 'org7', name: 'Scoped Org' }], scoped: true });

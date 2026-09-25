@@ -228,18 +228,14 @@ export class ProjectCreator {
       throw this.unsuccessful({ org, project, envName, environment, status: NO_DEPLOYMENT_STATUS });
     }
 
+    const scope = { org, project: project.uid, environment: environment.uid, deployment: deployment.uid };
     const outcome = await this.explaining({ org, project, envName, environment, deployment }, () =>
       watchDeployment({
         ...this.timing,
         ux: this.services.ux,
         outputIsTTY: this.services.outputIsTTY === true,
-        poll: () =>
-          this.services.api.deployments.get({
-            org,
-            project: project.uid,
-            environment: environment.uid,
-            deployment: deployment.uid,
-          }),
+        logs: (after) => this.services.api.deploymentLogs.after({ ...scope, timestamp: after }),
+        poll: () => this.services.api.deployments.get(scope),
       }),
     );
 

@@ -7,6 +7,7 @@ import { gitFlags, gitResolution } from './git/git.inputs';
 import { ProjectsApi } from './projects/projects.api';
 import { EnvironmentsApi } from './environments/environments.api';
 import { DeploymentsApi } from './deployments/deployments.api';
+import { DeploymentLogsApi } from './deployments/deployment-logs.api';
 import { GitApi } from './git/git.api';
 import { OrganizationsApi } from './organizations/organizations.api';
 import type { CmaSession } from './transport/cma-client';
@@ -40,15 +41,17 @@ export interface ApiSurface {
   projects: ProjectsApi;
   environments: EnvironmentsApi;
   deployments: DeploymentsApi;
+  deploymentLogs: DeploymentLogsApi;
   git: GitApi;
 }
 
-export function buildApi(client: RestApiClient, cma: CmaSession): ApiSurface {
+export function buildApi(client: RestApiClient, cma: CmaSession, logsClient: RestApiClient): ApiSurface {
   return {
     organizations: new OrganizationsApi(cma),
     projects: new ProjectsApi(client),
     environments: new EnvironmentsApi(client),
     deployments: new DeploymentsApi(client),
+    deploymentLogs: new DeploymentLogsApi(logsClient),
     git: new GitApi(client),
   };
 }
