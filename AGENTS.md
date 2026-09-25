@@ -480,8 +480,21 @@ Backoff reuses `RetryPolicy.delayFor` - do not introduce a second retry concept.
 at `DEPLOYMENT_MAX_BACKOFF_STEPS` so a long deployment settles at a fixed poll interval.
 
 Output is one line per **status change**, always. The `  ... still <STATUS>` heartbeat is printed
-only when `isTTY`, so a CI log gets one line per transition and **no escape codes at all** - a test
-asserts the absence of `\u001b`.
+only when `isTTY`, and only in a poll that brought no new log lines, so a CI log gets one line per
+transition and **no escape codes at all** - a test asserts the absence of `\u001b`.
+
+**The build logs stream between the status lines, as V1's did.** Every poll also reads
+`GET /projects/:p/environments/:e/deployments/:d/logs/deployment-logs?timestamp=` from
+contentfly-logs-service (`DeploymentLogsApi`, on its own `RestApiClient` at `<launchHubUrl>/logs`,
+the prefix V1's `logs/graphql` used) and prints each line as V1 did, `YYYY-MM-DD HH:MM:SS.mmm:  message`.
+The first read asks from `DEPLOYMENT_LOGS_FROM` (the epoch) and every later one from the last
+parseable timestamp printed: with a `timestamp` the service returns what came strictly after it in
+ascending order, and without one it returns the newest page in **descending** order, so never let the
+cursor drop the query. An in-flight status line prints before that poll's logs and the terminal line
+after them, so the last lines of a build are never cut off by the `✔`/`✖`. The logs are auxiliary: a
+failed read prints one `  ! Could not read the deployment logs (...)` notice for the whole wait, is
+retried from the same cursor on the next poll, and never changes the outcome - the status poll alone
+decides that.
 
 **Writing a test for it: the fake clock must advance.** `now()` and `sleep()` are injected and both
 are required, not optional with defaults. A fake `now: () => 0` with a `sleep` that does nothing

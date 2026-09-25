@@ -21,12 +21,16 @@ fileignoreconfig:
     - "formField\\('key', "
 - filename: src/projects/projects.api.test.ts
   allowed_patterns:
+    - "the caller passes neither"
+    - "the caller must pass a uid instead"
     - "formFieldKey"
 - filename: src/projects/project.create.test.ts
   allowed_patterns:
+    - "'SECRET=hunter2'"
     - "formFieldKey"
 - filename: test/integration/projects-create.test.ts
   allowed_patterns:
+    - "mockImplementation\\(\\(key: string\\) => CONFIG\\[key\\]\\)"
     - "formFieldKey"
     - "key: 'x-ms-blob-type', value: 'BlockBlob'"
     - "key: 'Content-Type', value: 'application/zip'"
@@ -82,4 +86,20 @@ fileignoreconfig:
 - filename: src/core/rules.ts
   allowed_patterns:
     - "FlagKey"
+- filename: src/resources.ts
+  allowed_patterns:
+    - "FlagKey"
+- filename: src/resources.test.ts
+  allowed_patterns:
+    - "a project name passed on argv to the project resolver"
+- filename: AGENTS.md
+  allowed_patterns:
+    - "Do not add an exemption to a guard to make a new file pass"
+    - "passes its own error wording to `client.request\\(req, MESSAGES\\)`"
+    - "a key of `ProjectConfig`"
+    - "returns silently when `--yes` was passed"
+    - "path the user passed with `--config`"
+    - "what `limit` resolves to when nobody passed it"
+    - "a test passes `var`, `env-file` and `from-stack`"
+    - "an in-flight secret registry to redact against"
 version: "1.0"
