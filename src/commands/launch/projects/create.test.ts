@@ -34,8 +34,6 @@ describe('launch:projects:create', () => {
       name: 'My Site',
       description: 'A site',
       'env-name': 'Default',
-      namespace: 'my-org',
-      repo: 'my-org/my-repo',
       branch: 'main',
       framework: 'NEXTJS',
       'build-cmd': 'npm run build',
@@ -55,8 +53,6 @@ describe('launch:projects:create', () => {
         name: 'My Site',
         description: 'A site',
         envName: 'Default',
-        namespace: 'my-org',
-        repo: 'my-org/my-repo',
         branch: 'main',
         framework: 'NEXTJS',
         buildCmd: 'npm run build',
@@ -100,7 +96,7 @@ describe('launch:projects:create', () => {
 
   it('declares the framework gate and the GitHub-only flag gates as rules, so a bad pairing costs no API call', () => {
     expect(ProjectsCreate.rules).toEqual([serverCommandFrameworkGate, ...gitOnlyFlagRules]);
-    expect(gitOnlyFlagRules).toHaveLength(3);
+    expect(gitOnlyFlagRules).toHaveLength(1);
   });
 
   it('declares every flag it reads and requires only the organization', () => {
@@ -110,8 +106,6 @@ describe('launch:projects:create', () => {
       'name',
       'description',
       'env-name',
-      'namespace',
-      'repo',
       'branch',
       'framework',
       'build-cmd',
@@ -160,5 +154,12 @@ describe('launch:projects:create', () => {
     );
     expect(ProjectsCreate.examples[0]).toContain('--type GitHub');
     expect(ProjectsCreate.examples[1]).toContain('--type FileUpload');
+  });
+
+  it('shows that a local clone supplies the namespace and repository on its own', () => {
+    expect(ProjectsCreate.examples[2]).toBe(
+      '$ csdx launch:projects:create --org <org-uid> --type GitHub --data-dir ./my-clone ' +
+        '# the repository comes from the folder\'s GitHub remote',
+    );
   });
 });

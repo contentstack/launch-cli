@@ -1,10 +1,10 @@
 import AdmZip from 'adm-zip';
 import { cliux } from '@contentstack/cli-utilities';
-import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { CancelledError, MissingInputError, UsageError } from '../core/errors';
+import { CancelledError, MissingInputError, SessionExpiredError, UsageError } from '../core/errors';
 import { UxLike } from '../core/render';
 import { ServiceContext } from '../core/service-context';
 import { DeploymentUnsuccessfulError } from '../deployments/deployment.errors';
@@ -56,10 +56,10 @@ interface Scenario {
   environments?: unknown[];
   deployments?: unknown[];
   repositories?: unknown[];
-  namespaces?: unknown[];
   branches?: unknown[];
   detected?: unknown;
   createFails?: Error;
+  repositoriesFails?: Error;
   pollFails?: Error;
   signedUrlFails?: Error;
   environmentFails?: Error;
@@ -75,12 +75,11 @@ function harness(scenario: Scenario = {}) {
   const askedPayloads: Record<string, unknown>[] = [];
   const created: unknown[] = [];
   const gitCalls: unknown[] = [];
-  const calls: Record<'signedUploadUrl' | 'environments' | 'latest' | 'get' | 'namespaces' | 'branches', unknown[]> = {
+  const calls: Record<'signedUploadUrl' | 'environments' | 'latest' | 'get' | 'branches', unknown[]> = {
     signedUploadUrl: [],
     environments: [],
     latest: [],
     get: [],
-    namespaces: [],
     branches: [],
   };
   let answerIndex = 0;
@@ -176,15 +175,13 @@ function harness(scenario: Scenario = {}) {
       after: async () => [],
     },
     git: {
-      namespaces: async (params: unknown) => {
-        calls.namespaces.push(params);
-        return {
-          pagination: { count: 1, limit: 100 },
-          namespaces: scenario.namespaces ?? [{ name: 'my-org' }],
-        };
-      },
       repositories: async (params: unknown) => {
         gitCalls.push(params);
+
+        if (scenario.repositoriesFails) {
+          throw scenario.repositoriesFails;
+        }
+
         return {
           pagination: { count: 1, limit: 100 },
           repositories: scenario.repositories ?? [
@@ -222,6 +219,16 @@ function harness(scenario: Scenario = {}) {
   };
 }
 
+function usingClone(repoName = 'my-org/my-repo'): string {
+  return `Using the GitHub repository "${repoName}" checked out in ${dataDir}. Pass --data-dir to build from another folder.`;
+}
+
+function cloneOf(repoName: string): void {
+  mkdirSync(join(dataDir, '.git'), { recursive: true });
+  writeFileSync(join(dataDir, '.git', 'HEAD'), 'ref: refs/heads/main\n');
+  writeFileSync(join(dataDir, '.git', 'config'), `[remote "origin"]\n\turl = https://github.com/${repoName}.git\n`);
+}
+
 function configPathIn(dir: string): string {
   return join(dir, '.cs-launch.json');
 }
@@ -238,8 +245,6 @@ function gitRequest(overrides: Partial<CreateRequest> = {}): CreateRequest {
     type: 'GitHub',
     name: 'My Site',
     envName: 'Default',
-    namespace: 'my-org',
-    repo: 'my-org/my-repo',
     branch: 'main',
     framework: 'NEXTJS',
     buildCmd: 'npm run build',
@@ -275,6 +280,7 @@ describe('ProjectCreator on the GitHub path', () => {
   beforeEach(() => {
     dataDir = mkdtempSync(join(tmpdir(), 'launch-create-'));
     writeFileSync(join(dataDir, 'index.html'), '<h1>site</h1>');
+    cloneOf('my-org/my-repo');
   });
 
   afterEach(() => {
@@ -315,13 +321,7 @@ describe('ProjectCreator on the GitHub path', () => {
         gitProviderMetadata: { gitProvider: 'GitHub' },
       },
     });
-    expect(printed).toEqual([
-      'Deployment URL https://my-site.example.test',
-      'uid   p1',
-      'name  My Site',
-      'type  GITPROVIDER',
-      'url   https://my-site.example.test',
-    ]);
+    expect(printed).toEqual([usingClone(), 'Deployment URL https://my-site.example.test']);
   });
 
   it('sends the project description and the two toggles only when they were supplied', async () => {
@@ -389,47 +389,120 @@ describe('ProjectCreator on the GitHub path', () => {
     );
   });
 
-  it('refuses a --repo that the namespace does not hold', async () => {
-    const { creator } = harness({ repositories: [{ fullName: 'my-org/other-repo' }] });
+  it('takes the namespace and repository from the local clone instead of asking for them', async () => {
+    cloneOf('my-org/my-repo');
+    const { creator, asked, created } = harness({ isTTY: true, answers: ['main'] });
 
-    await expect(creator.create(gitRequest({ repo: 'my-org/missing' }))).rejects.toThrow(UsageError);
-    await expect(creator.create(gitRequest({ repo: 'my-org/missing' }))).rejects.toThrow(
-      'No repository named "my-org/missing" was found under "my-org".',
+    await creator.create(gitRequest({ branch: undefined }));
+
+    expect(asked).toEqual(['Choose a branch']);
+    expect(bodyOf(created).repository).toMatchObject({
+      repositoryName: 'my-org/my-repo',
+      username: 'my-org',
+    });
+  });
+
+  it('offers the detected repository default branch when it asks for a branch', async () => {
+    cloneOf('my-org/my-repo');
+    const { creator, asked, askedPayloads, calls } = harness({ isTTY: true, answers: ['main'] });
+
+    await creator.create(gitRequest({ branch: undefined }));
+
+    expect(asked).toEqual(['Choose a branch']);
+    expect(askedPayloads[0]).toMatchObject({ default: 'main' });
+    expect(calls.branches).toEqual([
+      { org: ORG, provider: 'GitHub', namespace: 'my-org', repoName: 'my-org/my-repo', limit: 100, skip: 0 },
+    ]);
+  });
+
+  it('creates from a local clone with no terminal to ask on', async () => {
+    cloneOf('my-org/my-repo');
+    const { creator, created } = harness();
+
+    await creator.create(gitRequest());
+
+    expect(bodyOf(created).repository).toMatchObject({
+      repositoryName: 'my-org/my-repo',
+      username: 'my-org',
+    });
+  });
+
+  it.each([[true], [false]])('refuses when the folder is not a GitHub working copy (terminal: %p)', async (isTTY) => {
+    const notAClone = join(dataDir, 'sub');
+    mkdirSync(notAClone, { recursive: true });
+    const { creator, asked } = harness({ isTTY });
+
+    const failure = await creator
+      .create(gitRequest({ dataDir: notAClone, configPath: configPathIn(notAClone) }))
+      .catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(UsageError);
+    expect((failure as Error).message).toBe(
+      `No GitHub repository was found in ${notAClone}. Run this command from a GitHub working copy, ` +
+        'or pass --data-dir with the folder holding one.',
+    );
+    expect(asked).toEqual([]);
+  });
+
+  it('names the detected repository when the API rejects the lookup outright', async () => {
+    const { creator } = harness({
+      repositoriesFails: new LaunchApiError(404, [
+        { code: 'launch.USERCONNECTION.NOT_FOUND', message: 'No user connection found' },
+      ]),
+    });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(UsageError);
+    expect((failure as Error).message).toBe(
+      `The GitHub repository "my-org/my-repo" checked out in ${dataDir} is not available to this ` +
+        'organization\'s connected GitHub account: No user connection found. ' +
+        'Connect it in the Launch app, or pass --data-dir with a folder whose repository is connected.',
     );
   });
 
-  it.each([['my-org/my-repo'], ['my-repo']])(
-    'searches the namespace by the repository name alone when --repo is %p, as the Git provider matches bare names',
-    async (repo) => {
-      const { creator, gitCalls, created } = harness();
+  it('lets a failure that is not an API error through the lookup untouched', async () => {
+    const boom = new SessionExpiredError();
+    const { creator } = harness({ repositoriesFails: boom });
 
-      await creator.create(gitRequest({ repo }));
-
-      expect(gitCalls[0]).toEqual({
-        org: ORG,
-        provider: 'GitHub',
-        namespace: 'my-org',
-        search: 'my-repo',
-        limit: 100,
-        skip: 0,
-      });
-      expect((bodyOf(created).repository as Record<string, string>).repositoryName).toBe('my-org/my-repo');
-    },
-  );
-
-  it('accepts a --repo given as the bare repository name', async () => {
-    const { creator, created } = harness({ repositories: [{ name: 'my-repo', url: 'https://github.com/x/my-repo' }] });
-
-    await creator.create(gitRequest({ repo: 'my-repo' }));
-
-    expect((bodyOf(created).repository as Record<string, string>).repositoryName).toBe('my-repo');
+    await expect(creator.create(gitRequest())).rejects.toBe(boom);
   });
+
+  it('says which local repository it took, so the choice is never silent', async () => {
+    cloneOf('my-org/my-repo');
+    const { creator, printed } = harness({ isTTY: true, answers: ['main'] });
+
+    await creator.create(gitRequest({ branch: undefined }));
+
+    expect(printed).toContain(
+      `Using the GitHub repository "my-org/my-repo" checked out in ${dataDir}. ` +
+        'Pass --data-dir to build from another folder.',
+    );
+  });
+
+  it('names the local folder and the flags when the detected repository is not connected', async () => {
+    cloneOf('other-org/missing-repo');
+    const { creator } = harness({ isTTY: true });
+
+    const failure = await creator
+      .create(gitRequest({ branch: undefined }))
+      .catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(UsageError);
+    expect((failure as Error).message).toBe(
+      `The GitHub repository "other-org/missing-repo" checked out in ${dataDir} is not available to this ` +
+        'organization\'s connected GitHub account: no repository with that name was found. ' +
+        'Connect it in the Launch app, or pass --data-dir with a folder whose repository is connected.',
+    );
+  });
+
 });
 
 describe('ProjectCreator prompting order and refusals', () => {
   beforeEach(() => {
     dataDir = mkdtempSync(join(tmpdir(), 'launch-create-'));
     writeFileSync(join(dataDir, 'index.html'), '<h1>site</h1>');
+    cloneOf('my-org/my-repo');
   });
 
   afterEach(() => {
@@ -439,7 +512,7 @@ describe('ProjectCreator prompting order and refusals', () => {
   it('asks in the order the doc pins: type, project name, environment name, framework, build, output, response, Contentstack Authentication', async () => {
     const { creator, asked } = harness({
       isTTY: true,
-      answers: ['GitHub', 'My Site', 'Default', 'my-org', 'my-org/my-repo', 'main', 'NextJs', 'npm run build', '.next', 'buffered', 'enable'],
+      answers: ['GitHub', 'My Site', 'Default', 'main', 'NextJs', 'npm run build', '.next', 'buffered', 'enable'],
     });
 
     await creator.create({ org: ORG, dataDir, configPath: configPathIn(dataDir) });
@@ -448,8 +521,6 @@ describe('ProjectCreator prompting order and refusals', () => {
       'Project type',
       'Project name',
       'Environment name',
-      'Choose a Git namespace',
-      'Choose a repository',
       'Choose a branch',
       'Framework preset',
       'Build command',
@@ -491,7 +562,6 @@ describe('ProjectCreator prompting order and refusals', () => {
     ['type', {}],
     ['name', { type: 'GitHub' }],
     ['env-name', { type: 'GitHub', name: 'My Site' }],
-    ['namespace', { type: 'GitHub', name: 'My Site', envName: 'Default' }],
   ])('exits 2 naming --%s when there is no terminal to ask on', async (flag, supplied) => {
     const { creator } = harness();
 
@@ -641,6 +711,16 @@ describe('ProjectCreator on the FileUpload path', () => {
 
   afterEach(() => {
     rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  it('never reads the local clone, even when the data dir is one', async () => {
+    cloneOf('my-org/my-repo');
+    const { creator, created, gitCalls } = harness();
+
+    await creator.create(uploadRequest());
+
+    expect(gitCalls).toEqual([{ org: ORG, uploadUid: 'upload-uid' }]);
+    expect(bodyOf(created).repository).toBeUndefined();
   });
 
   it('zips the data dir, uploads it, and creates the project with the upload uid', async () => {
@@ -821,6 +901,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
   beforeEach(() => {
     dataDir = mkdtempSync(join(tmpdir(), 'launch-create-'));
     writeFileSync(join(dataDir, 'index.html'), '<h1>site</h1>');
+    cloneOf('my-org/my-repo');
   });
 
   afterEach(() => {
@@ -849,7 +930,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed[0]).toBe('Deployment URL https://my-site.example.test');
+    expect(printed.slice(0, 2)).toEqual([usingClone(), 'Deployment URL https://my-site.example.test']);
   });
 
   it.each([
@@ -863,7 +944,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
       await creator.create(gitRequest());
 
-      expect(printed[0]).toBe(line);
+      expect(printed[1]).toBe(line);
     },
   );
 
@@ -873,7 +954,6 @@ describe('ProjectCreator waiting on the first deployment', () => {
     await creator.create(gitRequest());
 
     expect(printed).toContain('Deployment URL https://my-site.example.test');
-    expect(printed).toContain('url   https://my-site.example.test');
   });
 
   it('exits 1 on a failed deployment, saying what survived and how to retry and inspect it', async () => {
@@ -1007,7 +1087,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed).toContain('url   https://domain.example.test');
+    expect(printed).toContain('Deployment URL https://domain.example.test');
   });
 
   it('reports no url at all when neither the deployment nor the environment has one', async () => {
@@ -1022,7 +1102,6 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed).not.toContain('url');
     expect(printed.join('\n')).not.toContain('Deployment URL');
     expect(printed.join('\n')).not.toContain('undefined');
   });
@@ -1056,7 +1135,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
     const { creator, printed } = harness({ createFails: boom });
 
     await expect(creator.create(gitRequest())).rejects.toBe(boom);
-    expect(printed).toEqual([]);
+    expect(printed).toEqual([usingClone()]);
   });
 });
 
@@ -1065,6 +1144,7 @@ describe('ProjectCreator writing the project config', () => {
     (uploadArchive as jest.Mock).mockImplementation(async () => undefined);
     dataDir = mkdtempSync(join(tmpdir(), 'launch-create-'));
     writeFileSync(join(dataDir, 'index.html'), '<h1>site</h1>');
+    cloneOf('my-org/my-repo');
   });
 
   afterEach(() => {
@@ -1144,7 +1224,7 @@ describe('ProjectCreator writing the project config', () => {
     expect(printed).toContain(
       `Could not record this project in ${configPathIn(dataDir)}: ` +
         `The config file at '${configPathIn(dataDir)}' is not valid JSON. It was left unchanged. ` +
-        'Pass --org and --project explicitly when you run Launch commands in this folder.',
+        `Pass --org ${ORG} --project ${PROJECT_UID} explicitly when you run Launch commands in this folder.`,
     );
     expect(printed.some((line) => line.includes(PROJECT_UID))).toBe(true);
   });

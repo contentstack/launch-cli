@@ -34,7 +34,7 @@ export function askProjectType(ux: UxLike): Promise<string> {
   );
 }
 
-export const GIT_ONLY_FLAGS = ['branch', 'namespace', 'repo'] as const;
+export const GIT_ONLY_FLAGS = ['branch'] as const;
 
 export const gitOnlyFlagRules = GIT_ONLY_FLAGS.map((flag) => onlyWithValueOf(flag, 'type', ['GitHub']));
 

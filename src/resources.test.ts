@@ -206,7 +206,7 @@ describe('the api surface', () => {
   });
 
   it('contributes every resource’s flags to the one catalog', () => {
-    for (const flag of ['org', 'project', 'type', 'env-name', 'framework', 'server-cmd', 'namespace', 'repo']) {
+    for (const flag of ['org', 'project', 'type', 'env-name', 'framework', 'server-cmd', 'branch']) {
       expect(catalog).toHaveProperty(flag);
     }
   });

@@ -1,6 +1,5 @@
 import { MissingInputError, UsageError } from '../core/errors';
 import { ProjectConfig, ProjectConfigStore } from '../core/project-config';
-import { renderDetail } from '../core/render';
 import { requireValueOf } from '../core/rules';
 import type { ServiceContext } from '../core/service-context';
 import { Loader, silentLoader, terminalLoader } from '../core/loader';
@@ -20,20 +19,20 @@ import {
 } from '../environments/environment.inputs';
 import type { CreateEnvironmentInput, Environment, FrameworkPreset } from '../environments/types';
 import { SERVER_COMMAND_FRAMEWORKS } from '../environments/types';
+import { detectGitHubRepository, LocalGitHubRepository } from '../git/local-repository';
 import { GIT_PROVIDER_GITHUB, GitRepository } from '../git/types';
+import { LaunchApiError } from '../transport/errors';
 import { archiveDirectory } from './project.archive';
 import {
   askBranch,
   askChoice,
-  askNamespace,
   askOptionalText,
-  askRepository,
   askText,
   findRepository,
   repositoryLabel,
   repositorySearchTerm,
 } from './project.create.prompt';
-import { deploymentFailureMessage, deploymentUrlLine, projectCreatedFields } from './project.presenter';
+import { deploymentFailureMessage, deploymentUrlLine } from './project.presenter';
 import {
   GIT_ONLY_FLAGS,
   PROJECT_TYPE_BY_CHOICE,
@@ -65,8 +64,6 @@ export interface CreateRequest {
   name?: string;
   description?: string;
   envName?: string;
-  namespace?: string;
-  repo?: string;
   branch?: string;
   framework?: FrameworkPreset;
   buildCmd?: string;
@@ -105,6 +102,14 @@ export function frameworkLabelOf(detected: unknown): string | undefined {
   const wanted = detected.trim().toLowerCase();
 
   return FRAMEWORK_CHOICES.find((label) => label.toLowerCase() === wanted);
+}
+
+function unreachableRepository(request: CreateRequest, local: LocalGitHubRepository, reason: string): string {
+  return (
+    `The GitHub repository "${local.repoName}" checked out in ${request.dataDir} is not available to this ` +
+    `organization's connected GitHub account: ${reason} ` +
+    'Connect it in the Launch app, or pass --data-dir with a folder whose repository is connected.'
+  );
 }
 
 export class ProjectCreator {
@@ -190,7 +195,8 @@ export class ProjectCreator {
 
       this.services.ux.print(
         `Could not record this project in ${path}: ${reason} ` +
-          'Pass --org and --project explicitly when you run Launch commands in this folder.',
+          `Pass --org ${request.org} --project ${project.uid} explicitly when you run Launch commands ` +
+          'in this folder.',
       );
     }
   }
@@ -247,7 +253,6 @@ export class ProjectCreator {
         this.services.ux.print(deploymentUrlLine(url, this.services.outputIsTTY === true));
       }
 
-      renderDetail(this.services.ux, projectCreatedFields(project, url));
       return;
     }
 
@@ -309,10 +314,17 @@ export class ProjectCreator {
   }
 
   private async selectGitSource(request: CreateRequest): Promise<SourceSelection> {
-    const namespace = await this.need('namespace', request.namespace, () =>
-      askNamespace(this.services, request.org),
-    );
-    const repository = await this.repository(request, namespace);
+    const local = detectGitHubRepository(request.dataDir);
+
+    if (local === undefined) {
+      throw new UsageError(
+        `No GitHub repository was found in ${request.dataDir}. Run this command from a GitHub working copy, ` +
+          'or pass --data-dir with the folder holding one.',
+      );
+    }
+
+    const namespace = local.namespace;
+    const repository = await this.detectedRepository(request, local);
     const repoName = repositoryLabel(repository);
     const branch = await this.need('branch', request.branch, () =>
       askBranch(
@@ -332,26 +344,43 @@ export class ProjectCreator {
     return { detected, repository, namespace, branch };
   }
 
-  private async repository(request: CreateRequest, namespace: string): Promise<GitRepository> {
-    if (request.repo === undefined) {
-      return askRepository(this.services, { org: request.org, provider: GIT_PROVIDER_GITHUB, namespace });
-    }
-
-    const page = await this.services.api.git.repositories({
-      org: request.org,
-      provider: GIT_PROVIDER_GITHUB,
-      namespace,
-      search: repositorySearchTerm(request.repo),
-      limit: 100,
-      skip: 0,
-    });
-    const match = findRepository(page.repositories, request.repo);
+  private async detectedRepository(request: CreateRequest, local: LocalGitHubRepository): Promise<GitRepository> {
+    const match = await this.reachableRepository(request, local);
 
     if (match === undefined) {
-      throw new UsageError(`No repository named "${request.repo}" was found under "${namespace}".`);
+      throw new UsageError(unreachableRepository(request, local, 'no repository with that name was found.'));
     }
 
+    this.services.ux.print(
+      `Using the GitHub repository "${local.repoName}" checked out in ${request.dataDir}. ` +
+        'Pass --data-dir to build from another folder.',
+    );
+
     return match;
+  }
+
+  private async reachableRepository(
+    request: CreateRequest,
+    local: LocalGitHubRepository,
+  ): Promise<GitRepository | undefined> {
+    try {
+      const page = await this.services.api.git.repositories({
+        org: request.org,
+        provider: GIT_PROVIDER_GITHUB,
+        namespace: local.namespace,
+        search: repositorySearchTerm(local.repoName),
+        limit: 100,
+        skip: 0,
+      });
+
+      return findRepository(page.repositories, local.repoName);
+    } catch (error) {
+      if (error instanceof LaunchApiError) {
+        throw new UsageError(unreachableRepository(request, local, reasonOf(error)));
+      }
+
+      throw error;
+    }
   }
 
   private async selectUploadSource(request: CreateRequest): Promise<SourceSelection> {
@@ -497,11 +526,7 @@ export class ProjectCreator {
   }
 
   private refuseGitFlagsOffGitHub(request: CreateRequest, choice: ProjectTypeChoice): void {
-    const supplied: Record<(typeof GIT_ONLY_FLAGS)[number], string | undefined> = {
-      branch: request.branch,
-      namespace: request.namespace,
-      repo: request.repo,
-    };
+    const supplied: Record<(typeof GIT_ONLY_FLAGS)[number], string | undefined> = { branch: request.branch };
 
     for (const flag of GIT_ONLY_FLAGS) {
       if (supplied[flag] !== undefined) {

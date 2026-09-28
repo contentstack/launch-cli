@@ -195,9 +195,8 @@ Create a Launch project, its first environment, and its first deployment
 ```
 USAGE
   $ csdx launch:projects:create [-c <value>] [-d <value>] [--org <value>] [--type <value>] [--name <value>] [--description
-    <value>] [--env-name <value>] [--namespace <value>] [--repo <value>] [--branch <value>] [--framework <value>]
-    [--build-cmd <value>] [--server-cmd <value>] [--output-dir <value>] [--res-mode <value>] [--auto-deploy <value>]
-    [--cs-auth <value>]
+    <value>] [--env-name <value>] [--branch <value>] [--framework <value>] [--build-cmd <value>] [--server-cmd <value>]
+    [--output-dir <value>] [--res-mode <value>] [--auto-deploy <value>] [--cs-auth <value>]
 
 FLAGS
   -c, --config=<value>       Path to the local '.cs-launch.json' file
@@ -211,10 +210,8 @@ FLAGS
       --framework=<value>    Framework preset (Gatsby | NextJs | CRA | CSR | Analog | Angular | Nuxt | Astro | VueJs |
                              Remix | Other)
       --name=<value>         Project name (200 characters or fewer)
-      --namespace=<value>    Git namespace — the user or organization the repository belongs to
       --org=<value>          Organization UID
       --output-dir=<value>   Output directory
-      --repo=<value>         Repository, as <namespace>/<repository> or the bare repository name
       --res-mode=<value>     Response mode (buffered | streaming)
       --server-cmd=<value>   Server command
       --type=<value>         Project type (GitHub | FileUpload)
@@ -223,9 +220,11 @@ DESCRIPTION
   Create a Launch project, its first environment, and its first deployment
 
 EXAMPLES
-  $ csdx launch:projects:create --org <org-uid> --type GitHub --name <name> --env-name <environment> --namespace <git-namespace> --repo <namespace/repo> --branch main --framework NextJs --build-cmd "npm run build" --output-dir .next --res-mode buffered
+  $ csdx launch:projects:create --org <org-uid> --type GitHub --name <name> --env-name <environment> --branch main --framework NextJs --build-cmd "npm run build" --output-dir .next --res-mode buffered
 
   $ csdx launch:projects:create --org <org-uid> --type FileUpload --name <name> --env-name <environment> --data-dir ./site --framework Other --build-cmd "npm run build" --output-dir ./ --res-mode buffered
+
+  $ csdx launch:projects:create --org <org-uid> --type GitHub --data-dir ./my-clone # the repository comes from the folder's GitHub remote
 ```
 
 _See code: [src/commands/launch/projects/create.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/projects/create.ts)_

@@ -2,7 +2,7 @@ import { PICKER_PAGE_SIZE } from '../core/constants';
 import { CancelledError, UsageError } from '../core/errors';
 import type { UxLike } from '../core/render';
 import type { ApiSurface } from '../resources';
-import { GIT_PROVIDER_GITHUB, GitRepository } from '../git/types';
+import { GitRepository } from '../git/types';
 
 export interface CreatePromptDeps {
   api: ApiSurface;
@@ -55,68 +55,6 @@ export function repositorySearchTerm(wanted: string): string {
 
 export function findRepository(repositories: GitRepository[], wanted: string): GitRepository | undefined {
   return repositories.find((repository) => repositoryLabel(repository) === wanted || repository.name === wanted);
-}
-
-function isGitHubNamespace(provider: string | undefined): boolean {
-  return provider === undefined || provider === GIT_PROVIDER_GITHUB;
-}
-
-export async function askNamespace(deps: CreatePromptDeps, org: string): Promise<string> {
-  const page = await deps.api.git.namespaces({ org, limit: PICKER_PAGE_SIZE, skip: 0 });
-  const named = page.namespaces.filter((namespace) => Boolean(namespace.name));
-
-  if (named.length === 0) {
-    throw new UsageError(
-      'No Git namespaces are available for this organization. Connect a Git provider in the Launch app first.',
-    );
-  }
-
-  const github = named.filter((namespace) => isGitHubNamespace(namespace.provider));
-
-  if (github.length === 0) {
-    throw new UsageError(
-      'No GitHub namespaces are connected to this organization. Connect GitHub in the Launch app first.',
-    );
-  }
-
-  noteTruncation(deps.ux, page.pagination.count, page.namespaces.length, 'namespaces', '--namespace');
-
-  return askChoice(
-    deps.ux,
-    'Choose a Git namespace',
-    github.map((namespace) => ({ name: namespace.name as string, value: namespace.name as string })),
-  );
-}
-
-export async function askRepository(
-  deps: CreatePromptDeps,
-  params: { org: string; provider: string; namespace: string },
-): Promise<GitRepository> {
-  const page = await deps.api.git.repositories({ ...params, limit: PICKER_PAGE_SIZE, skip: 0 });
-  const named = page.repositories.filter((repository) => repositoryLabel(repository) !== '');
-
-  if (named.length === 0) {
-    throw new UsageError(`No repositories are available under "${params.namespace}".`);
-  }
-
-  noteTruncation(deps.ux, page.pagination.count, named.length, 'repositories', '--repo');
-
-  const picked = await askChoice(
-    deps.ux,
-    'Choose a repository',
-    named.map((repository) => ({ name: repositoryLabel(repository), value: repositoryLabel(repository) })),
-  );
-
-  const match = findRepository(named, picked);
-
-  if (match === undefined) {
-    throw new UsageError(
-      `No repository named "${picked}" was found under "${params.namespace}". ` +
-        'Choose one from the list, or pass --repo.',
-    );
-  }
-
-  return match;
 }
 
 export async function askBranch(

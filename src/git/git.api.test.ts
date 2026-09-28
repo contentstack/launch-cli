@@ -23,22 +23,6 @@ function fakeRestClient(result: unknown) {
 }
 
 describe('GitApi', () => {
-  it('lists namespaces as an org-scoped GET carrying limit and skip', async () => {
-    const page = { pagination: { count: 1, limit: 100, skip: 0 }, namespaces: [{ name: 'my-org' }] };
-    const { client, requests, messages } = fakeRestClient(page);
-
-    const result = await new GitApi(client).namespaces({ org: ORG, limit: 100, skip: 0 });
-
-    expect(result).toBe(page);
-    expect(requests[0]).toEqual({
-      method: 'GET',
-      path: '/git-namespaces',
-      orgUid: ORG,
-      query: { limit: 100, skip: 0 },
-    });
-    expect(messages[0]).toBe(GIT_ERROR_MESSAGES);
-  });
-
   it('lists repositories carrying the provider, namespace and search it was given', async () => {
     const page = { pagination: { count: 1, limit: 100 }, repositories: [{ fullName: 'my-org/my-repo' }] };
     const { client, requests } = fakeRestClient(page);
@@ -93,18 +77,12 @@ describe('GitApi', () => {
     });
   });
 
-  it('raises a malformed-response error when a namespaces body has no namespaces array', async () => {
-    const { client } = fakeRestClient({ pagination: { count: 0, limit: 100 } });
-
-    await expect(new GitApi(client).namespaces({ org: ORG })).rejects.toThrow(LaunchApiError);
-    await expect(new GitApi(client).namespaces({ org: ORG })).rejects.toThrow(
-      'The Launch API returned a namespaces response without a namespaces array.',
-    );
-  });
-
   it('raises a malformed-response error when a repositories body has no repositories array', async () => {
     const { client } = fakeRestClient({});
 
+    await expect(new GitApi(client).repositories({ org: ORG, provider: GIT_PROVIDER_GITHUB })).rejects.toThrow(
+      LaunchApiError,
+    );
     await expect(
       new GitApi(client).repositories({ org: ORG, provider: GIT_PROVIDER_GITHUB }),
     ).rejects.toThrow('The Launch API returned a repositories response without a repositories array.');

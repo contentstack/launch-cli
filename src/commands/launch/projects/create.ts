@@ -9,8 +9,6 @@ const createInputs = inputs({
   name: {},
   description: {},
   'env-name': {},
-  namespace: {},
-  repo: {},
   branch: {},
   framework: {},
   'build-cmd': {},
@@ -26,10 +24,11 @@ export default class ProjectsCreate extends LaunchCommand<typeof createInputs> {
 
   static examples = [
     '$ csdx launch:projects:create --org <org-uid> --type GitHub --name <name> --env-name <environment> ' +
-      '--namespace <git-namespace> --repo <namespace/repo> --branch main --framework NextJs ' +
-      '--build-cmd "npm run build" --output-dir .next --res-mode buffered',
+      '--branch main --framework NextJs --build-cmd "npm run build" --output-dir .next --res-mode buffered',
     '$ csdx launch:projects:create --org <org-uid> --type FileUpload --name <name> --env-name <environment> ' +
       '--data-dir ./site --framework Other --build-cmd "npm run build" --output-dir ./ --res-mode buffered',
+    '$ csdx launch:projects:create --org <org-uid> --type GitHub --data-dir ./my-clone ' +
+      '# the repository comes from the folder\'s GitHub remote',
   ];
 
   static inputs = createInputs;
@@ -49,8 +48,6 @@ export default class ProjectsCreate extends LaunchCommand<typeof createInputs> {
       name: resolved.name,
       description: resolved.description,
       envName: resolved['env-name'],
-      namespace: resolved.namespace,
-      repo: resolved.repo,
       branch: resolved.branch,
       framework: resolved.framework,
       buildCmd: resolved['build-cmd'],

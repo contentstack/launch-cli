@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -112,10 +112,6 @@ function gitFlags(): string[] {
     '"My Site"',
     '--env-name',
     'Default',
-    '--namespace',
-    'my-org',
-    '--repo',
-    'my-org/my-repo',
     '--branch',
     'main',
     '--framework',
@@ -201,6 +197,12 @@ function withoutFlags(args: string[], ...names: string[]): string[] {
   return kept;
 }
 
+function cloneOf(repoName: string): void {
+  mkdirSync(join(dataDir, '.git'), { recursive: true });
+  writeFileSync(join(dataDir, '.git', 'HEAD'), 'ref: refs/heads/main\n');
+  writeFileSync(join(dataDir, '.git', 'config'), `[remote "origin"]\n\turl = git@github.com:${repoName}.git\n`);
+}
+
 function stubRepositoryLookup(): void {
   hub()
     .get('/manage/git-repositories')
@@ -239,6 +241,7 @@ describe('integration: launch:projects:create on the wire', () => {
   beforeEach(() => {
     process.exitCode = 0;
     dataDir = mkdtempSync(join(tmpdir(), 'launch-create-wire-'));
+    cloneOf('my-org/my-repo');
     writeFileSync(join(dataDir, 'index.html'), '<h1>site</h1>');
     recordWire();
     jest.spyOn(console, 'log').mockImplementation((message: unknown) => {
@@ -299,10 +302,7 @@ describe('integration: launch:projects:create on the wire', () => {
     expect(stdout).toContain('Deployment URL https://my-site.example.test\n');
     expect(stdout).not.toContain('Deployment #1 is');
     expect(stdout).not.toContain('\u001b');
-    expect(stdout).toContain(`uid   ${PROJECT_UID}`);
-    expect(stdout).toContain('name  My Site');
-    expect(stdout).toContain('type  GITPROVIDER');
-    expect(stdout).toContain('url   https://my-site.example.test');
+    expect(stdout).not.toContain(`uid   ${PROJECT_UID}`);
     expect(stdout).not.toContain('test-authtoken');
     expect(onWire).toEqual([]);
   });
@@ -325,47 +325,6 @@ describe('integration: launch:projects:create on the wire', () => {
     expect(lines[first + 1]).toBe('2026-09-25 10:00:09.000:  Deployed successfully');
     expect(lines[first + 2]).toBe('Deployment URL https://my-site.example.test');
     expect(stdout).not.toContain('Could not read the deployment logs');
-    expect(onWire).toEqual([]);
-  });
-
-  it('finds the repository from the bare name as well as from <namespace>/<repository>', async () => {
-    let body: unknown;
-    stubGitLookups();
-    const create = hub()
-      .post('/manage/projects', (sent: unknown) => {
-        body = sent;
-        return true;
-      })
-      .query({})
-      .reply(201, { project: CREATED_PROJECT });
-    stubFollowUp('LIVE');
-    const args = gitFlags();
-    args[args.indexOf('my-org/my-repo')] = 'my-repo';
-
-    const { error } = await runCommand(args, config);
-
-    expect(error).toBeUndefined();
-    expect(create.isDone()).toBe(true);
-    expect(body).toMatchObject({
-      repository: { repositoryName: 'my-org/my-repo', repositoryUrl: 'https://github.com/my-org/my-repo' },
-    });
-    expect(onWire).toEqual([]);
-  });
-
-  it('exits 2 naming the repository when <namespace>/<repository> names a namespace other than --namespace', async () => {
-    hub()
-      .get('/manage/git-repositories')
-      .query({ provider: 'GitHub', namespace: 'my-org', search: 'my-repo', limit: 100, skip: 0 })
-      .reply(200, { pagination: { count: 1, limit: 100, skip: null }, repositories: [MY_REPO] });
-    const create = hub().post('/manage/projects').query({}).reply(201, { project: CREATED_PROJECT });
-    const args = gitFlags();
-    args[args.indexOf('my-org/my-repo')] = 'other-org/my-repo';
-
-    const { error } = await runCommand(args, config);
-
-    expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toBe('No repository named "other-org/my-repo" was found under "my-org".');
-    expect(create.isDone()).toBe(false);
     expect(onWire).toEqual([]);
   });
 
@@ -594,15 +553,13 @@ describe('integration: launch:projects:create on the wire', () => {
     expect(process.listenerCount('SIGINT')).toBe(0);
   });
 
-  it('asks all twelve GitHub prompts in the pinned order and submits exactly what was answered', async () => {
+  it('asks all ten GitHub prompts in the pinned order and submits exactly what was answered', async () => {
     let body: unknown;
     const prompts = answerPrompts({
       'Project type': 'GitHub',
       'Choose an organization': ORG_UID,
       'Project name': 'My Site',
       'Environment name': 'Default',
-      'Choose a Git namespace': 'my-org',
-      'Choose a repository': 'my-org/my-repo',
       'Choose a branch': 'main',
       'Framework preset': 'NextJs',
       'Build command': 'npm run build',
@@ -614,14 +571,7 @@ describe('integration: launch:projects:create on the wire', () => {
       .get('/v3/organizations')
       .query({ limit: '100', asc: 'name', include_count: 'true', skip: '0' })
       .reply(200, { organizations: [{ uid: ORG_UID, name: 'Acme' }], count: 1 });
-    const namespaces = hub()
-      .get('/manage/git-namespaces')
-      .query({ limit: 100, skip: 0 })
-      .reply(200, { pagination: { count: 1, limit: 100, skip: null }, namespaces: [{ name: 'my-org' }] });
-    const repositories = hub()
-      .get('/manage/git-repositories')
-      .query({ provider: 'GitHub', namespace: 'my-org', limit: 100, skip: 0 })
-      .reply(200, { pagination: { count: 1, limit: 100, skip: null }, repositories: [MY_REPO] });
+    stubRepositoryLookup();
     const branches = hub()
       .get('/manage/git-branches')
       .query({ provider: 'GitHub', repoName: 'my-org/my-repo', namespace: 'my-org', limit: 100, skip: 0 })
@@ -642,19 +592,12 @@ describe('integration: launch:projects:create on the wire', () => {
     const { error } = await onTerminal(() => runCommand(['launch:projects:create', '--data-dir', dataDir], config));
 
     expect(error).toBeUndefined();
-    expect([namespaces.isDone(), repositories.isDone(), branches.isDone(), create.isDone()]).toEqual([
-      true,
-      true,
-      true,
-      true,
-    ]);
+    expect([branches.isDone(), create.isDone()]).toEqual([true, true]);
     expect(prompts.messages).toEqual([
       'Project type',
       'Choose an organization',
       'Project name',
       'Environment name',
-      'Choose a Git namespace',
-      'Choose a repository',
       'Choose a branch',
       'Framework preset',
       'Build command',
@@ -663,8 +606,6 @@ describe('integration: launch:projects:create on the wire', () => {
       'Contentstack Authentication',
     ]);
     expect(prompts.payloads.map((payload) => payload.default)).toEqual([
-      undefined,
-      undefined,
       undefined,
       undefined,
       undefined,
@@ -695,6 +636,61 @@ describe('integration: launch:projects:create on the wire', () => {
         repositoryUrl: 'https://github.com/my-org/my-repo',
         gitProviderMetadata: { gitProvider: 'GitHub' },
       },
+    });
+    expect(onWire).toEqual([]);
+  });
+
+  it('skips the namespace and repository prompts when the data dir is a GitHub clone', async () => {
+    cloneOf('my-org/my-repo');
+    let body: unknown;
+    const prompts = answerPrompts({
+      'Project type': 'GitHub',
+      'Project name': 'My Site',
+      'Environment name': 'Default',
+      'Choose a branch': 'main',
+      'Framework preset': 'NextJs',
+      'Build command': 'npm run build',
+      'Output directory': '.next',
+      'Response mode': 'buffered',
+      'Contentstack Authentication': 'enable',
+    });
+    stubRepositoryLookup();
+    const branches = hub()
+      .get('/manage/git-branches')
+      .query({ provider: 'GitHub', repoName: 'my-org/my-repo', namespace: 'my-org', limit: 100, skip: 0 })
+      .reply(200, { pagination: { count: 1, limit: 100, skip: null }, branches: [{ name: 'main' }] });
+    stubDetection({ framework: 'NEXTJS', buildCommand: 'npm run build', outputDirectory: '.next' });
+    const create = hub()
+      .post('/manage/projects', (sent: unknown) => {
+        body = sent;
+        return true;
+      })
+      .query({})
+      .reply(201, { project: CREATED_PROJECT });
+    stubFollowUp('LIVE');
+
+    const { error } = await onTerminal(() =>
+      runCommand(['launch:projects:create', '--org', ORG_UID, '--data-dir', dataDir], config),
+    );
+
+    expect(error).toBeUndefined();
+    expect(prompts.messages).toEqual([
+      'Project type',
+      'Project name',
+      'Environment name',
+      'Choose a branch',
+      'Framework preset',
+      'Build command',
+      'Output directory',
+      'Response mode',
+      'Contentstack Authentication',
+    ]);
+    expect([branches.isDone(), create.isDone()]).toEqual([true, true]);
+    expect((body as { repository: unknown }).repository).toEqual({
+      repositoryName: 'my-org/my-repo',
+      username: 'my-org',
+      repositoryUrl: 'https://github.com/my-org/my-repo',
+      gitProviderMetadata: { gitProvider: 'GitHub' },
     });
     expect(onWire).toEqual([]);
   });
@@ -857,11 +853,7 @@ describe('integration: launch:projects:create on the wire', () => {
     expect(create.scope.isDone()).toBe(false);
   });
 
-  it.each([
-    ['--branch', 'main'],
-    ['--namespace', 'my-org'],
-    ['--repo', 'my-org/my-repo'],
-  ])('refuses %s with --type FileUpload before uploading anything', async (flag, value) => {
+  it.each([['--branch', 'main']])('refuses %s with --type FileUpload before uploading anything', async (flag, value) => {
     const signed = hub().get('/manage/projects/upload/signed_url').query({}).reply(200, awsSignedUpload());
 
     const { error } = await runCommand(

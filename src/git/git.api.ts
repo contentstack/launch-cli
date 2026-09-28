@@ -1,7 +1,7 @@
 import { assertArray } from '../transport/envelope';
 import { RestApiClient, RestRequest } from '../transport/rest-client';
 import { GIT_ERROR_MESSAGES } from './git.errors';
-import { GitBranchesPage, GitNamespacesPage, GitRepositoriesPage } from './types';
+import { GitBranchesPage, GitRepositoriesPage } from './types';
 
 export * from './types';
 
@@ -11,7 +11,6 @@ export interface GitPageParams {
   skip?: number;
 }
 
-export type ListNamespacesParams = GitPageParams;
 
 export interface ListRepositoriesParams extends GitPageParams {
   provider: string;
@@ -39,18 +38,6 @@ export class GitApi {
     assertArray(response, key, `${key} response`);
 
     return response;
-  }
-
-  namespaces(params: ListNamespacesParams): Promise<GitNamespacesPage> {
-    return this.page<GitNamespacesPage>(
-      {
-        method: 'GET',
-        path: '/git-namespaces',
-        orgUid: params.org,
-        query: { limit: params.limit, skip: params.skip },
-      },
-      'namespaces',
-    );
   }
 
   repositories(params: ListRepositoriesParams): Promise<GitRepositoriesPage> {
