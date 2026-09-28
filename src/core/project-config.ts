@@ -5,7 +5,6 @@ import { UsageError } from './errors';
 export interface ProjectConfig {
   uid?: string | null;
   organizationUid?: string | null;
-  name?: string | null;
 }
 
 export type ProjectConfigKey = keyof ProjectConfig;
@@ -41,7 +40,7 @@ function textOrNull(value: unknown): string | null | undefined {
 function configFrom(block: Record<string, unknown>): ProjectConfig {
   const config: ProjectConfig = {};
 
-  for (const field of ['uid', 'organizationUid', 'name'] as const) {
+  for (const field of ['uid', 'organizationUid'] as const) {
     const value = textOrNull(block[field]);
 
     if (value !== undefined) {

@@ -417,8 +417,8 @@ that way, keeping the field name; without it every validation 400 read "request 
 **The `.cs-launch.json` file.** `ProjectConfigStore` owns it. `load()` returns a typed
 `ProjectConfig`, applying the v1 rule that several branch blocks are usable only when they
 agree on one project. A resolution spec addresses it by a key of `ProjectConfig`, never a
-dotted string. `load()` keeps only the three keys a resolution spec can read - `uid`,
-`organizationUid` and `name` - and only when each is a string or `null`, so a number in the file is
+dotted string. `load()` keeps only the two keys a resolution spec can read - `uid`
+and `organizationUid` - and only when each is a string or `null`, so a number in the file is
 absent rather than a value that reaches a request header. `save()` has one caller, `projects:create`,
 which records the project it created. It merges into every branch block, keeping every other key it
 finds there; it writes a single `project` block into a missing file or one holding an empty object; it refuses, as a

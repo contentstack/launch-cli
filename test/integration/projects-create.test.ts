@@ -892,7 +892,7 @@ describe('integration: launch:projects:create on the wire', () => {
     const other = randomBytes(12).toString('hex');
     writeFileSync(
       join(dataDir, '.cs-launch.json'),
-      JSON.stringify({ project: { uid: other, organizationUid: ORG_UID, name: 'Existing Site' } }),
+      JSON.stringify({ project: { uid: other, organizationUid: ORG_UID } }),
     );
     const signed = hub().get('/manage/projects/upload/signed_url').query({}).reply(200, awsSignedUpload());
     const create = captureCreate();
@@ -917,7 +917,7 @@ describe('integration: launch:projects:create on the wire', () => {
     );
 
     expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toContain(`already linked to the project "Existing Site" (${other})`);
+    expect(error?.message).toContain(`already linked to the project ${other}`);
     expect(error?.message).toContain('--config');
     expect(signed.isDone()).toBe(false);
     expect(create.scope.isDone()).toBe(false);

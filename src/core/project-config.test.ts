@@ -281,9 +281,9 @@ describe('ProjectConfigStore.save', () => {
   it('merges into the sole existing block rather than replacing it', () => {
     const store = storeFor({ main: { uid: 'p1', organizationUid: 'org1', name: 'old-name' } });
 
-    store.save({ name: 'new-name' });
+    store.save({ organizationUid: 'org2' });
 
-    expect(fileAt(store)).toEqual({ main: { uid: 'p1', organizationUid: 'org1', name: 'new-name' } });
+    expect(fileAt(store)).toEqual({ main: { uid: 'p1', organizationUid: 'org2', name: 'old-name' } });
   });
 
   it('updates every branch block and discards none of them', () => {
@@ -302,14 +302,14 @@ describe('ProjectConfigStore.save', () => {
       },
     });
 
-    store.save({ uid: 'p1', name: 'renamed' });
+    store.save({ uid: 'p1', organizationUid: 'org2' });
 
     expect(fileAt(store)).toEqual({
-      main: { uid: 'p1', organizationUid: 'org1', name: 'renamed', environments: [{ uid: 'e1', name: 'Default' }] },
+      main: { uid: 'p1', organizationUid: 'org2', name: 'my-site', environments: [{ uid: 'e1', name: 'Default' }] },
       'feature/checkout': {
         uid: 'p1',
-        organizationUid: 'org1',
-        name: 'renamed',
+        organizationUid: 'org2',
+        name: 'my-site',
         environments: [{ uid: 'e2', name: 'Preview' }],
       },
     });
@@ -321,8 +321,8 @@ describe('ProjectConfigStore.save', () => {
       staging: { uid: 'p2', organizationUid: 'org1' },
     });
 
-    expect(() => store.save({ name: 'renamed' })).toThrow(UsageError);
-    expect(() => store.save({ name: 'renamed' })).toThrow('main, staging');
+    expect(() => store.save({ organizationUid: 'org2' })).toThrow(UsageError);
+    expect(() => store.save({ organizationUid: 'org2' })).toThrow('main, staging');
     expect(fileAt(store)).toEqual({
       main: { uid: 'p1', organizationUid: 'org1' },
       staging: { uid: 'p2', organizationUid: 'org1' },
@@ -332,8 +332,8 @@ describe('ProjectConfigStore.save', () => {
   it('refuses to write when the sole existing block names a different project', () => {
     const store = storeFor({ main: { uid: 'p1', organizationUid: 'org1', name: 'other-site' } });
 
-    expect(() => store.save({ uid: 'p2', organizationUid: 'org1', name: 'my-site' })).toThrow(UsageError);
-    expect(() => store.save({ uid: 'p2', organizationUid: 'org1', name: 'my-site' })).toThrow(
+    expect(() => store.save({ uid: 'p2', organizationUid: 'org1' })).toThrow(UsageError);
+    expect(() => store.save({ uid: 'p2', organizationUid: 'org1' })).toThrow(
       `The config file at '${store.path}' already names project p1. Delete it or pass --config with another path.`,
     );
     expect(fileAt(store)).toEqual({ main: { uid: 'p1', organizationUid: 'org1', name: 'other-site' } });
@@ -370,7 +370,7 @@ describe('ProjectConfigStore.save', () => {
 
   it('writes the file so that a later load reads back exactly what was saved', () => {
     const store = new ProjectConfigStore(tempPath());
-    const config = { uid: 'p1', organizationUid: 'org1', name: 'my-site' };
+    const config = { uid: 'p1', organizationUid: 'org1' };
 
     store.save(config);
 
@@ -389,11 +389,11 @@ describe('ProjectConfigStore.save', () => {
     const store = new ProjectConfigStore(path);
 
     const loaded = store.load();
-    store.save({ name: 'renamed' });
+    store.save({ organizationUid: 'org1' });
 
-    expect(loaded).toEqual({ organizationUid: null, name: 'my-site' });
+    expect(loaded).toEqual({ organizationUid: null });
     expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({
-      project: { uid: 42, organizationUid: null, name: 'renamed', environments: [{ uid: 'e1' }], extra: true },
+      project: { uid: 42, organizationUid: 'org1', name: 'my-site', environments: [{ uid: 'e1' }], extra: true },
     });
   });
 

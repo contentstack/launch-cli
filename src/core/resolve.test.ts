@@ -114,7 +114,7 @@ describe('resolveInputs', () => {
   it('advises only the remedies that exist for a required input with no config key and no prompt', async () => {
     const promise = resolveInputs(inputs({ name: { required: true } }), {
       parsed: {},
-      projectConfig: { name: 'from-config' },
+      projectConfig: { organizationUid: 'from-config' },
       services: services({ isTTY: true }),
     });
 

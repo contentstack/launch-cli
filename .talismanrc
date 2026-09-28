@@ -109,4 +109,10 @@ fileignoreconfig:
     - "what `limit` resolves to when nobody passed it"
     - "a test passes `var`, `env-file` and `from-stack`"
     - "an in-flight secret registry to redact against"
+- filename: src/core/project-config.ts
+  checksum: feec5219c90a2368edccab2c290284b6e7ccee7fb78443c7b4852d7b207119a4
+- filename: src/core/project-config.test.ts
+  checksum: ff428e7553ba60bacc1ecf61f2076dedde03b09bd7167cc052b780a783217dc0
+- filename: src/core/resolve.test.ts
+  checksum: d745e6efbb9c4595ee7c57a2625a73d687d3e880a346f53de2d7da183971d875
 version: "1.0"

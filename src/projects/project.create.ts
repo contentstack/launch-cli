@@ -183,10 +183,6 @@ export class ProjectCreator {
 
     const config: ProjectConfig = { uid: project.uid, organizationUid: request.org };
 
-    if (project.name !== undefined) {
-      config.name = project.name;
-    }
-
     try {
       new ProjectConfigStore(path).save(config);
     } catch (error) {
@@ -494,10 +490,8 @@ export class ProjectCreator {
       return;
     }
 
-    const named = linked.name ? `"${linked.name}" (${linked.uid})` : `${linked.uid}`;
-
     throw new UsageError(
-      `This folder is already linked to the project ${named} in ${request.configPath}. ` +
+      `This folder is already linked to the project ${linked.uid} in ${request.configPath}. ` +
         'To create a new project, remove that file or pass --config with a different path.',
     );
   }

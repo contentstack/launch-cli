@@ -1077,7 +1077,7 @@ describe('ProjectCreator writing the project config', () => {
     await creator.create(gitRequest({ configPath: configPathIn(dataDir) }));
 
     expect(configFileIn(dataDir)).toEqual({
-      project: { uid: PROJECT_UID, organizationUid: ORG, name: 'My Site' },
+      project: { uid: PROJECT_UID, organizationUid: ORG },
     });
   });
 
@@ -1087,7 +1087,7 @@ describe('ProjectCreator writing the project config', () => {
     await creator.create(uploadRequest({ configPath: configPathIn(dataDir) }));
 
     expect(configFileIn(dataDir)).toEqual({
-      project: { uid: PROJECT_UID, organizationUid: ORG, name: 'My Site' },
+      project: { uid: PROJECT_UID, organizationUid: ORG },
     });
   });
 
@@ -1107,20 +1107,18 @@ describe('ProjectCreator writing the project config', () => {
       main: {
         uid: PROJECT_UID,
         organizationUid: ORG,
-        name: 'My Site',
         environments: [{ uid: 'e1', name: 'Default' }],
       },
       'feature/checkout': {
         uid: PROJECT_UID,
         organizationUid: ORG,
-        name: 'My Site',
         environments: [{ uid: 'e2', name: 'Preview' }],
       },
     });
   });
 
   it('refuses before creating anything, and leaves the file alone, when the folder already names a project', async () => {
-    const existing = { project: { uid: 'other-project', organizationUid: ORG, name: 'Other Site' } };
+    const existing = { project: { uid: 'other-project', organizationUid: ORG } };
     writeFileSync(configPathIn(dataDir), JSON.stringify(existing));
     const { creator, created } = harness();
 
@@ -1128,20 +1126,11 @@ describe('ProjectCreator writing the project config', () => {
 
     expect(failure).toBeInstanceOf(UsageError);
     expect((failure as UsageError).message).toBe(
-      `This folder is already linked to the project "Other Site" (other-project) in ${configPathIn(dataDir)}. ` +
+      `This folder is already linked to the project other-project in ${configPathIn(dataDir)}. ` +
         'To create a new project, remove that file or pass --config with a different path.',
     );
     expect(created).toEqual([]);
     expect(configFileIn(dataDir)).toEqual(existing);
-  });
-
-  it('names a linked project by uid alone when the file carries no name', async () => {
-    writeFileSync(configPathIn(dataDir), JSON.stringify({ project: { uid: 'other-project' } }));
-    const { creator } = harness();
-
-    const failure = await creator.create(gitRequest({ configPath: configPathIn(dataDir) })).catch((error: Error) => error);
-
-    expect((failure as UsageError).message).toContain('already linked to the project other-project in');
   });
 
   it('reports the miss and leaves an unparseable config file untouched, still completing the create', async () => {
