@@ -1,34 +1,33 @@
-import type { Project } from './types';
 import {
+  PROJECT_DELETE_QUESTION,
   deploymentFailureMessage,
   projectCreatedFields,
-  projectDeleteQuestion,
   projectDeletedLine,
+  projectNotDeletedLine,
   projectNotUpdatedLine,
   projectUpdatedLine,
 } from './project.presenter';
 
-describe('projectDeleteQuestion', () => {
-  it('names the project by its name and the resolved uid and says the change is permanent', () => {
-    expect(projectDeleteQuestion({ name: 'marketing-site' } as Project, 'a1b2c3d4e5f60718293a4b5c')).toBe(
-      'Delete project "marketing-site" (a1b2c3d4e5f60718293a4b5c)? This cannot be undone.',
-    );
-  });
-
-  it.each([[undefined], ['']])('falls back to the reference given when the name is %p', (name) => {
-    expect(projectDeleteQuestion({ uid: 'p1', name: name as string }, 'p1')).toBe(
-      'Delete project "p1"? This cannot be undone.',
-    );
+describe('PROJECT_DELETE_QUESTION', () => {
+  it('asks for confirmation without naming the project', () => {
+    expect(PROJECT_DELETE_QUESTION).toBe('Are you sure you want to delete this project?');
   });
 });
 
 describe('projectDeletedLine', () => {
-  it('names the project by the name the API returned', () => {
-    expect(projectDeletedLine({ uid: 'p1', name: 'Renamed Site' }, 'p1')).toBe('✔ Project "Renamed Site" deleted.');
+  it('says the project was deleted, in green when output is a terminal', () => {
+    expect(projectDeletedLine(true)).toBe('\u001b[32m✔ Project deleted successfully.\u001b[39m');
   });
 
-  it.each([[undefined], ['']])('falls back to the reference given when the name is %p', (name) => {
-    expect(projectDeletedLine({ uid: 'p1', name: name as string }, 'p1')).toBe('✔ Project "p1" deleted.');
+  it('prints plain text when output is not a terminal', () => {
+    expect(projectDeletedLine(false)).toBe('✔ Project deleted successfully.');
+  });
+});
+
+describe('projectNotDeletedLine', () => {
+  it('shows the notice in yellow when output is a terminal and leaves it plain otherwise', () => {
+    expect(projectNotDeletedLine(true)).toBe('\u001b[33mProject not deleted.\u001b[39m');
+    expect(projectNotDeletedLine(false)).toBe('Project not deleted.');
   });
 });
 

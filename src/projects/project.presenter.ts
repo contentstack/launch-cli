@@ -18,14 +18,18 @@ export function projectDetailFields(project: Project): [string, string][] {
   ];
 }
 
-export function projectDeleteQuestion(project: Project, reference: string): string {
-  const named = project.name ? `"${project.name}" (${reference})` : `"${reference}"`;
+export const PROJECT_DELETE_QUESTION = 'Are you sure you want to delete this project?';
 
-  return `Delete project ${named}? This cannot be undone.`;
+export const PROJECT_DELETED = '\u2714 Project deleted successfully.';
+
+export function projectDeletedLine(outputIsTTY: boolean): string {
+  return styled(PROJECT_DELETED, 'green', outputIsTTY);
 }
 
-export function projectDeletedLine(project: Project, reference: string): string {
-  return `\u2714 Project "${project.name || reference}" deleted.`;
+export const PROJECT_NOT_DELETED = 'Project not deleted.';
+
+export function projectNotDeletedLine(outputIsTTY: boolean): string {
+  return styled(PROJECT_NOT_DELETED, 'yellow', outputIsTTY);
 }
 
 export interface PartialCreateFailure {

@@ -1,6 +1,11 @@
 import { LaunchCommand } from '../../../core/launch-command';
 import { flagsFor, inputs } from '../../../core/inputs';
-import { projectDeleteQuestion, projectDeletedLine } from '../../../projects/project.presenter';
+import { EXIT_CANCELLED } from '../../../core/constants';
+import {
+  PROJECT_DELETE_QUESTION,
+  projectDeletedLine,
+  projectNotDeletedLine,
+} from '../../../projects/project.presenter';
 
 const deleteInputs = inputs({ org: { required: true }, project: { required: true }, yes: {} });
 
@@ -19,12 +24,17 @@ export default class ProjectsDelete extends LaunchCommand<typeof deleteInputs> {
   async run(): Promise<void> {
     const { org, project } = this.resolved;
 
-    const found = await this.services.api.projects.get({ org, project });
+    const outputIsTTY = this.services.outputIsTTY === true;
 
-    await this.confirm(projectDeleteQuestion(found, project));
+    await this.services.api.projects.get({ org, project });
+
+    if (!(await this.confirm(PROJECT_DELETE_QUESTION))) {
+      this.ux.print(projectNotDeletedLine(outputIsTTY));
+      this.exit(EXIT_CANCELLED);
+    }
 
     await this.services.api.projects.delete({ org, project });
 
-    this.ux.print(projectDeletedLine(found, project));
+    this.ux.print(projectDeletedLine(outputIsTTY));
   }
 }

@@ -69,7 +69,7 @@ describe('integration: launch:projects:delete on the wire', () => {
     nock.restore();
   });
 
-  it('deletes the project and reports it by name when --yes was passed', async () => {
+  it('deletes the project and reports it when --yes is given', async () => {
     const lookup = nock(LAUNCH_HUB_URL).get(`/manage/projects/${PROJECT_UID}`).query({}).reply(200, getFixture);
     const removal = nock(LAUNCH_HUB_URL, BODYLESS).delete(`/manage/projects/${PROJECT_UID}`).query({}).reply(204);
 
@@ -81,7 +81,7 @@ describe('integration: launch:projects:delete on the wire', () => {
     expect(error).toBeUndefined();
     expect(lookup.isDone()).toBe(true);
     expect(removal.isDone()).toBe(true);
-    expect(stdout).toBe('✔ Project "sample-project" deleted.\n');
+    expect(stdout).toBe('✔ Project deleted successfully.\n');
     expect(onWire).toEqual([]);
   });
 
@@ -102,10 +102,10 @@ describe('integration: launch:projects:delete on the wire', () => {
     expect(lookup.isDone()).toBe(true);
     expect(fetch.isDone()).toBe(true);
     expect(removal.isDone()).toBe(true);
-    expect(stdout).toBe('✔ Project "sample-project" deleted.\n');
+    expect(stdout).toBe('✔ Project deleted successfully.\n');
   });
 
-  it('exits 2 naming the project and --yes, and never sends the delete, without a terminal and without --yes', async () => {
+  it('exits 2 naming --yes, and never sends the delete, without a terminal and without --yes', async () => {
     const lookup = nock(LAUNCH_HUB_URL).get(`/manage/projects/${PROJECT_UID}`).query({}).reply(200, getFixture);
     const removal = nock(LAUNCH_HUB_URL, BODYLESS).delete(`/manage/projects/${PROJECT_UID}`).query({}).reply(204);
 
@@ -116,8 +116,7 @@ describe('integration: launch:projects:delete on the wire', () => {
 
     expect(error?.oclif?.exit).toBe(2);
     expect(error?.message).toBe(
-      `Delete project "sample-project" (${PROJECT_UID})? This cannot be undone. ` +
-        'Pass --yes to confirm without an interactive terminal.',
+      'Are you sure you want to delete this project? Pass --yes to confirm without an interactive terminal.',
     );
     expect(onWire).toEqual([]);
     expect(lookup.isDone()).toBe(true);
@@ -125,8 +124,11 @@ describe('integration: launch:projects:delete on the wire', () => {
     expect(nock.pendingMocks()).toEqual([`DELETE ${LAUNCH_HUB_URL}:443/manage/projects/${PROJECT_UID}`]);
   });
 
-  it('resolves a project name and names it in the refusal, and never sends the delete, without --yes', async () => {
-    const scan = nock(LAUNCH_HUB_URL).get('/manage/projects').query({ limit: '100', skip: '0' }).reply(200, listFixture);
+  it('resolves a project name, and never sends the delete, without --yes', async () => {
+    const scan = nock(LAUNCH_HUB_URL)
+      .get('/manage/projects')
+      .query({ limit: '100', skip: '0' })
+      .reply(200, listFixture);
     const lookup = nock(LAUNCH_HUB_URL).get(`/manage/projects/${PROJECT_UID}`).query({}).reply(200, getFixture);
     const removal = nock(LAUNCH_HUB_URL, BODYLESS).delete(`/manage/projects/${PROJECT_UID}`).query({}).reply(204);
 
@@ -137,14 +139,13 @@ describe('integration: launch:projects:delete on the wire', () => {
 
     expect(error?.oclif?.exit).toBe(2);
     expect(error?.message).toBe(
-      `Delete project "sample-project" (${PROJECT_UID})? This cannot be undone. ` +
-        'Pass --yes to confirm without an interactive terminal.',
+      'Are you sure you want to delete this project? Pass --yes to confirm without an interactive terminal.',
     );
     expect(onWire).toEqual([]);
     expect([scan.isDone(), lookup.isDone(), removal.isDone()]).toEqual([true, true, false]);
   });
 
-  it('exits 3 and never sends the delete when the user declines the prompt', async () => {
+  it('says the project was not deleted, exits 3 and never sends the delete when the user declines the prompt', async () => {
     const lookup = nock(LAUNCH_HUB_URL).get(`/manage/projects/${PROJECT_UID}`).query({}).reply(200, getFixture);
     const removal = nock(LAUNCH_HUB_URL, BODYLESS).delete(`/manage/projects/${PROJECT_UID}`).query({}).reply(204);
     const restore = pretendTerminal();
@@ -155,18 +156,18 @@ describe('integration: launch:projects:delete on the wire', () => {
     });
 
     try {
-      const { error } = await runCommand(
+      const { error, stdout } = await runCommand(
         ['launch:projects:delete', '--org', ORG_UID, '--project', PROJECT_UID, '--data-dir', DATA_DIR],
         config,
       );
 
       expect(error?.oclif?.exit).toBe(3);
-      expect(error?.message).toBe('Cancelled. Nothing was changed.');
+      expect(stdout).toBe('Project not deleted.\n');
       expect(inquired).toEqual([
         {
           type: 'confirm',
           name: 'confirm',
-          message: `Delete project "sample-project" (${PROJECT_UID})? This cannot be undone.`,
+          message: 'Are you sure you want to delete this project?',
           default: false,
         },
       ]);
@@ -182,11 +183,14 @@ describe('integration: launch:projects:delete on the wire', () => {
   it('exits 3 as cancelled, not 130, and never sends the delete when Ctrl-C is pressed at the confirmation', async () => {
     const lookup = nock(LAUNCH_HUB_URL).get(`/manage/projects/${PROJECT_UID}`).query({}).reply(200, getFixture);
     const removal = nock(LAUNCH_HUB_URL, BODYLESS).delete(`/manage/projects/${PROJECT_UID}`).query({}).reply(204);
-    const question = `Delete project "sample-project" (${PROJECT_UID})? This cannot be undone.`;
+    const question = 'Are you sure you want to delete this project?';
     const prompts = answerPrompts({ [question]: CTRL_C });
 
     const { error } = await onTerminal(() =>
-      runCommand(['launch:projects:delete', '--org', ORG_UID, '--project', PROJECT_UID, '--data-dir', DATA_DIR], config),
+      runCommand(
+        ['launch:projects:delete', '--org', ORG_UID, '--project', PROJECT_UID, '--data-dir', DATA_DIR],
+        config,
+      ),
     );
 
     expect(error?.oclif?.exit).toBe(3);

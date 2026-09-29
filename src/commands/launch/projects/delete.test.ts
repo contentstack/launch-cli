@@ -1,4 +1,4 @@
-import { CancelledError, UsageError } from '../../../core/errors';
+import { UsageError } from '../../../core/errors';
 import { UxLike } from '../../../core/render';
 import { Project } from '../../../projects/types';
 import ProjectsDelete from './delete';
@@ -66,7 +66,7 @@ function commandUnderTest(harness: Harness) {
 }
 
 describe('launch:projects:delete', () => {
-  it('fetches the project, confirms naming it, deletes it and reports it by name', async () => {
+  it('fetches the project, confirms, deletes it and reports it by name', async () => {
     const { command, lines, inquired, calls, got, deleted } = commandUnderTest({ answer: true });
 
     await command.run();
@@ -75,14 +75,14 @@ describe('launch:projects:delete', () => {
       {
         type: 'confirm',
         name: 'confirm',
-        message: `Delete project "sample-project" (${PROJECT_UID})? This cannot be undone.`,
+        message: 'Are you sure you want to delete this project?',
         default: false,
       },
     ]);
     expect(calls).toEqual(['get', 'delete']);
     expect(got).toEqual([{ org: 'org1', project: PROJECT_UID }]);
     expect(deleted).toEqual([{ org: 'org1', project: PROJECT_UID }]);
-    expect(lines).toEqual(['✔ Project "sample-project" deleted.']);
+    expect(lines).toEqual(['✔ Project deleted successfully.']);
   });
 
   it('skips the prompt entirely when --yes was passed', async () => {
@@ -92,20 +92,18 @@ describe('launch:projects:delete', () => {
 
     expect(inquired).toEqual([]);
     expect(calls).toEqual(['get', 'delete']);
-    expect(lines).toEqual(['✔ Project "sample-project" deleted.']);
+    expect(lines).toEqual(['✔ Project deleted successfully.']);
   });
 
-  it('exits 3 without sending the delete when the user declines', async () => {
+  it('says the project was not deleted and exits 3 without sending the delete when the user declines', async () => {
     const { command, lines, calls, deleted } = commandUnderTest({ answer: false });
 
-    const error = (await command.run().catch((thrown: unknown) => thrown)) as CancelledError;
+    const error = (await command.run().catch((thrown: unknown) => thrown)) as { oclif?: { exit?: number } };
 
-    expect(error).toBeInstanceOf(CancelledError);
-    expect(error.exitCode).toBe(3);
-    expect(error.message).toBe('Cancelled. Nothing was changed.');
+    expect(error.oclif?.exit).toBe(3);
     expect(calls).toEqual(['get']);
     expect(deleted).toEqual([]);
-    expect(lines).toEqual([]);
+    expect(lines).toEqual(['Project not deleted.']);
   });
 
   it('exits 2 naming the project and --yes without sending the delete when there is no terminal', async () => {
@@ -116,31 +114,12 @@ describe('launch:projects:delete', () => {
     expect(error).toBeInstanceOf(UsageError);
     expect(error.exitCode).toBe(2);
     expect(error.message).toBe(
-      `Delete project "sample-project" (${PROJECT_UID})? This cannot be undone. ` +
-        'Pass --yes to confirm without an interactive terminal.',
+      'Are you sure you want to delete this project? Pass --yes to confirm without an interactive terminal.',
     );
     expect(inquired).toEqual([]);
     expect(calls).toEqual(['get']);
     expect(deleted).toEqual([]);
     expect(lines).toEqual([]);
-  });
-
-  it('names the project by the resolved reference in the question when the API returned no name', async () => {
-    const { command, inquired } = commandUnderTest({ answer: true, project: { uid: PROJECT_UID } });
-
-    await command.run();
-
-    expect((inquired[0] as { message: string }).message).toBe(
-      `Delete project "${PROJECT_UID}"? This cannot be undone.`,
-    );
-  });
-
-  it('falls back to the resolved reference when the deleted project carried no name', async () => {
-    const { command, lines } = commandUnderTest({ yes: true, project: { uid: PROJECT_UID } });
-
-    await command.run();
-
-    expect(lines).toEqual([`✔ Project "${PROJECT_UID}" deleted.`]);
   });
 
   it('propagates a failure from the lookup without asking or deleting anything', async () => {

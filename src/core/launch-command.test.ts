@@ -198,34 +198,32 @@ describe('LaunchCommand.confirm', () => {
     );
   });
 
-  it('resolves without prompting when --yes was supplied, even with no TTY', async () => {
+  it('resolves true without prompting when --yes was supplied, even with no TTY', async () => {
     const { instance, inquired } = gated(true, false);
 
-    await expect(instance['confirm']('Delete project "marketing-site"?')).resolves.toBeUndefined();
+    await expect(instance['confirm']('Delete project "marketing-site"?')).resolves.toBe(true);
 
     expect(inquired).toEqual([]);
     expect(instance.error).not.toHaveBeenCalled();
   });
 
-  it('prompts on a TTY and resolves when the user accepts', async () => {
+  it('prompts on a TTY and resolves true when the user accepts', async () => {
     const { instance, inquired } = gated(false, true, true);
 
-    await expect(instance['confirm']('Delete project "marketing-site"?')).resolves.toBeUndefined();
+    await expect(instance['confirm']('Delete project "marketing-site"?')).resolves.toBe(true);
 
     expect(inquired).toEqual([
       { type: 'confirm', name: 'confirm', message: 'Delete project "marketing-site"?', default: false },
     ]);
   });
 
-  it('fails with the dedicated cancellation exit code when the user declines on a TTY', async () => {
+  it('resolves false when the user declines on a TTY, leaving the command to report it', async () => {
     const { instance, inquired } = gated(false, true, false);
 
-    const rejection = await instance['confirm']('Delete project "marketing-site"?').catch((err: Error) => err);
-    await instance['catch'](rejection as Error);
+    await expect(instance['confirm']('Delete project "marketing-site"?')).resolves.toBe(false);
 
-    expect(rejection).toBeInstanceOf(CancelledError);
     expect(inquired).toHaveLength(1);
-    expect(instance.error).toHaveBeenCalledWith('Cancelled. Nothing was changed.', { exit: 3 });
+    expect(instance.error).not.toHaveBeenCalled();
   });
 
   it('fails as a usage error without prompting when there is no TTY and no --yes', async () => {

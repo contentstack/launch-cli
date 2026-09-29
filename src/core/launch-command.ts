@@ -6,7 +6,7 @@ import { cliux, configHandler, isAuthenticated } from '@contentstack/cli-utiliti
 import { EXIT_RUNTIME, PROJECT_CONFIG_FILE } from './constants';
 import { ProjectConfig, ProjectConfigStore } from './project-config';
 import { RegionLike, resolveLaunchHubUrl } from './region';
-import { CancelledError, LaunchError, UsageError } from './errors';
+import { LaunchError, UsageError } from './errors';
 import { catalog, FlagKey } from '../resources';
 import { AnyInputs, Resolved } from './inputs';
 import { resolveInputs } from './resolve';
@@ -131,7 +131,7 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
     this.configPath = configPath;
   }
 
-  protected async confirm(message: string): Promise<void> {
+  protected async confirm(message: string): Promise<boolean> {
     const inputs = this.contract.inputs;
 
     if (!('yes' in inputs)) {
@@ -139,7 +139,7 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
     }
 
     if (this.resolvedValues.yes === true) {
-      return;
+      return true;
     }
 
     if (!this.services.isTTY) {
@@ -153,9 +153,7 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
       default: false,
     });
 
-    if (!confirmed) {
-      throw new CancelledError();
-    }
+    return confirmed === true;
   }
 
   protected get contract(): typeof LaunchCommand {

@@ -278,12 +278,12 @@ gate** - declining, or running without a TTY and without `--yes`, never sends th
 "no request before the gate", and it cannot be: choosing the project is itself a read. The organization
 picker lists organizations, the project picker lists projects, and `--project <name>` is resolved to a
 uid by scanning the organization, all in the resolution chain before `run()`. `run()` then fetches the
-project so the question names it the way the user knows it - `Delete project "<name>" (<uid>)? This
-cannot be undone.`, falling back to the uid alone when the API returns no name - and only then asks.
-Asking first and resolving afterwards was rejected: the question could only echo what was typed, a
-picked project would be named by a uid the user never saw, and a name that matched nothing would be
-reported only after the user had said yes. A failed lookup therefore surfaces before any question.
-The success line reports the fetched name too - `✔ Project "<name>" deleted.`
+project and only then asks `Are you sure you want to delete this project?` - the wording the
+Contentstack CLI uses for its own deletes, which names no project. The fetch stays so a project that
+does not exist is reported before the user is asked, not after they have said yes. Declining prints
+the yellow `Project not deleted.` and exits 3 (`EXIT_CANCELLED`) without the `Error:` line a
+`CancelledError` would print; Ctrl-C at the question is still a `CancelledError`. The success line is
+the green `✔ Project deleted successfully.`, matching `projects:update`.
 
 **The organization prompt.** `--org` resolves flag -> `.cs-launch.json` -> prompt (TTY only), and
 the prompt is `promptForOrganization` in `src/organizations/organization.prompt.ts`, so every command
