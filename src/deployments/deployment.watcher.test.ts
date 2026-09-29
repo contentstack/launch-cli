@@ -489,19 +489,22 @@ describe('deployment log streaming', () => {
   );
 
   it.each([
-    [true, '\u001b[32m2026-09-25 10:00:00.123:  Installing dependencies...\u001b[39m'],
+    [true, '\u001b[2m10:00:00\u001b[22m  Installing dependencies...'],
     [false, '2026-09-25 10:00:00.123:  Installing dependencies...'],
-  ])('prints a log line in green only when the output is a terminal (terminal: %s)', async (outputIsTTY, line) => {
-    const { deps, lines } = streamingHarness(
-      ['LIVE'],
-      [[{ message: 'Installing dependencies...', timestamp: '2026-09-25T10:00:00.123Z' }]],
-      { outputIsTTY },
-    );
+  ])(
+    'stamps a log line with a dimmed local clock on a terminal and the full utc stamp off one (terminal: %s)',
+    async (outputIsTTY, line) => {
+      const { deps, lines } = streamingHarness(
+        ['LIVE'],
+        [[{ message: 'Installing dependencies...', timestamp: '2026-09-25T10:00:00.123Z' }]],
+        { outputIsTTY },
+      );
 
-    await watchDeployment(deps);
+      await watchDeployment(deps);
 
-    expect(lines).toEqual([line]);
-  });
+      expect(lines).toEqual([line]);
+    },
+  );
 
   it('shows the loader while it waits for more logs and stops it before printing anything', async () => {
     const { deps, events } = streamingHarness(
@@ -551,10 +554,14 @@ describe('deployment log streaming', () => {
   });
 
   it.each([
-    [true, '\u001b[32m2026-09-25 10:00:00.000:  —— Step 4: Packaging ——  [SERVER]  CPU: 0.5 vCPUs\u001b[39m'],
+    [
+      true,
+      '\u001b[2m10:00:00\u001b[22m  \u001b[1m\u001b[92m—— Step 4: Packaging ——\u001b[0m  ' +
+        '\u001b[34m[SERVER]\u001b[39m  CPU: 0.5 vCPUs',
+    ],
     [false, '2026-09-25 10:00:00.000:  —— Step 4: Packaging ——  [SERVER]  CPU: 0.5 vCPUs'],
   ])(
-    'drops the colours a log message carries so every line is one shade (terminal: %s)',
+    'keeps the colours the deployment agent sends on a terminal and flattens them off one (terminal: %s)',
     async (outputIsTTY, line) => {
       const message = '\u001b[1m\u001b[92m—— Step 4: Packaging ——\u001b[0m  \u001b[34m[SERVER]\u001b[39m  CPU: 0.5 vCPUs';
       const { deps, lines } = streamingHarness(['LIVE'], [[{ message, timestamp: '2026-09-25T10:00:00.000Z' }]], {

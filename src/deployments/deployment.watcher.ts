@@ -1,6 +1,5 @@
 import type { Loader } from '../core/loader';
 import type { UxLike } from '../core/render';
-import { styled } from '../core/style';
 import { RetryPolicy } from '../transport/retry-policy';
 import { classifyStatus, normalizeStatus } from './deployment.status';
 import {
@@ -110,7 +109,7 @@ async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
     }
 
     for (const log of logs) {
-      deps.ux.print(styled(deploymentLogLine(log), 'green', deps.outputIsTTY));
+      deps.ux.print(deploymentLogLine(log, deps.outputIsTTY, process.stdout.columns));
 
       if (log.timestamp && !Number.isNaN(Date.parse(log.timestamp))) {
         logsAfter = log.timestamp;

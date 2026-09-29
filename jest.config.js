@@ -1,3 +1,6 @@
+/* global process */
+process.env.TZ = 'UTC';
+
 /** @type {import('jest').Config} */
 const config = {
   preset: 'ts-jest',
