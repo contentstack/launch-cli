@@ -166,13 +166,8 @@ describe('integration: the organization prompt', () => {
 
   it('asks projects:update for the organization and puts the change in the one chosen', async () => {
     useSession(session());
-    const inquired = answering([ORG_UID, '']);
+    const inquired = answering([ORG_UID]);
     nock(CMA_URL).get('/v3/organizations').query(ORGANIZATION_QUERY).reply(200, ORGANIZATIONS);
-    nock(LAUNCH_HUB_URL)
-      .matchHeader('x-organization-uid', ORG_UID)
-      .get(`/manage/projects/${PROJECT_UID}`)
-      .query({})
-      .reply(200, getFixture);
     const update = nock(LAUNCH_HUB_URL)
       .matchHeader('x-organization-uid', ORG_UID)
       .put(`/manage/projects/${PROJECT_UID}`, { name: 'Renamed Site' })
@@ -191,10 +186,7 @@ describe('integration: the organization prompt', () => {
 
     expect(error).toBeUndefined();
     expect(update.isDone()).toBe(true);
-    expect(inquired).toEqual([
-      ORGANIZATION_PICKER,
-      expect.objectContaining({ type: 'input', message: 'Update project description (optional)' }),
-    ]);
+    expect(inquired).toEqual([ORGANIZATION_PICKER]);
     expect(onWire).toEqual([]);
   });
 

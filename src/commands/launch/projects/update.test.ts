@@ -176,57 +176,38 @@ describe('launch:projects:update', () => {
     expect(lines).toEqual(['✔ Project updated successfully.']);
   });
 
-  it('prompts only for the description when --name was supplied in a terminal', async () => {
-    const { command, lines, sent, asked } = commandUnderTest(
+  it('sends only --name without prompting for the description or fetching the project in a terminal', async () => {
+    const { command, lines, sent, asked, fetched } = commandUnderTest(
       { name: 'Renamed Site', description: undefined },
       undefined,
       undefined,
-      {
-        answers: ['A new blurb'],
-      },
+      { answers: [] },
     );
 
     await command.run();
 
-    expect(asked).toEqual([expect.objectContaining({ message: 'Update project description (optional)' })]);
+    expect(asked).toEqual([]);
+    expect(fetched).toEqual([]);
     expect(sent).toEqual([
-      { org: 'org1', project: PROJECT_UID, update: { name: 'Renamed Site', description: 'A new blurb' } },
+      { org: 'org1', project: PROJECT_UID, update: { name: 'Renamed Site', description: undefined } },
     ]);
     expect(lines).toEqual(['✔ Project updated successfully.']);
   });
 
-  it('prompts only for the name when --description was supplied in a terminal', async () => {
-    const { command, sent, asked } = commandUnderTest(
+  it('sends only --description without prompting for the name or fetching the project in a terminal', async () => {
+    const { command, lines, sent, asked, fetched } = commandUnderTest(
       { name: undefined, description: 'A new blurb' },
       undefined,
       undefined,
-      {
-        answers: ['Renamed Site'],
-      },
+      { answers: [] },
     );
 
     await command.run();
 
-    expect(asked).toEqual([expect.objectContaining({ message: 'Update project name (optional)' })]);
+    expect(asked).toEqual([]);
+    expect(fetched).toEqual([]);
     expect(sent).toEqual([
-      { org: 'org1', project: PROJECT_UID, update: { name: 'Renamed Site', description: 'A new blurb' } },
-    ]);
-  });
-
-  it('still sends the flag value when the remaining prompt is left blank', async () => {
-    const { command, lines, sent } = commandUnderTest(
-      { name: 'Renamed Site', description: undefined },
-      undefined,
-      undefined,
-      {
-        answers: [''],
-      },
-    );
-
-    await command.run();
-
-    expect(sent).toEqual([
-      { org: 'org1', project: PROJECT_UID, update: { name: 'Renamed Site', description: undefined } },
+      { org: 'org1', project: PROJECT_UID, update: { name: undefined, description: 'A new blurb' } },
     ]);
     expect(lines).toEqual(['✔ Project updated successfully.']);
   });

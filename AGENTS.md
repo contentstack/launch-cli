@@ -316,13 +316,14 @@ mirrored as `PROJECT_NAME_MAX_LENGTH` / `PROJECT_DESCRIPTION_MAX_LENGTH` in
 `src/projects/project.inputs.ts` and enforced in each flag's `normalize`, so a value from config or
 a prompt is checked as well as one from argv.
 
-In a terminal, every updatable field not supplied as a flag is prompted for, in order (name, then
-description): `promptForProjectUpdate` in `src/projects/project.update.prompt.ts`. Prompts carry no
-pre-filled value; a blank answer, or one equal to the current value (read with one `GET` first),
-leaves that field out, and a flag value is always sent. The length limits are checked inside each
-prompt's `validate`, so an oversized answer re-prompts instead of failing. When both flags are
-supplied nothing is fetched or prompted. If nothing is left to send, the command prints a yellow
-`Project not updated. No changes were entered.`, sends no `PUT` and exits 0.
+Supplying either flag is the whole request: the supplied fields are sent as given and the other one
+is neither prompted for nor fetched, in a terminal or not. Only when neither flag is supplied, in a
+terminal, are both fields prompted for, in order (name, then description): `promptForProjectUpdate`
+in `src/projects/project.update.prompt.ts`. Prompts carry no pre-filled value; a blank answer, or one
+equal to the current value (read with one `GET` first), leaves that field out. The length limits are
+checked inside each prompt's `validate`, so an oversized answer re-prompts instead of failing. If
+nothing is left to send, the command prints a yellow `Project not updated. No changes were entered.`,
+sends no `PUT` and exits 0.
 
 Without a terminal nothing is prompted: supplied flags are sent as given, and supplying neither is a
 usage error (exit 2) raised in the command's `run()` - the API would answer `BODY_EMPTY`, and a round

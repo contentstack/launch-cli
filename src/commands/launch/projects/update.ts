@@ -47,29 +47,22 @@ export default class ProjectsUpdate extends LaunchCommand<typeof updateInputs> {
     project: string,
     supplied: ProjectUpdate,
   ): Promise<ProjectUpdate | undefined> {
-    const missing = PROJECT_UPDATABLE_FIELDS.filter((field) => supplied[field] === undefined);
-
-    if (missing.length === 0) {
+    if (PROJECT_UPDATABLE_FIELDS.some((field) => supplied[field] !== undefined)) {
       return supplied;
     }
 
     if (!this.services.isTTY) {
-      if (missing.length === PROJECT_UPDATABLE_FIELDS.length) {
-        throw new UsageError('Pass at least one of --name, --description; none was supplied.');
-      }
-
-      return supplied;
+      throw new UsageError('Pass at least one of --name, --description; none was supplied.');
     }
 
     const current = await this.services.api.projects.get({ org, project });
-    const prompted = await promptForProjectUpdate(this.services.ux, current, missing);
-    const update = { ...supplied, ...prompted };
+    const prompted = await promptForProjectUpdate(this.services.ux, current);
 
-    if (!PROJECT_UPDATABLE_FIELDS.some((field) => update[field] !== undefined)) {
+    if (!PROJECT_UPDATABLE_FIELDS.some((field) => prompted[field] !== undefined)) {
       this.ux.print(projectNotUpdatedLine(this.services.outputIsTTY === true));
       return undefined;
     }
 
-    return update;
+    return prompted;
   }
 }
