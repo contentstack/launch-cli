@@ -1,11 +1,14 @@
 import { cliux } from '@contentstack/cli-utilities';
 
-import { stdinReportingTTY } from './support/terminal';
+import { stdinReportingTTY, stdoutOfWidth, stdoutReportingTTY } from './support/terminal';
 
-let restoreTerminal: () => void = () => undefined;
+let restoreTerminal: (() => void)[] = [];
 
 beforeEach(() => {
-  restoreTerminal = stdinReportingTTY(false);
+  // Pin both streams to what a piped run reports, so a suite run inside a real
+  // terminal renders exactly what CI renders — no TTY colouring, no wrapping
+  // and no table truncation that depends on how wide the window happens to be.
+  restoreTerminal = [stdinReportingTTY(false), stdoutReportingTTY(false), stdoutOfWidth(undefined)];
 
   jest.spyOn(cliux, 'inquire').mockImplementation(async (payload: unknown) => {
     const message = String((payload as Record<string, unknown> | undefined)?.message ?? '');
@@ -17,5 +20,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  restoreTerminal();
+  for (const restore of restoreTerminal.reverse()) {
+    restore();
+  }
+
+  restoreTerminal = [];
 });

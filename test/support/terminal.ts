@@ -1,26 +1,32 @@
 import { cliux } from '@contentstack/cli-utilities';
 
-function streamReportingTTY(stream: NodeJS.ReadStream | NodeJS.WriteStream, isTTY: boolean | undefined): () => void {
-  const descriptor = Object.getOwnPropertyDescriptor(stream, 'isTTY');
+type Stream = NodeJS.ReadStream | NodeJS.WriteStream;
 
-  Object.defineProperty(stream, 'isTTY', { value: isTTY, configurable: true, writable: true });
+function pinned(stream: Stream, property: 'isTTY' | 'columns', value: unknown): () => void {
+  const descriptor = Object.getOwnPropertyDescriptor(stream, property);
+
+  Object.defineProperty(stream, property, { value, configurable: true, writable: true });
 
   return () => {
     if (descriptor === undefined) {
-      delete (stream as unknown as { isTTY?: boolean }).isTTY;
+      delete (stream as unknown as Record<string, unknown>)[property];
       return;
     }
 
-    Object.defineProperty(stream, 'isTTY', descriptor);
+    Object.defineProperty(stream, property, descriptor);
   };
 }
 
 export function stdinReportingTTY(isTTY: boolean | undefined): () => void {
-  return streamReportingTTY(process.stdin, isTTY);
+  return pinned(process.stdin, 'isTTY', isTTY);
 }
 
 export function stdoutReportingTTY(isTTY: boolean | undefined): () => void {
-  return streamReportingTTY(process.stdout, isTTY);
+  return pinned(process.stdout, 'isTTY', isTTY);
+}
+
+export function stdoutOfWidth(columns: number | undefined): () => void {
+  return pinned(process.stdout, 'columns', columns);
 }
 
 export function pretendTerminal(): () => void {
