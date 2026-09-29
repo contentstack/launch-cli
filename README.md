@@ -323,6 +323,8 @@ DESCRIPTION
   Update a Launch project
 
 EXAMPLES
+  $ csdx launch:projects:update
+
   $ csdx launch:projects:update --org <org-uid> --project <name-or-uid> --name <new-name>
 
   $ csdx launch:projects:update --org <org-uid> --project <name-or-uid> --description <new-description>

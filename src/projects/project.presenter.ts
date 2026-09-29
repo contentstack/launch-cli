@@ -84,8 +84,14 @@ export function deploymentFailureMessage(failure: PartialCreateFailure): string 
 
 export const PROJECT_UPDATABLE_FIELDS: (keyof ProjectUpdate)[] = ['name', 'description'];
 
-export function projectUpdatedLines(requested: ProjectUpdate, updated: Project): string[] {
-  return PROJECT_UPDATABLE_FIELDS.filter((field) => requested[field] !== undefined).map(
-    (field) => `\u2714 ${field} updated to "${updated[field] ?? requested[field]}"`,
-  );
+export const PROJECT_UPDATED = '\u2714 Project updated successfully.';
+
+export function projectUpdatedLine(outputIsTTY: boolean): string {
+  return styled(PROJECT_UPDATED, 'green', outputIsTTY);
+}
+
+export const PROJECT_NOT_UPDATED = 'Project not updated. No changes were entered.';
+
+export function projectNotUpdatedLine(outputIsTTY: boolean): string {
+  return styled(PROJECT_NOT_UPDATED, 'yellow', outputIsTTY);
 }

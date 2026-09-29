@@ -2,6 +2,8 @@ const CODES = {
   bold: [1, 22],
   cyan: [36, 39],
   dim: [2, 22],
+  green: [32, 39],
+  yellow: [33, 39],
 } as const;
 
 export type Style = keyof typeof CODES;

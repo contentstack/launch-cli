@@ -23,6 +23,25 @@ fileignoreconfig:
     - "headers: \\[\\{ key: '"
     - 'name="key"'
     - "drops a field with no key"
+- filename: src/commands/launch/projects/update.test.ts
+  allowed_patterns:
+    - "a1b2c3d4e5f60718293a4b5c"
+    - "Pass at least one of --name, --description"
+    - "Object\\.keys\\(ProjectsUpdate\\.flags\\)"
+- filename: test/integration/projects-update.test.ts
+  allowed_patterns:
+    - "a1b2c3d4e5f60718293a4b5c"
+    - "mockImplementation\\(\\(key: string\\) => CONFIG\\[key\\]\\)"
+    - "Pass at least one of --name, --description"
+- filename: test/integration/organization-prompt.test.ts
+  allowed_patterns:
+    - "a1b2c3d4e5f60718293a4b5c"
+    - "mockImplementation\\(\\(key: string\\) => values\\[key\\]\\)"
+    - "Pass --org, set it in \\.cs-launch\\.json"
+    - "when --org is passed"
+- filename: src/commands/launch/projects/update.ts
+  allowed_patterns:
+    - "Pass at least one of --name, --description"
 - filename: src/projects/project.presenter.ts
   allowed_patterns:
     - "keyof ProjectUpdate"

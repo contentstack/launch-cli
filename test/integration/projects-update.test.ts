@@ -65,7 +65,7 @@ describe('integration: launch:projects:update on the wire', () => {
     nock.restore();
   });
 
-  it('puts only the supplied field in the PUT body and prints the one line that changed', async () => {
+  it('puts only the supplied field in the PUT body and reports success', async () => {
     const scope = nock(LAUNCH_HUB_URL)
       .put(`/manage/projects/${PROJECT_UID}`, { name: 'Renamed Site' })
       .query({})
@@ -88,11 +88,11 @@ describe('integration: launch:projects:update on the wire', () => {
 
     expect(error).toBeUndefined();
     expect(scope.isDone()).toBe(true);
-    expect(stdout).toBe('✔ name updated to "Renamed Site"\n');
+    expect(stdout).toBe('✔ Project updated successfully.\n');
     expect(onWire).toEqual([]);
   });
 
-  it('puts both fields when both were supplied and prints one line each', async () => {
+  it('puts both fields when both were supplied and reports success once', async () => {
     const scope = nock(LAUNCH_HUB_URL)
       .put(`/manage/projects/${PROJECT_UID}`, { name: 'Renamed Site', description: 'A new blurb' })
       .query({})
@@ -117,7 +117,7 @@ describe('integration: launch:projects:update on the wire', () => {
 
     expect(error).toBeUndefined();
     expect(scope.isDone()).toBe(true);
-    expect(stdout).toBe(['✔ name updated to "Renamed Site"', '✔ description updated to "A new blurb"', ''].join('\n'));
+    expect(stdout).toBe('✔ Project updated successfully.\n');
   });
 
   it('accepts a project name and updates the uid it resolves to', async () => {
@@ -148,7 +148,7 @@ describe('integration: launch:projects:update on the wire', () => {
     expect(error).toBeUndefined();
     expect(lookup.isDone()).toBe(true);
     expect(scope.isDone()).toBe(true);
-    expect(stdout).toBe('✔ description updated to "A new blurb"\n');
+    expect(stdout).toBe('✔ Project updated successfully.\n');
   });
 
   it('exits 2 without sending anything when neither --name nor --description was supplied', async () => {

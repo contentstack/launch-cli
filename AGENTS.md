@@ -316,12 +316,20 @@ mirrored as `PROJECT_NAME_MAX_LENGTH` / `PROJECT_DESCRIPTION_MAX_LENGTH` in
 `src/projects/project.inputs.ts` and enforced in each flag's `normalize`, so a value from config or
 a prompt is checked as well as one from argv.
 
-Supplying neither flag is a usage error raised by `atLeastOneOf('name', 'description')` in
-`src/core/rules.ts` - the API would answer `BODY_EMPTY`, and a round trip to be told that is worse
-than exit 2. Rules run after the resolution chain, so a `--project <name>` still costs its
-name-to-uid lookup before the rule fires; only the `PUT` is avoided. The success lines report the
-value the **API confirmed**, falling back to the requested value if the response omits the field, so
-a server-side normalisation is not reported as something it was not.
+In a terminal, every updatable field not supplied as a flag is prompted for, in order (name, then
+description): `promptForProjectUpdate` in `src/projects/project.update.prompt.ts`. Prompts carry no
+pre-filled value; a blank answer, or one equal to the current value (read with one `GET` first),
+leaves that field out, and a flag value is always sent. The length limits are checked inside each
+prompt's `validate`, so an oversized answer re-prompts instead of failing. When both flags are
+supplied nothing is fetched or prompted. If nothing is left to send, the command prints a yellow
+`Project not updated. No changes were entered.`, sends no `PUT` and exits 0.
+
+Without a terminal nothing is prompted: supplied flags are sent as given, and supplying neither is a
+usage error (exit 2) raised in the command's `run()` - the API would answer `BODY_EMPTY`, and a round
+trip to be told that is worse than exit 2. It is not a `static rules` entry because a rule runs
+inside `init()`, before a command can prompt, and cannot tell a terminal from a pipe. A `--project
+<name>` still costs its name-to-uid lookup before the check. Success prints one green
+`✔ Project updated successfully.`, whichever fields were sent.
 
 `--name` and `--description` live in `src/projects/project.inputs.ts` because their limits are the
 project DTO's. When `environments:*` needs its own `--name`, the flat catalog key `name` is already
@@ -589,9 +597,8 @@ request to prove the body is unchanged. **No secret may reach argv** (FR30, G16)
 oclif's native `exclusive` / `relationships` on the flag definition, where it also shows in `--help` -
 and a simple range does too: `limit` and `skip` carry oclif's own `min`/`max` rather than being
 checked later. A rule that must read a *resolved* value (one that config, a prompt or a default may
-have supplied) belongs in `src/core/rules.ts` - there are three: `atLeastOneOf` (used by
-`projects:update`), `onlyWithValueOf` (used by `projects:create`) and `exactlyOneOf` (no consumer yet;
-see "Built ahead of use" below) - declared as a `static rules = [...]` array on the command. `resolveInputs` evaluates them after resolution,
+have supplied) belongs in `src/core/rules.ts` - there are three: `atLeastOneOf` and `exactlyOneOf` (no consumer yet;
+see "Built ahead of use" below) and `onlyWithValueOf` (used by `projects:create`) - declared as a `static rules = [...]` array on the command. `resolveInputs` evaluates them after resolution,
 and a failing rule is a usage error (exit 2).
 
 A rule asks what the **user supplied**, never what a default filled in. `resolveInputs` hands each rule
@@ -603,7 +610,7 @@ gate value `onlyWithValueOf` reads is a value, not a "was it supplied?" question
 wherever it came from. Write the next rule when a command needs it; a rule
 kept alive only by its own test proves nothing.
 
-**Built ahead of use.** Four pieces of production code have no caller yet, on purpose, each held
+**Built ahead of use.** Five pieces of production code have no caller yet, on purpose, each held
 for a named ticket whose shape it already fits. Nothing else in `src` is uncalled; add to this list
 rather than leave an orphan unexplained.
 
@@ -613,6 +620,7 @@ rather than leave an orphan unexplained.
 | `DeploymentsApi.list` | CL-7170 (`deployments:*`) | a `DeploymentScope` plus paging -> `DeploymentsPage` |
 | `src/core/redact.ts` | CL-7169 (variables) | see below |
 | `exactlyOneOf` | CL-7172 (`cache:purge`) | "purge these paths, or everything, not both" - and it judges what the user supplied, not defaults |
+| `atLeastOneOf` | no ticket yet - its caller, `projects:update`, now prompts for missing fields instead | "at least one of these flags" for the next command that must not prompt - and it judges what the user supplied, not defaults |
 
 **Redaction.** `src/core/redact.ts` (`REDACTED`, `redactedColumn`) has no caller yet; it is kept
 ahead of its first use on purpose, so the easy path for the first presenter that renders an

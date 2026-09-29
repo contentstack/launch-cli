@@ -4,7 +4,8 @@ import {
   projectCreatedFields,
   projectDeleteQuestion,
   projectDeletedLine,
-  projectUpdatedLines,
+  projectNotUpdatedLine,
+  projectUpdatedLine,
 } from './project.presenter';
 
 describe('projectDeleteQuestion', () => {
@@ -31,49 +32,27 @@ describe('projectDeletedLine', () => {
   });
 });
 
-describe('projectUpdatedLines', () => {
-  it('prints one line per requested field, carrying the value the API confirmed', () => {
-    expect(
-      projectUpdatedLines(
-        { name: 'Renamed Site', description: 'A new blurb' },
-        { uid: 'p1', name: 'Renamed Site', description: 'A new blurb' },
-      ),
-    ).toEqual(['\u2714 name updated to "Renamed Site"', '\u2714 description updated to "A new blurb"']);
+describe('projectUpdatedLine', () => {
+  it('says the project was updated, in green when output is a terminal', () => {
+    expect(projectUpdatedLine(true)).toBe('\u001b[32m\u2714 Project updated successfully.\u001b[39m');
   });
 
-  it.each([
-    [{ name: 'Renamed Site' }, ['\u2714 name updated to "Renamed Site"']],
-    [{ description: 'A new blurb' }, ['\u2714 description updated to "A new blurb"']],
-  ])('prints only the field that was requested for %p', (requested, expected) => {
-    expect(projectUpdatedLines(requested, { uid: 'p1', name: 'Renamed Site', description: 'A new blurb' })).toEqual(
-      expected,
-    );
+  it('prints plain text when output is not a terminal', () => {
+    expect(projectUpdatedLine(false)).toBe('\u2714 Project updated successfully.');
   });
+});
 
-  it('prints no line for a field left undefined', () => {
-    expect(
-      projectUpdatedLines({ name: 'Renamed Site', description: undefined }, { uid: 'p1', name: 'Renamed Site' }),
-    ).toEqual(['\u2714 name updated to "Renamed Site"']);
-  });
-
-  it('falls back to the requested value when the response omitted the field', () => {
-    expect(projectUpdatedLines({ name: 'Renamed Site' }, { uid: 'p1', name: undefined as unknown as string })).toEqual([
-      '\u2714 name updated to "Renamed Site"',
-    ]);
-  });
-
-  it('prints nothing when no field was requested', () => {
-    expect(projectUpdatedLines({}, { uid: 'p1', name: 'Renamed Site' })).toEqual([]);
+describe('projectNotUpdatedLine', () => {
+  it('shows the notice in yellow when output is a terminal and leaves it plain otherwise', () => {
+    expect(projectNotUpdatedLine(true)).toBe('\u001b[33mProject not updated. No changes were entered.\u001b[39m');
+    expect(projectNotUpdatedLine(false)).toBe('Project not updated. No changes were entered.');
   });
 });
 
 describe('project create presentation', () => {
   it('reports uid, name, type and the site url of a created project', () => {
     expect(
-      projectCreatedFields(
-        { uid: 'p1', name: 'My Site', projectType: 'GITPROVIDER' },
-        'https://my-site.example.test',
-      ),
+      projectCreatedFields({ uid: 'p1', name: 'My Site', projectType: 'GITPROVIDER' }, 'https://my-site.example.test'),
     ).toEqual([
       ['uid', 'p1'],
       ['name', 'My Site'],
