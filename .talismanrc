@@ -10,6 +10,7 @@ fileignoreconfig:
   allowed_patterns:
     - "key: 'Content-Type'"
     - "formFieldKey: 'key', formFieldValue"
+    - "key: 'x-ms-blob-type', value: 'BlockBlob'"
 - filename: src/projects/project.upload.ts
   allowed_patterns:
     - "formFieldKey"
