@@ -3,6 +3,7 @@ import { ProjectConfig, ProjectConfigStore } from '../core/project-config';
 import { requireValueOf } from '../core/rules';
 import type { ServiceContext } from '../core/service-context';
 import { Loader, silentLoader, terminalLoader } from '../core/loader';
+import { Progress, silentProgress, terminalProgress } from '../core/progress';
 import { DeploymentUnsuccessfulError } from '../deployments/deployment.errors';
 import { deploymentUrlOf } from '../deployments/deployment.presenter';
 import { WatchTiming, watchDeployment } from '../deployments/deployment.watcher';
@@ -35,7 +36,7 @@ import {
   repositoryLabel,
   repositorySearchTerm,
 } from './project.create.prompt';
-import { deploymentFailureMessage, deploymentUrlLine } from './project.presenter';
+import { PREPARING_ARCHIVE, deploymentFailureMessage, deploymentUrlLine } from './project.presenter';
 import {
   GIT_ONLY_FLAGS,
   PROJECT_TYPE_BY_CHOICE,
@@ -44,7 +45,7 @@ import {
   projectTypeChoiceOf,
 } from './project.inputs';
 import { refuseOversizedArchive, uploadArchive } from './project.upload';
-import type { CreateProjectInput, DetectedFramework, IdentifiedProject } from './types';
+import type { CreateProjectInput, DetectedFramework, IdentifiedProject, SignedUploadUrl } from './types';
 
 export { DEPLOYMENT_WAIT_TIMEOUT_MS, defaultWatchTiming } from '../deployments/deployment.watcher';
 export { serverCommandFrameworkGate } from '../environments/environment.inputs';
@@ -53,6 +54,7 @@ export const NO_DEPLOYMENT_STATUS = 'NONE';
 export const DEFAULT_ENVIRONMENT_NAME = 'Default';
 export const FIRST_LOOKUP_ATTEMPTS = 3;
 export const CREATE_PROMPT_REMEDIES = { config: false, prompt: true };
+export const UPLOAD_PROGRESS_LABEL = 'Uploading project.zip';
 
 export function reasonOf(error: unknown): string {
   const text = (error instanceof Error ? error.message : String(error)).trim();
@@ -406,10 +408,8 @@ export class ProjectCreator {
   }
 
   private async selectUploadSource(request: CreateRequest): Promise<SourceSelection> {
-    const loader = this.loader();
-    const archive = spinning(loader, 'Preparing zip file', () =>
-      archiveDirectory(request.dataDir, [request.configPath]),
-    );
+    this.services.ux.print(PREPARING_ARCHIVE);
+    const archive = archiveDirectory(request.dataDir, [request.configPath]);
     refuseOversizedArchive(archive.buffer.length);
 
     if (archive.skippedLinks.length > 0) {
@@ -420,7 +420,7 @@ export class ProjectCreator {
     }
 
     const signed = await this.services.api.projects.signedUploadUrl({ org: request.org });
-    await spinning(loader, 'Starting file upload...', () => uploadArchive(signed, archive.buffer));
+    await this.uploading(signed, archive.buffer);
 
     const detected = await this.services.api.projects.fileFramework({
       org: request.org,
@@ -430,8 +430,27 @@ export class ProjectCreator {
     return { detected, uploadUid: signed.uploadUid };
   }
 
+  private async uploading(signed: SignedUploadUrl, body: Buffer): Promise<void> {
+    const progress = this.progress();
+
+    try {
+      await uploadArchive(signed, body, {
+        onProgress: (sent, total) => {
+          progress.start(total);
+          progress.advance(sent);
+        },
+      });
+    } finally {
+      progress.stop();
+    }
+  }
+
   private loader(): Loader {
     return this.services.outputIsTTY === true ? terminalLoader() : silentLoader;
+  }
+
+  private progress(): Progress {
+    return this.services.outputIsTTY === true ? terminalProgress(UPLOAD_PROGRESS_LABEL) : silentProgress;
   }
 
   private async selectFramework(request: CreateRequest, detected: DetectedFramework): Promise<FrameworkPreset> {
@@ -609,24 +628,5 @@ export class ProjectCreator {
     }
 
     return ask();
-  }
-}
-
-function spinning<T>(loader: Loader, message: string, step: () => T): T {
-  loader.start(message);
-
-  try {
-    const result = step();
-
-    if (result instanceof Promise) {
-      return result.finally(() => loader.stop()) as T;
-    }
-
-    loader.stop();
-
-    return result;
-  } catch (error) {
-    loader.stop();
-    throw error;
   }
 }

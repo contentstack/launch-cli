@@ -12,7 +12,7 @@ import { WatchTiming } from '../deployments/deployment.watcher';
 import { ApiErrorEntry, LaunchApiError } from '../transport/errors';
 import { GitConnectionMissingError } from '../git/git.errors';
 import { ApiSurface } from '../resources';
-import { CreateRequest, ProjectCreator } from './project.create';
+import { CreateRequest, ProjectCreator, UPLOAD_PROGRESS_LABEL } from './project.create';
 import { UploadFailedError } from './project.errors';
 
 jest.mock('./project.upload', () => ({
@@ -21,7 +21,35 @@ jest.mock('./project.upload', () => ({
 }));
 
 import * as archiveModule from './project.archive';
-import { MAX_UPLOAD_BYTES, uploadArchive } from './project.upload';
+import { MAX_UPLOAD_BYTES, UploadOptions, uploadArchive } from './project.upload';
+
+function fakeProgressBars() {
+  const built: Record<string, unknown>[] = [];
+  const calls: string[] = [];
+  const bar = {
+    started: [] as number[],
+    updated: [] as number[],
+    start: (total: number) => {
+      bar.started.push(total);
+      calls.push('start');
+    },
+    update: (value: number) => {
+      bar.updated.push(value);
+      calls.push('update');
+    },
+    stop: () => {
+      calls.push('stop');
+    },
+  };
+  const bars: unknown[] = [];
+  jest.spyOn(cliux, 'progress').mockImplementation(((options: Record<string, unknown>) => {
+    built.push(options);
+    bars.push(bar);
+    return bar;
+  }) as never);
+
+  return { built, bars, bar, calls };
+}
 
 const ORG = 'org1';
 const PROJECT_UID = 'p1';
@@ -839,29 +867,72 @@ describe('ProjectCreator on the FileUpload path', () => {
     expect(printed.join('\n')).not.toContain('Uploading');
   });
 
-  it.each([
-    [true, ['Preparing zip file', 'done', 'Starting file upload...', 'done']],
-    [false, []],
-    [undefined, []],
-  ])('draws the zip and upload spinners only when the output is a terminal (output terminal: %s)', async (outputIsTTY, drawn) => {
-    const spun: string[] = [];
-    jest.spyOn(cliux, 'loaderV2').mockImplementation(((message: string, running?: unknown) => {
-      spun.push(message);
-      return running === undefined ? {} : undefined;
-    }) as never);
-    const { creator } = harness({ outputIsTTY });
+  it.each([[true], [false], [undefined]])(
+    'never spins for the zip, whose step says so in a line of its own (output terminal: %s)',
+    async (outputIsTTY) => {
+      const spun: string[] = [];
+      jest.spyOn(cliux, 'loaderV2').mockImplementation(((message: string, running?: unknown) => {
+        spun.push(message);
+        return running === undefined ? {} : undefined;
+      }) as never);
+      const { creator, printed } = harness({ outputIsTTY });
+
+      await creator.create(uploadRequest());
+
+      expect(spun).not.toContain('Preparing zip file...');
+      expect(printed[0]).toBe('Preparing zip file...');
+    },
+  );
+
+  it.each([[true], [false], [undefined]])(
+    'draws the upload progress bar only when the output is a terminal (output terminal: %s)',
+    async (outputIsTTY) => {
+      const { bars, calls } = fakeProgressBars();
+      (uploadArchive as jest.Mock).mockImplementation(async (_target, body: Buffer, options: UploadOptions) => {
+        options.onProgress?.(body.length / 2, body.length);
+        options.onProgress?.(body.length, body.length);
+      });
+      const { creator } = harness({ outputIsTTY });
+
+      await creator.create(uploadRequest());
+
+      expect(bars).toHaveLength(outputIsTTY === true ? 1 : 0);
+      expect(calls).toEqual(outputIsTTY === true ? ['start', 'update', 'update', 'stop'] : []);
+    },
+  );
+
+  it('sizes the bar by the bytes going on the wire, not by the archive the multipart body wraps', async () => {
+    const { built, bar } = fakeProgressBars();
+    const WIRE_TOTAL = 53_335;
+    (uploadArchive as jest.Mock).mockImplementation(async (_target, body: Buffer, options: UploadOptions) => {
+      expect(body.length).toBeLessThan(WIRE_TOTAL);
+      options.onProgress?.(0, WIRE_TOTAL);
+      options.onProgress?.(WIRE_TOTAL, WIRE_TOTAL);
+    });
+    const { creator } = harness({ outputIsTTY: true });
 
     await creator.create(uploadRequest());
 
-    expect(spun.slice(0, 4)).toEqual(drawn);
+    expect(built[0].format).toContain(UPLOAD_PROGRESS_LABEL);
+    expect(bar.started).toEqual([WIRE_TOTAL]);
+    expect(bar.updated).toEqual([0, WIRE_TOTAL]);
   });
 
-  it('stops the upload spinner when the upload fails', async () => {
-    const spun: string[] = [];
-    jest.spyOn(cliux, 'loaderV2').mockImplementation(((message: string, running?: unknown) => {
-      spun.push(message);
-      return running === undefined ? {} : undefined;
-    }) as never);
+  it('stops the upload progress bar when the upload fails partway, rather than leaving it drawn', async () => {
+    const { calls } = fakeProgressBars();
+    (uploadArchive as jest.Mock).mockImplementation(async (_target, body: Buffer, options: UploadOptions) => {
+      options.onProgress?.(0, body.length);
+      throw new Error('upload refused');
+    });
+    const { creator } = harness({ outputIsTTY: true });
+
+    await expect(creator.create(uploadRequest())).rejects.toThrow('upload refused');
+
+    expect(calls).toEqual(['start', 'update', 'stop']);
+  });
+
+  it('draws no bar at all when the upload fails before a single byte reaches the wire', async () => {
+    const { bars, calls } = fakeProgressBars();
     (uploadArchive as jest.Mock).mockImplementation(async () => {
       throw new Error('upload refused');
     });
@@ -869,7 +940,8 @@ describe('ProjectCreator on the FileUpload path', () => {
 
     await expect(creator.create(uploadRequest())).rejects.toThrow('upload refused');
 
-    expect(spun).toEqual(['Preparing zip file', 'done', 'Starting file upload...', 'done']);
+    expect(bars).toEqual([]);
+    expect(calls).toEqual([]);
   });
 
   it('refuses a zip over the upload limit before asking for an upload url or any name', async () => {
@@ -900,13 +972,43 @@ describe('ProjectCreator on the FileUpload path', () => {
     expect(uploaded.getEntries().map((entry) => entry.entryName)).toEqual(['index.html']);
   });
 
+  it.each([[true], [false]])(
+    'says it is preparing the zip in plain text, terminal or not (output terminal: %s)',
+    async (outputIsTTY) => {
+      let printedBeforeUpload: string[] = [];
+      const { creator, printed } = harness({ outputIsTTY });
+      (uploadArchive as jest.Mock).mockImplementation(async () => {
+        printedBeforeUpload = [...printed];
+      });
+
+      await creator.create(uploadRequest());
+
+      expect(printed[0]).toBe('Preparing zip file...');
+      expect(printedBeforeUpload[0]).toBe('Preparing zip file...');
+    },
+  );
+
+  it('never claims a zip it refused was ready, having only said it was preparing one', async () => {
+    jest.spyOn(archiveModule, 'archiveDirectory').mockReturnValue({
+      buffer: { length: MAX_UPLOAD_BYTES + 1 } as Buffer,
+      entries: ['index.html'],
+      skippedLinks: [],
+    });
+    const { creator, printed } = harness();
+
+    await expect(creator.create(uploadRequest())).rejects.toThrow('over the 100 MB Launch accepts');
+
+    expect(printed).toEqual(['Preparing zip file...']);
+  });
+
   it('says which symbolic links it left out of the upload before uploading', async () => {
     symlinkSync(join(dataDir, 'index.html'), join(dataDir, 'linked.html'));
     const { creator, printed } = harness();
 
     await creator.create(uploadRequest());
 
-    expect(printed[0]).toBe('Skipping 1 symbolic link(s), which are never uploaded: linked.html');
+    expect(printed[0]).toBe('Preparing zip file...');
+    expect(printed[1]).toBe('Skipping 1 symbolic link(s), which are never uploaded: linked.html');
   });
 
   it('creates the project with no server command when the optional prompt is left empty', async () => {

@@ -1,7 +1,7 @@
 import nock from 'nock';
 
 import { UploadFailedError } from '../../src/projects/project.errors';
-import { UPLOAD_IDLE_TIMEOUT_MS, uploadArchive } from '../../src/projects/project.upload';
+import { UPLOAD_CHUNK_BYTES, UPLOAD_IDLE_TIMEOUT_MS, uploadArchive } from '../../src/projects/project.upload';
 
 const HOST = 'https://uploads.integration.test';
 const ARCHIVE = Buffer.from('archive-bytes');
@@ -137,9 +137,9 @@ describe('integration: uploading the project archive on the wire', () => {
   it('gives up with exit 1 when the upload stalls, rather than hanging the command', async () => {
     nock(HOST).put('/bucket').delayConnection(2000).reply(201);
 
-    const failure = await uploadArchive({ uploadUrl: `${HOST}/bucket`, uploadUid: 'u' }, ARCHIVE, 50).catch(
-      (error: Error) => error,
-    );
+    const failure = await uploadArchive({ uploadUrl: `${HOST}/bucket`, uploadUid: 'u' }, ARCHIVE, {
+      idleTimeoutMs: 50,
+    }).catch((error: Error) => error);
 
     expect(failure).toBeInstanceOf(UploadFailedError);
     expect((failure as Error).message).toBe(
@@ -149,5 +149,99 @@ describe('integration: uploading the project archive on the wire', () => {
 
   it('waits up to two minutes of silence by default, a limit on idleness rather than on the size of the upload', () => {
     expect(UPLOAD_IDLE_TIMEOUT_MS).toBe(120_000);
+  });
+
+  it('sends the body in chunks of a quarter megabyte by default', () => {
+    expect(UPLOAD_CHUNK_BYTES).toBe(256 * 1024);
+  });
+
+  it('reports every chunk it flushed, rising to the whole body, and delivers the body intact', async () => {
+    const body = Buffer.from('0123456789');
+    let seen = '';
+    const scope = nock(HOST)
+      .put('/bucket')
+      .reply(200, function (_uri: string, received: unknown) {
+        seen = String(received);
+        return '';
+      });
+    const reported: [number, number][] = [];
+
+    await uploadArchive({ uploadUrl: `${HOST}/bucket`, uploadUid: 'u' }, body, {
+      chunkBytes: 4,
+      onProgress: (sent, total) => reported.push([sent, total]),
+    });
+
+    expect(scope.isDone()).toBe(true);
+    expect(seen).toBe('0123456789');
+    expect(reported).toEqual([
+      [0, 10],
+      [4, 10],
+      [8, 10],
+      [10, 10],
+    ]);
+  });
+
+  it('reports the multipart envelope, not just the archive, because that is what is on the wire', async () => {
+    nock(HOST).post('/bucket').reply(204, '');
+    const reported: number[] = [];
+
+    await uploadArchive(
+      {
+        uploadUrl: `${HOST}/bucket`,
+        uploadUid: 'u',
+        fields: [{ formFieldKey: 'key', formFieldValue: 'uploads/project.zip' }],
+      },
+      ARCHIVE,
+      { onProgress: (sent) => reported.push(sent) },
+    );
+
+    expect(reported).toEqual([0, expect.any(Number)]);
+    expect(reported[1]).toBeGreaterThan(ARCHIVE.length);
+  });
+
+  it('reports the wire total before the first byte, so a bar can size itself against it', async () => {
+    nock(HOST)
+      .post('/bucket')
+      .reply(204, '');
+    const reported: [number, number][] = [];
+
+    await uploadArchive(
+      {
+        uploadUrl: `${HOST}/bucket`,
+        uploadUid: 'u',
+        fields: [{ formFieldKey: 'key', formFieldValue: 'uploads/project.zip' }],
+      },
+      ARCHIVE,
+      { onProgress: (sent, total) => reported.push([sent, total]) },
+    );
+
+    const [[firstSent, wireTotal]] = reported;
+
+    expect(firstSent).toBe(0);
+    expect(wireTotal).toBeGreaterThan(ARCHIVE.length);
+    for (const [sent, total] of reported) {
+      expect(total).toBe(wireTotal);
+      expect(sent).toBeLessThanOrEqual(wireTotal);
+    }
+    expect(reported[reported.length - 1][0]).toBe(wireTotal);
+  });
+
+  it('reports one flush for a body smaller than a chunk, and none for an empty one', async () => {
+    nock(HOST).put('/bucket').reply(200, '');
+    const small: number[] = [];
+
+    await uploadArchive({ uploadUrl: `${HOST}/bucket`, uploadUid: 'u' }, ARCHIVE, {
+      onProgress: (sent) => small.push(sent),
+    });
+
+    nock(HOST).put('/empty').reply(200, '');
+    const empty: number[] = [];
+
+    await uploadArchive({ uploadUrl: `${HOST}/empty`, uploadUid: 'u' }, Buffer.alloc(0), {
+      onProgress: (sent) => empty.push(sent),
+    });
+
+    expect(small).toEqual([0, ARCHIVE.length]);
+    expect(empty).toEqual([0]);
   });
 });

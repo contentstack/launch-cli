@@ -1,4 +1,5 @@
 import {
+  PREPARING_ARCHIVE,
   PROJECT_DELETE_QUESTION,
   deploymentFailureMessage,
   projectDeletedLine,
@@ -10,6 +11,12 @@ import {
 describe('PROJECT_DELETE_QUESTION', () => {
   it('asks for confirmation without naming the project', () => {
     expect(PROJECT_DELETE_QUESTION).toBe('Are you sure you want to delete this project?');
+  });
+});
+
+describe('PREPARING_ARCHIVE', () => {
+  it('announces the step in the present tense, because it is printed before the zip is built', () => {
+    expect(PREPARING_ARCHIVE).toBe('Preparing zip file...');
   });
 });
 

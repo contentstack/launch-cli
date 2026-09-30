@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import type { ClientRequest } from 'node:http';
 import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import { URL } from 'node:url';
@@ -12,6 +13,7 @@ export const UPLOAD_FILE_NAME = 'project.zip';
 export const UPLOAD_CONTENT_TYPE = 'application/zip';
 export const UPLOAD_IDLE_TIMEOUT_MS = 120_000;
 export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+export const UPLOAD_CHUNK_BYTES = 256 * 1024;
 
 const BYTES_PER_MB = 1024 * 1024;
 
@@ -94,11 +96,41 @@ export function prepareUpload(target: SignedUploadUrl, archive: Buffer): Prepare
   return { method: target.method ?? 'POST', headers, body: form.body };
 }
 
-export function uploadArchive(
-  target: SignedUploadUrl,
-  archive: Buffer,
-  idleTimeoutMs = UPLOAD_IDLE_TIMEOUT_MS,
-): Promise<void> {
+export type UploadProgress = (sent: number, total: number) => void;
+
+export interface UploadOptions {
+  idleTimeoutMs?: number;
+  chunkBytes?: number;
+  onProgress?: UploadProgress;
+}
+
+function sendBody(request: ClientRequest, body: Buffer, chunkBytes: number, report: UploadProgress): void {
+  let offset = 0;
+
+  report(offset, body.length);
+
+  const next = (): void => {
+    if (offset >= body.length) {
+      request.end();
+      return;
+    }
+
+    const end = Math.min(offset + chunkBytes, body.length);
+    const chunk = body.subarray(offset, end);
+    offset = end;
+    request.write(chunk, () => {
+      report(offset, body.length);
+      next();
+    });
+  };
+
+  next();
+}
+
+export function uploadArchive(target: SignedUploadUrl, archive: Buffer, options: UploadOptions = {}): Promise<void> {
+  const idleTimeoutMs = options.idleTimeoutMs ?? UPLOAD_IDLE_TIMEOUT_MS;
+  const chunkBytes = options.chunkBytes ?? UPLOAD_CHUNK_BYTES;
+  const report = options.onProgress ?? (() => undefined);
   const prepared = prepareUpload(target, archive);
   const url = new URL(target.uploadUrl);
   const send = url.protocol === 'http:' ? httpRequest : httpsRequest;
@@ -129,6 +161,6 @@ export function uploadArchive(
       request.destroy();
     });
 
-    request.end(prepared.body);
+    sendBody(request, prepared.body, chunkBytes, report);
   });
 }
