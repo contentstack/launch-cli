@@ -219,10 +219,6 @@ function harness(scenario: Scenario = {}) {
   };
 }
 
-function usingClone(repoName = 'my-org/my-repo'): string {
-  return `Using the GitHub repository "${repoName}" checked out in ${dataDir}. Pass --data-dir to build from another folder.`;
-}
-
 function cloneOf(repoName: string): void {
   mkdirSync(join(dataDir, '.git'), { recursive: true });
   writeFileSync(join(dataDir, '.git', 'HEAD'), 'ref: refs/heads/main\n');
@@ -321,7 +317,7 @@ describe('ProjectCreator on the GitHub path', () => {
         gitProviderMetadata: { gitProvider: 'GitHub' },
       },
     });
-    expect(printed).toEqual([usingClone(), 'Deployment URL https://my-site.example.test']);
+    expect(printed).toEqual(['Deployment URL https://my-site.example.test']);
   });
 
   it('sends the project description and the two toggles only when they were supplied', async () => {
@@ -468,18 +464,6 @@ describe('ProjectCreator on the GitHub path', () => {
     await expect(creator.create(gitRequest())).rejects.toBe(boom);
   });
 
-  it('says which local repository it took, so the choice is never silent', async () => {
-    cloneOf('my-org/my-repo');
-    const { creator, printed } = harness({ isTTY: true, answers: ['main'] });
-
-    await creator.create(gitRequest({ branch: undefined }));
-
-    expect(printed).toContain(
-      `Using the GitHub repository "my-org/my-repo" checked out in ${dataDir}. ` +
-        'Pass --data-dir to build from another folder.',
-    );
-  });
-
   it('names the local folder and the flags when the detected repository is not connected', async () => {
     cloneOf('other-org/missing-repo');
     const { creator } = harness({ isTTY: true });
@@ -528,6 +512,18 @@ describe('ProjectCreator prompting order and refusals', () => {
       'Response mode',
       'Contentstack Authentication',
     ]);
+  });
+
+  it('offers Default as the environment name, so pressing enter is enough, as V1 did', async () => {
+    const { creator, askedPayloads, created } = harness({
+      isTTY: true,
+      answers: ['GitHub', 'My Site', 'Default', 'main', 'NextJs', 'npm run build', '.next', 'buffered', 'enable'],
+    });
+
+    await creator.create({ org: ORG, dataDir, configPath: configPathIn(dataDir) });
+
+    expect(askedPayloads[2]).toMatchObject({ message: 'Environment name', default: 'Default' });
+    expect(bodyOf(created).environment).toMatchObject({ name: 'Default' });
   });
 
   it('asks for Contentstack Authentication on a terminal, defaulting to enable, and sends the answer', async () => {
@@ -930,7 +926,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed.slice(0, 2)).toEqual([usingClone(), 'Deployment URL https://my-site.example.test']);
+    expect(printed.slice(0, 1)).toEqual(['Deployment URL https://my-site.example.test']);
   });
 
   it.each([
@@ -944,7 +940,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
       await creator.create(gitRequest());
 
-      expect(printed[1]).toBe(line);
+      expect(printed[0]).toBe(line);
     },
   );
 
@@ -1135,7 +1131,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
     const { creator, printed } = harness({ createFails: boom });
 
     await expect(creator.create(gitRequest())).rejects.toBe(boom);
-    expect(printed).toEqual([usingClone()]);
+    expect(printed).toEqual([]);
   });
 });
 

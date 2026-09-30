@@ -609,7 +609,7 @@ describe('integration: launch:projects:create on the wire', () => {
       undefined,
       undefined,
       undefined,
-      undefined,
+      'Default',
       'main',
       'NextJs',
       'npm run build',

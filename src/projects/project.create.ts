@@ -47,6 +47,7 @@ export { DEPLOYMENT_WAIT_TIMEOUT_MS, defaultWatchTiming } from '../deployments/d
 export { serverCommandFrameworkGate } from '../environments/environment.inputs';
 
 export const NO_DEPLOYMENT_STATUS = 'NONE';
+export const DEFAULT_ENVIRONMENT_NAME = 'Default';
 export const FIRST_LOOKUP_ATTEMPTS = 3;
 export const CREATE_PROMPT_REMEDIES = { config: false, prompt: true };
 
@@ -126,7 +127,7 @@ export class ProjectCreator {
     const upload = choice === 'GitHub' ? undefined : await this.selectUploadSource(request);
     const name = await this.need('name', request.name, () => askText(this.services.ux, 'Project name'));
     const envName = await this.need('env-name', request.envName, () =>
-      askText(this.services.ux, 'Environment name'),
+      askText(this.services.ux, 'Environment name', DEFAULT_ENVIRONMENT_NAME),
     );
     const source = upload ?? (await this.selectGitSource(request));
     const framework = await this.selectFramework(request, source.detected);
@@ -350,11 +351,6 @@ export class ProjectCreator {
     if (match === undefined) {
       throw new UsageError(unreachableRepository(request, local, 'no repository with that name was found.'));
     }
-
-    this.services.ux.print(
-      `Using the GitHub repository "${local.repoName}" checked out in ${request.dataDir}. ` +
-        'Pass --data-dir to build from another folder.',
-    );
 
     return match;
   }
