@@ -185,6 +185,15 @@ const latestLiveDeploymentQuery: DocumentNode = gql`
   }
 `;
 
+const rollbackSettingsQuery: DocumentNode = gql`
+  query RollbackSettings {
+    RollbackSettings {
+      isEnabled
+      retentionCount
+    }
+  }
+`;
+
 const environmentsQuery: DocumentNode = gql`
   query Environments($skipRollbackData: Boolean = true) {
     Environments {
@@ -228,4 +237,5 @@ export {
   serverlessLogsQuery,
   latestLiveDeploymentQuery,
   environmentsQuery,
+  rollbackSettingsQuery,
 };

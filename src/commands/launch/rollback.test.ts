@@ -82,23 +82,73 @@ describe('Rollback Command', () => {
     jest.clearAllMocks();
   });
 
-  it('exits when no rollback-eligible deployments are available', async () => {
-    const noEligibleResponse = {
-      data: {
-        Environments: {
-          edges: [
-            {
-              node: {
-                uid: 'env-uid',
-                name: 'Default',
-                deployments: { edges: [{ node: liveDeployment }] },
-              },
+  const noEligibleResponse = {
+    data: {
+      Environments: {
+        edges: [
+          {
+            node: {
+              uid: 'env-uid',
+              name: 'Default',
+              deployments: { edges: [{ node: liveDeployment }] },
             },
-          ],
-        },
+          },
+        ],
       },
-    };
-    const query = jest.fn().mockResolvedValueOnce(noEligibleResponse);
+    },
+  };
+
+  it('exits when no rollback-eligible deployments are available', async () => {
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce(noEligibleResponse)
+      .mockResolvedValueOnce({
+        data: { RollbackSettings: { isEnabled: true, retentionCount: 3 } },
+      });
+    const mutate = jest.fn();
+    const cmd = buildCommand({ environment: 'Default' }, query, mutate);
+    jest
+      .spyOn(cmd as any, 'fetchCurrentLiveDeployment')
+      .mockResolvedValueOnce(liveDeployment);
+
+    await expect((cmd as any).rollbackDeployment()).rejects.toThrow('process.exit:1');
+
+    expect(mutate).not.toHaveBeenCalled();
+    expect(exitMock).toHaveBeenCalledWith(1);
+    expect((cmd as any).log).toHaveBeenCalledWith(
+      'No rollback-eligible deployments are available for this environment.',
+      'error',
+    );
+  });
+
+  it('shows a plan-not-available message when instant rollback is not entitled', async () => {
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce(noEligibleResponse)
+      .mockResolvedValueOnce({
+        data: { RollbackSettings: { isEnabled: false, retentionCount: 0 } },
+      });
+    const mutate = jest.fn();
+    const cmd = buildCommand({ environment: 'Default' }, query, mutate);
+    jest
+      .spyOn(cmd as any, 'fetchCurrentLiveDeployment')
+      .mockResolvedValueOnce(liveDeployment);
+
+    await expect((cmd as any).rollbackDeployment()).rejects.toThrow('process.exit:1');
+
+    expect(mutate).not.toHaveBeenCalled();
+    expect(exitMock).toHaveBeenCalledWith(1);
+    expect((cmd as any).log).toHaveBeenCalledWith(
+      'Instant rollback isn\'t available on your organization\'s plan.',
+      'error',
+    );
+  });
+
+  it('falls back to the generic message when the settings fetch fails', async () => {
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce(noEligibleResponse)
+      .mockRejectedValueOnce(new Error('network error'));
     const mutate = jest.fn();
     const cmd = buildCommand({ environment: 'Default' }, query, mutate);
     jest
