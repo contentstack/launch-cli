@@ -62,6 +62,7 @@ interface Scenario {
   createFails?: Error;
   repositoriesFails?: Error;
   launchAppUrl?: string;
+  withoutOpenUrl?: boolean;
   pollFails?: Error;
   signedUrlFails?: Error;
   environmentFails?: Error;
@@ -217,7 +218,7 @@ function harness(scenario: Scenario = {}) {
     isTTY: scenario.isTTY ?? false,
     outputIsTTY: scenario.outputIsTTY,
     launchAppUrl: scenario.launchAppUrl,
-    openUrl: (url) => opened.push(url),
+    openUrl: scenario.withoutOpenUrl ? undefined : (url) => opened.push(url),
   };
 
   return {
@@ -529,6 +530,32 @@ describe('ProjectCreator on the GitHub path', () => {
 
     expect(failure).toBeInstanceOf(GitConnectionMissingError);
     expect(printed).toEqual(['error: GitHub connection not found!']);
+    expect(opened).toEqual([]);
+  });
+
+  it('still reports a missing GitHub connection when there is no way to open its url', async () => {
+    const { creator, printed } = harness({
+      launchAppUrl: 'https://dev11-app.csnonprod.com',
+      withoutOpenUrl: true,
+      repositoriesFails: new LaunchApiError(404, [{ message: 'No user connection found' }]),
+    });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(GitConnectionMissingError);
+    expect(printed).toContain(CONNECT_URL);
+  });
+
+  it('does not read a rejection whose entries carry no message as a missing connection', async () => {
+    const { creator, opened } = harness({
+      launchAppUrl: 'https://dev11-app.csnonprod.com',
+      repositoriesFails: new LaunchApiError(404, [{ code: 'launch.SOMETHING.WRONG' }]),
+    });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(UsageError);
+    expect(failure).not.toBeInstanceOf(GitConnectionMissingError);
     expect(opened).toEqual([]);
   });
 
