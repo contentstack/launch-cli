@@ -28,7 +28,9 @@ describe('redactedColumn', () => {
 
     renderTable(ux, [{ header: 'Key', value: (row: Variable) => row.key }, redactedColumn<Variable>('Value')], rows);
 
-    expect(printed).toEqual(['Key        Value', `API_TOKEN  ${REDACTED}`, `REGION     ${REDACTED}`]);
+    expect(printed[1]).toBe('\u2502  Key        \u2502  Value   \u2502');
+    expect(printed[3]).toBe(`\u2502  API_TOKEN  \u2502  ${REDACTED}  \u2502`);
+    expect(printed[5]).toBe(`\u2502  REGION     \u2502  ${REDACTED}  \u2502`);
     expect(printed.join('\n')).not.toContain('cs-super-secret');
     expect(printed.join('\n')).not.toContain('eu-west-1');
   });

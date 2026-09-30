@@ -42,9 +42,9 @@ describe('launch:projects:list', () => {
     await command.run();
 
     expect(listed).toEqual([{ org: 'org1', limit: 50, skip: 0 }]);
-    expect(lines[0]).toBe('UID  NAME  TYPE        UPDATED');
-    expect(lines[1]).toBe('p1   site  FILEUPLOAD  2026-09-01T00:00:00.000Z');
-    expect(lines[2]).toBe('Showing 1-1 of 1');
+    expect(lines[1]).toBe('\u2502  NAME  \u2502  TYPE        \u2502  UID  \u2502');
+    expect(lines[3]).toBe('\u2502  site  \u2502  FILEUPLOAD  \u2502  p1   \u2502');
+    expect(lines[5]).toBe('Showing 1-1 of 1');
   });
 
   it('renders placeholders for a project missing optional fields', async () => {
@@ -55,7 +55,7 @@ describe('launch:projects:list', () => {
 
     await command.run();
 
-    expect(lines[1]).toBe('p1   site  -     -');
+    expect(lines[3]).toBe('\u2502  site  \u2502  -     \u2502  p1   \u2502');
   });
 
   it('renders a placeholder for a project row carrying neither a uid nor a name', async () => {
@@ -66,8 +66,8 @@ describe('launch:projects:list', () => {
 
     await command.run();
 
-    expect(lines[0]).toBe('UID  NAME  TYPE  UPDATED');
-    expect(lines[1]).toBe('-    -     -     -');
+    expect(lines[1]).toBe('\u2502  NAME  \u2502  TYPE  \u2502  UID  \u2502');
+    expect(lines[3]).toBe('\u2502  -     \u2502  -     \u2502  -    \u2502');
   });
 
   it('prints only the empty-table placeholder and no pagination footer for an empty page', async () => {
@@ -81,7 +81,7 @@ describe('launch:projects:list', () => {
     expect(lines).toEqual(['No records found.']);
   });
 
-  it('pads every column to the widest row in the page', async () => {
+  it('sizes every column to the widest row in the page', async () => {
     const { command, lines } = commandUnderTest({
       pagination: { count: 3, limit: 50, skip: 0 },
       projects: [
@@ -93,13 +93,11 @@ describe('launch:projects:list', () => {
 
     await command.run();
 
-    expect(lines).toEqual([
-      `UID${' '.repeat(23)}NAME            TYPE         UPDATED`,
-      `${'a'.repeat(24)}  marketing-site  GITPROVIDER  2026-09-01`,
-      `${'b'.repeat(24)}  docs            FILEUPLOAD   2026-09-02`,
-      `${'c'.repeat(24)}  x               FILEUPLOAD   2026-09-03`,
-      'Showing 1-3 of 3',
-    ]);
+    expect(lines[1]).toBe(`\u2502  NAME            \u2502  TYPE         \u2502  UID${' '.repeat(23)}\u2502`);
+    expect(lines[3]).toBe(`\u2502  marketing-site  \u2502  GITPROVIDER  \u2502  ${'a'.repeat(24)}  \u2502`);
+    expect(lines[5]).toBe(`\u2502  docs            \u2502  FILEUPLOAD   \u2502  ${'b'.repeat(24)}  \u2502`);
+    expect(lines[7]).toBe(`\u2502  x               \u2502  FILEUPLOAD   \u2502  ${'c'.repeat(24)}  \u2502`);
+    expect(lines[9]).toBe('Showing 1-3 of 3');
   });
 
   it('passes a non-default limit and skip through to the api and reports the rows it printed', async () => {

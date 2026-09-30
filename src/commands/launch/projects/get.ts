@@ -1,7 +1,7 @@
 import { LaunchCommand } from '../../../core/launch-command';
 import { flagsFor, inputs } from '../../../core/inputs';
-import { renderDetail } from '../../../core/render';
-import { projectDetailFields } from '../../../projects/project.presenter';
+import { renderTable } from '../../../core/render';
+import { PROJECT_DESCRIPTION_COLUMN, PROJECT_DETAIL_COLUMNS } from '../../../projects/project.presenter';
 
 const getInputs = inputs({ org: { required: true }, project: { required: true } });
 
@@ -20,6 +20,13 @@ export default class ProjectsGet extends LaunchCommand<typeof getInputs> {
       project: this.resolved.project,
     });
 
-    renderDetail(this.ux, projectDetailFields(result));
+    renderTable(
+      this.ux,
+      PROJECT_DETAIL_COLUMNS,
+      [result],
+      process.stdout.columns,
+      PROJECT_DESCRIPTION_COLUMN,
+      this.services.outputIsTTY,
+    );
   }
 }

@@ -21,7 +21,14 @@ export default class ProjectsList extends LaunchCommand<typeof listInputs> {
       skip: this.resolved.skip,
     });
 
-    renderTable(this.ux, PROJECT_COLUMNS, page.projects);
+    renderTable(
+      this.ux,
+      PROJECT_COLUMNS,
+      page.projects,
+      process.stdout.columns,
+      undefined,
+      this.services.outputIsTTY,
+    );
     renderPagination(this.ux, page.pagination, page.projects.length);
   }
 }

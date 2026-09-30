@@ -3,20 +3,17 @@ import { styled } from '../core/style';
 import type { Project, ProjectUpdate } from './types';
 
 export const PROJECT_COLUMNS: TableColumn<Project>[] = [
-  { header: 'UID', value: (project) => project.uid ?? '-' },
   { header: 'NAME', value: (project) => project.name ?? '-' },
   { header: 'TYPE', value: (project) => project.projectType ?? '-' },
-  { header: 'UPDATED', value: (project) => project.updatedAt ?? '-' },
+  { header: 'UID', value: (project) => project.uid ?? '-' },
 ];
 
-export function projectDetailFields(project: Project): [string, string][] {
-  return [
-    ['uid', project.uid ?? ''],
-    ['name', project.name ?? ''],
-    ['description', project.description ?? ''],
-    ['type', project.projectType ?? ''],
-  ];
-}
+export const PROJECT_DETAIL_COLUMNS: TableColumn<Project>[] = [
+  ...PROJECT_COLUMNS,
+  { header: 'DESCRIPTION', value: (project) => project.description ?? '-' },
+];
+
+export const PROJECT_DESCRIPTION_COLUMN = PROJECT_DETAIL_COLUMNS.length - 1;
 
 export const PROJECT_DELETE_QUESTION = 'Are you sure you want to delete this project?';
 
@@ -46,15 +43,6 @@ export interface PartialCreateFailure {
 
 export function deploymentUrlLine(url: string, outputIsTTY: boolean): string {
   return `${styled('Deployment URL', 'bold', outputIsTTY)} ${styled(url, 'cyan', outputIsTTY)}`;
-}
-
-export function projectCreatedFields(project: Project, siteUrl?: string): [string, string][] {
-  return [
-    ['uid', project.uid ?? ''],
-    ['name', project.name ?? ''],
-    ['type', project.projectType ?? ''],
-    ['url', siteUrl ?? ''],
-  ];
 }
 
 export function deploymentFailureMessage(failure: PartialCreateFailure): string {

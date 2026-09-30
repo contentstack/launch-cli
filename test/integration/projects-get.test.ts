@@ -2,10 +2,10 @@ import nock from 'nock';
 
 import { buildApi } from '../../src/resources';
 import { Project } from '../../src/projects/types';
-import { projectDetailFields } from '../../src/projects/project.presenter';
+import { PROJECT_DESCRIPTION_COLUMN, PROJECT_DETAIL_COLUMNS } from '../../src/projects/project.presenter';
 import { LaunchApiError } from '../../src/transport/errors';
 import { RestApiClient } from '../../src/transport/rest-client';
-import { UxLike, renderDetail } from '../../src/core/render';
+import { UxLike, renderTable } from '../../src/core/render';
 import getFileUploadFixture from '../fixtures/project-get-fileupload.json';
 import getFixture from '../fixtures/project-get.json';
 import notFoundFixture from '../fixtures/project-not-found.json';
@@ -110,9 +110,15 @@ describe('integration: GET /projects/{project_uid}', () => {
     const { ux, lines } = recordingUx();
 
     const project = await buildApi(buildClient(), UNUSED_CMA, {} as never).projects.get({ org: ORG_UID, project: PROJECT_UID });
-    renderDetail(ux, projectDetailFields(project));
+    renderTable(ux, PROJECT_DETAIL_COLUMNS, [project], undefined, PROJECT_DESCRIPTION_COLUMN);
 
-    expect(lines).toEqual(['uid   a1b2c3d4e5f60718293a4b5c', 'name  sample-project', 'type  GITPROVIDER']);
+    expect(lines).toEqual([
+      '\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510',
+      '\u2502  NAME            \u2502  TYPE         \u2502  UID                       \u2502  DESCRIPTION  \u2502',
+      '\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524',
+      '\u2502  sample-project  \u2502  GITPROVIDER  \u2502  a1b2c3d4e5f60718293a4b5c  \u2502  -            \u2502',
+      '\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518',
+    ]);
   });
 
   it('unwraps a FileUpload project that carries neither repository nor description', async () => {
@@ -134,9 +140,15 @@ describe('integration: GET /projects/{project_uid}', () => {
     const { ux, lines } = recordingUx();
 
     const project = await buildApi(buildClient(), UNUSED_CMA, {} as never).projects.get({ org: ORG_UID, project: FILEUPLOAD_PROJECT_UID });
-    renderDetail(ux, projectDetailFields(project));
+    renderTable(ux, PROJECT_DETAIL_COLUMNS, [project], undefined, PROJECT_DESCRIPTION_COLUMN);
 
-    expect(lines).toEqual(['uid   c3d4e5f60718293a4b5c6d7e', 'name  docs-site', 'type  FILEUPLOAD']);
+    expect(lines).toEqual([
+      '\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510',
+      '\u2502  NAME       \u2502  TYPE        \u2502  UID                       \u2502  DESCRIPTION  \u2502',
+      '\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524',
+      '\u2502  docs-site  \u2502  FILEUPLOAD  \u2502  c3d4e5f60718293a4b5c6d7e  \u2502  -            \u2502',
+      '\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518',
+    ]);
   });
 
   it('raises a LaunchApiError carrying the mapped message for the documented 404 body', async () => {

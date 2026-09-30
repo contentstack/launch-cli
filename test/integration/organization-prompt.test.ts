@@ -160,7 +160,7 @@ describe('integration: the organization prompt', () => {
     expect(error).toBeUndefined();
     expect(fetch.isDone()).toBe(true);
     expect(inquired).toEqual([ORGANIZATION_PICKER]);
-    expect(stdout).toContain(`uid   ${PROJECT_UID}`);
+    expect(stdout).toContain(`\u2502  ${PROJECT_UID}  \u2502`);
     expect(onWire).toEqual([]);
   });
 

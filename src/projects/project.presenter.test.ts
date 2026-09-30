@@ -1,7 +1,6 @@
 import {
   PROJECT_DELETE_QUESTION,
   deploymentFailureMessage,
-  projectCreatedFields,
   projectDeletedLine,
   projectNotDeletedLine,
   projectNotUpdatedLine,
@@ -49,35 +48,6 @@ describe('projectNotUpdatedLine', () => {
 });
 
 describe('project create presentation', () => {
-  it('reports uid, name, type and the site url of a created project', () => {
-    expect(
-      projectCreatedFields({ uid: 'p1', name: 'My Site', projectType: 'GITPROVIDER' }, 'https://my-site.example.test'),
-    ).toEqual([
-      ['uid', 'p1'],
-      ['name', 'My Site'],
-      ['type', 'GITPROVIDER'],
-      ['url', 'https://my-site.example.test'],
-    ]);
-  });
-
-  it('falls back to an empty cell for every field the API left out, including the url', () => {
-    expect(projectCreatedFields({ uid: 'p1' } as never)).toEqual([
-      ['uid', 'p1'],
-      ['name', ''],
-      ['type', ''],
-      ['url', ''],
-    ]);
-  });
-
-  it('falls back to an empty cell when even the uid is missing', () => {
-    expect(projectCreatedFields({} as never, undefined)).toEqual([
-      ['uid', ''],
-      ['name', ''],
-      ['type', ''],
-      ['url', ''],
-    ]);
-  });
-
   it('says the project and environment survived a failed deployment and how to retry and inspect it', () => {
     const message = deploymentFailureMessage({
       org: 'org1',

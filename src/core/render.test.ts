@@ -1,4 +1,4 @@
-import { UxLike, renderDetail, renderPagination, renderTable } from './render';
+import { UxLike, renderPagination, renderTable } from './render';
 
 function fakeUx() {
   const lines: string[] = [];
@@ -12,7 +12,7 @@ function fakeUx() {
 }
 
 describe('renderTable', () => {
-  it('pads every column to its widest cell including the header', () => {
+  it('draws a box around cells padded to the widest value in each column, header included', () => {
     const { ux, lines } = fakeUx();
 
     renderTable(
@@ -28,13 +28,17 @@ describe('renderTable', () => {
     );
 
     expect(lines).toEqual([
-      'UID        NAME',
-      'p1         marketing-site',
-      'project-2  docs',
+      '\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510',
+      '\u2502  UID        \u2502  NAME            \u2502',
+      '\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524',
+      '\u2502  p1         \u2502  marketing-site  \u2502',
+      '\u251c\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u253c\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2524',
+      '\u2502  project-2  \u2502  docs            \u2502',
+      '\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518',
     ]);
   });
 
-  it('prints a placeholder when there are no rows', () => {
+  it('prints a placeholder and draws no box when there are no rows', () => {
     const { ux, lines } = fakeUx();
 
     renderTable(ux, [{ header: 'UID', value: (row: { uid: string }) => row.uid }], []);
@@ -42,28 +46,27 @@ describe('renderTable', () => {
     expect(lines).toEqual(['No records found.']);
   });
 
-  it('pads a single column', () => {
+  it('boxes a single column', () => {
     const { ux, lines } = fakeUx();
 
-    renderTable(
-      ux,
-      [{ header: 'UID', value: (row: { uid: string }) => row.uid }],
-      [{ uid: 'p1' }],
-    );
+    renderTable(ux, [{ header: 'UID', value: (row: { uid: string }) => row.uid }], [{ uid: 'p1' }]);
 
-    expect(lines).toEqual(['UID', 'p1']);
+    expect(lines).toEqual([
+      '\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510',
+      '\u2502  UID  \u2502',
+      '\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524',
+      '\u2502  p1   \u2502',
+      '\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518',
+    ]);
   });
 
-  it('handles columns wider than header', () => {
+  it('widens a column past its header when the value is longer', () => {
     const { ux, lines } = fakeUx();
 
-    renderTable(
-      ux,
-      [{ header: 'ID', value: (row: { id: string }) => row.id }],
-      [{ id: 'very-long-id-value' }],
-    );
+    renderTable(ux, [{ header: 'ID', value: (row: { id: string }) => row.id }], [{ id: 'very-long-id-value' }]);
 
-    expect(lines).toEqual(['ID', 'very-long-id-value']);
+    expect(lines[1]).toBe('\u2502  ID                  \u2502');
+    expect(lines[3]).toBe('\u2502  very-long-id-value  \u2502');
   });
 
   it('renders a blank cell rather than crashing when a column yields no value', () => {
@@ -78,18 +81,17 @@ describe('renderTable', () => {
       [{}],
     );
 
-    expect(lines).toEqual(['UID  NAME', '     site']);
+    expect(lines[3]).toBe('\u2502       \u2502  site  \u2502');
   });
 
   it.each([
-    [123, '123'],
-    [0, '0'],
-    [true, 'true'],
-    [false, 'false'],
-    [BigInt(10), '10'],
-  ])('renders the non-string cell %p as %j rather than crashing', (value, expected) => {
+    [123, '\u2502  123   \u2502  ok    \u2502'],
+    [0, '\u2502  0     \u2502  ok    \u2502'],
+    [true, '\u2502  true  \u2502  ok    \u2502'],
+    [false, '\u2502  false  \u2502  ok    \u2502'],
+    [BigInt(10), '\u2502  10    \u2502  ok    \u2502'],
+  ])('renders the non-string cell %p as %j rather than crashing', (value, line) => {
     const { ux, lines } = fakeUx();
-    const width = Math.max('NAME'.length, expected.length);
 
     renderTable(
       ux,
@@ -100,21 +102,18 @@ describe('renderTable', () => {
       [{}, {}],
     );
 
-    expect(lines).toEqual([
-      `${'NAME'.padEnd(width)}  TAIL`,
-      `${expected.padEnd(width)}  ok`,
-      `${expected.padEnd(width)}  ok`,
-    ]);
+    expect(lines[3]).toBe(line);
+    expect(lines[5]).toBe(line);
   });
 
-  it.each([[{}], [[1, 2]], [Symbol('x')], [() => undefined], [Number.NaN], [Number.POSITIVE_INFINITY]].map((value) => [value]))(
+  it.each([[{}], [[1, 2]], [Symbol('x')], [() => undefined], [Number.NaN], [Number.POSITIVE_INFINITY]])(
     'renders the unprintable cell %p as a dash rather than object text',
     (value) => {
       const { ux, lines } = fakeUx();
 
       renderTable(ux, [{ header: 'NAME', value: () => value as unknown as string }], [{}]);
 
-      expect(lines).toEqual(['NAME', '-']);
+      expect(lines[3]).toBe('\u2502  -     \u2502');
     },
   );
 
@@ -130,10 +129,10 @@ describe('renderTable', () => {
       [{}],
     );
 
-    expect(lines).toEqual(['NAME  TAIL', '      ok']);
+    expect(lines[3]).toBe('\u2502        \u2502  ok    \u2502');
   });
 
-  it('pads a middle column to its widest cell and leaves the last column unpadded', () => {
+  it('pads every column to its widest cell, the last one included', () => {
     const { ux, lines } = fakeUx();
 
     renderTable(
@@ -149,77 +148,129 @@ describe('renderTable', () => {
       ],
     );
 
-    expect(lines).toEqual([
-      'A   B                        C',
-      'a1  a-very-wide-middle-cell  c1',
-      'a2  b2                       c2',
-    ]);
-  });
-});
-
-describe('renderDetail', () => {
-  it('aligns labels and skips empty values', () => {
-    const { ux, lines } = fakeUx();
-
-    renderDetail(ux, [
-      ['uid', 'p1'],
-      ['name', 'site'],
-      ['description', ''],
-    ]);
-
-    expect(lines).toEqual(['uid   p1', 'name  site']);
+    expect(lines[1]).toBe('\u2502  A   \u2502  B                        \u2502  C   \u2502');
+    expect(lines[3]).toBe('\u2502  a1  \u2502  a-very-wide-middle-cell  \u2502  c1  \u2502');
+    expect(lines[5]).toBe('\u2502  a2  \u2502  b2                       \u2502  c2  \u2502');
   });
 
-  it('prints nothing when all fields are empty', () => {
+  it('shrinks only the first column, with an ellipsis, when the box is wider than the terminal', () => {
     const { ux, lines } = fakeUx();
 
-    renderDetail(ux, [
-      ['uid', ''],
-      ['name', ''],
-      ['description', ''],
-    ]);
+    renderTable(
+      ux,
+      [
+        { header: 'NAME', value: (row: { name: string; uid: string }) => row.name },
+        { header: 'UID', value: (row: { name: string; uid: string }) => row.uid },
+      ],
+      [{ name: 'a-long-project-name', uid: 'p1' }],
+      24,
+    );
 
-    expect(lines).toEqual([]);
+    expect(lines[1]).toBe('\u2502  NAME        \u2502  UID  \u2502');
+    expect(lines[3]).toBe('\u2502  a-long-pr\u2026  \u2502  p1   \u2502');
+    expect(lines.every((line) => [...line].length === 24)).toBe(true);
   });
 
-  it('skips a field whose value is absent rather than printing undefined', () => {
+  it('stops shrinking at the first header, drawing wider than the terminal rather than erasing the column', () => {
     const { ux, lines } = fakeUx();
 
-    renderDetail(ux, [
-      ['uid', undefined as unknown as string],
-      ['name', 'site'],
-    ]);
+    renderTable(
+      ux,
+      [
+        { header: 'NAME', value: (row: { name: string; uid: string }) => row.name },
+        { header: 'UID', value: (row: { name: string; uid: string }) => row.uid },
+      ],
+      [{ name: 'a-long-project-name', uid: 'p1' }],
+      8,
+    );
 
-    expect(lines).toEqual(['name  site']);
+    expect(lines[1]).toBe('\u2502  NAME  \u2502  UID  \u2502');
+    expect(lines[3]).toBe('\u2502  a-l\u2026  \u2502  p1   \u2502');
   });
 
   it.each([
-    [123, '123'],
-    [true, 'true'],
-  ])('renders the non-string detail value %p as %j', (value, expected) => {
+    [33, 'exactly fills the terminal'],
+    [40, 'leaves room to spare'],
+  ])('leaves every column at its natural width when the box already fits (%i columns, %s)', (available) => {
     const { ux, lines } = fakeUx();
 
-    renderDetail(ux, [['uid', value as unknown as string]]);
+    renderTable(
+      ux,
+      [
+        { header: 'NAME', value: (row: { name: string; uid: string }) => row.name },
+        { header: 'UID', value: (row: { name: string; uid: string }) => row.uid },
+      ],
+      [{ name: 'a-long-project-name', uid: 'p1' }],
+      available,
+    );
 
-    expect(lines).toEqual([`uid  ${expected}`]);
+    expect(lines[3]).toBe('\u2502  a-long-project-name  \u2502  p1   \u2502');
   });
 
-  it.each([[{}], [Number.NaN]])('renders the unprintable detail value %p as a dash', (value) => {
+  it('leaves the table alone when no terminal width is known, so piped output keeps every value whole', () => {
     const { ux, lines } = fakeUx();
 
-    renderDetail(ux, [['uid', value as unknown as string]]);
+    renderTable(
+      ux,
+      [{ header: 'NAME', value: (row: { name: string }) => row.name }],
+      [{ name: 'a-long-project-name' }],
+      undefined,
+    );
 
-    expect(lines).toEqual(['uid  -']);
+    expect(lines[3]).toBe('\u2502  a-long-project-name  \u2502');
   });
 
-  it('aligns a single non-empty field', () => {
+  it('measures and truncates by character, so an astral cell never splits into a replacement glyph', () => {
     const { ux, lines } = fakeUx();
 
-    renderDetail(ux, [
-      ['uid', 'p1'],
-    ]);
+    renderTable(ux, [{ header: 'NAME', value: (row: { name: string }) => row.name }], [{ name: '\u{1f600}'.repeat(6) }], 10);
 
-    expect(lines).toEqual(['uid  p1']);
+    expect(lines[3]).toBe('\u2502  \u{1f600}\u{1f600}\u{1f600}\u2026  \u2502');
+    expect(lines.map((line) => [...line].length)).toEqual([10, 10, 10, 10, 10]);
+    expect(lines.join('')).not.toContain('\ufffd');
+  });
+
+  it('shrinks the column it is told to and leaves every other one whole', () => {
+    const { ux, lines } = fakeUx();
+    const columns = [
+      { header: 'UID', value: (row: { uid: string; note: string }) => row.uid },
+      { header: 'NOTE', value: (row: { uid: string; note: string }) => row.note },
+    ];
+    const rows = [{ uid: 'project-uid-of-24-chars!', note: 'a note long enough to need trimming' }];
+
+    renderTable(ux, columns, rows, 50, 1);
+
+    expect(lines[3]).toBe('\u2502  project-uid-of-24-chars!  \u2502  a note long en\u2026  \u2502');
+    expect(lines.map((line) => [...line].length)).toEqual([50, 50, 50, 50, 50]);
+  });
+
+  it('bolds the header cells on a terminal, after padding them, and leaves the data rows alone', () => {
+    const { ux, lines } = fakeUx();
+    const columns = [{ header: 'NAME', value: (row: { name: string }) => row.name }];
+
+    renderTable(ux, columns, [{ name: 'a-long-name' }], undefined, undefined, true);
+
+    expect(lines[1]).toBe('\u2502  \u001b[1mNAME       \u001b[22m  \u2502');
+    expect(lines[3]).toBe('\u2502  a-long-name  \u2502');
+    expect(lines[0]).toBe('\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510');
+  });
+
+  it('leaves the header plain when the output is not a terminal', () => {
+    const { ux, lines } = fakeUx();
+    const columns = [{ header: 'NAME', value: (row: { name: string }) => row.name }];
+
+    renderTable(ux, columns, [{ name: 'site' }]);
+
+    expect(lines[1]).toBe('\u2502  NAME  \u2502');
+    expect(lines.join('\n')).not.toContain('\u001b');
+  });
+
+  it('prints nothing rather than an unclosable box when there are no columns to size', () => {
+    const { ux, lines } = fakeUx();
+
+    renderTable(ux, [], [{}], 10);
+
+    expect(lines).toEqual([]);
   });
 });
 

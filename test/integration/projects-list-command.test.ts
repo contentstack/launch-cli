@@ -10,6 +10,7 @@ import nock from 'nock';
 import getFixture from '../fixtures/project-get.json';
 import listFixture from '../fixtures/projects-list.json';
 import notFoundFixture from '../fixtures/project-not-found.json';
+import { stdoutOfWidth } from '../support/terminal';
 
 const LAUNCH_HUB_URL = 'https://launch-api.integration.test';
 const ORG_UID = 'blt4d9e2a7c1f6b3085';
@@ -63,25 +64,37 @@ describe('integration: shipped commands driven through oclif runCommand', () => 
   });
 
   it('prints the project table and the pagination line for launch:projects:list', async () => {
-    const scope = nock(LAUNCH_HUB_URL)
-      .get('/manage/projects')
-      .query({ limit: '100', skip: '0' })
-      .reply(200, listFixture);
+    const restoreWidth = stdoutOfWidth(200);
 
-    const { error, stdout } = await runLaunch(['launch:projects:list', '--org', ORG_UID, '--data-dir', DATA_DIR]);
+    try {
+      const scope = nock(LAUNCH_HUB_URL)
+        .get('/manage/projects')
+        .query({ limit: '100', skip: '0' })
+        .reply(200, listFixture);
 
-    expect(error).toBeUndefined();
-    expect(scope.isDone()).toBe(true);
-    expect(stdout).toBe(
-      [
-        'UID                       NAME            TYPE         UPDATED',
-        'a1b2c3d4e5f60718293a4b5c  sample-project  GITPROVIDER  2025-10-09T09:36:16.484Z',
-        'b2c3d4e5f60718293a4b5c6d  marketing-site  GITPROVIDER  2025-08-28T10:27:31.065Z',
-        'c3d4e5f60718293a4b5c6d7e  docs-site       FILEUPLOAD   2025-08-08T06:23:58.338Z',
-        'Showing 1-3 of 3',
-        '',
-      ].join('\n'),
-    );
+      const { error, stdout } = await runLaunch(['launch:projects:list', '--org', ORG_UID, '--data-dir', DATA_DIR]);
+
+      expect(error).toBeUndefined();
+      expect(scope.isDone()).toBe(true);
+      expect(stdout).toBe(
+        [
+          '\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510',
+          '\u2502  NAME            \u2502  TYPE         \u2502  UID                       \u2502',
+          '\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524',
+          '\u2502  sample-project  \u2502  GITPROVIDER  \u2502  a1b2c3d4e5f60718293a4b5c  \u2502',
+          '\u251c\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u253c\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u253c\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2524',
+          '\u2502  marketing-site  \u2502  GITPROVIDER  \u2502  b2c3d4e5f60718293a4b5c6d  \u2502',
+          '\u251c\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u253c\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u253c\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2504\u2524',
+          '\u2502  docs-site       \u2502  FILEUPLOAD   \u2502  c3d4e5f60718293a4b5c6d7e  \u2502',
+          '\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518',
+          'Showing 1-3 of 3',
+          '',
+        ].join('\n'),
+      );
+
+    } finally {
+      restoreWidth();
+    }
   });
 
   it('sends the limit and skip supplied on argv for launch:projects:list', async () => {
@@ -122,7 +135,14 @@ describe('integration: shipped commands driven through oclif runCommand', () => 
     expect(error).toBeUndefined();
     expect(scope.isDone()).toBe(true);
     expect(stdout).toBe(
-      ['uid   a1b2c3d4e5f60718293a4b5c', 'name  sample-project', 'type  GITPROVIDER', ''].join('\n'),
+      [
+        '\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510',
+        '\u2502  NAME            \u2502  TYPE         \u2502  UID                       \u2502  DESCRIPTION  \u2502',
+        '\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524',
+        '\u2502  sample-project  \u2502  GITPROVIDER  \u2502  a1b2c3d4e5f60718293a4b5c  \u2502  -            \u2502',
+        '\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518',
+        '',
+      ].join('\n'),
     );
   });
 
@@ -143,7 +163,7 @@ describe('integration: shipped commands driven through oclif runCommand', () => 
     expect(error).toBeUndefined();
     expect(lookup.isDone()).toBe(true);
     expect(fetch.isDone()).toBe(true);
-    expect(stdout).toContain('uid   a1b2c3d4e5f60718293a4b5c');
+    expect(stdout).toContain('\u2502  sample-project  \u2502  GITPROVIDER  \u2502  a1b2c3d4e5f60718293a4b5c  \u2502  -            \u2502');
   });
 
   it('refuses --limit 0 with exit 2 before any request, because the API reads a zero limit as no limit at all', async () => {
