@@ -143,7 +143,7 @@ fileignoreconfig:
 - filename: src/git/local-repository.ts
   checksum: 03d1f815701e27f241782b81fdb4c7d346c1a506c85c23cf8aae51c8bc51a42b
 - filename: src/core/layering.test.ts
-  checksum: ad03c58028a06745f1e14a8a143dd3a09807741f87afe99023a0f8a7be4164d2
+  checksum: 7a62eca2d63801b98591267dcbaa9e2568b20e1732ab1c744263ddab7f0dbbe8
 - filename: src/commands/launch/projects/create.test.ts
   checksum: d271aa6c5a5067be9b27ab7c8d8f6dbde31a239783aeede7918ba49e3cefff72
 - filename: src/commands/launch/projects/delete.test.ts
@@ -151,7 +151,7 @@ fileignoreconfig:
 - filename: test/integration/projects-delete.test.ts
   checksum: 4e2960b921f69bcb5fc1b4d6089b7ded1b71ed54609d8304bf7ee84041cf7fc2
 - filename: src/core/launch-command.ts
-  checksum: b7737a0850ef1d51bf9cc44b78b5f14279ba9584c8d59e70b370347040190fc7
+  checksum: d0feba27c3773df89bd527b9e1ba43233d1152927e2c9c69121e084760ed7d94
 - filename: src/core/launch-command.test.ts
   checksum: 76367d660556bd49cf04e494818425f844bb8e1d8f6bfd2168db5ac101d66abc
 - filename: src/projects/project.inputs.test.ts
