@@ -147,29 +147,13 @@ fileignoreconfig:
 - filename: src/commands/launch/projects/create.test.ts
   checksum: d271aa6c5a5067be9b27ab7c8d8f6dbde31a239783aeede7918ba49e3cefff72
 - filename: src/commands/launch/projects/delete.test.ts
-  allowed_patterns:
-    - "a1b2c3d4e5f60718293a4b5c"
-    - "skips the prompt entirely when --yes was passed"
-    - "Object\\.keys\\(ProjectsDelete\\.flags\\)"
+  checksum: 029c034d3d38d8cb37901b0936a7d6b4525d5bedf8c7ce052984c9b6f9ceffec
 - filename: test/integration/projects-delete.test.ts
-  allowed_patterns:
-    - "a1b2c3d4e5f60718293a4b5c"
-    - "mockImplementation\\(\\(key: string\\) => CONFIG\\[key\\]\\)"
+  checksum: 4e2960b921f69bcb5fc1b4d6089b7ded1b71ed54609d8304bf7ee84041cf7fc2
 - filename: src/core/launch-command.ts
-  allowed_patterns:
-    - "Partial<Record<FlagKey, unknown>>"
+  checksum: b7737a0850ef1d51bf9cc44b78b5f14279ba9584c8d59e70b370347040190fc7
 - filename: src/core/launch-command.test.ts
-  allowed_patterns:
-    - "'Pass --org\\.'"
-    - "mockImplementation\\(\\(key: string\\) =>"
-    - "if \\(key === 'region'\\)"
-    - "key === 'authorisationType'"
-    - "Pass exactly one of --org, --limit"
-    - "passes the declared rules through to the resolver"
+  checksum: 76367d660556bd49cf04e494818425f844bb8e1d8f6bfd2168db5ac101d66abc
 - filename: src/projects/project.inputs.test.ts
-  allowed_patterns:
-    - "Object\\.keys\\(projectFlags\\)"
-    - "projectFlags\\[flag as keyof typeof projectFlags\\]"
-    - "passes a name at the limit through unchanged"
-    - "passes a description at the limit through unchanged"
+  checksum: f8dbd017bbe58700d010881d9bc92f6e640260668d27c91cfe1bb4ee9d1942b6
 version: "1.0"
