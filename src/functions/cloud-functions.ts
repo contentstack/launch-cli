@@ -7,6 +7,7 @@ import type { Express } from 'express-serve-static-core';
 import { Server } from 'http';
 import path from 'path';
 
+import { styled } from '../core/style';
 import { CloudFunctionsValidator } from './cloud-functions-validator';
 import {
   CLOUD_FUNCTIONS_DIRECTORY,
@@ -68,10 +69,30 @@ export class CloudFunctions {
 
     dotenv.config({ path: path.join(this.pathToSourceCode, ENV_FILE_NAME) });
 
-    return this.startServer(app, servingPort);
+    return this.startServer(app, servingPort, [
+      ...exactRouteResources,
+      ...dynamicRouteResources,
+    ]);
   }
 
-  private startServer(app: Express, servingPort: number): Promise<Server> {
+  private printServing(
+    servingPort: number,
+    cloudFunctionResources: CloudFunctionResource[]
+  ): void {
+    console.log('Detected Serverless Functions:');
+    cloudFunctionResources.forEach(({ apiResourceURI }) => {
+      console.log(`  λ ${apiResourceURI}`);
+    });
+    console.log('');
+    const url = styled(`http://localhost:${servingPort}`, 'cyan', process.stdout.isTTY === true);
+    console.log(`Serving Cloud Functions at ${url}`);
+  }
+
+  private startServer(
+    app: Express,
+    servingPort: number,
+    cloudFunctionResources: CloudFunctionResource[]
+  ): Promise<Server> {
     return new Promise<Server>((resolve, reject) => {
       const refuse = (error: NodeJS.ErrnoException): void => {
         reject(listenFailure(error, servingPort));
@@ -79,7 +100,7 @@ export class CloudFunctions {
 
       const server = app.listen(servingPort, () => {
         server.off('error', refuse);
-        console.log(`Serving on port ${servingPort}`);
+        this.printServing(servingPort, cloudFunctionResources);
         resolve(server);
       });
 
@@ -103,7 +124,7 @@ export class CloudFunctions {
           }
           next();
         });
-        
+
         app.all(
           cloudFunctionResource.apiResourceURI,
           async (request: Request, response: Response) => {
@@ -140,7 +161,7 @@ export class CloudFunctions {
       }
 
       const handler = await this.buildHandlerForFilepath(filePath);
-      if(!handler) {
+      if (!handler) {
         continue;
       }
 
@@ -173,10 +194,6 @@ export class CloudFunctions {
     const exactRouteResources: CloudFunctionResource[] = [];
     const dynamicRouteResources: CloudFunctionResource[] = [];
 
-    if (cloudFunctionResources.length) {
-      console.log('Detected Serverless functions...');
-    }
-
     cloudFunctionResources.forEach(
       (cloudFunctionResource: CloudFunctionResource) => {
         if (
@@ -192,10 +209,8 @@ export class CloudFunctions {
             ...cloudFunctionResource,
             apiResourceURI,
           });
-          console.log(`λ ${apiResourceURI} \n`);
         } else {
           exactRouteResources.push(cloudFunctionResource);
-          console.log(`λ ${cloudFunctionResource.apiResourceURI} \n`);
         }
       }
     );
@@ -214,19 +229,19 @@ export class CloudFunctions {
       input: cloudFunctionFilePath,
       plugins: [nodeResolve({ preferBuiltins: true }), commonjs(), json()],
     });
-  
+
     const { output } = await bundle.generate({
       format: 'esm',
       inlineDynamicImports: true,
     });
-  
+
     const builtCode = output[0].code;
-  
+
     const builtCodeInDataURLFormat =
       'data:text/javascript;base64,' + Buffer.from(builtCode).toString('base64');
-  
+
     const module = await loadDataURL(builtCodeInDataURLFormat);
-    
+
     let handler = null;
     const isDefaultExportESModuleFunction = typeof module.default === 'function';
     const isDefaultExportCommonjsFunction = typeof module.default?.default === 'function';

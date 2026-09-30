@@ -166,4 +166,6 @@ fileignoreconfig:
   checksum: 9e99dc536b36b27810388039f61cc2c5ffa757fa33509171d91c91396d16e657
 - filename: test/integration/projects-list-command.test.ts
   checksum: b34a68639ba0694dd89df11373b0192329e58cef9e2b1ff9d7e5456a528f882b
+- filename: src/functions/cloud-functions.test.ts
+  checksum: b3e7ad3428544faf1695752bd04af45716a0189b5950f77fcb104f282516a56c
 version: "1.0"

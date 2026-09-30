@@ -63,16 +63,6 @@ function sendRequest(port: number, path: string, method = 'GET'): Promise<HttpRe
   });
 }
 
-async function waitFor(condition: () => boolean): Promise<void> {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    if (condition()) {
-      return;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
-  throw new Error('condition was never met');
-}
-
 beforeEach(() => {
   workspace = mkdtempSync(join(tmpdir(), 'launch-cloud-functions-'));
   startedServers = [];
@@ -158,7 +148,7 @@ describe('CloudFunctions serve directory handling', () => {
     expect(loggedLines).toContain('No Serverless functions detected.');
     expect(exitCodes).toEqual([]);
     expect(startedServers).toHaveLength(0);
-    expect(loggedLines).not.toContain('Detected Serverless functions...');
+    expect(loggedLines).not.toContain('Detected Serverless Functions:');
   });
 
   it('ignores proxy edge files and unsupported extensions', async () => {
@@ -205,9 +195,31 @@ describe('CloudFunctions serve routing', () => {
 
     expect(response.status).toBe(200);
     expect(JSON.parse(response.body)).toEqual({ ok: true });
-    expect(loggedLines).toContain('Detected Serverless functions...');
-    expect(loggedLines).toContain('λ /hello \n');
-    await waitFor(() => loggedLines.includes(`Serving on port ${port}`));
+    expect(loggedLines).toEqual([
+      'Detected Serverless Functions:',
+      '  λ /hello',
+      '',
+      `Serving Cloud Functions at http://localhost:${port}`,
+    ]);
+  });
+
+  it('colours the serving url cyan when stdout is a terminal', async () => {
+    writeFunctionFile('hello.js', 'export default function hello(request, response) { response.end(); }');
+    const port = await freePort();
+    const descriptor = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY');
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+
+    try {
+      await new CloudFunctions(workspace).serve(port);
+    } finally {
+      if (descriptor) {
+        Object.defineProperty(process.stdout, 'isTTY', descriptor);
+      } else {
+        delete (process.stdout as { isTTY?: boolean }).isTTY;
+      }
+    }
+
+    expect(loggedLines).toContain(`Serving Cloud Functions at \u001b[36mhttp://localhost:${port}\u001b[39m`);
   });
 
   it('serves a commonjs default export', async () => {
@@ -244,7 +256,7 @@ describe('CloudFunctions serve routing', () => {
 
     expect(response.status).toBe(200);
     expect(JSON.parse(response.body)).toEqual({ id: '42' });
-    expect(loggedLines).toContain('λ /api/items/:id \n');
+    expect(loggedLines).toContain('  λ /api/items/:id');
   });
 
   it('answers a post request on an exact route', async () => {
