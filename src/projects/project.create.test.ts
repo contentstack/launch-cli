@@ -518,7 +518,7 @@ describe('ProjectCreator prompting order and refusals', () => {
     await creator.create({ org: ORG, dataDir, configPath: configPathIn(dataDir) });
 
     expect(asked).toEqual([
-      'Project type',
+      'Choose a project type to proceed',
       'Project name',
       'Environment name',
       'Choose a branch',
@@ -554,7 +554,7 @@ describe('ProjectCreator prompting order and refusals', () => {
     await creator.create({ org: ORG, dataDir, configPath: configPathIn(dataDir) });
 
     expect(uploadArchive).toHaveBeenCalledTimes(1);
-    expect(askedBeforeUpload).toEqual(['Project type']);
+    expect(askedBeforeUpload).toEqual(['Choose a project type to proceed']);
     expect(asked.slice(1, 4)).toEqual(['Project name', 'Environment name', 'Framework preset']);
   });
 
@@ -788,7 +788,7 @@ describe('ProjectCreator on the FileUpload path', () => {
     expect((failure as Error).message).toContain('over the 100 MB Launch accepts for a file upload');
     expect(calls.signedUploadUrl).toEqual([]);
     expect(uploadArchive).not.toHaveBeenCalled();
-    expect(asked).toEqual(['Project type']);
+    expect(asked).toEqual(['Choose a project type to proceed']);
   });
 
   it('leaves a --config file that lives inside the data dir out of the upload', async () => {

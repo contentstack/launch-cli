@@ -3,7 +3,7 @@ import { resolve as resolvePath } from 'node:path';
 import { Command } from '@contentstack/cli-command';
 import { cliux, configHandler, isAuthenticated } from '@contentstack/cli-utilities';
 
-import { EXIT_RUNTIME, PROJECT_CONFIG_FILE } from './constants';
+import { EXIT_RUNTIME, PROJECT_CONFIG_FILE, STDIN_MAX_LISTENERS } from './constants';
 import { ProjectConfig, ProjectConfigStore } from './project-config';
 import { RegionLike, resolveLaunchHubUrl } from './region';
 import { LaunchError, UsageError } from './errors';
@@ -102,6 +102,7 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
   async init(): Promise<void> {
     await super.init();
     registerSearchList();
+    process.stdin.setMaxListeners(STDIN_MAX_LISTENERS);
 
     const { flags } = await this.parse({
       flags: this.contract.flags,

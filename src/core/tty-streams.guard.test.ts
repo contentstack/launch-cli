@@ -2,6 +2,7 @@ import { Occurrence, SourceFile, describeOccurrence, productionSources } from '.
 
 const PLUMBING_FILES = ['core/launch-command.ts', 'core/service-context.ts', 'core/resolution.ts'];
 const PLUMBING_LINE = /^isTTY\??:\s*(boolean|args\.isTTY|options\.isTTY|Boolean\(process\.stdin\.isTTY\)),?;?$/;
+const LISTENER_LIMIT_LINE = /^process\.stdin\.setMaxListeners\(STDIN_MAX_LISTENERS\);$/;
 const PROMPT_DECISION = /\.inquire\b|\bask[A-Z]\w*\(|\bprompt\b|\bthrow new (MissingInputError|UsageError)\b/;
 const GATE_WINDOW = 4;
 
@@ -21,7 +22,7 @@ function stdinReads(source: SourceFile): Occurrence[] {
 }
 
 function isPlumbing(read: Occurrence): boolean {
-  return PLUMBING_FILES.includes(read.path) && PLUMBING_LINE.test(read.text);
+  return PLUMBING_FILES.includes(read.path) && (PLUMBING_LINE.test(read.text) || LISTENER_LIMIT_LINE.test(read.text));
 }
 
 function isPromptDecision(source: SourceFile, read: Occurrence): boolean {

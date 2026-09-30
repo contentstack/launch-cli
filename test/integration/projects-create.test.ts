@@ -467,7 +467,7 @@ describe('integration: launch:projects:create on the wire', () => {
 
   it('asks on a terminal in the pinned order: type, organization, project name, environment name, then the build and Contentstack Authentication', async () => {
     const prompts = answerPrompts({
-      'Project type': 'FileUpload',
+      'Choose a project type to proceed': 'FileUpload',
       'Choose an organization': ORG_UID,
       'Project name': 'My Site',
       'Environment name': 'Default',
@@ -503,7 +503,7 @@ describe('integration: launch:projects:create on the wire', () => {
     expect(organizations.isDone()).toBe(true);
     expect(create.isDone()).toBe(true);
     expect(prompts.messages).toEqual([
-      'Project type',
+      'Choose a project type to proceed',
       'Choose an organization',
       'Project name',
       'Environment name',
@@ -518,7 +518,7 @@ describe('integration: launch:projects:create on the wire', () => {
 
   it('exits 3 as cancelled, not 130, and creates nothing when Ctrl-C is pressed at the last create prompt', async () => {
     const prompts = answerPrompts({
-      'Project type': 'FileUpload',
+      'Choose a project type to proceed': 'FileUpload',
       'Choose an organization': ORG_UID,
       'Project name': 'My Site',
       'Environment name': 'Default',
@@ -556,7 +556,7 @@ describe('integration: launch:projects:create on the wire', () => {
   it('asks all ten GitHub prompts in the pinned order and submits exactly what was answered', async () => {
     let body: unknown;
     const prompts = answerPrompts({
-      'Project type': 'GitHub',
+      'Choose a project type to proceed': 'GitHub',
       'Choose an organization': ORG_UID,
       'Project name': 'My Site',
       'Environment name': 'Default',
@@ -594,7 +594,7 @@ describe('integration: launch:projects:create on the wire', () => {
     expect(error).toBeUndefined();
     expect([branches.isDone(), create.isDone()]).toEqual([true, true]);
     expect(prompts.messages).toEqual([
-      'Project type',
+      'Choose a project type to proceed',
       'Choose an organization',
       'Project name',
       'Environment name',
@@ -644,7 +644,7 @@ describe('integration: launch:projects:create on the wire', () => {
     cloneOf('my-org/my-repo');
     let body: unknown;
     const prompts = answerPrompts({
-      'Project type': 'GitHub',
+      'Choose a project type to proceed': 'GitHub',
       'Project name': 'My Site',
       'Environment name': 'Default',
       'Choose a branch': 'main',
@@ -675,7 +675,7 @@ describe('integration: launch:projects:create on the wire', () => {
 
     expect(error).toBeUndefined();
     expect(prompts.messages).toEqual([
-      'Project type',
+      'Choose a project type to proceed',
       'Project name',
       'Environment name',
       'Choose a branch',

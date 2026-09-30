@@ -8,3 +8,4 @@ export const DEFAULT_LIMIT = 100;
 export const CLIENT_MAX_LIMIT = 1000;
 export const PICKER_PAGE_SIZE = 100;
 export const MAX_PAGES = 100;
+export const STDIN_MAX_LISTENERS = 50;

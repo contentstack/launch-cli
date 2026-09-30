@@ -117,10 +117,10 @@ describe('the --type flag', () => {
       {
         type: 'search-list',
         name: 'value',
-        message: 'Project type',
+        message: 'Choose a project type to proceed',
         choices: [
-          { name: 'GitHub', value: 'GitHub' },
-          { name: 'FileUpload', value: 'FileUpload' },
+          { name: 'Continue with GitHub', value: 'GitHub' },
+          { name: 'Continue with FileUpload', value: 'FileUpload' },
         ],
         default: undefined,
       },
@@ -140,6 +140,6 @@ describe('the --type flag', () => {
     await expect(
       projectResolution.type.prompt({ services: { api: {} as ApiSurface, ux, isTTY: true }, resolved: {} }),
     ).resolves.toBe('GitHub');
-    expect(asked).toEqual(['Project type']);
+    expect(asked).toEqual(['Choose a project type to proceed']);
   });
 });

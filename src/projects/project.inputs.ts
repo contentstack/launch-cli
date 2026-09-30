@@ -26,11 +26,13 @@ export function projectTypeChoiceOf(value: string): ProjectTypeChoice {
   return oneOf('type', value, PROJECT_TYPE_CHOICES);
 }
 
+export const PROJECT_TYPE_QUESTION = 'Choose a project type to proceed';
+
 export function askProjectType(ux: UxLike): Promise<string> {
   return askChoice(
     ux,
-    'Project type',
-    PROJECT_TYPE_CHOICES.map((value) => ({ name: value, value })),
+    PROJECT_TYPE_QUESTION,
+    PROJECT_TYPE_CHOICES.map((value) => ({ name: `Continue with ${value}`, value })),
   );
 }
 

@@ -166,4 +166,10 @@ fileignoreconfig:
     - "key === 'authorisationType'"
     - "Pass exactly one of --org, --limit"
     - "passes the declared rules through to the resolver"
+- filename: src/projects/project.inputs.test.ts
+  allowed_patterns:
+    - "Object\\.keys\\(projectFlags\\)"
+    - "projectFlags\\[flag as keyof typeof projectFlags\\]"
+    - "passes a name at the limit through unchanged"
+    - "passes a description at the limit through unchanged"
 version: "1.0"

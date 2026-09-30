@@ -333,6 +333,21 @@ describe('LaunchCommand.init', () => {
     authSpy.mockRestore();
   });
 
+  it('raises the stdin listener limit so a long run of prompts does not warn of a leak', async () => {
+    const instance = probe();
+    const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
+    Object.defineProperty(instance, 'launchRegion', { value: { launchHubUrl: 'https://launch-api.test' }, configurable: true });
+    Object.defineProperty(instance, 'config', { value: { userAgent: 'cli/2.0.0' }, configurable: true });
+    (instance as unknown as { parse: jest.Mock }).parse = jest.fn().mockResolvedValue({ flags: {} });
+    const previous = process.stdin.getMaxListeners();
+
+    await instance.init();
+
+    expect(process.stdin.getMaxListeners()).toBe(50);
+    process.stdin.setMaxListeners(previous);
+    authSpy.mockRestore();
+  });
+
   it('derives the hub url from the configured region cma when the region declares no launch hub url', async () => {
     const instance = probe();
     const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
