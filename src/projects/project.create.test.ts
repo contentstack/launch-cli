@@ -9,7 +9,8 @@ import { UxLike } from '../core/render';
 import { ServiceContext } from '../core/service-context';
 import { DeploymentUnsuccessfulError } from '../deployments/deployment.errors';
 import { WatchTiming } from '../deployments/deployment.watcher';
-import { LaunchApiError } from '../transport/errors';
+import { ApiErrorEntry, LaunchApiError } from '../transport/errors';
+import { GitConnectionMissingError } from '../git/git.errors';
 import { ApiSurface } from '../resources';
 import { CreateRequest, ProjectCreator } from './project.create';
 import { UploadFailedError } from './project.errors';
@@ -60,12 +61,15 @@ interface Scenario {
   detected?: unknown;
   createFails?: Error;
   repositoriesFails?: Error;
+  launchAppUrl?: string;
   pollFails?: Error;
   signedUrlFails?: Error;
   environmentFails?: Error;
   latestFails?: Error;
   createdProject?: unknown;
 }
+
+const CONNECT_URL = 'https://dev11-app.csnonprod.com/#!/launch/settings/connected-accounts';
 
 let dataDir: string;
 
@@ -206,10 +210,19 @@ function harness(scenario: Scenario = {}) {
     },
   } as unknown as ApiSurface;
 
-  const services: ServiceContext = { api, ux, isTTY: scenario.isTTY ?? false, outputIsTTY: scenario.outputIsTTY };
+  const opened: string[] = [];
+  const services: ServiceContext = {
+    api,
+    ux,
+    isTTY: scenario.isTTY ?? false,
+    outputIsTTY: scenario.outputIsTTY,
+    launchAppUrl: scenario.launchAppUrl,
+    openUrl: (url) => opened.push(url),
+  };
 
   return {
     creator: new ProjectCreator(services, advancingTiming()),
+    opened,
     printed,
     asked,
     askedPayloads,
@@ -442,9 +455,7 @@ describe('ProjectCreator on the GitHub path', () => {
 
   it('names the detected repository when the API rejects the lookup outright', async () => {
     const { creator } = harness({
-      repositoriesFails: new LaunchApiError(404, [
-        { code: 'launch.USERCONNECTION.NOT_FOUND', message: 'No user connection found' },
-      ]),
+      repositoriesFails: new LaunchApiError(404, [{ message: 'Something went wrong' }]),
     });
 
     const failure = await creator.create(gitRequest()).catch((error: Error) => error);
@@ -452,9 +463,73 @@ describe('ProjectCreator on the GitHub path', () => {
     expect(failure).toBeInstanceOf(UsageError);
     expect((failure as Error).message).toBe(
       `The GitHub repository "my-org/my-repo" checked out in ${dataDir} is not available to this ` +
-        'organization\'s connected GitHub account: No user connection found. ' +
+        'organization\'s connected GitHub account: Something went wrong. ' +
         'Connect it in the Launch app, or pass --data-dir with a folder whose repository is connected.',
     );
+  });
+
+  it.each<[string, ApiErrorEntry]>([
+    ['the code', { code: 'launch.USERCONNECTION.NOT_FOUND', message: 'No user connection found' }],
+    ['only the message', { message: 'No user connection found' }],
+  ])(
+    'points a missing GitHub connection at the connected-accounts page and opens it, by %s, as V1 did',
+    async (_by, entry) => {
+      const { creator, opened, printed } = harness({
+        launchAppUrl: 'https://dev11-app.csnonprod.com',
+        repositoriesFails: new LaunchApiError(404, [entry]),
+      });
+
+      const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+      expect(failure).toBeInstanceOf(GitConnectionMissingError);
+      expect(printed).toEqual([
+        'error: GitHub connection not found!',
+        'info: You can connect your GitHub account to the UI using the following URL:',
+        CONNECT_URL,
+      ]);
+      expect((failure as GitConnectionMissingError).exitCode).toBe(1);
+      expect(opened).toEqual([CONNECT_URL]);
+    },
+  );
+
+  it('colours the missing-connection lines only when stdout is a terminal', async () => {
+    const { creator, printed } = harness({
+      outputIsTTY: true,
+      launchAppUrl: 'https://dev11-app.csnonprod.com',
+      repositoriesFails: new LaunchApiError(404, [{ message: 'No user connection found' }]),
+    });
+
+    await creator.create(gitRequest()).catch(() => undefined);
+
+    expect(printed).toEqual([
+      '\u001b[31merror: GitHub connection not found!\u001b[39m',
+      '\u001b[32minfo: You can connect your GitHub account to the UI using the following URL:\u001b[39m',
+      `\u001b[32m${CONNECT_URL}\u001b[39m`,
+    ]);
+  });
+
+  it('is reported by its own lines, so the command exits on its code without printing it again', async () => {
+    const { creator } = harness({
+      launchAppUrl: 'https://dev11-app.csnonprod.com',
+      repositoriesFails: new LaunchApiError(404, [{ message: 'No user connection found' }]),
+    });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect((failure as GitConnectionMissingError).reported).toBe(true);
+    expect((failure as GitConnectionMissingError).connectUrl).toBe(CONNECT_URL);
+  });
+
+  it('still reports a missing GitHub connection, without a url to open, when no region names one', async () => {
+    const { creator, opened, printed } = harness({
+      repositoriesFails: new LaunchApiError(404, [{ message: 'No user connection found' }]),
+    });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(GitConnectionMissingError);
+    expect(printed).toEqual(['error: GitHub connection not found!']);
+    expect(opened).toEqual([]);
   });
 
   it('lets a failure that is not an API error through the lookup untouched', async () => {

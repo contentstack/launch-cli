@@ -19,8 +19,11 @@ import {
 } from '../environments/environment.inputs';
 import type { CreateEnvironmentInput, Environment, FrameworkPreset } from '../environments/types';
 import { SERVER_COMMAND_FRAMEWORKS } from '../environments/types';
+import { GitConnectionMissingError, isMissingGitConnection } from '../git/git.errors';
+import { gitConnectionLines } from '../git/git.presenter';
 import { detectGitHubRepository, LocalGitHubRepository } from '../git/local-repository';
 import { GIT_PROVIDER_GITHUB, GitRepository } from '../git/types';
+import { connectedAccountsUrl } from '../core/region';
 import { LaunchApiError } from '../transport/errors';
 import { archiveDirectory } from './project.archive';
 import {
@@ -371,12 +374,35 @@ export class ProjectCreator {
 
       return findRepository(page.repositories, local.repoName);
     } catch (error) {
+      if (isMissingGitConnection(error)) {
+        throw this.noGitConnection();
+      }
+
       if (error instanceof LaunchApiError) {
         throw new UsageError(unreachableRepository(request, local, reasonOf(error)));
       }
 
       throw error;
     }
+  }
+
+  /**
+   * V1 did not merely report a missing GitHub connection: it printed the connected-accounts URL
+   * and opened it, because the fix is a page in the Launch app and nothing the CLI can do.
+   */
+  private noGitConnection(): GitConnectionMissingError {
+    const appUrl = this.services.launchAppUrl;
+    const connectUrl = appUrl === undefined ? undefined : connectedAccountsUrl(appUrl);
+
+    for (const line of gitConnectionLines(GIT_PROVIDER_GITHUB, connectUrl, this.services.outputIsTTY === true)) {
+      this.services.ux.print(line);
+    }
+
+    if (connectUrl !== undefined) {
+      this.services.openUrl?.(connectUrl);
+    }
+
+    return new GitConnectionMissingError(GIT_PROVIDER_GITHUB, connectUrl);
   }
 
   private async selectUploadSource(request: CreateRequest): Promise<SourceSelection> {

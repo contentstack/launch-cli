@@ -8,7 +8,11 @@ import { Config, Interfaces, Plugin } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
+import open from 'open';
+
 import { CTRL_C, answerPrompts, onTerminal } from '../support/terminal';
+
+jest.mock('open', () => jest.fn().mockResolvedValue(undefined));
 
 const LAUNCH_HUB_URL = 'https://launch-api.integration.test';
 const UPLOAD_HOST = 'https://uploads.integration.test';
@@ -730,6 +734,25 @@ describe('integration: launch:projects:create on the wire', () => {
     expect(error?.message).not.toContain('auth:login');
     expect(create.isDone()).toBe(true);
     expect(resent.isDone()).toBe(false);
+  });
+
+  it('sends a missing GitHub connection to the connected-accounts page and opens it, as V1 did', async () => {
+    (open as unknown as jest.Mock).mockClear();
+    const repositories = hub()
+      .get('/manage/git-repositories')
+      .query({ provider: 'GitHub', namespace: 'my-org', search: 'my-repo', limit: 100, skip: 0 })
+      .reply(404, { errors: [{ message: 'No user connection found' }], status: 404 });
+
+    const { error, stdout } = await runCommand(gitFlags(), config);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(stdout).toContain('error: GitHub connection not found!\n');
+    expect(stdout).toContain(
+      'info: You can connect your GitHub account to the UI using the following URL:\n' +
+        'https://app.integration.test/#!/launch/settings/connected-accounts\n',
+    );
+    expect(open).toHaveBeenCalledWith('https://app.integration.test/#!/launch/settings/connected-accounts');
+    expect(repositories.isDone()).toBe(true);
   });
 
   it('shows the message of a field-named validation error instead of a bare status', async () => {

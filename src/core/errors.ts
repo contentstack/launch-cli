@@ -4,6 +4,13 @@ export type ExitCode = typeof EXIT_RUNTIME | typeof EXIT_USAGE | typeof EXIT_CAN
 
 export abstract class LaunchError extends Error {
   abstract readonly exitCode: ExitCode;
+
+  /**
+   * An error that has already put its own wording on screen - because it needs more shape than a
+   * single line, as a V1 message with a URL under it does. `LaunchCommand` exits on its code
+   * rather than printing it a second time.
+   */
+  readonly reported: boolean = false;
 }
 
 export class UsageError extends LaunchError {

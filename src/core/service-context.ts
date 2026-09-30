@@ -2,12 +2,14 @@ import { ApiSurface, buildApi } from '../resources';
 import { RestApiClient } from '../transport/rest-client';
 import { selectAuthStrategy } from '../transport/auth-strategy';
 import { createCmaSession } from '../transport/cma-client';
-import { getLogsApiBaseUrl, getManageApiBaseUrl } from './region';
+import { getLogsApiBaseUrl, getManageApiBaseUrl, resolveLaunchAppUrl } from './region';
+import { openInBrowser } from './browser';
 import { UxLike } from './render';
 
 export interface ServiceContextOptions {
   launchHubUrl: string;
   cma?: string;
+  uiHost?: string;
   analyticsInfo: string;
   ux: UxLike;
   isTTY: boolean;
@@ -19,6 +21,8 @@ export interface ServiceContext {
   ux: UxLike;
   isTTY: boolean;
   outputIsTTY?: boolean;
+  launchAppUrl?: string;
+  openUrl?: (url: string) => void;
 }
 
 export function buildServiceContext(options: ServiceContextOptions): ServiceContext {
@@ -36,5 +40,7 @@ export function buildServiceContext(options: ServiceContextOptions): ServiceCont
     ux: options.ux,
     isTTY: options.isTTY,
     outputIsTTY: options.outputIsTTY === true,
+    launchAppUrl: resolveLaunchAppUrl({ cma: options.cma, uiHost: options.uiHost }),
+    openUrl: openInBrowser,
   };
 }

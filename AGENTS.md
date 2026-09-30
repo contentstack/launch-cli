@@ -555,6 +555,29 @@ the output directory is the detected one, or the framework's V1 default (`OUTPUT
 inferred value is printed with the flag that overrides it. Contentstack Authentication is the one
 exception: with no `--cs-auth` the field is left out of the body and the service's default applies. On a terminal the same values are the
 prompt defaults. Type, project name and environment name have nothing to infer and stay required.
+The environment name prompt does carry V1's `Default` as its initial value, so enter alone answers it -
+an empty answer is a cancel, and a required field whose prompt offers nothing cannot be answered that way.
+
+**A missing GitHub connection names the page that fixes it.** `GET /git-repositories` answers
+`No user connection found` when the organization has no GitHub connection, which is not a fact about the
+local clone, so create does not report it with the "not available to this organization's connected GitHub
+account" wording. `isMissingGitConnection` (`src/git/git.errors.ts`) recognises it by code **or** by that
+message - the service raises a bare `NotFoundException`, so there is no code to rely on - and create
+prints V1's three lines through `gitConnectionLines` (`src/git/git.presenter.ts`): the problem in red under
+an `error:` label, the way out in green under an `info:` one, and the connected-accounts URL green on a
+line of its own so it can be copied whole. Those are the colours V1 inherited from winston, and they are
+gated on `outputIsTTY` like every other drawn thing. As V1 did, create then opens that URL.
+
+The URL is **per region**, never a constant: `resolveLaunchAppUrl` takes the region's `uiHost` -
+cli-utilities sets it from the region's `endpoints.application` - and falls back to V1's rule of reading
+the cma host as an app host (`api` -> `app`, a trailing `.io` -> `.com`) only for a region that predates
+that field. With no region to derive one from, the problem is still reported and simply no URL is named.
+Opening a browser never fails a command - `openInBrowser` swallows both a rejection and a throw, because a
+headless box still has to read the message.
+
+An error that has already drawn itself this way sets `reported` on `LaunchError`, and `LaunchCommand.catch`
+exits on its code instead of calling `this.error`, so oclif does not print a fourth line restating what the
+first one said. Everything else stays the ordinary one-line error.
 
 **A folder already linked to a project is refused up front.** If the `.cs-launch.json` create would
 record into already names a project, create exits 2 before uploading or posting anything, naming that

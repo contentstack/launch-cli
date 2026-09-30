@@ -1,5 +1,11 @@
 import { UsageError } from './errors';
-import { getLogsApiBaseUrl, getManageApiBaseUrl, resolveLaunchHubUrl } from './region';
+import {
+  connectedAccountsUrl,
+  getLogsApiBaseUrl,
+  getManageApiBaseUrl,
+  resolveLaunchAppUrl,
+  resolveLaunchHubUrl,
+} from './region';
 
 describe('getManageApiBaseUrl', () => {
   it('appends the manage API path to the launch hub url', () => {
@@ -96,6 +102,60 @@ describe('resolveLaunchHubUrl', () => {
     expect(() => resolveLaunchHubUrl(undefined)).toThrow(UsageError);
     expect(() => resolveLaunchHubUrl(undefined)).toThrow(
       'Region not configured. Please set the region with command $ csdx config:set:region',
+    );
+  });
+});
+
+describe('resolveLaunchAppUrl', () => {
+  it('takes the app url the region names, because uiHost is the Contentstack app itself', () => {
+    expect(resolveLaunchAppUrl({ cma: 'dev11-api.csnonprod.io', uiHost: 'https://dev11-app.csnonprod.com' })).toBe(
+      'https://dev11-app.csnonprod.com',
+    );
+  });
+
+  it('gives a bare uiHost a scheme, so the url is one a browser can open', () => {
+    expect(resolveLaunchAppUrl({ uiHost: 'app.contentstack.com' })).toBe('https://app.contentstack.com');
+  });
+
+  it.each<[string, string]>([
+    ['dev11-api.csnonprod.io', 'https://dev11-app.csnonprod.com'],
+    ['api.contentstack.io', 'https://app.contentstack.com'],
+    ['https://eu-api.contentstack.com', 'https://eu-app.contentstack.com'],
+    ['azure-na-api.contentstack.com', 'https://azure-na-app.contentstack.com'],
+  ])('falls back to deriving the app url from the cma host %s when the region names no uiHost', (cma, expected) => {
+    expect(resolveLaunchAppUrl({ cma })).toBe(expected);
+  });
+
+  it('keeps the dev11 prefix, because the app is served there while the api is not', () => {
+    expect(resolveLaunchAppUrl({ cma: 'dev11-api.csnonprod.io' })).toContain('dev11-app');
+  });
+
+  it.each<[string, string]>([
+    ['rapid-api.example.test', 'https://rapid-app.example.test'],
+    ['api.rapid.example.test', 'https://app.rapid.example.test'],
+  ])('reads api only in the leading label of %s, so the rest of the host is not mangled', (cma, expected) => {
+    expect(resolveLaunchAppUrl({ cma })).toBe(expected);
+  });
+
+  it.each([[undefined], [{}], [{ launchHubUrl: 'https://launch-api.contentstack.com' }]])(
+    'answers undefined rather than guessing an app url from %j',
+    (region) => {
+      expect(resolveLaunchAppUrl(region)).toBeUndefined();
+    },
+  );
+
+  it.each([['cma.example.test'], ['launch.example.test'], ['cma.example.test/branch']])(
+    'answers undefined for the cma host %s, which names no app host to derive one from',
+    (cma) => {
+      expect(resolveLaunchAppUrl({ cma })).toBeUndefined();
+    },
+  );
+});
+
+describe('connectedAccountsUrl', () => {
+  it.each([[''], ['/'], ['//']])('points at the connected accounts page of an app url ending in %j', (slashes) => {
+    expect(connectedAccountsUrl(`https://dev11-app.csnonprod.com${slashes}`)).toBe(
+      'https://dev11-app.csnonprod.com/#!/launch/settings/connected-accounts',
     );
   });
 });

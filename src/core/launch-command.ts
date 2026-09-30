@@ -22,6 +22,7 @@ export interface ResolveLaunchContextArgs<S extends AnyInputs> {
   rules?: Rule[];
   launchHubUrl: string;
   cma?: string;
+  uiHost?: string;
   analyticsInfo: string;
   ux: UxLike;
   isTTY: boolean;
@@ -45,6 +46,7 @@ export async function resolveLaunchContext<S extends AnyInputs>(
   const services = buildServiceContext({
     launchHubUrl: args.launchHubUrl,
     cma: args.cma,
+    uiHost: args.uiHost,
     analyticsInfo: args.analyticsInfo,
     ux: args.ux,
     isTTY: args.isTTY,
@@ -120,6 +122,7 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
       rules: this.contract.rules,
       launchHubUrl: resolveLaunchHubUrl(region),
       cma: region.cma,
+      uiHost: region.uiHost,
       analyticsInfo: this.config.userAgent,
       ux: this.ux,
       isTTY: Boolean(process.stdin.isTTY),
@@ -173,7 +176,7 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
 
   protected async catch(err: Error & { exitCode?: number }): Promise<unknown> {
     if (err instanceof LaunchError) {
-      return this.error(err.message, { exit: err.exitCode });
+      return err.reported ? this.exit(err.exitCode) : this.error(err.message, { exit: err.exitCode });
     }
 
     return super.catch(err);

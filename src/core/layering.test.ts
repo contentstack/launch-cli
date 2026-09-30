@@ -148,6 +148,8 @@ describe('layering between resources', () => {
       'environments',
       'git',
       'git',
+      'git',
+      'git',
     ]);
   });
 

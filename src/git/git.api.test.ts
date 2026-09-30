@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto';
 
-import { LaunchApiError } from '../transport/errors';
+import { LaunchApiError, parseErrorEnvelope } from '../transport/errors';
 import { RestApiClient, RestRequest } from '../transport/rest-client';
-import { GIT_ERROR_MESSAGES } from './git.errors';
+import { GIT_CONNECTION_NOT_FOUND_CODE, GIT_ERROR_MESSAGES } from './git.errors';
 import { GitApi } from './git.api';
 import { GIT_PROVIDER_GITHUB } from './types';
 
@@ -96,14 +96,39 @@ describe('GitApi', () => {
     ).rejects.toThrow('The Launch API returned a branches response without a branches array.');
   });
 
-  it('rewords the Git failures the CLI has its own wording for', () => {
-    expect(Object.keys(GIT_ERROR_MESSAGES).sort()).toEqual([
-      'launch.GIT_BRANCH.NOT_FOUND',
+  /**
+   * Each row is a body management-service's http exception filter really sends - its own code and
+   * its own terser message - so a code that has drifted from the service shows up as the API's
+   * wording surviving instead of the CLI's. Listing the map back at itself could not.
+   */
+  it.each<[string, string, string]>([
+    ['launch.REPOSITORY.NOT_FOUND', 'No repository found.', 'No repository found with that name for this Git connection.'],
+    ['launch.BRANCH.NOT_FOUND', 'No branch found.', 'No branch found with that name in that repository.'],
+    [
       'launch.GIT_PROVIDER.UNAUTHORIZED_ACCESS',
-      'launch.GIT_REPOSITORY.NOT_FOUND',
-      'launch.PROVIDER.REQUIRED',
-      'launch.USERCONNECTION.NOT_FOUND',
-    ]);
-    expect(GIT_ERROR_MESSAGES['launch.USERCONNECTION.NOT_FOUND']).toContain('Connect one in the Launch app');
+      'Unauthorized access to git provider.',
+      'Launch could not access your GitHub account. Reconnect GitHub in the Launch app, then try again.',
+    ],
+  ])('answers %s with the CLI wording rather than the API text', (code, apiText, expected) => {
+    const failure = parseErrorEnvelope(404, { errors: [{ code, message: apiText }], status: 404 }, GIT_ERROR_MESSAGES);
+
+    expect(failure.code).toBe(code);
+    expect(failure.message).toBe(expected);
+  });
+
+  it('leaves a code it has no wording for carrying the API text, so nothing is invented', () => {
+    const failure = parseErrorEnvelope(
+      404,
+      { errors: [{ code: 'launch.GIT_PROVIDER.FORBIDDEN', message: 'Access to git provider is forbidden.' }] },
+      GIT_ERROR_MESSAGES,
+    );
+
+    expect(failure.message).toBe('Access to git provider is forbidden.');
+  });
+
+  it('rewords no code the API never sends, since one that matches nothing can only be dead', () => {
+    expect(Object.keys(GIT_ERROR_MESSAGES)).not.toContain('launch.GIT_REPOSITORY.NOT_FOUND');
+    expect(Object.keys(GIT_ERROR_MESSAGES)).not.toContain('launch.GIT_BRANCH.NOT_FOUND');
+    expect(Object.keys(GIT_ERROR_MESSAGES)).not.toContain(GIT_CONNECTION_NOT_FOUND_CODE);
   });
 });
