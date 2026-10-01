@@ -13,7 +13,7 @@ import { ApiErrorEntry, LaunchApiError } from '../transport/errors';
 import { GitConnectionMissingError } from '../git/git.errors';
 import { ApiSurface } from '../resources';
 import { CreateRequest, ProjectCreator, UPLOAD_PROGRESS_LABEL } from './project.create';
-import { UploadFailedError } from './project.errors';
+import { DuplicateProjectNameError, PROJECT_ERROR_MESSAGES, UploadFailedError } from './project.errors';
 
 jest.mock('./project.upload', () => ({
   ...jest.requireActual('./project.upload'),
@@ -88,6 +88,7 @@ interface Scenario {
   branches?: unknown[];
   detected?: unknown;
   createFails?: Error;
+  createFailures?: Error[];
   repositoriesFails?: Error;
   launchAppUrl?: string;
   withoutOpenUrl?: boolean;
@@ -142,6 +143,12 @@ function harness(scenario: Scenario = {}) {
 
         if (scenario.createFails) {
           throw scenario.createFails;
+        }
+
+        const failure = scenario.createFailures?.shift();
+
+        if (failure) {
+          throw failure;
         }
 
         return scenario.createdProject ?? { uid: PROJECT_UID, name: 'My Site', projectType: 'GITPROVIDER' };
@@ -477,7 +484,7 @@ describe('ProjectCreator on the GitHub path', () => {
     expect(failure).toBeInstanceOf(UsageError);
     expect((failure as Error).message).toBe(
       `No GitHub repository was found in ${notAClone}. Run this command from a GitHub working copy, ` +
-        'or pass --data-dir with the folder holding one.',
+      'or pass --data-dir with the folder holding one.',
     );
     expect(asked).toEqual([]);
   });
@@ -492,8 +499,8 @@ describe('ProjectCreator on the GitHub path', () => {
     expect(failure).toBeInstanceOf(UsageError);
     expect((failure as Error).message).toBe(
       `The GitHub repository "my-org/my-repo" checked out in ${dataDir} is not available to this ` +
-        'organization\'s connected GitHub account: Something went wrong. ' +
-        'Connect it in the Launch app, or pass --data-dir with a folder whose repository is connected.',
+      'organization\'s connected GitHub account: Something went wrong. ' +
+      'Connect it in the Launch app, or pass --data-dir with a folder whose repository is connected.',
     );
   });
 
@@ -605,8 +612,8 @@ describe('ProjectCreator on the GitHub path', () => {
     expect(failure).toBeInstanceOf(UsageError);
     expect((failure as Error).message).toBe(
       `The GitHub repository "other-org/missing-repo" checked out in ${dataDir} is not available to this ` +
-        'organization\'s connected GitHub account: no repository with that name was found. ' +
-        'Connect it in the Launch app, or pass --data-dir with a folder whose repository is connected.',
+      'organization\'s connected GitHub account: no repository with that name was found. ' +
+      'Connect it in the Launch app, or pass --data-dir with a folder whose repository is connected.',
     );
   });
 
@@ -865,6 +872,62 @@ describe('ProjectCreator on the FileUpload path', () => {
     expect(bodyOf(created)).not.toHaveProperty('repository');
     expect(gitCalls).toContainEqual({ org: ORG, uploadUid: 'upload-uid' });
     expect(printed.join('\n')).not.toContain('Uploading');
+  });
+
+  it('warns that --auto-deploy is not supported and creates the project without it, asking nothing', async () => {
+    const { creator, created, printed, asked } = harness({ isTTY: true });
+
+    await creator.create(uploadRequest({ autoDeploy: 'enable' }));
+
+    expect(printed).toContain('warn: --auto-deploy is not supported for FileUpload projects.');
+    expect(asked.filter((question) => String(question).includes('proceed'))).toEqual([]);
+    expect(bodyOf(created).environment).not.toHaveProperty('autoDeployOnPush');
+  });
+
+  it('warns that --branch is not supported and creates the project without one', async () => {
+    const { creator, created, printed } = harness();
+
+    await creator.create(uploadRequest({ branch: 'main' }));
+
+    expect(printed).toContain('warn: --branch is not supported for FileUpload projects.');
+    expect(bodyOf(created).environment).toMatchObject({ gitBranch: undefined });
+  });
+
+  it('warns once per unsupported flag, before zipping or uploading anything', async () => {
+    const { creator, printed } = harness();
+
+    await creator.create(uploadRequest({ branch: 'main', autoDeploy: 'disable' }));
+
+    expect(printed.slice(0, 3)).toEqual([
+      'warn: --branch is not supported for FileUpload projects.',
+      'warn: --auto-deploy is not supported for FileUpload projects.',
+      'Preparing zip file...',
+    ]);
+  });
+
+  it('warns and carries on without an interactive terminal too', async () => {
+    const { creator, created, printed } = harness({ isTTY: false });
+
+    await creator.create(uploadRequest({ autoDeploy: 'enable' }));
+
+    expect(printed).toContain('warn: --auto-deploy is not supported for FileUpload projects.');
+    expect(created).toHaveLength(1);
+  });
+
+  it('warns about --branch when FileUpload was chosen at the type prompt', async () => {
+    const { creator, printed } = harness({ isTTY: true, answers: ['FileUpload'] });
+
+    await creator.create(uploadRequest({ type: undefined, branch: 'main' }));
+
+    expect(printed).toContain('warn: --branch is not supported for FileUpload projects.');
+  });
+
+  it('colours the warning yellow only when stdout is a terminal', async () => {
+    const { creator, printed } = harness({ outputIsTTY: true });
+
+    await creator.create(uploadRequest({ autoDeploy: 'enable' }));
+
+    expect(printed).toContain('\u001b[33mwarn: --auto-deploy is not supported for FileUpload projects.\u001b[39m');
   });
 
   it.each([[true], [false], [undefined]])(
@@ -1165,10 +1228,10 @@ describe('ProjectCreator waiting on the first deployment', () => {
     expect((failure as DeploymentUnsuccessfulError).exitCode).toBe(1);
     expect((failure as Error).message).toBe(
       'The deployment did not succeed; its last status was FAILED. ' +
-        'The project "My Site" (p1) and its environment "Default" were created and have not been rolled back. ' +
-        'Run csdx launch:deployments:create --org org1 --project p1 --env e1 to try the deployment again, ' +
-        'or csdx launch:logs:get --org org1 --project p1 --env e1 --deployment d1 ' +
-        'to see why it did not succeed.',
+      'The project "My Site" (p1) and its environment "Default" were created and have not been rolled back. ' +
+      'Run csdx launch:deployments:create --org org1 --project p1 --env e1 to try the deployment again, ' +
+      'or csdx launch:logs:get --org org1 --project p1 --env e1 --deployment d1 ' +
+      'to see why it did not succeed.',
     );
   });
 
@@ -1407,7 +1470,7 @@ describe('ProjectCreator writing the project config', () => {
     expect(failure).toBeInstanceOf(UsageError);
     expect((failure as UsageError).message).toBe(
       `This folder is already linked to the project other-project in ${configPathIn(dataDir)}. ` +
-        'To create a new project, remove that file or pass --config with a different path.',
+      'To create a new project, remove that file or pass --config with a different path.',
     );
     expect(created).toEqual([]);
     expect(configFileIn(dataDir)).toEqual(existing);
@@ -1423,8 +1486,8 @@ describe('ProjectCreator writing the project config', () => {
     expect(created).toHaveLength(1);
     expect(printed).toContain(
       `Could not record this project in ${configPathIn(dataDir)}: ` +
-        `The config file at '${configPathIn(dataDir)}' is not valid JSON. It was left unchanged. ` +
-        `Pass --org ${ORG} --project ${PROJECT_UID} explicitly when you run Launch commands in this folder.`,
+      `The config file at '${configPathIn(dataDir)}' is not valid JSON. It was left unchanged. ` +
+      `Pass --org ${ORG} --project ${PROJECT_UID} explicitly when you run Launch commands in this folder.`,
     );
     expect(printed.some((line) => line.includes(PROJECT_UID))).toBe(true);
   });
@@ -1447,4 +1510,126 @@ describe('ProjectCreator writing the project config', () => {
     expect(configFileIn(dataDir)).toEqual({ project: { uid: PROJECT_UID, organizationUid: ORG } });
   });
 
+});
+
+describe('ProjectCreator when the project name is already taken', () => {
+  const duplicate = (): LaunchApiError =>
+    new LaunchApiError(409, [{ code: 'launch.PROJECT.DUPLICATE_NAME' }], PROJECT_ERROR_MESSAGES);
+
+  beforeEach(() => {
+    dataDir = mkdtempSync(join(tmpdir(), 'launch-create-'));
+    writeFileSync(join(dataDir, 'index.html'), '<h1>site</h1>');
+    (uploadArchive as jest.Mock).mockClear();
+    (uploadArchive as jest.Mock).mockImplementation(async () => undefined);
+  });
+
+  afterEach(() => {
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  function terminalRequest(): CreateRequest {
+    return uploadRequest({ serverCmd: 'npm start' });
+  }
+
+  it('offers a new name in a terminal and retries with it, reusing the upload rather than zipping again', async () => {
+    const { creator, created, printed, asked } = harness({
+      isTTY: true,
+      createFailures: [duplicate()],
+      answers: [true, 'My Site 2'],
+    });
+
+    await creator.create(terminalRequest());
+
+    expect(printed).toEqual(expect.arrayContaining([
+      'error: New project creation failed!',
+      'error: Duplicate project name identified',
+    ]));
+    expect(asked).toEqual(['Would you like to change the project\'s name and try again?', 'Project name']);
+    expect(created).toHaveLength(2);
+    expect(bodyOf(created.slice(1))).toMatchObject({ name: 'My Site 2', fileUpload: { uploadUid: 'upload-uid' } });
+    expect(uploadArchive).toHaveBeenCalledTimes(1);
+  });
+
+  it('prints the V1 lines and exits 1 with nothing more when the user does not want to rename', async () => {
+    const { creator, created, printed } = harness({ isTTY: true, createFailures: [duplicate()], answers: [false] });
+
+    const failure = await creator.create(terminalRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(DuplicateProjectNameError);
+    expect((failure as DuplicateProjectNameError).exitCode).toBe(1);
+    expect((failure as DuplicateProjectNameError).reported).toBe(true);
+    expect(printed.slice(-2)).toEqual([
+      'error: New project creation failed!',
+      'error: Duplicate project name identified',
+    ]);
+    expect(created).toHaveLength(1);
+  });
+
+  it('prints the V1 lines and says to rename without a terminal, never prompting', async () => {
+    const { creator, created, printed, asked } = harness({ isTTY: false, createFailures: [duplicate()] });
+
+    const failure = await creator.create(uploadRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(DuplicateProjectNameError);
+    expect((failure as DuplicateProjectNameError).exitCode).toBe(1);
+    expect(printed.slice(-3)).toEqual([
+      'error: New project creation failed!',
+      'error: Duplicate project name identified',
+      'info: Change the project name and re-run the command.',
+    ]);
+    expect(asked).toEqual([]);
+    expect(created).toHaveLength(1);
+  });
+
+  it('stops after three renames with the V1 retry-limit warning', async () => {
+    const { creator, created, printed } = harness({
+      isTTY: true,
+      createFailures: [duplicate(), duplicate(), duplicate(), duplicate()],
+      answers: [true, 'Two', true, 'Three', true, 'Four'],
+    });
+
+    const failure = await creator.create(terminalRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(DuplicateProjectNameError);
+    expect(printed.slice(-3)).toEqual([
+      'error: New project creation failed!',
+      'error: Duplicate project name identified',
+      'warn: Reached max project creation retry limit',
+    ]);
+    expect(created).toHaveLength(4);
+  });
+
+  it('refuses a new name over the length limit', async () => {
+    const { creator, created } = harness({
+      isTTY: true,
+      createFailures: [duplicate()],
+      answers: [true, 'x'.repeat(201)],
+    });
+
+    const failure = await creator.create(terminalRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(UsageError);
+    expect((failure as Error).message).toBe('--name must be 200 characters or fewer; that value is 201 characters.');
+    expect(created).toHaveLength(1);
+  });
+
+  it('colours the error lines red and the rename hint green only when stdout is a terminal', async () => {
+    const { creator, printed } = harness({ outputIsTTY: true, createFailures: [duplicate()] });
+
+    await creator.create(uploadRequest()).catch(() => undefined);
+
+    expect(printed.slice(-3)).toEqual([
+      '\u001b[31merror: New project creation failed!\u001b[39m',
+      '\u001b[31merror: Duplicate project name identified\u001b[39m',
+      '\u001b[32minfo: Change the project name and re-run the command.\u001b[39m',
+    ]);
+  });
+
+  it('lets any other create failure through untouched', async () => {
+    const boom = new LaunchApiError(422, [{ code: 'launch.PROJECT.LIMIT_REACHED' }], PROJECT_ERROR_MESSAGES);
+    const { creator, asked } = harness({ isTTY: true, createFailures: [boom] });
+
+    await expect(creator.create(terminalRequest())).rejects.toBe(boom);
+    expect(asked).toEqual([]);
+  });
 });

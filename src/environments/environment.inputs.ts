@@ -67,13 +67,15 @@ export const environmentFlags = {
       'Name of the environment created with the project ' +
       `(${ENVIRONMENT_NAME_MAX_LENGTH} characters or fewer)`,
   }),
-  branch: Flags.string({ description: 'Git branch name' }),
+  branch: Flags.string({ description: 'Git branch name, GitHub projects only' }),
   framework: Flags.string({ description: `Framework preset (${FRAMEWORK_CHOICES.join(' | ')})` }),
   'build-cmd': Flags.string({ description: 'Build command' }),
   'server-cmd': Flags.string({ description: 'Server command' }),
   'output-dir': Flags.string({ description: 'Output directory' }),
   'res-mode': Flags.string({ description: `Response mode (${RESPONSE_MODES.join(' | ')})` }),
-  'auto-deploy': Flags.string({ description: `Deploy on every push (${TOGGLE_VALUES.join(' | ')})` }),
+  'auto-deploy': Flags.string({
+    description: `Deploy on every push, GitHub projects only (${TOGGLE_VALUES.join(' | ')})`,
+  }),
   'cs-auth': Flags.string({ description: `Contentstack Authentication (${TOGGLE_VALUES.join(' | ')})` }),
 };
 

@@ -12,6 +12,21 @@ export class UploadFailedError extends LaunchError {
   }
 }
 
+/**
+ * A taken name, reported the way V1 did: its lines are already printed when this is thrown, so the
+ * command exits 1 without printing the message a second time.
+ */
+export class DuplicateProjectNameError extends LaunchError {
+  readonly exitCode = EXIT_RUNTIME;
+
+  readonly reported = true;
+
+  constructor() {
+    super('Duplicate project name identified');
+    this.name = 'DuplicateProjectNameError';
+  }
+}
+
 export const PROJECT_ERROR_MESSAGES: ErrorMessages = {
   ...GIT_PROVIDER_ERROR_MESSAGES,
   'launch.PROJECT.DUPLICATE_NAME': 'A project with that name already exists in this organization.',

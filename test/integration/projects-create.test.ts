@@ -771,6 +771,24 @@ describe('integration: launch:projects:create on the wire', () => {
     expect(error?.message).toBe('Project name contains characters that are not allowed.');
   });
 
+  it('prints the V1 duplicate-name lines and exits 1 without prompting when there is no terminal', async () => {
+    stubGitLookups();
+    const create = hub()
+      .post('/manage/projects')
+      .query({})
+      .reply(409, { errors: [{ code: 'launch.PROJECT.DUPLICATE_NAME' }], status: 409 });
+
+    const { error, stdout } = await runCommand(gitFlags(), config);
+
+    expect(create.isDone()).toBe(true);
+    expect(error?.oclif?.exit).toBe(1);
+    expect(stdout).toContain(
+      'error: New project creation failed!\n' +
+        'error: Duplicate project name identified\n' +
+        'info: Change the project name and re-run the command.\n',
+    );
+  });
+
   it('uses the detected framework, build command and output directory and the buffered default when there is no terminal', async () => {
     stubGitLookups();
     const create = captureCreate();
@@ -876,10 +894,22 @@ describe('integration: launch:projects:create on the wire', () => {
     expect(create.scope.isDone()).toBe(false);
   });
 
-  it.each([['--branch', 'main']])('refuses %s with --type FileUpload before uploading anything', async (flag, value) => {
-    const signed = hub().get('/manage/projects/upload/signed_url').query({}).reply(200, awsSignedUpload());
+  it('warns that --branch and --auto-deploy are not supported with --type FileUpload and creates the project without them', async () => {
+    let body: unknown;
+    const signedUpload = awsSignedUpload();
+    hub().get('/manage/projects/upload/signed_url').query({}).reply(200, signedUpload);
+    nock(UPLOAD_HOST).post('/bucket').reply(204);
+    hub().get('/manage/projects/file-framework').query({ uploadUid: 'upload-uid' }).reply(200, { framework: 'OTHER' });
+    const create = hub()
+      .post('/manage/projects', (sent: unknown) => {
+        body = sent;
+        return true;
+      })
+      .query({})
+      .reply(201, { project: { ...CREATED_PROJECT, projectType: 'FILEUPLOAD' } });
+    stubFollowUp('DEPLOYED');
 
-    const { error } = await runCommand(
+    const { error, stdout } = await runCommand(
       [
         'launch:projects:create',
         '--org',
@@ -890,17 +920,30 @@ describe('integration: launch:projects:create on the wire', () => {
         'Site',
         '--env-name',
         'Default',
+        '--framework',
+        'Other',
+        '--build-cmd',
+        '"npm run build"',
+        '--output-dir',
+        './',
+        '--res-mode',
+        'buffered',
         '--data-dir',
         dataDir,
-        flag,
-        value,
+        '--branch',
+        'main',
+        '--auto-deploy',
+        'enable',
       ],
       config,
     );
 
-    expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toBe(`${flag} is only supported when --type is one of GitHub; --type is FileUpload.`);
-    expect(signed.isDone()).toBe(false);
+    expect(error).toBeUndefined();
+    expect(stdout).toContain('warn: --branch is not supported for FileUpload projects.');
+    expect(stdout).toContain('warn: --auto-deploy is not supported for FileUpload projects.');
+    expect(create.isDone()).toBe(true);
+    expect((body as { environment: Record<string, unknown> }).environment).not.toHaveProperty('autoDeployOnPush');
+    expect((body as { environment: Record<string, unknown> }).environment).not.toHaveProperty('gitBranch');
   });
 
   it('refuses before uploading or creating anything when the folder is already linked to another project', async () => {

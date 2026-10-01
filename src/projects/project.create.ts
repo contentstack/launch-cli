@@ -25,6 +25,7 @@ import { gitConnectionLines } from '../git/git.presenter';
 import { detectGitHubRepository, LocalGitHubRepository } from '../git/local-repository';
 import { GIT_PROVIDER_GITHUB, GitRepository } from '../git/types';
 import { connectedAccountsUrl } from '../core/region';
+import { withinLength } from '../core/values';
 import { LaunchApiError } from '../transport/errors';
 import { archiveDirectory } from './project.archive';
 import {
@@ -36,14 +37,26 @@ import {
   repositoryLabel,
   repositorySearchTerm,
 } from './project.create.prompt';
-import { PREPARING_ARCHIVE, deploymentFailureMessage, deploymentUrlLine } from './project.presenter';
+import {
+  PREPARING_ARCHIVE,
+  RENAME_PROJECT_QUESTION,
+  deploymentFailureMessage,
+  deploymentUrlLine,
+  duplicateProjectNameLines,
+  gitOnlyFlagLine,
+  renameAndRerunLine,
+  renameRetryLimitLine,
+} from './project.presenter';
 import {
   GIT_ONLY_FLAGS,
+  GitOnlyFlag,
+  PROJECT_NAME_MAX_LENGTH,
   PROJECT_TYPE_BY_CHOICE,
   ProjectTypeChoice,
   askProjectType,
   projectTypeChoiceOf,
 } from './project.inputs';
+import { DuplicateProjectNameError } from './project.errors';
 import { refuseOversizedArchive, uploadArchive } from './project.upload';
 import type { CreateProjectInput, DetectedFramework, IdentifiedProject, SignedUploadUrl } from './types';
 
@@ -55,6 +68,8 @@ export const DEFAULT_ENVIRONMENT_NAME = 'Default';
 export const FIRST_LOOKUP_ATTEMPTS = 3;
 export const CREATE_PROMPT_REMEDIES = { config: false, prompt: true };
 export const UPLOAD_PROGRESS_LABEL = 'Uploading project.zip';
+export const DUPLICATE_PROJECT_NAME_CODE = 'launch.PROJECT.DUPLICATE_NAME';
+export const PROJECT_RENAME_ATTEMPTS = 3;
 
 export function reasonOf(error: unknown): string {
   const text = (error instanceof Error ? error.message : String(error)).trim();
@@ -128,7 +143,8 @@ export class ProjectCreator {
     this.refuseLinkedFolder(request);
 
     const choice = await this.projectType(request);
-    this.refuseGitFlagsOffGitHub(request, choice);
+    this.warnGitFlagsOffGitHub(request, choice);
+    const autoDeploy = choice === 'GitHub' ? request.autoDeploy : undefined;
     const upload = choice === 'GitHub' ? undefined : await this.selectUploadSource(request);
     const name = await this.need('name', request.name, () => askText(this.services.ux, 'Project name'));
     const envName = await this.need('env-name', request.envName, () =>
@@ -149,8 +165,8 @@ export class ProjectCreator {
       isStreamingEnabled: await this.streaming(request),
     };
 
-    if (request.autoDeploy !== undefined) {
-      environment.autoDeployOnPush = request.autoDeploy === 'enable';
+    if (autoDeploy !== undefined) {
+      environment.autoDeployOnPush = autoDeploy === 'enable';
     }
 
     const csAuth = await this.contentstackAuthentication(request);
@@ -182,11 +198,67 @@ export class ProjectCreator {
       input.fileUpload = { uploadUid: source.uploadUid };
     }
 
-    const project = await this.services.api.projects.create({ org: request.org, input });
+    const project = await this.createProject(request.org, input);
 
     this.remember(request, project);
 
     await this.follow(request.org, project, envName);
+  }
+
+  /**
+   * A taken name is the one create failure the user can fix on the spot, so it is reported in V1's words
+   * and, in a terminal, a new name is offered and the same request sent again - the upload included, so
+   * nothing is zipped twice. V1 allowed three renames. Declining, running out of renames, or having no
+   * terminal to ask on all exit 1 as V1 did; the last says how to fix it, where V1 hung on its prompt.
+   */
+  private async createProject(org: string, input: CreateProjectInput, renames = 0): Promise<IdentifiedProject> {
+    try {
+      return await this.services.api.projects.create({ org, input });
+    } catch (error) {
+      if (!(error instanceof LaunchApiError) || error.code !== DUPLICATE_PROJECT_NAME_CODE) {
+        throw error;
+      }
+
+      const colour = this.services.outputIsTTY === true;
+
+      for (const line of duplicateProjectNameLines(colour)) {
+        this.services.ux.print(line);
+      }
+
+      if (this.services.isTTY) {
+        return this.askToRename(org, input, renames, colour);
+      }
+
+      this.services.ux.print(renameAndRerunLine(colour));
+      throw new DuplicateProjectNameError();
+    }
+  }
+
+  private async askToRename(
+    org: string,
+    input: CreateProjectInput,
+    renames: number,
+    colour: boolean,
+  ): Promise<IdentifiedProject> {
+    if (renames >= PROJECT_RENAME_ATTEMPTS) {
+      this.services.ux.print(renameRetryLimitLine(colour));
+      throw new DuplicateProjectNameError();
+    }
+
+    const rename = await this.services.ux.inquire<boolean>({
+      type: 'confirm',
+      name: 'confirm',
+      message: RENAME_PROJECT_QUESTION,
+      default: true,
+    });
+
+    if (rename !== true) {
+      throw new DuplicateProjectNameError();
+    }
+
+    const name = await withinLength('name', await askText(this.services.ux, 'Project name'), PROJECT_NAME_MAX_LENGTH);
+
+    return this.createProject(org, { ...input, name }, renames + 1);
   }
 
   private remember(request: CreateRequest, project: IdentifiedProject): void {
@@ -566,12 +638,23 @@ export class ProjectCreator {
     );
   }
 
-  private refuseGitFlagsOffGitHub(request: CreateRequest, choice: ProjectTypeChoice): void {
-    const supplied: Record<(typeof GIT_ONLY_FLAGS)[number], string | undefined> = { branch: request.branch };
+  /**
+   * A branch and auto-deploy both belong to a git repository, which a FileUpload project has none of.
+   * Either one supplied is dropped with a warning naming the flag, so it is never ignored silently.
+   */
+  private warnGitFlagsOffGitHub(request: CreateRequest, choice: ProjectTypeChoice): void {
+    if (choice === 'GitHub') {
+      return;
+    }
+
+    const supplied: Record<GitOnlyFlag, string | undefined> = {
+      branch: request.branch,
+      'auto-deploy': request.autoDeploy,
+    };
 
     for (const flag of GIT_ONLY_FLAGS) {
       if (supplied[flag] !== undefined) {
-        requireValueOf(flag, 'type', ['GitHub'], choice);
+        this.services.ux.print(gitOnlyFlagLine(flag, this.services.outputIsTTY === true));
       }
     }
   }

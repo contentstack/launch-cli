@@ -1,7 +1,6 @@
 import { LaunchCommand } from '../../../core/launch-command';
 import { flagsFor, inputs } from '../../../core/inputs';
 import { ProjectCreator, defaultWatchTiming, serverCommandFrameworkGate } from '../../../projects/project.create';
-import { gitOnlyFlagRules } from '../../../projects/project.inputs';
 
 const createInputs = inputs({
   org: { required: true },
@@ -35,7 +34,7 @@ export default class ProjectsCreate extends LaunchCommand<typeof createInputs> {
 
   static flags = flagsFor(createInputs);
 
-  static rules = [serverCommandFrameworkGate, ...gitOnlyFlagRules];
+  static rules = [serverCommandFrameworkGate];
 
   async run(): Promise<void> {
     const resolved = this.resolved;

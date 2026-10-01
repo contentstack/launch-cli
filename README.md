@@ -201,8 +201,8 @@ USAGE
 FLAGS
   -c, --config=<value>       Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>     Current working directory
-      --auto-deploy=<value>  Deploy on every push (enable | disable)
-      --branch=<value>       Git branch name
+      --auto-deploy=<value>  Deploy on every push, GitHub projects only (enable | disable)
+      --branch=<value>       Git branch name, GitHub projects only
       --build-cmd=<value>    Build command
       --cs-auth=<value>      Contentstack Authentication (enable | disable)
       --description=<value>  Project description (255 characters or fewer)

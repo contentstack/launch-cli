@@ -1,5 +1,6 @@
 import type { TableColumn } from '../core/render';
 import { styled } from '../core/style';
+import type { GitOnlyFlag } from './project.inputs';
 import type { Project, ProjectUpdate } from './types';
 
 export const PROJECT_COLUMNS: TableColumn<Project>[] = [
@@ -29,6 +30,31 @@ export const PROJECT_NOT_DELETED = 'Project not deleted.';
 
 export function projectNotDeletedLine(outputIsTTY: boolean): string {
   return styled(PROJECT_NOT_DELETED, 'yellow', outputIsTTY);
+}
+
+export const RENAME_PROJECT_QUESTION = 'Would you like to change the project\'s name and try again?';
+
+/**
+ * V1's duplicate-name lines, word for word: the failure and its cause in red, then either the rename
+ * question, the retry-limit warning in yellow, or - with no terminal to rename in - the way out in green.
+ */
+export function duplicateProjectNameLines(outputIsTTY: boolean): string[] {
+  return [
+    styled('error: New project creation failed!', 'red', outputIsTTY),
+    styled('error: Duplicate project name identified', 'red', outputIsTTY),
+  ];
+}
+
+export function renameRetryLimitLine(outputIsTTY: boolean): string {
+  return styled('warn: Reached max project creation retry limit', 'yellow', outputIsTTY);
+}
+
+export function renameAndRerunLine(outputIsTTY: boolean): string {
+  return styled('info: Change the project name and re-run the command.', 'green', outputIsTTY);
+}
+
+export function gitOnlyFlagLine(flag: GitOnlyFlag, outputIsTTY: boolean): string {
+  return styled(`warn: --${flag} is not supported for FileUpload projects.`, 'yellow', outputIsTTY);
 }
 
 export interface PartialCreateFailure {

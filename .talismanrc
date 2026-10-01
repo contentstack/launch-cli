@@ -146,7 +146,7 @@ fileignoreconfig:
 - filename: src/core/layering.test.ts
   checksum: 7a62eca2d63801b98591267dcbaa9e2568b20e1732ab1c744263ddab7f0dbbe8
 - filename: src/commands/launch/projects/create.test.ts
-  checksum: d271aa6c5a5067be9b27ab7c8d8f6dbde31a239783aeede7918ba49e3cefff72
+  checksum: 65a8c28525aa8ade9af5f5356cf505d3ebe5fd0d6131ba9b758c709c2a34e242
 - filename: src/commands/launch/projects/delete.test.ts
   checksum: 029c034d3d38d8cb37901b0936a7d6b4525d5bedf8c7ce052984c9b6f9ceffec
 - filename: test/integration/projects-delete.test.ts
