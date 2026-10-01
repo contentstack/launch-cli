@@ -22,8 +22,22 @@ function chosen(value: unknown): string {
   return String(value);
 }
 
-export async function askText(ux: UxLike, message: string, initial?: string): Promise<string> {
-  return chosen(await ux.inquire<string | undefined>({ type: 'input', name: 'value', message, default: initial }));
+export function checkLength(label: string, value: string, max: number): true | string {
+  const length = value.trim().length;
+
+  return length > max ? `${label} must be ${max} characters or fewer; that value is ${length} characters.` : true;
+}
+
+/**
+ * A `max` is checked inside the prompt, the way projects:update checks its fields, so a value that is
+ * too long is answered again on the spot rather than failing the command after the upload.
+ */
+export async function askText(ux: UxLike, message: string, initial?: string, max?: number): Promise<string> {
+  const validate = max === undefined ? undefined : (value: string) => checkLength(message, value, max);
+
+  return chosen(
+    await ux.inquire<string | undefined>({ type: 'input', name: 'value', message, default: initial, validate }),
+  );
 }
 
 export async function askOptionalText(ux: UxLike, message: string, initial?: string): Promise<string | undefined> {

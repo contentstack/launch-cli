@@ -1,5 +1,7 @@
+import type { LaunchError } from '../core/errors';
 import type { TableColumn } from '../core/render';
 import { styled } from '../core/style';
+import { LaunchApiError } from '../transport/errors';
 import type { GitOnlyFlag } from './project.inputs';
 import type { Project, ProjectUpdate } from './types';
 
@@ -34,15 +36,42 @@ export function projectNotDeletedLine(outputIsTTY: boolean): string {
 
 export const RENAME_PROJECT_QUESTION = 'Would you like to change the project\'s name and try again?';
 
+const V1_PROJECT_LIMIT_CAUSE = 'Launch project limit reached!';
+const V1_FILE_SIZE_CAUSE = 'Please use a file over the size of 1KB and under the size of 100MB.';
+const FILE_SIZE_CODES: readonly string[] = [
+  'launch.DEPLOYMENT.INVALID_FILE_SIZE',
+  'launch.DEPLOYMENT.FILE_UPLOAD_FAILED',
+];
+
 /**
- * V1's duplicate-name lines, word for word: the failure and its cause in red, then either the rename
+ * V1 opened every create failure with this line, then named the cause on the next - in its own words for
+ * the limit and file-size cases, by the error's message otherwise. A duplicate name goes on to the rename
  * question, the retry-limit warning in yellow, or - with no terminal to rename in - the way out in green.
  */
-export function duplicateProjectNameLines(outputIsTTY: boolean): string[] {
-  return [
-    styled('error: New project creation failed!', 'red', outputIsTTY),
-    styled('error: Duplicate project name identified', 'red', outputIsTTY),
-  ];
+export function projectCreationFailedLine(outputIsTTY: boolean): string {
+  return styled('error: New project creation failed!', 'red', outputIsTTY);
+}
+
+export function duplicateProjectNameLine(outputIsTTY: boolean): string {
+  return styled('error: Duplicate project name identified', 'red', outputIsTTY);
+}
+
+export function createFailureCauseLine(failure: LaunchError, outputIsTTY: boolean): string {
+  return styled(`error: ${createFailureCause(failure)}`, 'red', outputIsTTY);
+}
+
+function createFailureCause(failure: LaunchError): string {
+  const code = failure instanceof LaunchApiError ? failure.code : undefined;
+
+  if (code === 'launch.PROJECT.LIMIT_REACHED') {
+    return V1_PROJECT_LIMIT_CAUSE;
+  }
+
+  if (code !== undefined && FILE_SIZE_CODES.includes(code)) {
+    return V1_FILE_SIZE_CAUSE;
+  }
+
+  return failure.message;
 }
 
 export function renameRetryLimitLine(outputIsTTY: boolean): string {

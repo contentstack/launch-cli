@@ -1,10 +1,11 @@
 import { UsageError } from '../core/errors';
 import {
   MAX_UPLOAD_BYTES,
+  MIN_UPLOAD_BYTES,
   UPLOAD_CONTENT_TYPE,
   UPLOAD_FILE_NAME,
   prepareUpload,
-  refuseOversizedArchive,
+  refuseArchiveOutsideLimits,
 } from './project.upload';
 import type { SignedUploadFormField, SignedUploadHeader } from './types';
 
@@ -227,23 +228,39 @@ describe('signed upload preparation', () => {
   });
 });
 
-describe('refuseOversizedArchive', () => {
+describe('refuseArchiveOutsideLimits', () => {
   it('caps an upload at the 100 MB Launch accepts for a file upload', () => {
     expect(MAX_UPLOAD_BYTES).toBe(100 * 1024 * 1024);
   });
 
   it('lets an archive of exactly the limit through', () => {
-    expect(() => refuseOversizedArchive(MAX_UPLOAD_BYTES)).not.toThrow();
+    expect(() => refuseArchiveOutsideLimits(MAX_UPLOAD_BYTES)).not.toThrow();
   });
 
   it('refuses an archive one byte over the limit as a usage error', () => {
-    expect(() => refuseOversizedArchive(MAX_UPLOAD_BYTES + 1)).toThrow(UsageError);
+    expect(() => refuseArchiveOutsideLimits(MAX_UPLOAD_BYTES + 1)).toThrow(UsageError);
   });
 
   it('names the archive size, the limit, and how to shrink the upload', () => {
-    expect(() => refuseOversizedArchive(150 * 1024 * 1024)).toThrow(
+    expect(() => refuseArchiveOutsideLimits(150 * 1024 * 1024)).toThrow(
       'Your project files zip to 150.0 MB, over the 100 MB Launch accepts for a file upload. ' +
         'Pass --data-dir with a folder holding only the files to deploy.',
+    );
+  });
+
+  it('floors an upload at the 1 KB every storage provider enforces', () => {
+    expect(MIN_UPLOAD_BYTES).toBe(1024);
+  });
+
+  it('lets an archive of exactly the floor through', () => {
+    expect(() => refuseArchiveOutsideLimits(MIN_UPLOAD_BYTES)).not.toThrow();
+  });
+
+  it('refuses an archive under 1 KB before uploading, naming its size and how to fix it', () => {
+    expect(() => refuseArchiveOutsideLimits(512)).toThrow(UsageError);
+    expect(() => refuseArchiveOutsideLimits(512)).toThrow(
+      'Your project files zip to 0.5 KB, under the 1 KB Launch accepts for a file upload. ' +
+        'Pass --data-dir with the folder holding your site\'s files.',
     );
   });
 });

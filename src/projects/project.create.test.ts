@@ -1,4 +1,5 @@
 import AdmZip from 'adm-zip';
+import { randomBytes } from 'node:crypto';
 import { cliux } from '@contentstack/cli-utilities';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -13,7 +14,12 @@ import { ApiErrorEntry, LaunchApiError } from '../transport/errors';
 import { GitConnectionMissingError } from '../git/git.errors';
 import { ApiSurface } from '../resources';
 import { CreateRequest, ProjectCreator, UPLOAD_PROGRESS_LABEL } from './project.create';
-import { DuplicateProjectNameError, PROJECT_ERROR_MESSAGES, UploadFailedError } from './project.errors';
+import {
+  DuplicateProjectNameError,
+  PROJECT_ERROR_MESSAGES,
+  ProjectCreateFailedError,
+  UploadFailedError,
+} from './project.errors';
 
 jest.mock('./project.upload', () => ({
   ...jest.requireActual('./project.upload'),
@@ -22,6 +28,9 @@ jest.mock('./project.upload', () => ({
 
 import * as archiveModule from './project.archive';
 import { MAX_UPLOAD_BYTES, UploadOptions, uploadArchive } from './project.upload';
+
+// Random, so it zips past the 1 KB Launch's storage providers accept as the smallest upload.
+const SITE_PAGE = `<h1>site</h1><!-- ${randomBytes(2048).toString('hex')} -->`;
 
 function fakeProgressBars() {
   const built: Record<string, unknown>[] = [];
@@ -324,7 +333,7 @@ function bodyOf(created: unknown[]): Record<string, unknown> {
 describe('ProjectCreator on the GitHub path', () => {
   beforeEach(() => {
     dataDir = mkdtempSync(join(tmpdir(), 'launch-create-'));
-    writeFileSync(join(dataDir, 'index.html'), '<h1>site</h1>');
+    writeFileSync(join(dataDir, 'index.html'), SITE_PAGE);
     cloneOf('my-org/my-repo');
   });
 
@@ -622,7 +631,7 @@ describe('ProjectCreator on the GitHub path', () => {
 describe('ProjectCreator prompting order and refusals', () => {
   beforeEach(() => {
     dataDir = mkdtempSync(join(tmpdir(), 'launch-create-'));
-    writeFileSync(join(dataDir, 'index.html'), '<h1>site</h1>');
+    writeFileSync(join(dataDir, 'index.html'), SITE_PAGE);
     cloneOf('my-org/my-repo');
   });
 
@@ -837,7 +846,7 @@ describe('ProjectCreator prompting order and refusals', () => {
 describe('ProjectCreator on the FileUpload path', () => {
   beforeEach(() => {
     dataDir = mkdtempSync(join(tmpdir(), 'launch-create-'));
-    writeFileSync(join(dataDir, 'index.html'), '<h1>site</h1>');
+    writeFileSync(join(dataDir, 'index.html'), SITE_PAGE);
     (uploadArchive as jest.Mock).mockClear();
     (uploadArchive as jest.Mock).mockImplementation(async () => undefined);
   });
@@ -1024,6 +1033,19 @@ describe('ProjectCreator on the FileUpload path', () => {
     expect(asked).toEqual(['Choose a project type to proceed']);
   });
 
+  it('refuses a folder that zips under 1 KB before asking for an upload url, rather than being refused by storage', async () => {
+    writeFileSync(join(dataDir, 'index.html'), '<h1>site</h1>');
+    const { creator, calls, created } = harness();
+
+    const failure = await creator.create(uploadRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(UsageError);
+    expect((failure as Error).message).toContain('under the 1 KB Launch accepts for a file upload');
+    expect(calls.signedUploadUrl).toEqual([]);
+    expect(uploadArchive).not.toHaveBeenCalled();
+    expect(created).toEqual([]);
+  });
+
   it('leaves a --config file that lives inside the data dir out of the upload', async () => {
     const configPath = join(dataDir, 'launch.json');
     writeFileSync(configPath, JSON.stringify({ project: { organizationUid: ORG } }));
@@ -1163,7 +1185,7 @@ describe('ProjectCreator on the FileUpload path', () => {
 describe('ProjectCreator waiting on the first deployment', () => {
   beforeEach(() => {
     dataDir = mkdtempSync(join(tmpdir(), 'launch-create-'));
-    writeFileSync(join(dataDir, 'index.html'), '<h1>site</h1>');
+    writeFileSync(join(dataDir, 'index.html'), SITE_PAGE);
     cloneOf('my-org/my-repo');
   });
 
@@ -1393,12 +1415,19 @@ describe('ProjectCreator waiting on the first deployment', () => {
     expect((failure as Error).message).not.toContain('undefined');
   });
 
-  it('propagates a create failure without waiting on anything', async () => {
-    const boom = new UsageError('A project with that name already exists in this organization.');
-    const { creator, printed } = harness({ createFails: boom });
+  it('reports a create failure under V1\'s header without waiting on anything', async () => {
+    const boom = new UsageError('Project name contains characters that are not allowed.');
+    const { creator, printed, calls } = harness({ createFails: boom });
 
-    await expect(creator.create(gitRequest())).rejects.toBe(boom);
-    expect(printed).toEqual([]);
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(ProjectCreateFailedError);
+    expect((failure as ProjectCreateFailedError).exitCode).toBe(2);
+    expect(printed).toEqual([
+      'error: New project creation failed!',
+      'error: Project name contains characters that are not allowed.',
+    ]);
+    expect(calls.environments).toEqual([]);
   });
 });
 
@@ -1406,7 +1435,7 @@ describe('ProjectCreator writing the project config', () => {
   beforeEach(() => {
     (uploadArchive as jest.Mock).mockImplementation(async () => undefined);
     dataDir = mkdtempSync(join(tmpdir(), 'launch-create-'));
-    writeFileSync(join(dataDir, 'index.html'), '<h1>site</h1>');
+    writeFileSync(join(dataDir, 'index.html'), SITE_PAGE);
     cloneOf('my-org/my-repo');
   });
 
@@ -1512,13 +1541,41 @@ describe('ProjectCreator writing the project config', () => {
 
 });
 
+describe('ProjectCreator name prompts', () => {
+  beforeEach(() => {
+    dataDir = mkdtempSync(join(tmpdir(), 'launch-create-'));
+    writeFileSync(join(dataDir, 'index.html'), SITE_PAGE);
+    (uploadArchive as jest.Mock).mockClear();
+    (uploadArchive as jest.Mock).mockImplementation(async () => undefined);
+  });
+
+  afterEach(() => {
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  it.each([
+    ['Project name', 200],
+    ['Environment name', 200],
+  ])('checks a typed %s against its %i-character limit inside the prompt', async (message, max) => {
+    const { creator, asked, askedPayloads } = harness({ isTTY: true, answers: ['My Site', 'Default'] });
+
+    await creator.create(uploadRequest({ name: undefined, envName: undefined, serverCmd: 'npm start' }));
+
+    const validate = askedPayloads[asked.indexOf(message)].validate as (value: string) => true | string;
+    expect(validate('x'.repeat(max))).toBe(true);
+    expect(validate('x'.repeat(max + 1))).toBe(
+      `${message} must be ${max} characters or fewer; that value is ${max + 1} characters.`,
+    );
+  });
+});
+
 describe('ProjectCreator when the project name is already taken', () => {
   const duplicate = (): LaunchApiError =>
     new LaunchApiError(409, [{ code: 'launch.PROJECT.DUPLICATE_NAME' }], PROJECT_ERROR_MESSAGES);
 
   beforeEach(() => {
     dataDir = mkdtempSync(join(tmpdir(), 'launch-create-'));
-    writeFileSync(join(dataDir, 'index.html'), '<h1>site</h1>');
+    writeFileSync(join(dataDir, 'index.html'), SITE_PAGE);
     (uploadArchive as jest.Mock).mockClear();
     (uploadArchive as jest.Mock).mockImplementation(async () => undefined);
   });
@@ -1599,18 +1656,18 @@ describe('ProjectCreator when the project name is already taken', () => {
     expect(created).toHaveLength(4);
   });
 
-  it('refuses a new name over the length limit', async () => {
-    const { creator, created } = harness({
+  it('checks a new name against the length limit inside the prompt, so the user can fix it there', async () => {
+    const { creator, askedPayloads } = harness({
       isTTY: true,
       createFailures: [duplicate()],
-      answers: [true, 'x'.repeat(201)],
+      answers: [true, 'My Site 2'],
     });
 
-    const failure = await creator.create(terminalRequest()).catch((error: Error) => error);
+    await creator.create(terminalRequest());
 
-    expect(failure).toBeInstanceOf(UsageError);
-    expect((failure as Error).message).toBe('--name must be 200 characters or fewer; that value is 201 characters.');
-    expect(created).toHaveLength(1);
+    const validate = askedPayloads[1].validate as (value: string) => true | string;
+    expect(validate('x'.repeat(200))).toBe(true);
+    expect(validate('x'.repeat(201))).toBe('Project name must be 200 characters or fewer; that value is 201 characters.');
   });
 
   it('colours the error lines red and the rename hint green only when stdout is a terminal', async () => {
@@ -1625,11 +1682,50 @@ describe('ProjectCreator when the project name is already taken', () => {
     ]);
   });
 
-  it('lets any other create failure through untouched', async () => {
-    const boom = new LaunchApiError(422, [{ code: 'launch.PROJECT.LIMIT_REACHED' }], PROJECT_ERROR_MESSAGES);
-    const { creator, asked } = harness({ isTTY: true, createFailures: [boom] });
+  it.each([
+    ['launch.PROJECT.LIMIT_REACHED', 'error: Launch project limit reached!'],
+    ['launch.DEPLOYMENT.INVALID_FILE_SIZE', 'error: Please use a file over the size of 1KB and under the size of 100MB.'],
+    ['launch.DEPLOYMENT.FILE_UPLOAD_FAILED', 'error: Please use a file over the size of 1KB and under the size of 100MB.'],
+    ['launch.PROJECT.CREATE_FAILED', 'error: The Launch API could not create that project.'],
+  ])('reports %s under V1\'s header in V1\'s words, exiting 1 without prompting', async (code, cause) => {
+    const boom = new LaunchApiError(422, [{ code }], PROJECT_ERROR_MESSAGES);
+    const { creator, asked, printed } = harness({ isTTY: true, createFailures: [boom] });
 
-    await expect(creator.create(terminalRequest())).rejects.toBe(boom);
-    expect(asked).toEqual([]);
+    const failure = await creator.create(terminalRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(ProjectCreateFailedError);
+    expect((failure as ProjectCreateFailedError).exitCode).toBe(1);
+    expect((failure as ProjectCreateFailedError).reported).toBe(true);
+    expect(printed.slice(-2)).toEqual(['error: New project creation failed!', cause]);
+    expect(asked.filter((question) => String(question).includes('change the project'))).toEqual([]);
+  });
+
+  it('reports a failure carrying only a message by that message', async () => {
+    const boom = new LaunchApiError(500, [{ message: 'Something went wrong.' }], PROJECT_ERROR_MESSAGES);
+    const { creator, printed } = harness({ createFailures: [boom] });
+
+    await creator.create(uploadRequest()).catch(() => undefined);
+
+    expect(printed.slice(-2)).toEqual(['error: New project creation failed!', 'error: Something went wrong.']);
+  });
+
+  it('colours a reported create failure red only when stdout is a terminal', async () => {
+    const boom = new LaunchApiError(422, [{ code: 'launch.PROJECT.LIMIT_REACHED' }], PROJECT_ERROR_MESSAGES);
+    const { creator, printed } = harness({ outputIsTTY: true, createFailures: [boom] });
+
+    await creator.create(uploadRequest()).catch(() => undefined);
+
+    expect(printed.slice(-2)).toEqual([
+      '\u001b[31merror: New project creation failed!\u001b[39m',
+      '\u001b[31merror: Launch project limit reached!\u001b[39m',
+    ]);
+  });
+
+  it('lets a failure that is not a Launch error through untouched, unreported', async () => {
+    const boom = new Error('a bug, not a Launch failure');
+    const { creator, printed } = harness({ createFailures: [boom] });
+
+    await expect(creator.create(uploadRequest())).rejects.toBe(boom);
+    expect(printed).not.toContain('error: New project creation failed!');
   });
 });

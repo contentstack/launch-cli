@@ -1,4 +1,4 @@
-import { MissingInputError, UsageError } from '../core/errors';
+import { LaunchError, MissingInputError, UsageError } from '../core/errors';
 import { ProjectConfig, ProjectConfigStore } from '../core/project-config';
 import { requireValueOf } from '../core/rules';
 import type { ServiceContext } from '../core/service-context';
@@ -9,6 +9,7 @@ import { deploymentUrlOf } from '../deployments/deployment.presenter';
 import { WatchTiming, watchDeployment } from '../deployments/deployment.watcher';
 import type { Deployment } from '../deployments/types';
 import {
+  ENVIRONMENT_NAME_MAX_LENGTH,
   FRAMEWORK_CHOICES,
   FRAMEWORK_PRESET_BY_LABEL,
   OUTPUT_DIRECTORY_BY_FRAMEWORK,
@@ -25,7 +26,6 @@ import { gitConnectionLines } from '../git/git.presenter';
 import { detectGitHubRepository, LocalGitHubRepository } from '../git/local-repository';
 import { GIT_PROVIDER_GITHUB, GitRepository } from '../git/types';
 import { connectedAccountsUrl } from '../core/region';
-import { withinLength } from '../core/values';
 import { LaunchApiError } from '../transport/errors';
 import { archiveDirectory } from './project.archive';
 import {
@@ -42,8 +42,10 @@ import {
   RENAME_PROJECT_QUESTION,
   deploymentFailureMessage,
   deploymentUrlLine,
-  duplicateProjectNameLines,
+  createFailureCauseLine,
+  duplicateProjectNameLine,
   gitOnlyFlagLine,
+  projectCreationFailedLine,
   renameAndRerunLine,
   renameRetryLimitLine,
 } from './project.presenter';
@@ -56,8 +58,8 @@ import {
   askProjectType,
   projectTypeChoiceOf,
 } from './project.inputs';
-import { DuplicateProjectNameError } from './project.errors';
-import { refuseOversizedArchive, uploadArchive } from './project.upload';
+import { DuplicateProjectNameError, ProjectCreateFailedError } from './project.errors';
+import { refuseArchiveOutsideLimits, uploadArchive } from './project.upload';
 import type { CreateProjectInput, DetectedFramework, IdentifiedProject, SignedUploadUrl } from './types';
 
 export { DEPLOYMENT_WAIT_TIMEOUT_MS, defaultWatchTiming } from '../deployments/deployment.watcher';
@@ -146,9 +148,11 @@ export class ProjectCreator {
     this.warnGitFlagsOffGitHub(request, choice);
     const autoDeploy = choice === 'GitHub' ? request.autoDeploy : undefined;
     const upload = choice === 'GitHub' ? undefined : await this.selectUploadSource(request);
-    const name = await this.need('name', request.name, () => askText(this.services.ux, 'Project name'));
+    const name = await this.need('name', request.name, () =>
+      askText(this.services.ux, 'Project name', undefined, PROJECT_NAME_MAX_LENGTH),
+    );
     const envName = await this.need('env-name', request.envName, () =>
-      askText(this.services.ux, 'Environment name', DEFAULT_ENVIRONMENT_NAME),
+      askText(this.services.ux, 'Environment name', DEFAULT_ENVIRONMENT_NAME, ENVIRONMENT_NAME_MAX_LENGTH),
     );
     const source = upload ?? (await this.selectGitSource(request));
     const framework = await this.selectFramework(request, source.detected);
@@ -215,15 +219,20 @@ export class ProjectCreator {
     try {
       return await this.services.api.projects.create({ org, input });
     } catch (error) {
-      if (!(error instanceof LaunchApiError) || error.code !== DUPLICATE_PROJECT_NAME_CODE) {
+      if (!(error instanceof LaunchError)) {
         throw error;
       }
 
       const colour = this.services.outputIsTTY === true;
 
-      for (const line of duplicateProjectNameLines(colour)) {
-        this.services.ux.print(line);
+      this.services.ux.print(projectCreationFailedLine(colour));
+
+      if (!(error instanceof LaunchApiError) || error.code !== DUPLICATE_PROJECT_NAME_CODE) {
+        this.services.ux.print(createFailureCauseLine(error, colour));
+        throw new ProjectCreateFailedError(error);
       }
+
+      this.services.ux.print(duplicateProjectNameLine(colour));
 
       if (this.services.isTTY) {
         return this.askToRename(org, input, renames, colour);
@@ -256,7 +265,7 @@ export class ProjectCreator {
       throw new DuplicateProjectNameError();
     }
 
-    const name = await withinLength('name', await askText(this.services.ux, 'Project name'), PROJECT_NAME_MAX_LENGTH);
+    const name = await askText(this.services.ux, 'Project name', undefined, PROJECT_NAME_MAX_LENGTH);
 
     return this.createProject(org, { ...input, name }, renames + 1);
   }
@@ -482,7 +491,7 @@ export class ProjectCreator {
   private async selectUploadSource(request: CreateRequest): Promise<SourceSelection> {
     this.services.ux.print(PREPARING_ARCHIVE);
     const archive = archiveDirectory(request.dataDir, [request.configPath]);
-    refuseOversizedArchive(archive.buffer.length);
+    refuseArchiveOutsideLimits(archive.buffer.length);
 
     if (archive.skippedLinks.length > 0) {
       this.services.ux.print(

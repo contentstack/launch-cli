@@ -13,11 +13,26 @@ export const UPLOAD_FILE_NAME = 'project.zip';
 export const UPLOAD_CONTENT_TYPE = 'application/zip';
 export const UPLOAD_IDLE_TIMEOUT_MS = 120_000;
 export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+export const MIN_UPLOAD_BYTES = 1024;
 export const UPLOAD_CHUNK_BYTES = 256 * 1024;
 
+const BYTES_PER_KB = 1024;
 const BYTES_PER_MB = 1024 * 1024;
 
-export function refuseOversizedArchive(bytes: number): void {
+/**
+ * Every storage provider Launch uploads to enforces the same 1 KB - 100 MB range (management-service's
+ * MIN_FILE_SIZE_BYTES / MAX_FILE_SIZE_BYTES). Checking it here refuses a bad zip before it is uploaded,
+ * where the storage provider would only answer with a bare HTTP refusal.
+ */
+export function refuseArchiveOutsideLimits(bytes: number): void {
+  if (bytes < MIN_UPLOAD_BYTES) {
+    throw new UsageError(
+      `Your project files zip to ${(bytes / BYTES_PER_KB).toFixed(1)} KB, under the ` +
+        `${MIN_UPLOAD_BYTES / BYTES_PER_KB} KB Launch accepts for a file upload. ` +
+        'Pass --data-dir with the folder holding your site\'s files.',
+    );
+  }
+
   if (bytes <= MAX_UPLOAD_BYTES) {
     return;
   }

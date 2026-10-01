@@ -12,6 +12,9 @@ import open from 'open';
 
 import { CTRL_C, answerPrompts, onTerminal } from '../support/terminal';
 
+// Random, so it zips past the 1 KB Launch's storage providers accept as the smallest upload.
+const SITE_PAGE = `<h1>site</h1><!-- ${randomBytes(2048).toString('hex')} -->`;
+
 jest.mock('open', () => jest.fn().mockResolvedValue(undefined));
 
 const LAUNCH_HUB_URL = 'https://launch-api.integration.test';
@@ -246,7 +249,7 @@ describe('integration: launch:projects:create on the wire', () => {
     process.exitCode = 0;
     dataDir = mkdtempSync(join(tmpdir(), 'launch-create-wire-'));
     cloneOf('my-org/my-repo');
-    writeFileSync(join(dataDir, 'index.html'), '<h1>site</h1>');
+    writeFileSync(join(dataDir, 'index.html'), SITE_PAGE);
     recordWire();
     jest.spyOn(console, 'log').mockImplementation((message: unknown) => {
       process.stdout.write(`${String(message)}\n`);
@@ -725,13 +728,14 @@ describe('integration: launch:projects:create on the wire', () => {
       });
     const resent = hub().post('/manage/projects').query({}).reply(201, { project: CREATED_PROJECT });
 
-    const { error } = await runCommand(gitFlags(), config);
+    const { error, stdout } = await runCommand(gitFlags(), config);
 
     expect(error?.oclif?.exit).toBe(1);
-    expect(error?.message).toBe(
-      'Launch could not access your GitHub account. Reconnect GitHub in the Launch app, then try again.',
+    expect(stdout).toContain(
+      'error: New project creation failed!\n' +
+        'error: Launch could not access your GitHub account. Reconnect GitHub in the Launch app, then try again.\n',
     );
-    expect(error?.message).not.toContain('auth:login');
+    expect(stdout).not.toContain('auth:login');
     expect(create.isDone()).toBe(true);
     expect(resent.isDone()).toBe(false);
   });
@@ -765,10 +769,12 @@ describe('integration: launch:projects:create on the wire', () => {
         status: 400,
       });
 
-    const { error } = await runCommand(gitFlags(), config);
+    const { error, stdout } = await runCommand(gitFlags(), config);
 
     expect(error?.oclif?.exit).toBe(1);
-    expect(error?.message).toBe('Project name contains characters that are not allowed.');
+    expect(stdout).toContain(
+      'error: New project creation failed!\nerror: Project name contains characters that are not allowed.\n',
+    );
   });
 
   it('prints the V1 duplicate-name lines and exits 1 without prompting when there is no terminal', async () => {

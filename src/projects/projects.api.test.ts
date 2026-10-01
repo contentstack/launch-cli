@@ -351,6 +351,12 @@ describe('PROJECT_ERROR_MESSAGES', () => {
       'launch.PROJECT.NOT_FOUND': 'No project found with that name or UID.',
       'launch.PROJECT.DELETE_FAILED': 'The Launch API could not delete that project.',
       'launch.PROJECT.UPDATE_FAILED': 'The Launch API could not update that project.',
+      'launch.PROJECT.CREATE_FAILED': 'The Launch API could not create that project.',
+      'launch.PROJECT.NAME.TOO_LONG': 'Project name must be 200 characters or fewer.',
+      'launch.PROJECT.UPLOADED_FILE_NOT_FOUND_ERROR':
+        'Your uploaded project files could not be found; the upload may have expired. Run the command again.',
+      'launch.PROJECT.FILE_UPLOAD_SIGNED_URL.GET_FAILED':
+        'The Launch API could not prepare an upload for your project files.',
     });
   });
 });
