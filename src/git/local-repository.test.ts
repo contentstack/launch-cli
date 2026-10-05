@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -50,6 +51,11 @@ describe('detectGitHubRepository', () => {
     ['ssh url', 'ssh://git@github.com/SakshiKoli-CS/next-partial-prerendering.git'],
     ['http', 'http://github.com/SakshiKoli-CS/next-partial-prerendering'],
     ['trailing slash', 'https://github.com/SakshiKoli-CS/next-partial-prerendering/'],
+    ['https with a username', 'https://SakshiKoli-CS@github.com/SakshiKoli-CS/next-partial-prerendering.git'],
+    [
+      'https with a username and a credential',
+      `https://SakshiKoli-CS:${randomUUID()}@github.com/SakshiKoli-CS/next-partial-prerendering.git`,
+    ],
   ])('reads a %s remote url', (_form, url) => {
     gitDirectory(`[remote "origin"]\n\turl = ${url}\n`);
 
@@ -104,6 +110,16 @@ describe('detectGitHubRepository', () => {
     ['the remote is not GitHub', '[remote "origin"]\n\turl = https://gitlab.com/SakshiKoli-CS/site.git\n'],
     ['the remote names no repository', '[remote "origin"]\n\turl = https://github.com/SakshiKoli-CS\n'],
     ['the remote points below a repository', '[remote "origin"]\n\turl = https://github.com/a/b/c.git\n'],
+    ['github.com is only the username of another host', '[remote "origin"]\n\turl = https://github.com@example.invalid/a/b.git\n'],
+    ['the host merely starts with github.com', '[remote "origin"]\n\turl = https://user@github.com.example.invalid/a/b.git\n'],
+    [
+      'a second username hides another host',
+      `[remote "origin"]\n\turl = https://user@github.com:${randomUUID()}@example.invalid/b.git\n`,
+    ],
+    [
+      'an scp-style path hides another host',
+      `[remote "origin"]\n\turl = git@github.com:${randomUUID()}@example.invalid/b.git\n`,
+    ],
   ])('finds nothing when %s', (_reason, config) => {
     if (config !== undefined) {
       gitDirectory(config);

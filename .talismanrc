@@ -142,7 +142,7 @@ fileignoreconfig:
 - filename: src/core/resolve.test.ts
   checksum: d745e6efbb9c4595ee7c57a2625a73d687d3e880a346f53de2d7da183971d875
 - filename: src/git/local-repository.ts
-  checksum: 03d1f815701e27f241782b81fdb4c7d346c1a506c85c23cf8aae51c8bc51a42b
+  checksum: 7f266d6d6796574721ca463a14914759c91ce25dfa5b333f103258fe2336cfe5
 - filename: src/core/layering.test.ts
   checksum: 7a62eca2d63801b98591267dcbaa9e2568b20e1732ab1c744263ddab7f0dbbe8
 - filename: src/commands/launch/projects/create.test.ts

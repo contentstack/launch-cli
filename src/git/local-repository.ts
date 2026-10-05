@@ -16,7 +16,9 @@ interface ConfigEntry {
 const SECTION = /^\s*\[\s*([A-Za-z0-9.-]+)(?:\s+"([^"]*)")?\s*\]/;
 const ENTRY = /^\s*([A-Za-z][A-Za-z0-9-]*)\s*=\s*(.*?)\s*$/;
 const HEAD_BRANCH = /^ref:\s*refs\/heads\/(.+)$/;
-const GITHUB_URL = /^(?:https?:\/\/|git@|ssh:\/\/git@)github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?\/?$/;
+const GITHUB_HOST = '(?:https?:\\/\\/(?:[^@/]+@)?github\\.com\\/|(?:ssh:\\/\\/)?[^@/]+@github\\.com[:/])';
+const GITHUB_NAME = '[A-Za-z0-9._-]+';
+const GITHUB_URL = new RegExp(`^${GITHUB_HOST}(${GITHUB_NAME})\\/(${GITHUB_NAME}?)(?:\\.git)?\\/?$`);
 const DEFAULT_REMOTE = 'origin';
 
 function readText(path: string): string | undefined {
