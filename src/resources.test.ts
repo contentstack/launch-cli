@@ -56,6 +56,19 @@ describe('resolution', () => {
     expect(table.project.configPath).toBe('uid');
   });
 
+  it('names org and project the way the config-file notice speaks of them', () => {
+    expect(table.org.configLabel).toBe('organization');
+    expect(table.project.configLabel).toBe('project');
+  });
+
+  it('labels every input the config file can supply, so the notice can name it', () => {
+    const unlabelled = Object.entries(table)
+      .filter(([, rule]) => rule.configPath !== undefined && !rule.configLabel)
+      .map(([key]) => key);
+
+    expect(unlabelled).toEqual([]);
+  });
+
   it('declares no config path for the flags that only ever come from the command line', () => {
     expect(table.limit.configPath).toBeUndefined();
     expect(table.skip.configPath).toBeUndefined();

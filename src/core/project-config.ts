@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
 import { UsageError } from './errors';
+import { styled } from './style';
 
 export interface ProjectConfig {
   uid?: string | null;
@@ -191,4 +192,15 @@ export class ProjectConfigStore {
 
     return isBlock(parsed) ? parsed : `The config file at '${this.path}' does not hold a project config.`;
   }
+}
+
+export function configSourceNotice(labels: string[], configPath: string, colour: boolean): string | undefined {
+  if (labels.length === 0) {
+    return undefined;
+  }
+
+  const last = labels[labels.length - 1];
+  const named = labels.length === 1 ? `${last} UID` : `${labels.slice(0, -1).join(', ')} and ${last} UIDs`;
+
+  return `Using the ${named} from ${styled(configPath, 'cyan', colour)}.`;
 }

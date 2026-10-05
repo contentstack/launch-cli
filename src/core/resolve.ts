@@ -59,7 +59,19 @@ export interface ResolveArgs {
   rules?: Rule[];
 }
 
+export interface TracedResolution<S extends AnyInputs> {
+  resolved: Resolved<S>;
+  sources: InputSources;
+}
+
 export async function resolveInputs<S extends AnyInputs>(spec: S, args: ResolveArgs): Promise<Resolved<S>> {
+  return (await resolveInputsTraced(spec, args)).resolved;
+}
+
+export async function resolveInputsTraced<S extends AnyInputs>(
+  spec: S,
+  args: ResolveArgs,
+): Promise<TracedResolution<S>> {
   const resolved = {} as Resolved<S>;
   const sources: InputSources = {};
   const readConfig = (): ProjectConfig =>
@@ -119,5 +131,5 @@ export async function resolveInputs<S extends AnyInputs>(spec: S, args: ResolveA
     rule(resolved, sources);
   }
 
-  return resolved;
+  return { resolved, sources };
 }

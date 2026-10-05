@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { UsageError } from './errors';
-import { DEFAULT_BLOCK_KEY, ProjectConfigStore } from './project-config';
+import { DEFAULT_BLOCK_KEY, ProjectConfigStore, configSourceNotice } from './project-config';
 
 const tempDirs: string[] = [];
 
@@ -408,5 +408,37 @@ describe('ProjectConfigStore.save', () => {
     );
 
     expect(new ProjectConfigStore(path).load()).toEqual({ uid: 'p1', organizationUid: 'org1' });
+  });
+});
+
+describe('configSourceNotice', () => {
+  it('names the one value it took from the config file', () => {
+    expect(configSourceNotice(['project'], '/work/site/.cs-launch.json', false)).toBe(
+      'Using the project UID from /work/site/.cs-launch.json.',
+    );
+  });
+
+  it('joins two values with "and" and speaks of UIDs', () => {
+    expect(configSourceNotice(['organization', 'project'], '/work/site/.cs-launch.json', false)).toBe(
+      'Using the organization and project UIDs from /work/site/.cs-launch.json.',
+    );
+  });
+
+  it('separates three or more values with commas and puts "and" before the last', () => {
+    const labels = ['organization', 'project', 'environment'];
+
+    expect(configSourceNotice(labels, '/work/site/.cs-launch.json', false)).toBe(
+      'Using the organization, project and environment UIDs from /work/site/.cs-launch.json.',
+    );
+  });
+
+  it('names a config file the user pointed at by its full path', () => {
+    expect(configSourceNotice(['project'], '/work/shared/envs/staging.json', false)).toBe(
+      'Using the project UID from /work/shared/envs/staging.json.',
+    );
+  });
+
+  it('has nothing to say when no value came from the config file', () => {
+    expect(configSourceNotice([], '/work/site/.cs-launch.json', false)).toBeUndefined();
   });
 });

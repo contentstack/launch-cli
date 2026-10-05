@@ -4,12 +4,12 @@ import { Command } from '@contentstack/cli-command';
 import { cliux, configHandler, isAuthenticated } from '@contentstack/cli-utilities';
 
 import { EXIT_RUNTIME, PROJECT_CONFIG_FILE, STDIN_MAX_LISTENERS } from './constants';
-import { ProjectConfig, ProjectConfigStore } from './project-config';
+import { ProjectConfig, ProjectConfigStore, configSourceNotice } from './project-config';
 import { RegionLike, resolveLaunchHubUrl } from './region';
 import { LaunchError, UsageError } from './errors';
-import { catalog, FlagKey } from '../resources';
+import { catalog, FlagKey, resolutionTable } from '../resources';
 import { AnyInputs, Resolved } from './inputs';
-import { resolveInputs } from './resolve';
+import { resolveInputsTraced } from './resolve';
 import { Rule } from './rules';
 import { cancelOnInterrupt } from './interruptible-ux';
 import { UxLike } from './render';
@@ -34,6 +34,7 @@ export interface ResolveLaunchContextResult<S extends AnyInputs> {
   resolved: Resolved<S>;
   dataDir: string;
   configPath: string;
+  configNotice?: string;
 }
 
 export async function resolveLaunchContext<S extends AnyInputs>(
@@ -53,14 +54,20 @@ export async function resolveLaunchContext<S extends AnyInputs>(
     outputIsTTY: args.outputIsTTY,
   });
 
-  const resolved = await resolveInputs(args.inputs, {
+  const { resolved, sources } = await resolveInputsTraced(args.inputs, {
     parsed: args.flags,
     projectConfig: projectConfigLoader(new ProjectConfigStore(configPath, Boolean(namedConfig)), Boolean(namedConfig)),
     services,
     rules: args.rules,
   });
 
-  return { services, resolved, dataDir, configPath };
+  const configLabels = Object.entries(sources)
+    .filter(([, source]) => source === 'config')
+    .map(([key]) => resolutionTable[key as FlagKey].configLabel)
+    .filter((label): label is string => label !== undefined);
+  const configNotice = configSourceNotice(configLabels, resolvePath(configPath), args.outputIsTTY === true);
+
+  return { services, resolved, dataDir, configPath, configNotice };
 }
 
 export function projectConfigLoader(store: ProjectConfigStore, named: boolean): ProjectConfig | (() => ProjectConfig) {
@@ -116,7 +123,7 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
 
     const region = this.launchRegion ?? {};
 
-    const { services, resolved, dataDir, configPath } = await resolveLaunchContext<S>({
+    const { services, resolved, dataDir, configPath, configNotice } = await resolveLaunchContext<S>({
       flags,
       inputs: this.contract.inputs as S,
       rules: this.contract.rules,
@@ -133,6 +140,10 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
     this.resolved = resolved;
     this.dataDir = dataDir;
     this.configPath = configPath;
+
+    if (configNotice !== undefined) {
+      this.ux.print(configNotice);
+    }
   }
 
   protected async confirm(message: string): Promise<boolean> {

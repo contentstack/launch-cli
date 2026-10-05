@@ -136,11 +136,13 @@ fileignoreconfig:
     - "a test passes `var`, `env-file` and `from-stack`"
     - "an in-flight secret registry to redact against"
 - filename: src/core/project-config.ts
-  checksum: feec5219c90a2368edccab2c290284b6e7ccee7fb78443c7b4852d7b207119a4
+  checksum: 1f19da706128ee78e1fe20d8624626038893d908a7061b3f2633e741a77c93b6
 - filename: src/core/project-config.test.ts
-  checksum: ff428e7553ba60bacc1ecf61f2076dedde03b09bd7167cc052b780a783217dc0
+  checksum: 65c0a613ec77d4dc6727224d4d097de4a02b300339286db692dbaea9379565ae
+- filename: src/core/resolve.ts
+  checksum: 25cb3c5eb789bfd148efb1a990932b99970c45d5777344d34e66cf54207c5256
 - filename: src/core/resolve.test.ts
-  checksum: d745e6efbb9c4595ee7c57a2625a73d687d3e880a346f53de2d7da183971d875
+  checksum: 1a07140c5f61d2c1cbd1f9746fca2e907fd2467f804c62a0ed6c188b6944b126
 - filename: src/git/local-repository.ts
   checksum: 7f266d6d6796574721ca463a14914759c91ce25dfa5b333f103258fe2336cfe5
 - filename: src/core/layering.test.ts
@@ -152,13 +154,13 @@ fileignoreconfig:
 - filename: test/integration/projects-delete.test.ts
   checksum: 4e2960b921f69bcb5fc1b4d6089b7ded1b71ed54609d8304bf7ee84041cf7fc2
 - filename: src/core/launch-command.ts
-  checksum: d0feba27c3773df89bd527b9e1ba43233d1152927e2c9c69121e084760ed7d94
+  checksum: 4bccae32140aa3b4da94346b4bfd3b199a2a7d568f26e28d7dad58b266148038
 - filename: src/core/launch-command.test.ts
-  checksum: 76367d660556bd49cf04e494818425f844bb8e1d8f6bfd2168db5ac101d66abc
+  checksum: 2cc245f8a4af102eb9edb53184d1af2486c6bbf9588a41e56452895a4c580e99
 - filename: src/projects/project.inputs.test.ts
   checksum: f8dbd017bbe58700d010881d9bc92f6e640260668d27c91cfe1bb4ee9d1942b6
 - filename: test/integration/projects-command-flows.test.ts
-  checksum: 27cf0618ef66f038e0bc70988af281971a3511b97dd4cbc584591b78ec884042
+  checksum: 58364e1ed8e4958fe32bfa86e1598c156ab260d495f2700690b0443e3cc670b9
 - filename: src/core/redact.test.ts
   checksum: ae497ea8c3a4c3f12217d2c4c028a1da3d1324e18362d68c355ba8120902bcb3
 - filename: src/commands/launch/projects/list.test.ts

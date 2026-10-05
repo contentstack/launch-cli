@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve as resolvePath, join } from 'node:path';
 
@@ -11,6 +11,7 @@ import { CancelledError, MissingInputError, UsageError } from './errors';
 import { exactlyOneOf } from './rules';
 import { LaunchApiError } from '../transport/errors';
 import { UxLike } from './render';
+import type { FlagKey } from '../resources';
 import { LaunchCommand, projectConfigLoader, resolveLaunchContext } from './launch-command';
 import * as serviceContext from './service-context';
 import { SearchListClass, utilitiesLoader } from './search-list';
@@ -525,6 +526,69 @@ describe('LaunchCommand.init terminal detection', () => {
   });
 });
 
+class ProbeWithOrg extends LaunchCommand {
+  static flags = {};
+  static inputs = { org: {} };
+
+  async run(): Promise<void> {
+    return undefined;
+  }
+}
+
+describe('LaunchCommand.init config file notice', () => {
+  const tempDirs: string[] = [];
+
+  afterEach(() => {
+    tempDirs.forEach((dir) => rmSync(dir, { recursive: true, force: true }));
+    tempDirs.length = 0;
+  });
+
+  async function initInFolderHoldingAnOrg(
+    flags: Record<string, unknown>,
+  ): Promise<{ printed: string[]; configFile: string }> {
+    const dir = mkdtempSync(join(tmpdir(), 'launch-cli-'));
+    tempDirs.push(dir);
+    writeFileSync(join(dir, PROJECT_CONFIG_FILE), JSON.stringify({ project: { organizationUid: 'org-from-cwd' } }));
+    jest.spyOn(process, 'cwd').mockReturnValue(dir);
+    jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
+    const instance = new ProbeWithOrg([], {} as never);
+    Object.defineProperty(instance, 'launchRegion', {
+      value: { launchHubUrl: 'https://launch-api.test' },
+      configurable: true,
+    });
+    Object.defineProperty(instance, 'config', { value: { userAgent: 'cli/2.0.0' }, configurable: true });
+    (instance as unknown as { parse: jest.Mock }).parse = jest.fn().mockResolvedValue({ flags });
+    const printed: string[] = [];
+    const ux: UxLike = { print: (message) => printed.push(message), inquire: async () => undefined as never };
+    Object.defineProperty(instance, 'ux', { value: ux, configurable: true });
+
+    await instance.init();
+
+    return { printed, configFile: join(dir, PROJECT_CONFIG_FILE) };
+  }
+
+  it('prints the notice on stdout when a value came from the config file', async () => {
+    const { printed, configFile } = await initInFolderHoldingAnOrg({});
+
+    expect(printed).toEqual([`Using the organization UID from ${configFile}.`]);
+  });
+
+  it('colours only the config file path cyan when stdout is a terminal', async () => {
+    const restore = stdoutReportingTTY(true);
+
+    const { printed, configFile } = await initInFolderHoldingAnOrg({});
+    restore();
+
+    expect(printed).toEqual([`Using the organization UID from \u001b[36m${configFile}\u001b[39m.`]);
+  });
+
+  it('prints nothing when every value came from a flag', async () => {
+    const { printed } = await initInFolderHoldingAnOrg({ org: 'org-from-flag' });
+
+    expect(printed).toEqual([]);
+  });
+});
+
 describe('LaunchCommand.init rules', () => {
   it('evaluates the rules the subclass declares as a static rules array', async () => {
     const instance = new ProbeWithRules([], {} as never) as ProbeWithRules & { error: jest.Mock };
@@ -636,6 +700,57 @@ describe('resolveLaunchContext', () => {
     expect(result.configPath).toBe(customPath);
     expect(result.services.ux).toBe(ux);
     expect(result.services.isTTY).toBe(true);
+  });
+
+  async function contextInFolderHoldingAnOrg(flags: Partial<Record<FlagKey, unknown>>) {
+    const dir = mkdtempSync(join(tmpdir(), 'launch-cli-'));
+    tempDirs.push(dir);
+    writeFileSync(join(dir, PROJECT_CONFIG_FILE), JSON.stringify({ project: { organizationUid: 'org-from-cwd' } }));
+    jest.spyOn(process, 'cwd').mockReturnValue(dir);
+
+    return resolveLaunchContext({
+      flags,
+      inputs: { org: {} },
+      launchHubUrl: 'https://launch-api.test',
+      analyticsInfo: 'cli/2.0.0',
+      ux: { print: () => undefined, inquire: async () => undefined as never },
+      isTTY: false,
+    });
+  }
+
+  it('words a notice naming the values the config file supplied and where that file is', async () => {
+    const result = await contextInFolderHoldingAnOrg({});
+
+    expect(result.configNotice).toBe(`Using the organization UID from ${result.configPath}.`);
+  });
+
+  it('names a config file passed by a relative --config path by its full path', async () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'launch-cli-')));
+    tempDirs.push(dir);
+    writeFileSync(join(dir, 'staging.json'), JSON.stringify({ project: { organizationUid: 'org-from-staging' } }));
+    const startedIn = process.cwd();
+    process.chdir(dir);
+
+    try {
+      const result = await resolveLaunchContext({
+        flags: { config: 'staging.json' },
+        inputs: { org: {} },
+        launchHubUrl: 'https://launch-api.test',
+        analyticsInfo: 'cli/2.0.0',
+        ux: { print: () => undefined, inquire: async () => undefined as never },
+        isTTY: false,
+      });
+
+      expect(result.configNotice).toBe(`Using the organization UID from ${join(dir, 'staging.json')}.`);
+    } finally {
+      process.chdir(startedIn);
+    }
+  });
+
+  it('words no notice when the flags supplied every value the config file also holds', async () => {
+    const result = await contextInFolderHoldingAnOrg({ org: 'org-from-flag' });
+
+    expect(result.configNotice).toBeUndefined();
   });
 });
 

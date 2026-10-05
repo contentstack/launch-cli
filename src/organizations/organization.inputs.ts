@@ -10,6 +10,7 @@ export const organizationFlags = {
 export const organizationResolution = {
   org: {
     configPath: 'organizationUid',
+    configLabel: 'organization',
     prompt: ({ services }) => promptForOrganization(services),
   } satisfies ResolutionSpec<string>,
 };
