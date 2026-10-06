@@ -6,6 +6,8 @@ import { URL } from 'node:url';
 
 import { UsageError } from '../core/errors';
 import { isAbsent } from '../core/values';
+import { PROXY_ERROR_CODES } from '../transport/errors';
+import { proxyFailureMessage, proxyRouteFor } from '../transport/proxy';
 import { UploadFailedError } from './project.errors';
 import type { SignedUploadFormField, SignedUploadHeader, SignedUploadUrl } from './types';
 
@@ -149,9 +151,11 @@ export function uploadArchive(target: SignedUploadUrl, archive: Buffer, options:
   const prepared = prepareUpload(target, archive);
   const url = new URL(target.uploadUrl);
   const send = url.protocol === 'http:' ? httpRequest : httpsRequest;
+  const proxy = proxyRouteFor(target.uploadUrl);
+  const requestOptions = { method: prepared.method, headers: prepared.headers, agent: proxy?.agent };
 
   return new Promise<void>((resolve, reject) => {
-    const request = send(url, { method: prepared.method, headers: prepared.headers }, (response) => {
+    const request = send(url, requestOptions, (response) => {
       response.resume();
       const status = Number(response.statusCode);
 
@@ -163,7 +167,12 @@ export function uploadArchive(target: SignedUploadUrl, archive: Buffer, options:
       reject(new UploadFailedError(`The upload of your project files was refused with HTTP ${status}.`));
     });
 
-    request.on('error', (error: Error) => {
+    request.on('error', (error: NodeJS.ErrnoException) => {
+      if (proxy !== undefined && PROXY_ERROR_CODES.includes(error.code as string)) {
+        reject(new UploadFailedError(proxyFailureMessage(proxy.address)));
+        return;
+      }
+
       reject(new UploadFailedError(`The upload of your project files failed: ${error.message}`));
     });
 

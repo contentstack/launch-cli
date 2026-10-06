@@ -1,10 +1,15 @@
 import { randomBytes } from 'node:crypto';
 
 import { configHandler } from '@contentstack/cli-utilities';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { request } from 'node:https';
+import type { Agent } from 'node:http';
 
-import { hasProxy, proxyUrl } from './proxy';
+import { hasProxy, proxyRouteFor, proxyUrl } from './proxy';
 
-const PROXY_VARIABLES = ['HTTPS_PROXY', 'HTTP_PROXY', 'https_proxy', 'http_proxy'];
+const PROXY_VARIABLES = ['HTTPS_PROXY', 'HTTP_PROXY', 'https_proxy', 'http_proxy', 'NO_PROXY', 'no_proxy'];
+const STORAGE_URL = 'https://storage.example.test/bucket/project.zip';
 
 function login(): { user: string; phrase: string } {
   return { user: `u${randomBytes(4).toString('hex')}`, phrase: randomBytes(12).toString('hex') };
@@ -144,5 +149,76 @@ describe('proxyUrl', () => {
 
     expect(hasProxy()).toBe(true);
     expect(proxyUrl()).toBe('proxy server');
+  });
+});
+
+interface RecordingProxy {
+  url: string;
+  port: number;
+  authorisations: (string | undefined)[];
+  close(): Promise<string[]>;
+}
+
+async function recordingProxy(): Promise<RecordingProxy> {
+  const seen: string[] = [];
+  const authorisations: (string | undefined)[] = [];
+  const server = createServer();
+  server.on('connect', (req, socket) => {
+    seen.push(`${req.method} ${req.url}`);
+    authorisations.push(req.headers['proxy-authorization']);
+    socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+
+  return {
+    url: `http://127.0.0.1:${port}`,
+    port,
+    authorisations,
+    close: () => new Promise((resolve) => server.close(() => resolve(seen))),
+  };
+}
+
+function reachThrough(agent: Agent | undefined): Promise<void> {
+  return new Promise((resolve) => {
+    request(STORAGE_URL, { agent }, () => resolve()).on('error', () => resolve()).end();
+  });
+}
+
+describe('proxyRouteFor', () => {
+  it('gives no agent when no proxy is configured, so the request connects directly', () => {
+    configuredProxy(undefined);
+
+    expect(proxyRouteFor(STORAGE_URL)).toBeUndefined();
+  });
+
+  it('tunnels through the proxy HTTPS_PROXY names', async () => {
+    configuredProxy(undefined);
+    const proxy = await recordingProxy();
+    process.env.HTTPS_PROXY = proxy.url;
+
+    await reachThrough(proxyRouteFor(STORAGE_URL)?.agent);
+
+    expect(await proxy.close()).toEqual(['CONNECT storage.example.test:443']);
+  });
+
+  it('connects directly when NO_PROXY lists the storage host, even with a proxy configured', () => {
+    configuredProxy(undefined);
+    process.env.HTTPS_PROXY = 'http://proxy.internal:3128';
+    process.env.NO_PROXY = '.example.test';
+
+    expect(proxyRouteFor(STORAGE_URL)).toBeUndefined();
+  });
+
+  it('prefers the configured proxy over HTTPS_PROXY and authenticates with its credentials', async () => {
+    const { user, phrase } = login();
+    const proxy = await recordingProxy();
+    configuredProxy({ protocol: 'http', host: '127.0.0.1', port: proxy.port, auth: { username: user, password: phrase } });
+    process.env.HTTPS_PROXY = 'http://ignored.internal:3128';
+
+    await reachThrough(proxyRouteFor(STORAGE_URL)?.agent);
+
+    expect(await proxy.close()).toEqual(['CONNECT storage.example.test:443']);
+    expect(proxy.authorisations).toEqual([`Basic ${Buffer.from(`${user}:${phrase}`).toString('base64')}`]);
   });
 });

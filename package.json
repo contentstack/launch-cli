@@ -30,6 +30,7 @@
     "adm-zip": "^0.6.1",
     "dotenv": "^16.4.7",
     "express": "^4.22.0",
+    "https-proxy-agent": "^5.0.1",
     "open": "^8.4.2",
     "rollup": "^4.63.4",
     "tslib": "^2.8.1",

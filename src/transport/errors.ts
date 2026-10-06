@@ -1,6 +1,6 @@
 import { EXIT_RUNTIME } from '../core/constants';
 import { LaunchError } from '../core/errors';
-import { proxyUrl } from './proxy';
+import { proxyFailureMessage, proxyUrl } from './proxy';
 
 export interface ApiErrorEntry {
   field?: string;
@@ -159,10 +159,7 @@ export function diagnoseTransportError(error: unknown): unknown {
     const url = proxyUrl();
 
     if (url !== undefined) {
-      return new LaunchNetworkError(
-        `Proxy error: Unable to connect to proxy server at ${url}. Please verify your proxy configuration.`,
-        error,
-      );
+      return new LaunchNetworkError(proxyFailureMessage(url), error);
     }
   }
 
