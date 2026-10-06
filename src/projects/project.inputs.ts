@@ -53,6 +53,7 @@ export const PROJECT_DEPENDENCIES = { project: ['org'] } as const;
 export const projectResolution = {
   project: {
     configPath: 'uid',
+    configLabel: 'project',
     dependsOn: PROJECT_DEPENDENCIES.project,
     prompt: ({ services, resolved }) => promptForProject(services, resolved.org),
     normalize: (value, { services, resolved, source }) =>

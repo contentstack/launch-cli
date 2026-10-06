@@ -32,6 +32,7 @@ export interface LooseArgs {
 
 export interface ResolutionSpec<T, D extends FlagKey = never, R extends T = T> {
   configPath?: ProjectConfigKey;
+  configLabel?: string;
   dependsOn?: readonly D[];
   prompt?(args: PromptArgs<D>): Promise<T>;
   normalize?(value: T, args: NormalizeArgs<D>): Promise<R>;
@@ -40,6 +41,7 @@ export interface ResolutionSpec<T, D extends FlagKey = never, R extends T = T> {
 
 export interface AnyResolutionSpec {
   configPath?: ProjectConfigKey;
+  configLabel?: string;
   dependsOn?: readonly FlagKey[];
   prompt?(args: LooseArgs): Promise<unknown>;
   normalize?(value: unknown, args: LooseNormalizeArgs): Promise<unknown>;

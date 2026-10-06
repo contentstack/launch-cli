@@ -5,7 +5,7 @@ import { FlagKey } from '../resources';
 import { AnyInputs, inputs } from './inputs';
 import * as resolutionModule from '../resources';
 import { AnyResolutionSpec } from './resolution';
-import { resolveInputs } from './resolve';
+import { resolveInputs, resolveInputsTraced } from './resolve';
 import { atLeastOneOf, exactlyOneOf } from './rules';
 
 function withResolution<T>(replacement: Record<string, AnyResolutionSpec>, run: () => Promise<T>): Promise<T> {
@@ -800,5 +800,20 @@ describe('MissingInputError', () => {
     expect(error).toBeInstanceOf(UsageError);
     expect(error.name).toBe('MissingInputError');
     expect(error.flag).toBe('org');
+  });
+});
+
+describe('resolveInputsTraced', () => {
+  it('reports where each resolved value came from alongside the values', async () => {
+    const traced = await resolveInputsTraced(inputs({ org: { required: true }, limit: {}, skip: {} }), {
+      parsed: { skip: 5 },
+      projectConfig: { organizationUid: 'from-config' },
+      services: services(),
+    });
+
+    expect(traced).toEqual({
+      resolved: { org: 'from-config', limit: 100, skip: 5 },
+      sources: { org: 'config', limit: 'default', skip: 'flag' },
+    });
   });
 });

@@ -201,7 +201,8 @@ A new resource - environments, variables, deployments, logs, cache - is a folder
    `T` is the value type and `D` names the inputs it depends on, so `resolved.org` is a
    `string` inside a prompt or normalize callback rather than something to cast. A spec
    may carry `configPath` (a key of `ProjectConfig`, checked at compile time),
-   `dependsOn`, `prompt`, `normalize` and `default`.
+   `configLabel` (how the config-file notice names it; required alongside `configPath`,
+   enforced by `src/resources.test.ts`), `dependsOn`, `prompt`, `normalize` and `default`.
 5. **`src/resources.ts`** - spread the new flags into `catalog`, the new specs into
    `resolution`, the new dependencies into `DEPENDENCIES`, and add the repository to
    `ApiSurface` / `buildApi`. This is the one shared file, so expect to rebase on it.
@@ -475,6 +476,18 @@ from a typo in it is the wrong trade. A missing file is simply written fresh.
 `LaunchCommand` reads the default-location file only when a resolution spec first needs a value from
 it (`projectConfigLoader`), so a V1 file whose branch blocks disagree does not block a command whose
 flags already supply everything; a file named with `--config` is still read at once.
+
+**The config-file notice.** When any input came from the file, `LaunchCommand.init` prints one line
+through `this.ux.print` (stdout, like every other line the CLI prints), worded by
+`configSourceNotice` in `src/core/project-config.ts` from the `configLabel` of each such input and the
+**full path** of the file actually read (a relative `--config` is resolved first): `Using the
+organization and project UIDs from /Users/me/site/.cs-launch.json.` (one input: `Using the project UID
+from …`). It is the first line a command prints. There is no `info:` prefix; only the path is cyan -
+the one style here that means neither success (green) nor warning (yellow) - and only when
+`outputIsTTY`; the rest of the line is plain. It names no uid and no override hint by decision, prints
+with or without a terminal, and says nothing when every value came from a flag, a prompt or a
+default. `resolveInputsTraced` is what reports where each value came from; `resolveInputs` is the
+same resolution without the sources.
 
 The store's second constructor argument says whether the path was one the **user named**.
 At the implicit default path a missing or unreadable file is simply an empty config; at a
