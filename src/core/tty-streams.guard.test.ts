@@ -116,7 +116,7 @@ describe('guard: output decisions read stdout; only the decision to prompt reads
         'if (!this.services.isTTY) {',
         '  throw new MissingInputError(flag, REMEDIES);',
         '}',
-        'return this.services.isTTY ? askChoice(ux, message, choices) : undefined;',
+        'return this.services.isTTY ? askOption(ux, message, choices) : undefined;',
       ].join('\n'),
     };
 

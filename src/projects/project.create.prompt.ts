@@ -47,9 +47,9 @@ export async function askOptionalText(ux: UxLike, message: string, initial?: str
   return text === '' ? undefined : text;
 }
 
-export async function askChoice(ux: UxLike, message: string, choices: Choice[], initial?: string): Promise<string> {
+export async function askOption(ux: UxLike, message: string, choices: Choice[], initial?: string): Promise<string> {
   return chosen(
-    await ux.inquire<string | undefined>({ type: 'search-list', name: 'value', message, choices, default: initial }),
+    await ux.inquire<string | undefined>({ type: 'list', name: 'value', message, choices, default: initial }),
   );
 }
 
@@ -85,7 +85,7 @@ export async function askBranch(
 
   noteTruncation(deps.ux, page.pagination.count, named.length, 'branches', '--branch');
 
-  return askChoice(
+  return askOption(
     deps.ux,
     'Choose a branch',
     named.map((branch) => ({ name: branch.name as string, value: branch.name as string })),

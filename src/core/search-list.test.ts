@@ -1,9 +1,20 @@
-import { SearchListClass, launchSearchList, registerSearchList, startingPointer, utilitiesLoader } from './search-list';
+import {
+  SearchListClass,
+  UnlistedAnswer,
+  answerFor,
+  launchSearchList,
+  refuseUnlisted,
+  registerSearchList,
+  startingPointer,
+  unlistedMessage,
+  utilitiesLoader,
+} from './search-list';
 
 const load = utilitiesLoader();
 const SearchList = load('inquirer-search-list') as SearchListClass;
 
 interface Prompt {
+  opt: { validate: (value: unknown, answers?: unknown) => unknown };
   pointer: number;
   rl: { line: string };
   selected: unknown;
@@ -68,18 +79,66 @@ describe('launchSearchList', () => {
     expect(prompt.getCurrentValue()).toBe('Other');
   });
 
-  it('submits the submitted line rather than the first choice when the typed text matches nothing', () => {
+  it('refuses the submitted line rather than answering with it when the typed text matches no choice', () => {
     const prompt = typed(open({}), 'no-such-framework-9987');
     prompt.rl.line = '';
 
-    expect(prompt.getCurrentValue('no-such-framework-9987')).toBe('no-such-framework-9987');
+    const submitted = prompt.getCurrentValue('no-such-framework-9987');
+
+    expect(submitted).toEqual(new UnlistedAnswer('no-such-framework-9987'));
+    expect(prompt.opt.validate(submitted)).toBe(unlistedMessage('no-such-framework-9987'));
   });
 
-  it('reads nothing as the value when the typed text matches nothing and no line was submitted', () => {
+  it('refuses an empty submitted line, so Enter again after a refusal does not take the first choice', () => {
     const prompt = typed(open({}), 'no-such-framework-9987');
     prompt.rl.line = '';
 
-    expect(prompt.getCurrentValue()).toBe('');
+    const submitted = prompt.getCurrentValue('');
+
+    expect(submitted).toEqual(new UnlistedAnswer(''));
+    expect(prompt.opt.validate(submitted)).toBe(unlistedMessage(''));
+  });
+
+  it('reads back the value it accepted, not an empty line, when asked with no line after the answer', () => {
+    const prompt = typed(open({ choices: [{ name: 'Acme Corp', value: 'blt8ca9ce72e25d0172' }] }), 'blt8ca9ce72e25d0172');
+    prompt.getCurrentValue('blt8ca9ce72e25d0172');
+    prompt.rl.line = '';
+
+    expect(prompt.getCurrentValue()).toBe('blt8ca9ce72e25d0172');
+  });
+
+  it('echoes the label of a value typed in full, rather than the object that refused the empty line', () => {
+    const prompt = typed(open({ choices: [{ name: 'Acme Corp', value: 'blt8ca9ce72e25d0172' }] }), 'blt8ca9ce72e25d0172');
+    prompt.getCurrentValue('blt8ca9ce72e25d0172');
+    prompt.rl.line = '';
+
+    prompt.selected = prompt.getCurrentValue();
+
+    expect(prompt.selected).toBe('Acme Corp');
+  });
+
+  it('reads nothing back when asked with no line before anything was accepted', () => {
+    const prompt = typed(open({}), 'no-such-framework-9987');
+    prompt.rl.line = '';
+
+    expect(prompt.getCurrentValue()).toBeUndefined();
+  });
+
+  it('submits the value of the choice whose value was typed in full, which the name filter hides', () => {
+    const choices = [{ name: 'Acme Corp', value: 'blt8ca9ce72e25d0172' }];
+    const prompt = typed(open({ choices }), 'blt8ca9ce72e25d0172');
+    prompt.rl.line = '';
+
+    const submitted = prompt.getCurrentValue('blt8ca9ce72e25d0172');
+
+    expect(submitted).toBe('blt8ca9ce72e25d0172');
+    expect(prompt.opt.validate(submitted)).toBe(true);
+  });
+
+  it('accepts a highlighted match without consulting the typed text', () => {
+    const prompt = typed(open({}), 'Oth');
+
+    expect(prompt.opt.validate(prompt.getCurrentValue())).toBe(true);
   });
 
   it('echoes the label of the chosen choice, not its value, once answered', () => {
@@ -100,6 +159,57 @@ describe('launchSearchList', () => {
 
   it('echoes nothing before a choice is made', () => {
     expect(open({}).selected).toBe('');
+  });
+});
+
+describe('answerFor', () => {
+  it('answers with the value of the choice whose name was typed in full', () => {
+    expect(answerFor(CHOICES, 'NextJs')).toBe('NextJs');
+  });
+
+  it('answers with the value of the choice whose value was typed in full, even when its name differs', () => {
+    expect(answerFor([{ name: 'Acme Corp', value: 'blt1' }], 'blt1')).toBe('blt1');
+  });
+
+  it('answers with an unlisted answer carrying the text when it matches no choice', () => {
+    expect(answerFor(CHOICES, 'Svelte')).toEqual(new UnlistedAnswer('Svelte'));
+  });
+
+  it('does not take an empty text as a match for a choice with no name', () => {
+    expect(answerFor([{ value: 'a' }], '')).toEqual(new UnlistedAnswer(''));
+  });
+});
+
+describe('unlistedMessage', () => {
+  it('quotes the text that matched nothing and says where to pick from', () => {
+    expect(unlistedMessage('yes')).toBe('"yes" is not one of the options. Pick one from the list.');
+  });
+
+  it('asks for a choice without quoting an empty text', () => {
+    expect(unlistedMessage('')).toBe('Pick one of the options from the list.');
+  });
+});
+
+describe('refuseUnlisted', () => {
+  it('refuses an unlisted answer with its message, without calling the validate it wraps', () => {
+    const inner = jest.fn().mockReturnValue(true);
+
+    expect(refuseUnlisted(inner)(new UnlistedAnswer('yes'))).toBe(
+      '"yes" is not one of the options. Pick one from the list.',
+    );
+    expect(inner).not.toHaveBeenCalled();
+  });
+
+  it('passes a listed answer, and the answers beside it, to the validate it wraps', () => {
+    const inner = jest.fn().mockReturnValue(true);
+    const answers = { org: 'blt1' };
+
+    expect(refuseUnlisted(inner)('enable', answers)).toBe(true);
+    expect(inner).toHaveBeenCalledWith('enable', answers);
+  });
+
+  it('keeps the refusal the wrapped validate gives a listed answer', () => {
+    expect(refuseUnlisted(() => 'Too long.')('enable')).toBe('Too long.');
   });
 });
 

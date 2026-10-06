@@ -5,7 +5,7 @@ import type { ResolutionSpec } from '../core/resolution';
 import { oneOf, withinLength } from '../core/values';
 import { ProjectRef } from './project-ref';
 import type { ProjectType } from './types';
-import { askChoice } from './project.create.prompt';
+import { askOption } from './project.create.prompt';
 import { promptForProject } from './project.prompt';
 import { ProjectResolver } from './project.resolver';
 
@@ -28,7 +28,7 @@ export function projectTypeChoiceOf(value: string): ProjectTypeChoice {
 export const PROJECT_TYPE_QUESTION = 'Choose a project type to proceed';
 
 export function askProjectType(ux: UxLike): Promise<string> {
-  return askChoice(
+  return askOption(
     ux,
     PROJECT_TYPE_QUESTION,
     PROJECT_TYPE_CHOICES.map((value) => ({ name: `Continue with ${value}`, value })),

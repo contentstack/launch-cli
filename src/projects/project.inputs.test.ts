@@ -115,7 +115,7 @@ describe('the --type flag', () => {
     await expect(askProjectType(ux)).resolves.toBe('FileUpload');
     expect(asked).toEqual([
       {
-        type: 'search-list',
+        type: 'list',
         name: 'value',
         message: 'Choose a project type to proceed',
         choices: [

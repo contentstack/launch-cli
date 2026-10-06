@@ -1,12 +1,7 @@
 import { CancelledError } from '../core/errors';
 import { UxLike } from '../core/render';
 import { ApiSurface } from '../resources';
-import {
-  askBranch,
-  askChoice,
-  askText,
-  repositoryLabel,
-} from './project.create.prompt';
+import { askBranch, askOption, askText, repositoryLabel } from './project.create.prompt';
 
 const ORG = 'org1';
 const GIT = { org: ORG, provider: 'GitHub', namespace: 'my-org' };
@@ -61,16 +56,16 @@ describe('project create prompts', () => {
     }
   });
 
-  it('asks for a choice and returns the value picked', async () => {
+  it('asks a fixed set of options as a list, which takes no typed text, and returns the one picked', async () => {
     const { asked, ux } = deps(['FileUpload']);
     const choices = [
       { name: 'GitHub', value: 'GitHub' },
       { name: 'FileUpload', value: 'FileUpload' },
     ];
 
-    await expect(askChoice(ux, 'Project type', choices, 'GitHub')).resolves.toBe('FileUpload');
+    await expect(askOption(ux, 'Project type', choices, 'GitHub')).resolves.toBe('FileUpload');
     expect(asked[0]).toEqual({
-      type: 'search-list',
+      type: 'list',
       name: 'value',
       message: 'Project type',
       choices,
@@ -78,10 +73,10 @@ describe('project create prompts', () => {
     });
   });
 
-  it('cancels rather than accepting nothing at a picker', async () => {
+  it('cancels rather than accepting nothing at a list of options', async () => {
     const { ux } = deps([undefined]);
 
-    await expect(askChoice(ux, 'Project type', [{ name: 'a', value: 'a' }])).rejects.toThrow(CancelledError);
+    await expect(askOption(ux, 'Project type', [{ name: 'a', value: 'a' }])).rejects.toThrow(CancelledError);
   });
 
   it('labels a repository by its full name, falling back to its bare name', () => {
@@ -98,7 +93,7 @@ describe('project create prompts', () => {
     await expect(askBranch(d, { ...GIT, repoName: 'my-org/my-repo' }, 'main')).resolves.toBe('develop');
     expect(requested[0]).toEqual({ ...GIT, repoName: 'my-org/my-repo', limit: 100, skip: 0 });
     expect(asked[0]).toEqual({
-      type: 'search-list',
+      type: 'list',
       name: 'value',
       message: 'Choose a branch',
       choices: [

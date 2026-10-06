@@ -30,7 +30,7 @@ import { LaunchApiError } from '../transport/errors';
 import { archiveDirectory } from './project.archive';
 import {
   askBranch,
-  askChoice,
+  askOption,
   askOptionalText,
   askText,
   findRepository,
@@ -541,7 +541,7 @@ export class ProjectCreator {
 
     if (this.services.isTTY) {
       return frameworkPresetOf(
-        await askChoice(
+        await askOption(
           this.services.ux,
           'Framework preset',
           FRAMEWORK_CHOICES.map((label) => ({ name: label, value: label })),
@@ -674,7 +674,7 @@ export class ProjectCreator {
     }
 
     if (this.services.isTTY) {
-      const mode = await askChoice(
+      const mode = await askOption(
         this.services.ux,
         'Response mode',
         RESPONSE_MODES.map((value) => ({ name: value, value })),
@@ -695,7 +695,7 @@ export class ProjectCreator {
     }
 
     if (this.services.isTTY) {
-      return askChoice(
+      return askOption(
         this.services.ux,
         'Contentstack Authentication',
         TOGGLE_VALUES.map((value) => ({ name: value, value })),

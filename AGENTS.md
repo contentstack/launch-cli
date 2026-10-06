@@ -285,6 +285,39 @@ the yellow `Project not deleted.` and exits 3 (`EXIT_CANCELLED`) without the `Er
 `CancelledError` would print; Ctrl-C at the question is still a `CancelledError`. The success line is
 the green `✔ Project deleted successfully.`, matching `projects:update`.
 
+**A prompt never answers with something that is not on its list.** Two mechanisms, chosen by
+whether the choices need searching. `askOption` in `src/projects/project.create.prompt.ts` is the
+default and the only choice helper left; the two prompts that still need a search box build their
+payload inline.
+
+*Almost every prompt takes no typed text at all.* `askOption` asks `type: 'list'`, which moves only
+on an arrow or a digit and ignores every letter, so text can never become the answer and nothing
+needs validating. Project type, branch, Framework preset, Response mode and Contentstack
+Authentication are all asked this way. Prefer it: the `❯` always shows what Enter will take, where a
+search box hides the list the moment the filter matches nothing. The branch picker is on this side
+despite fetching `PICKER_PAGE_SIZE` branches, because `noteTruncation` already prints the escape
+hatch for a repository with more (`Use --branch to reach any of them.`).
+
+*Only the organization and project pickers stay searchable, and they refuse what is not on them.*
+Both can run to `PICKER_PAGE_SIZE` entries with no flag that is cheaper than searching, so they keep
+`type: 'search-list'`, where the typed text filters and is not an answer in its own right. The
+upstream prompt treats a submission that filtered everything away as an answer anyway, and the CLI
+then carried that text onwards - the
+project picker sent `my-site` to the API as a project uid and got `No project found`, and before
+Contentstack Authentication became a list, typing `yes` at it answered a two-option
+`enable`/`disable` question with neither, which `csAuth === 'enable'` read as **disable**: the user
+asked for login protection and silently got none. `launchSearchList` in `src/core/search-list.ts`
+closes that once, for every search list the CLI issues. On a submission with no filtered match,
+`answerFor` resolves the typed text against the full choice list by exact `name` or exact `value` -
+so a uid typed in full still works, which is what the organization picker documents - and otherwise
+answers with an `UnlistedAnswer`. The wrapper installs `refuseUnlisted` over `this.opt.validate` in
+its constructor, so that answer never leaves the prompt: inquirer renders `"my-site" is not one of
+the options. Pick one from the list.` and asks again. A caller's own `validate` is wrapped, not
+replaced, and still sees every listed answer.
+
+Together these are the prompt-side twin of `oneOf` on the flag side (`--cs-auth yes` has always been
+exit 2); the two now agree, and no prompt module needs its own check.
+
 **The organization prompt.** `--org` resolves flag -> `.cs-launch.json` -> prompt (TTY only), and
 the prompt is `promptForOrganization` in `src/organizations/organization.prompt.ts`, so every command
 that declares `org` inherits it. The management service has no organization-listing endpoint, so the
@@ -302,7 +335,9 @@ it and `layering.test.ts` lists it with no outgoing edges.
 - **Failure** of either call is an `OrganizationLookupError` (exit 1) in the CLI's own words, never a
   raw SDK error, and it suggests `--org`.
 - The picker labels each organization by name and resolves to its uid. Text typed at the search list
-  that matches neither a uid nor a name is a usage error, not a crash.
+  that matches neither a uid nor a name is refused at the prompt itself, by the shared search list
+  below; the usage error in `promptForOrganization` stays as the backstop for a `ux` that answers
+  with something unlisted anyway.
 
 `MissingInputError` names only the remedies that exist for the flag it is about: "set it in
 `.cs-launch.json`" only when the spec has a `configPath`, "run in an interactive terminal" only when
@@ -659,6 +694,13 @@ or an error message.
 resolution spec's `normalize` reaches for. `oneOf` is case- and whitespace-insensitive and returns
 the **canonical** option, which is what makes a doc label map cleanly onto a service enum. Both
 resources use it rather than each writing their own.
+
+**One copy of a shared helper.** A predicate or a wording rule that two resources need lives in the
+layer they both import, never copied beside each one. `isRecord` is in `src/transport/envelope.ts`
+beside `hasUid`; `sentence` - trim a reason and give it a full stop, so a reason can be sewn into a
+longer message - is in `src/core/errors.ts` beside `advice`. Both had two identical copies, which is
+the state just before they drift: one gets a fix and the other keeps punctuating a reason its own
+way, so the same failure reads differently from one command to the next.
 
 **Doc labels are not service enum values.** The Commands Details page is the user-facing contract and
 the management service is the wire contract, and for two flags they differ:

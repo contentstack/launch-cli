@@ -5,8 +5,10 @@ export interface SearchChoice {
   value: unknown;
 }
 
+export type Validator = (value: unknown, answers?: unknown) => unknown;
+
 export interface SearchListPrompt {
-  opt: { default?: unknown };
+  opt: { default?: unknown; validate: Validator };
   rl: { line: string };
   pointer: number;
   list: SearchChoice[];
@@ -22,6 +24,27 @@ interface PromptRegistry {
   registerPrompt(name: string, prompt: unknown): void;
 }
 
+export class UnlistedAnswer {
+  constructor(public readonly typed: string) {}
+}
+
+export function answerFor(list: SearchChoice[], typed: string): unknown {
+  const match = list.find((choice) => choice.name === typed || choice.value === typed);
+
+  return match === undefined ? new UnlistedAnswer(typed) : match.value;
+}
+
+export function unlistedMessage(typed: string): string {
+  return typed === ''
+    ? 'Pick one of the options from the list.'
+    : `"${typed}" is not one of the options. Pick one from the list.`;
+}
+
+export function refuseUnlisted(validate: Validator): Validator {
+  return (value, answers) =>
+    value instanceof UnlistedAnswer ? unlistedMessage(value.typed) : validate(value, answers);
+}
+
 export function startingPointer(list: SearchChoice[], initial: unknown): number {
   const index = list.findIndex((choice) => initial !== undefined && choice.value === initial);
 
@@ -33,11 +56,28 @@ export function launchSearchList(SearchList: SearchListClass): SearchListClass {
     constructor(...params: never[]) {
       super(...params);
       this.pointer = startingPointer(this.list, this.opt.default);
+      this.opt.validate = refuseUnlisted(this.opt.validate);
     }
 
     getCurrentValue(line?: unknown): unknown {
-      return this.filterList.length > 0 ? this.filterList[this.pointer].value : String(line ?? '');
+      if (this.filterList.length > 0) {
+        return this.filterList[this.pointer].value;
+      }
+
+      if (line === undefined) {
+        return this.accepted;
+      }
+
+      const answer = answerFor(this.list, String(line));
+
+      if (!(answer instanceof UnlistedAnswer)) {
+        this.accepted = answer;
+      }
+
+      return answer;
     }
+
+    private accepted: unknown;
 
     private echoed: unknown;
 

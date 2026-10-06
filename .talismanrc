@@ -135,6 +135,9 @@ fileignoreconfig:
     - "what `limit` resolves to when nobody passed it"
     - "a test passes `var`, `env-file` and `from-stack`"
     - "an in-flight secret registry to redact against"
+- filename: src/core/search-list.test.ts
+  allowed_patterns:
+    - "passes a listed answer, and the answers beside it"
 - filename: src/core/project-config.ts
   checksum: feec5219c90a2368edccab2c290284b6e7ccee7fb78443c7b4852d7b207119a4
 - filename: src/core/project-config.test.ts
