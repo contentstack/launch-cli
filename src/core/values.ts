@@ -9,11 +9,13 @@ export function isAbsent(value: unknown): boolean {
 }
 
 export async function withinLength(flag: string, value: string, max: number): Promise<string> {
-  if (value.length > max) {
-    throw new UsageError(`--${flag} must be ${max} characters or fewer; that value is ${value.length} characters.`);
+  const trimmed = value.trim();
+
+  if (trimmed.length > max) {
+    throw new UsageError(`--${flag} must be ${max} characters or fewer; that value is ${trimmed.length} characters.`);
   }
 
-  return value;
+  return trimmed;
 }
 
 export function oneOf<T extends string>(flag: string, value: string, allowed: readonly T[]): T {

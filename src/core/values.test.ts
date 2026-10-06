@@ -7,6 +7,11 @@ describe('input value helpers', () => {
     await expect(withinLength('name', '', 3)).resolves.toBe('');
   });
 
+  it('drops the spaces around a value, and counts its length without them', async () => {
+    await expect(withinLength('name', '  my-site  ', 200)).resolves.toBe('my-site');
+    await expect(withinLength('name', '  abc  ', 3)).resolves.toBe('abc');
+  });
+
   it('refuses a value over the limit with a usage error naming the flag and both lengths', async () => {
     await expect(withinLength('name', 'abcd', 3)).rejects.toThrow(UsageError);
     await expect(withinLength('name', 'abcd', 3)).rejects.toThrow(

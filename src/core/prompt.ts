@@ -35,11 +35,17 @@ export function checkLength(label: string, value: string, max: number): true | s
  * too long is answered again on the spot rather than failing the command after the upload.
  */
 export async function askText(ux: UxLike, message: string, initial?: string, max?: number): Promise<string> {
-  const validate = max === undefined ? undefined : (value: string) => checkLength(message, value, max);
+  const validate = (value: string): true | string => {
+    if (value.trim() === '') {
+      return `${message} can't be empty.`;
+    }
+
+    return max === undefined ? true : checkLength(message, value, max);
+  };
 
   return answered(
     await ux.inquire<string | undefined>({ type: 'input', name: 'value', message, default: initial, validate }),
-  );
+  ).trim();
 }
 
 export async function askOptionalText(ux: UxLike, message: string, initial?: string): Promise<string | undefined> {
