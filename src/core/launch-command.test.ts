@@ -10,11 +10,12 @@ import { getManageApiBaseUrl } from './region';
 import { CancelledError, MissingInputError, UsageError } from './errors';
 import { exactlyOneOf } from './rules';
 import { LaunchApiError } from '../transport/errors';
-import { UxLike } from './render';
+import type { UxLike } from './prompt';
 import type { FlagKey } from '../resources';
 import { LaunchCommand, projectConfigLoader, resolveLaunchContext } from './launch-command';
 import * as serviceContext from './service-context';
-import { SearchListClass, utilitiesLoader } from './search-list';
+import type { SearchListClass } from './search-list';
+import { utilitiesLoader } from './search-list';
 import { pretendTerminal, stdinReportingTTY, stdoutReportingTTY } from '../../test/support/terminal';
 
 class Probe extends LaunchCommand {

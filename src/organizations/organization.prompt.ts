@@ -1,18 +1,13 @@
-import { CancelledError, UsageError } from '../core/errors';
-import type { UxLike } from '../core/render';
-import type { ApiSurface } from '../resources';
+import { UsageError } from '../core/errors';
+import type { PromptDeps } from '../core/prompt';
+import { answered } from '../core/prompt';
 import type { Organization } from './organizations.api';
-
-export interface OrganizationPromptDeps {
-  api: ApiSurface;
-  ux: UxLike;
-}
 
 function labelOf(organization: Organization): string {
   return organization.name ?? organization.uid;
 }
 
-export async function promptForOrganization(deps: OrganizationPromptDeps): Promise<string> {
+export async function promptForOrganization(deps: PromptDeps): Promise<string> {
   const { organizations, scoped } = await deps.api.organizations.available();
 
   if (scoped) {
@@ -28,16 +23,14 @@ export async function promptForOrganization(deps: OrganizationPromptDeps): Promi
     throw new UsageError('Your account belongs to no organization, so there is none to choose from.');
   }
 
-  const chosen = await deps.ux.inquire<string | null | undefined>({
-    type: 'search-list',
-    name: 'organization',
-    message: 'Choose an organization',
-    choices: organizations.map((organization) => ({ name: labelOf(organization), value: organization.uid })),
-  });
-
-  if (chosen === undefined || chosen === null || chosen === '') {
-    throw new CancelledError();
-  }
+  const chosen = answered(
+    await deps.ux.inquire<string | null | undefined>({
+      type: 'search-list',
+      name: 'organization',
+      message: 'Choose an organization',
+      choices: organizations.map((organization) => ({ name: labelOf(organization), value: organization.uid })),
+    }),
+  );
 
   const match = organizations.find((organization) => organization.uid === chosen || organization.name === chosen);
 

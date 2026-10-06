@@ -1,11 +1,12 @@
 import nock from 'nock';
 
 import { buildApi } from '../../src/resources';
-import { ProjectsPage } from '../../src/projects/types';
+import type { ProjectsPage } from '../../src/projects/types';
 import { PROJECT_COLUMNS } from '../../src/projects/project.presenter';
 import { LaunchApiError } from '../../src/transport/errors';
 import { RestApiClient } from '../../src/transport/rest-client';
-import { UxLike, renderPagination, renderTable } from '../../src/core/render';
+import { renderPagination, renderTable } from '../../src/core/render';
+import type { UxLike } from '../../src/core/prompt';
 import listFixture from '../fixtures/projects-list.json';
 import type { CmaSession } from '../../src/transport/cma-client';
 

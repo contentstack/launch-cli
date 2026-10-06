@@ -1,5 +1,5 @@
 import { assertArray } from '../transport/envelope';
-import { RestApiClient } from '../transport/rest-client';
+import type { RestApiClient } from '../transport/rest-client';
 import { DEPLOYMENT_ERROR_MESSAGES } from './deployment.errors';
 import { DeploymentsApi, type GetDeploymentParams } from './deployments.api';
 import type { DeploymentLog } from './types';

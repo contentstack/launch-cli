@@ -1,4 +1,5 @@
-import { Occurrence, SourceFile, describeOccurrence, productionSources } from '../../test/support/sources';
+import type { Occurrence, SourceFile } from '../../test/support/sources';
+import { describeOccurrence, productionSources } from '../../test/support/sources';
 
 const PLUMBING_FILES = ['core/launch-command.ts', 'core/service-context.ts', 'core/resolution.ts'];
 const PLUMBING_LINE = /^isTTY\??:\s*(boolean|args\.isTTY|options\.isTTY|Boolean\(process\.stdin\.isTTY\)),?;?$/;

@@ -1,12 +1,8 @@
 import { LaunchCommand } from '../../../core/launch-command';
 import { UsageError } from '../../../core/errors';
 import { flagsFor, inputs } from '../../../core/inputs';
-import {
-  PROJECT_UPDATABLE_FIELDS,
-  projectNotUpdatedLine,
-  projectUpdatedLine,
-} from '../../../projects/project.presenter';
-import { promptForProjectUpdate } from '../../../projects/project.update.prompt';
+import { projectNotUpdatedLine, projectUpdatedLine } from '../../../projects/project.presenter';
+import { PROJECT_UPDATABLE_FIELDS, promptForProjectUpdate } from '../../../projects/project.prompt';
 import type { ProjectUpdate } from '../../../projects/types';
 
 const updateInputs = inputs({

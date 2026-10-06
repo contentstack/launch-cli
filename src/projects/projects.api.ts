@@ -1,9 +1,9 @@
 import { MAX_PAGES } from '../core/constants';
 import { UsageError } from '../core/errors';
 import { assertPage, hasUid, isRecord, malformed, unwrap } from '../transport/envelope';
-import { RestApiClient, RestRequest } from '../transport/rest-client';
+import type { RestApiClient, RestRequest } from '../transport/rest-client';
 import { PROJECT_ERROR_MESSAGES } from './project.errors';
-import {
+import type {
   CreateProjectInput,
   DetectedFramework,
   IdentifiedProject,

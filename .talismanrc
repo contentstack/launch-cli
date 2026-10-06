@@ -1,4 +1,26 @@
 fileignoreconfig:
+- filename: test/integration/retired-commands.test.ts
+  checksum: ed3911c4dfc42bb7b2e4806f6785b15c839c87ddbd7ae7ad70f6e3a493ab76f8
+- filename: test/integration/manage-base-path.test.ts
+  checksum: 79eb9ad420ea47d5bee8045d812c45b010bbeeafcaf5f85d11653140b0cd0db1
+- filename: src/transport/rest-client.ts
+  checksum: bf0b19bdce7796208e7a8f29f7fdc8aad36ed2ffc10e148439fa19fd166c63d3
+- filename: src/transport/rest-client.test.ts
+  checksum: 3b5751449c61f7a1d71b978ed03b9472f714e12dd1679f691bbd4dd8f84be923
+- filename: src/transport/cma-client.ts
+  checksum: b1cc7c3348930846f1d27b9d025e3a76f807eaccd48db6464ef9c27ef83ec4ac
+- filename: src/transport/auth-strategy.test.ts
+  checksum: a4f3e3ea7db10dbf82abbac0207d2231ee740916f476fcda836a2268505295ef
+- filename: src/projects/types.ts
+  checksum: 563a1f339c7b1ba1a366e8cac087a52805af21d46f07e4078716358ed99270f5
+- filename: src/projects/projects.api.ts
+  checksum: 4bc980a0c0558046de0d8b0b98c45c34b7bacb18e91833d00f658c660ae1cc85
+- filename: src/core/service-context.test.ts
+  checksum: 7bc4f6ca3ec8a960f84fb4c07453a287bb2bb0ccc7e06c5805a7f56df160024a
+- filename: src/core/rules.test.ts
+  checksum: 2dbc873f3e635a72b1b566311c04252d2a2c25142570006523415c81a91c7a6a
+- filename: src/core/inputs.test.ts
+  checksum: c5b4be7a0aa2f0878153f062e1500b2bdbd53bdd2d84bb7c13c731db3c3699c4
 - filename: .github/workflows/secrets-scan.yml
   checksum: aa468892940460dd050b7bc2ec997d589fe88c3557779dabdb1583645e45b79b
 - filename: .husky/secrets-scan.sh
@@ -83,13 +105,18 @@ fileignoreconfig:
   ignore_detectors:
     - filename
 - filename: src/git/git.api.ts
-  checksum: dc9951fbcf6c1204c5eedb84c476bcce7d83339b1515ec10143e4f06bafda1aa
+  checksum: 57c98f5d7ba6da4fe4ecc211d803d67bb334244d947ea281b7994ab2d1e84b84
   allowed_patterns:
     - "assertArray\\(response, key, `\\$\\{key\\} response`\\)"
 - filename: src/environments/environment.inputs.ts
   ignore_detectors:
     - filename
+- filename: src/environments/environment.inputs.test.ts
+  checksum: 87139e8df1adc655cabff993774dea596e1f5c55cdc243da21a7fab30115ce14
+  ignore_detectors:
+    - filename
 - filename: src/core/inputs.ts
+  checksum: 6af3bfdfd7473eff2cce16acb6e7feb377eab05c68ad96a05101b20873582c49
   allowed_patterns:
     - "FlagKey"
     - "InputKeys"
@@ -117,6 +144,7 @@ fileignoreconfig:
     - "b2c3d4e5f60718293a4b5c6d"
     - "c3d4e5f60718293a4b5c6d7e"
 - filename: src/core/rules.ts
+  checksum: ac94c82b5ce3805f986b5aeecc4e53579dfdf1473d9617c20bc126597657fe37
   allowed_patterns:
     - "FlagKey"
 - filename: src/resources.ts
@@ -143,39 +171,39 @@ fileignoreconfig:
 - filename: src/core/project-config.test.ts
   checksum: 65c0a613ec77d4dc6727224d4d097de4a02b300339286db692dbaea9379565ae
 - filename: src/core/resolve.ts
-  checksum: 25cb3c5eb789bfd148efb1a990932b99970c45d5777344d34e66cf54207c5256
+  checksum: 5d150db11cb1c976911ecba61336118ddad051942da95f809695c0cf0346de42
 - filename: src/core/resolve.test.ts
-  checksum: 1a07140c5f61d2c1cbd1f9746fca2e907fd2467f804c62a0ed6c188b6944b126
+  checksum: 42dfd6c77b752f64f6a927845a2d98626934ba0952c911cf701b3df502cb0443
 - filename: src/git/local-repository.ts
   checksum: 7f266d6d6796574721ca463a14914759c91ce25dfa5b333f103258fe2336cfe5
 - filename: src/core/layering.test.ts
-  checksum: 7a62eca2d63801b98591267dcbaa9e2568b20e1732ab1c744263ddab7f0dbbe8
+  checksum: a1efe5f165b1c41e638eb6585cec28009b87cff00183072136d4954fed7f142a
 - filename: src/commands/launch/projects/create.test.ts
-  checksum: 65a8c28525aa8ade9af5f5356cf505d3ebe5fd0d6131ba9b758c709c2a34e242
+  checksum: df6bd90d4a8584442024f450f29299da748cf12a5a4be1701b8c26b31386dbf7
 - filename: src/commands/launch/projects/delete.test.ts
-  checksum: 029c034d3d38d8cb37901b0936a7d6b4525d5bedf8c7ce052984c9b6f9ceffec
+  checksum: d67d8a804d14f9b809153d10b0cf9d5e52b70f9e0b65678ebb1663a7d2da22c1
 - filename: test/integration/projects-delete.test.ts
-  checksum: 4e2960b921f69bcb5fc1b4d6089b7ded1b71ed54609d8304bf7ee84041cf7fc2
+  checksum: 61e5c6bb9c82260797552a1d9e263e7e0b6c88a627bcc996f5fd3b678d99f9b7
 - filename: src/core/launch-command.ts
-  checksum: 4bccae32140aa3b4da94346b4bfd3b199a2a7d568f26e28d7dad58b266148038
+  checksum: 85f86ea5f075bfdd78652dc05d20a2f6e89348466c6bd41ae903bcb1b7e8515d
 - filename: src/core/launch-command.test.ts
-  checksum: 2cc245f8a4af102eb9edb53184d1af2486c6bbf9588a41e56452895a4c580e99
+  checksum: 930069aeddbf4348097f33713e4e57bd26cb3be1b7970eb60142bb53010e1674
 - filename: src/projects/project.inputs.test.ts
-  checksum: 9d409c408f433eb1c7ca8fcff6dfc76d212281adaf7fcfd7bd9a121b8096577d
+  checksum: c20f69186e74bc5fe6deb73a9036fa2cb86aeff1bde48670f0c489d9e9121c62
 - filename: test/integration/projects-command-flows.test.ts
-  checksum: 58364e1ed8e4958fe32bfa86e1598c156ab260d495f2700690b0443e3cc670b9
+  checksum: ae02de4f2bb6c577065a31351cb7e4a3456f085148de6779fd1f23c36f6b85ad
 - filename: src/core/redact.test.ts
   checksum: ae497ea8c3a4c3f12217d2c4c028a1da3d1324e18362d68c355ba8120902bcb3
 - filename: src/commands/launch/projects/list.test.ts
-  checksum: 42f9d2d0e6fd1d16513ac5c675d2eb37beef6071e329b2b243215f4614e2b210
+  checksum: ad565f30c957dc4463d13e242dd8bb0cbae9270d345cb59e28999474855693dc
 - filename: src/commands/launch/projects/get.test.ts
-  checksum: 9e99dc536b36b27810388039f61cc2c5ffa757fa33509171d91c91396d16e657
+  checksum: fec6ca189bc3d93aefa109ee6405f8ce74a42318aa18a99045d40c3cb5561b9e
 - filename: test/integration/projects-list-command.test.ts
-  checksum: b34a68639ba0694dd89df11373b0192329e58cef9e2b1ff9d7e5456a528f882b
+  checksum: 1012c9fb505778c3ccd955da2d0877e16b69408ca460d78244e339c6afd28a8c
 - filename: src/functions/cloud-functions.test.ts
-  checksum: b3e7ad3428544faf1695752bd04af45716a0189b5950f77fcb104f282516a56c
+  checksum: cb88289005016bb88b1e3c70dcf91980156e5ec4e9a80bb63584022aa73a2890
 - filename: src/transport/proxy.test.ts
   checksum: 06db291bb40ec55774179b02e3e1a9644bbaa116ec511c163e8d6012aebb3868
 - filename: test/integration/project-upload-proxy.test.ts
-  checksum: 668f517734e60580470f770cb5b180b4f876db9746029610dafcb5d9826c8871
+  checksum: 6e3ebdd77f0bb99bc2cd2fc778c46c8a77b601d1a6bfdd40590cdf21d41009b6
 version: "1.0"

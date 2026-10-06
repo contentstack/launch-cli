@@ -1,6 +1,7 @@
 import { UsageError } from './errors';
 import type { InputSource } from './resolution';
-import { InputSources, ResolvedValues, atLeastOneOf, exactlyOneOf, onlyWithValueOf, requireValueOf } from './rules';
+import type { InputSources, ResolvedValues } from './rules';
+import { atLeastOneOf, exactlyOneOf, onlyWithValueOf, requireValueOf } from './rules';
 
 function from(source: InputSource, values: ResolvedValues): InputSources {
   return Object.fromEntries(Object.keys(values).map((key) => [key, source]));

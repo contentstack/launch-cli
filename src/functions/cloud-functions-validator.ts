@@ -4,7 +4,7 @@ import {
   InvalidFilepathNamingError,
   TopLevelDynamicRouteError,
 } from './function.errors';
-import { CloudFunctionResource, CloudFunctionValidationError } from './types';
+import type { CloudFunctionResource, CloudFunctionValidationError } from './types';
 
 export class CloudFunctionsValidator {
   private cloudFunctionResources: CloudFunctionResource[];

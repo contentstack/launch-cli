@@ -1,7 +1,7 @@
 import { assertPage, hasUid, malformed, unwrap } from '../transport/envelope';
-import { RestApiClient, RestRequest } from '../transport/rest-client';
+import type { RestApiClient, RestRequest } from '../transport/rest-client';
 import { DEPLOYMENT_ERROR_MESSAGES } from './deployment.errors';
-import { Deployment, DeploymentResponse, DeploymentsPage, IdentifiedDeployment } from './types';
+import type { Deployment, DeploymentResponse, DeploymentsPage, IdentifiedDeployment } from './types';
 
 export * from './types';
 

@@ -35,6 +35,12 @@ export default tseslint.config(
     },
   },
   {
+    files: ['src/**/*.ts', 'test/**/*.ts'],
+    rules: {
+      '@typescript-eslint/consistent-type-imports': ['error'],
+    },
+  },
+  {
     files: ['src/**/*.test.ts'],
     rules: {
       'max-len': 'off',

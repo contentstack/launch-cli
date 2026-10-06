@@ -2,7 +2,8 @@ import { randomBytes, randomUUID } from 'node:crypto';
 
 import nock from 'nock';
 
-import { HTTP_METHODS, HttpMethod, RestApiClient } from '../../src/transport/rest-client';
+import type { HttpMethod } from '../../src/transport/rest-client';
+import { HTTP_METHODS, RestApiClient } from '../../src/transport/rest-client';
 import { describeOccurrence, occurrences, productionSources } from '../support/sources';
 
 const ORIGIN = 'https://launch-api.content-type.test';

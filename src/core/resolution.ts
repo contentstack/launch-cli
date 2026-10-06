@@ -2,7 +2,7 @@ import type { ApiSurface, Catalog, FlagKey } from '../resources';
 import { DEFAULT_LIMIT } from './constants';
 import type { ValueOf } from './inputs';
 import type { ProjectConfigKey } from './project-config';
-import type { UxLike } from './render';
+import type { UxLike } from './prompt';
 
 export interface ResolveServices {
   api: ApiSurface;

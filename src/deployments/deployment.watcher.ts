@@ -1,5 +1,5 @@
 import type { Loader } from '../core/loader';
-import type { UxLike } from '../core/render';
+import type { UxLike } from '../core/prompt';
 import { RetryPolicy } from '../transport/retry-policy';
 import { classifyStatus, normalizeStatus } from './deployment.status';
 import {

@@ -3,6 +3,9 @@ import type { CreateEnvironmentInput } from '../environments/types';
 
 export type { Pagination };
 
+export const PROJECT_NAME_MAX_LENGTH = 200;
+export const PROJECT_DESCRIPTION_MAX_LENGTH = 255;
+
 export interface ProjectRepository {
   repositoryUrl?: string;
   repositoryName?: string;

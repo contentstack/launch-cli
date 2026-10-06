@@ -1,4 +1,4 @@
-import { UxLike } from '../../../core/render';
+import type { UxLike } from '../../../core/prompt';
 import ProjectsList from './list';
 
 function commandUnderTest(page: unknown, resolved: Record<string, unknown> = { org: 'org1', limit: 50, skip: 0 }) {

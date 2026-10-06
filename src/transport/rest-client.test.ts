@@ -4,7 +4,8 @@ import { HttpClient, configHandler } from '@contentstack/cli-utilities';
 
 import { API_VERSION } from '../core/constants';
 import { LaunchApiError, LaunchNetworkError } from './errors';
-import { HttpClientLike, RestApiClient } from './rest-client';
+import type { HttpClientLike } from './rest-client';
+import { RestApiClient } from './rest-client';
 import { DEFAULT_REQUEST_TIMEOUT_MS } from './retry-policy';
 
 interface RecordedCall {

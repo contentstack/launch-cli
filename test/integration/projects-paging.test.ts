@@ -6,7 +6,7 @@ import { buildApi } from '../../src/resources';
 import { PROJECT_SCAN_PAGE_SIZE } from '../../src/projects/projects.api';
 import { UsageError } from '../../src/core/errors';
 import { RestApiClient } from '../../src/transport/rest-client';
-import { UxLike } from '../../src/core/render';
+import type { UxLike } from '../../src/core/prompt';
 import { ProjectRef } from '../../src/projects/project-ref';
 import { ProjectResolver } from '../../src/projects/project.resolver';
 import type { CmaSession } from '../../src/transport/cma-client';

@@ -1,5 +1,6 @@
 import { EXIT_RUNTIME } from '../core/constants';
-import { ApiErrorEntry, LaunchApiError } from '../transport/errors';
+import type { ApiErrorEntry } from '../transport/errors';
+import { LaunchApiError } from '../transport/errors';
 import { GIT_CONNECTION_NOT_FOUND_CODE, GitConnectionMissingError, isMissingGitConnection } from './git.errors';
 
 function apiError(entries: ApiErrorEntry[]): LaunchApiError {

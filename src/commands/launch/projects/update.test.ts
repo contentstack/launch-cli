@@ -1,8 +1,8 @@
 import { UsageError } from '../../../core/errors';
-import { UxLike } from '../../../core/render';
+import type { UxLike } from '../../../core/prompt';
 import { resolveInputs } from '../../../core/resolve';
-import { ApiSurface } from '../../../resources';
-import { Project } from '../../../projects/types';
+import type { ApiSurface } from '../../../resources';
+import type { Project } from '../../../projects/types';
 import ProjectsUpdate from './update';
 
 const PROJECT_UID = 'a1b2c3d4e5f60718293a4b5c';

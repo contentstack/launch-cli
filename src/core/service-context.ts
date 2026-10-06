@@ -1,10 +1,11 @@
-import { ApiSurface, buildApi } from '../resources';
+import type { ApiSurface } from '../resources';
+import { buildApi } from '../resources';
 import { RestApiClient } from '../transport/rest-client';
 import { selectAuthStrategy } from '../transport/auth-strategy';
 import { createCmaSession } from '../transport/cma-client';
 import { getLogsApiBaseUrl, getManageApiBaseUrl, resolveLaunchAppUrl } from './region';
 import { openInBrowser } from './browser';
-import { UxLike } from './render';
+import type { UxLike } from './prompt';
 
 export interface ServiceContextOptions {
   launchHubUrl: string;

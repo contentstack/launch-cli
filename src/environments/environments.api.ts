@@ -1,7 +1,7 @@
 import { assertPage, hasUid, malformed } from '../transport/envelope';
-import { RestApiClient, RestRequest } from '../transport/rest-client';
+import type { RestApiClient, RestRequest } from '../transport/rest-client';
 import { ENVIRONMENT_ERROR_MESSAGES } from './environment.errors';
-import { EnvironmentsPage, IdentifiedEnvironment } from './types';
+import type { EnvironmentsPage, IdentifiedEnvironment } from './types';
 
 export * from './types';
 

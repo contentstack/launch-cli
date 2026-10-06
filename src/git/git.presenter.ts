@@ -1,4 +1,5 @@
 import { styled } from '../core/style';
+import type { GitRepository } from './types';
 
 /**
  * V1 drew this through winston, whose colours it inherited: the problem in red under an `error:`
@@ -17,4 +18,8 @@ export function gitConnectionLines(provider: string, connectUrl: string | undefi
     styled(`info: You can connect your ${provider} account to the UI using the following URL:`, 'green', colour),
     styled(connectUrl, 'green', colour),
   ];
+}
+
+export function repositoryLabel(repository: GitRepository): string {
+  return repository.fullName || repository.name || '';
 }

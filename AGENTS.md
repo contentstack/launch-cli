@@ -355,7 +355,7 @@ a prompt is checked as well as one from argv.
 Supplying either flag is the whole request: the supplied fields are sent as given and the other one
 is neither prompted for nor fetched, in a terminal or not. Only when neither flag is supplied, in a
 terminal, are both fields prompted for, in order (name, then description): `promptForProjectUpdate`
-in `src/projects/project.update.prompt.ts`. Prompts carry no pre-filled value; a blank answer, or one
+in `src/projects/project.prompt.ts`. Prompts carry no pre-filled value; a blank answer, or one
 equal to the current value (read with one `GET` first), leaves that field out. The length limits are
 checked inside each prompt's `validate`, so an oversized answer re-prompts instead of failing. If
 nothing is left to send, the command prints a yellow `Project not updated. No changes were entered.`,
@@ -570,8 +570,8 @@ makes the deadline unreachable and the suite **hangs** rather than failing - the
 as the `loadDataURL` rule below. Have `sleep` advance the same counter `now` reads.
 
 **`projects:create`.** The command is thin; `ProjectCreator` in `src/projects/project.create.ts` is
-the domain service, and `src/projects/project.create.prompt.ts` is a UI adapter that renders choices
-and nothing more.
+the domain service, and the prompts it asks come from `src/core/prompt.ts` (text, choice, cancel) and
+`src/git/git.prompt.ts` (branch picker), adapters that render choices and nothing more.
 
 Interactive order is pinned by a test against the order a real `csdx launch` run prompts in: type ->
 organization -> (FileUpload only: zip + upload) -> project name -> environment name -> (GitHub only:

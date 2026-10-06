@@ -1,5 +1,5 @@
 import { CancelledError, UsageError } from '../core/errors';
-import type { UxLike } from '../core/render';
+import type { UxLike } from '../core/prompt';
 import type { ApiSurface } from '../resources';
 import { OrganizationLookupError } from './organization.errors';
 import { promptForOrganization } from './organization.prompt';

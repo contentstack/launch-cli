@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { authHandler, configHandler } from '@contentstack/cli-utilities';
 
 import { SessionExpiredError, UnauthenticatedError } from '../core/errors';
-import { AuthStrategy, BasicAuth, OAuthAuth, selectAuthStrategy } from './auth-strategy';
+import type { AuthStrategy } from './auth-strategy';
+import { BasicAuth, OAuthAuth, selectAuthStrategy } from './auth-strategy';
 
 function configReturning(values: Record<string, unknown>) {
   return jest.spyOn(configHandler, 'get').mockImplementation((key: string) => values[key]);

@@ -1,10 +1,11 @@
 import dotenv from 'dotenv';
-import express, {
+import type {
   Request,
   Response,
 } from 'express';
+import express from 'express';
 import type { Express } from 'express-serve-static-core';
-import { Server } from 'http';
+import type { Server } from 'http';
 import path from 'path';
 
 import { styled } from '../core/style';
@@ -16,7 +17,7 @@ import {
 } from './constants';
 import { FunctionsDirectoryNotFoundError, PortInUseError } from './function.errors';
 import { walkFileSystem, checkIfDirectoryExists } from './os-helper';
-import { CloudFunctionResource } from './types';
+import type { CloudFunctionResource } from './types';
 
 import { loadDataURL } from './load-data-url';
 

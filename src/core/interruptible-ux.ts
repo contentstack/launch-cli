@@ -1,5 +1,5 @@
 import { CancelledError } from './errors';
-import { UxLike } from './render';
+import type { UxLike } from './prompt';
 
 export interface InterruptSource {
   once(signal: 'SIGINT', listener: () => void): unknown;

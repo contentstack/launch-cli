@@ -1,7 +1,7 @@
 import { UsageError } from '../core/errors';
-import { ResolveServices } from '../core/resolution';
-import { ApiSurface } from '../resources';
-import { UxLike } from '../core/render';
+import type { ResolveServices } from '../core/resolution';
+import type { ApiSurface } from '../resources';
+import type { UxLike } from '../core/prompt';
 import {
   ENVIRONMENT_NAME_MAX_LENGTH,
   FRAMEWORK_CHOICES,

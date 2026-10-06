@@ -1,7 +1,7 @@
 import { UsageError } from './errors';
 import type { InputSource } from './resolution';
 import { isAbsent } from './values';
-import { FlagKey } from '../resources';
+import type { FlagKey } from '../resources';
 
 export type ResolvedValues = Record<string, unknown>;
 

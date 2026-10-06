@@ -1,8 +1,8 @@
 import { LaunchNetworkError } from './errors';
+import type { HttpMethod } from './retry-policy';
 import {
   DEFAULT_MAX_RETRIES,
   DEFAULT_RETRY_DELAY_MS,
-  HttpMethod,
   MAX_RETRY_AFTER_MS,
   RetryPolicy,
   retryAfterMs,

@@ -1,5 +1,5 @@
+import type { ContentstackClient } from '@contentstack/cli-utilities';
 import {
-  ContentstackClient,
   configHandler,
   managementSDKClient,
   managementSDKInitiator,

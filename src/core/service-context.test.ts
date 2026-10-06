@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { HttpClient, authHandler, configHandler } from '@contentstack/cli-utilities';
 
 import { SessionExpiredError, UnauthenticatedError } from './errors';
-import { UxLike } from './render';
+import type { UxLike } from './prompt';
 import { buildServiceContext } from './service-context';
 
 interface CapturedCall {

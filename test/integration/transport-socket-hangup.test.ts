@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { AddressInfo, Socket } from 'node:net';
-import { Server, createServer } from 'node:http';
+import type { AddressInfo, Socket } from 'node:net';
+import type { Server } from 'node:http';
+import { createServer } from 'node:http';
 
 import { LaunchNetworkError } from '../../src/transport/errors';
-import { HttpMethod, RestApiClient } from '../../src/transport/rest-client';
+import type { HttpMethod } from '../../src/transport/rest-client';
+import { RestApiClient } from '../../src/transport/rest-client';
 
 const ANALYTICS_INFO = '@contentstack/cli-launch/2.0.0-alpha.0 darwin-arm64 node-v22.0.0';
 const ORG_UID = 'blt4d9e2a7c1f6b3085';

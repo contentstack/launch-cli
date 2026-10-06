@@ -1,6 +1,6 @@
-import { ApiSurface } from '../../../resources';
+import type { ApiSurface } from '../../../resources';
 import { resolveInputs } from '../../../core/resolve';
-import { UxLike } from '../../../core/render';
+import type { UxLike } from '../../../core/prompt';
 import ProjectsGet from './get';
 
 function commandUnderTest(project: unknown) {

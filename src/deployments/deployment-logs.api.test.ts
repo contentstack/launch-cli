@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 
 import { LaunchApiError } from '../transport/errors';
-import { RestApiClient, RestRequest } from '../transport/rest-client';
+import type { RestApiClient, RestRequest } from '../transport/rest-client';
 import { DEPLOYMENT_ERROR_MESSAGES } from './deployment.errors';
 import { DeploymentLogsApi } from './deployment-logs.api';
 

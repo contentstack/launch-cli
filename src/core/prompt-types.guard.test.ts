@@ -2,7 +2,8 @@ import { authHandler } from '@contentstack/cli-utilities';
 
 import { LaunchCommand } from './launch-command';
 import { utilitiesLoader } from './search-list';
-import { SourceFile, balancedCall, productionSources } from '../../test/support/sources';
+import type { SourceFile } from '../../test/support/sources';
+import { balancedCall, productionSources } from '../../test/support/sources';
 
 interface PromptRegistry {
   prompt: { prompts: Record<string, unknown> };

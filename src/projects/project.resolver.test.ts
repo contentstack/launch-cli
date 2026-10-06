@@ -3,8 +3,9 @@ import { randomBytes } from 'node:crypto';
 import { UsageError } from '../core/errors';
 import { LaunchApiError } from '../transport/errors';
 import { ProjectRef } from './project-ref';
-import { ProjectPages, ProjectResolver } from './project.resolver';
-import { ProjectsPage } from './types';
+import type { ProjectPages } from './project.resolver';
+import { ProjectResolver } from './project.resolver';
+import type { ProjectsPage } from './types';
 
 type FakeProject = { uid?: string | null; name?: string };
 

@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
-import { UxLike } from '../core/render';
+import type { UxLike } from '../core/prompt';
 import {
   DEPLOYMENT_MAX_BACKOFF_STEPS,
   DEPLOYMENT_MAX_POLL_ERRORS,
@@ -11,7 +11,7 @@ import {
   defaultWatchTiming,
   watchDeployment,
 } from './deployment.watcher';
-import { Deployment, DeploymentLog } from './types';
+import type { Deployment, DeploymentLog } from './types';
 
 const UID = randomBytes(12).toString('hex');
 

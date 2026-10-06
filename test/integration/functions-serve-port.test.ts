@@ -2,7 +2,8 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { Config, Errors, Interfaces, Plugin } from '@oclif/core';
+import type { Interfaces } from '@oclif/core';
+import { Config, Errors, Plugin } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 
 const INVALID_PORT_RECORD =

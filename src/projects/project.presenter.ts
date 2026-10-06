@@ -3,7 +3,7 @@ import type { TableColumn } from '../core/render';
 import { styled } from '../core/style';
 import { LaunchApiError } from '../transport/errors';
 import type { GitOnlyFlag } from './project.inputs';
-import type { Project, ProjectUpdate } from './types';
+import type { Project } from './types';
 
 export const PROJECT_COLUMNS: TableColumn<Project>[] = [
   { header: 'NAME', value: (project) => project.name ?? '-' },
@@ -130,8 +130,6 @@ export function deploymentFailureMessage(failure: PartialCreateFailure): string 
     `or csdx launch:logs:get ${scope}${environment}${deployment} to see why it did not succeed.`
   );
 }
-
-export const PROJECT_UPDATABLE_FIELDS: (keyof ProjectUpdate)[] = ['name', 'description'];
 
 export const PROJECT_UPDATED = '\u2714 Project updated successfully.';
 

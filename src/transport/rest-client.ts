@@ -1,7 +1,9 @@
 import { API_VERSION } from '../core/constants';
-import { AuthStrategy } from './auth-strategy';
-import { ErrorMessages, diagnoseTransportError, parseErrorEnvelope } from './errors';
-import { DEFAULT_REQUEST_TIMEOUT_MS, HttpMethod, RetryPolicy, retryAfterMs } from './retry-policy';
+import type { AuthStrategy } from './auth-strategy';
+import type { ErrorMessages } from './errors';
+import { diagnoseTransportError, parseErrorEnvelope } from './errors';
+import type { HttpMethod } from './retry-policy';
+import { DEFAULT_REQUEST_TIMEOUT_MS, RetryPolicy, retryAfterMs } from './retry-policy';
 import { createUtilityHttpClient } from './utility-http-client';
 
 export { HTTP_METHODS } from './retry-policy';

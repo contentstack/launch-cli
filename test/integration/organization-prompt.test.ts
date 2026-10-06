@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 
 import { authHandler, cliux, configHandler } from '@contentstack/cli-utilities';
-import { Config, Interfaces, Plugin } from '@oclif/core';
+import type { Interfaces } from '@oclif/core';
+import { Config, Plugin } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
 

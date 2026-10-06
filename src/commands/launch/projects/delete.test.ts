@@ -1,6 +1,6 @@
 import { UsageError } from '../../../core/errors';
-import { UxLike } from '../../../core/render';
-import { Project } from '../../../projects/types';
+import type { UxLike } from '../../../core/prompt';
+import type { Project } from '../../../projects/types';
 import ProjectsDelete from './delete';
 
 const PROJECT_UID = 'a1b2c3d4e5f60718293a4b5c';

@@ -1,4 +1,4 @@
-import { TableColumn } from './render';
+import type { TableColumn } from './render';
 
 export const REDACTED = '••••••';
 

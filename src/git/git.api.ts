@@ -1,7 +1,7 @@
 import { assertArray } from '../transport/envelope';
-import { RestApiClient, RestRequest } from '../transport/rest-client';
+import type { RestApiClient, RestRequest } from '../transport/rest-client';
 import { GIT_ERROR_MESSAGES } from './git.errors';
-import { GitBranchesPage, GitRepositoriesPage } from './types';
+import type { GitBranchesPage, GitRepositoriesPage } from './types';
 
 export * from './types';
 

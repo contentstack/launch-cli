@@ -1,9 +1,8 @@
 import { UsageError } from '../core/errors';
-import type { UxLike } from '../core/render';
+import type { UxLike } from '../core/prompt';
 import type { ApiSurface } from '../resources';
+import { PROJECT_DESCRIPTION_MAX_LENGTH, PROJECT_NAME_MAX_LENGTH } from './types';
 import {
-  PROJECT_DESCRIPTION_MAX_LENGTH,
-  PROJECT_NAME_MAX_LENGTH,
   PROJECT_TYPE_BY_CHOICE,
   PROJECT_TYPE_CHOICES,
   askProjectType,

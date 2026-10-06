@@ -1,7 +1,7 @@
+import type { defaultWatchTiming } from '../../../projects/project.create';
 import {
   DEPLOYMENT_WAIT_TIMEOUT_MS,
   ProjectCreator,
-  defaultWatchTiming,
   serverCommandFrameworkGate,
 } from '../../../projects/project.create';
 

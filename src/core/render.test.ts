@@ -1,4 +1,5 @@
-import { UxLike, renderPagination, renderTable } from './render';
+import { renderPagination, renderTable } from './render';
+import type { UxLike } from './prompt';
 
 function fakeUx() {
   const lines: string[] = [];

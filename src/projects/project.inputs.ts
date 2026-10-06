@@ -1,16 +1,14 @@
 import { Flags } from '@contentstack/cli-utilities';
 
-import type { UxLike } from '../core/render';
+import type { UxLike } from '../core/prompt';
 import type { ResolutionSpec } from '../core/resolution';
 import { oneOf, withinLength } from '../core/values';
 import { ProjectRef } from './project-ref';
 import type { ProjectType } from './types';
-import { askOption } from './project.create.prompt';
+import { PROJECT_DESCRIPTION_MAX_LENGTH, PROJECT_NAME_MAX_LENGTH } from './types';
+import { askOption } from '../core/prompt';
 import { promptForProject } from './project.prompt';
 import { ProjectResolver } from './project.resolver';
-
-export const PROJECT_NAME_MAX_LENGTH = 200;
-export const PROJECT_DESCRIPTION_MAX_LENGTH = 255;
 
 export const PROJECT_TYPE_CHOICES = ['GitHub', 'FileUpload'] as const;
 

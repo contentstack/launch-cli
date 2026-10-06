@@ -1,4 +1,4 @@
-import { gitConnectionLines } from './git.presenter';
+import { gitConnectionLines, repositoryLabel } from './git.presenter';
 
 const CONNECT_URL = 'https://dev11-app.csnonprod.com/#!/launch/settings/connected-accounts';
 
@@ -21,5 +21,13 @@ describe('gitConnectionLines', () => {
 
   it('says only what it knows when there is no url to offer', () => {
     expect(gitConnectionLines('GitHub', undefined, false)).toEqual(['error: GitHub connection not found!']);
+  });
+});
+
+describe('repositoryLabel', () => {
+  it('labels a repository by its full name, falling back to its bare name', () => {
+    expect(repositoryLabel({ fullName: 'my-org/my-repo', name: 'my-repo' })).toBe('my-org/my-repo');
+    expect(repositoryLabel({ name: 'my-repo' })).toBe('my-repo');
+    expect(repositoryLabel({})).toBe('');
   });
 });

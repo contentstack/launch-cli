@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 
 import { LaunchApiError, parseErrorEnvelope } from '../transport/errors';
-import { RestApiClient, RestRequest } from '../transport/rest-client';
+import type { RestApiClient, RestRequest } from '../transport/rest-client';
 import { GIT_CONNECTION_NOT_FOUND_CODE, GIT_ERROR_MESSAGES } from './git.errors';
 import { GitApi } from './git.api';
 import { GIT_PROVIDER_GITHUB } from './types';

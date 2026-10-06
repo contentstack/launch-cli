@@ -1,4 +1,5 @@
-import { DEPLOYMENT_STATUSES, DeploymentStatus, IN_FLIGHT_STATUSES, SUCCESS_STATUSES } from './types';
+import type { DeploymentStatus } from './types';
+import { DEPLOYMENT_STATUSES, IN_FLIGHT_STATUSES, SUCCESS_STATUSES } from './types';
 
 export type StatusKind = 'in-flight' | 'success' | 'failure' | 'unknown';
 

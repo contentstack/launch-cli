@@ -4,17 +4,21 @@ import { Command } from '@contentstack/cli-command';
 import { cliux, configHandler, isAuthenticated } from '@contentstack/cli-utilities';
 
 import { EXIT_RUNTIME, PROJECT_CONFIG_FILE, STDIN_MAX_LISTENERS } from './constants';
-import { ProjectConfig, ProjectConfigStore, configSourceNotice } from './project-config';
-import { RegionLike, resolveLaunchHubUrl } from './region';
+import type { ProjectConfig } from './project-config';
+import { ProjectConfigStore, configSourceNotice } from './project-config';
+import type { RegionLike } from './region';
+import { resolveLaunchHubUrl } from './region';
 import { LaunchError, UsageError } from './errors';
-import { catalog, FlagKey, resolutionTable } from '../resources';
-import { AnyInputs, Resolved } from './inputs';
+import type { FlagKey } from '../resources';
+import { catalog, resolutionTable } from '../resources';
+import type { AnyInputs, Resolved } from './inputs';
 import { resolveInputsTraced } from './resolve';
-import { Rule } from './rules';
+import type { Rule } from './rules';
 import { cancelOnInterrupt } from './interruptible-ux';
-import { UxLike } from './render';
+import type { UxLike } from './prompt';
 import { registerSearchList } from './search-list';
-import { ServiceContext, buildServiceContext } from './service-context';
+import type { ServiceContext } from './service-context';
+import { buildServiceContext } from './service-context';
 
 export interface ResolveLaunchContextArgs<S extends AnyInputs> {
   flags: Partial<Record<FlagKey, unknown>>;

@@ -6,14 +6,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { CancelledError, MissingInputError, SessionExpiredError, UsageError } from '../core/errors';
-import { UxLike } from '../core/render';
-import { ServiceContext } from '../core/service-context';
+import type { UxLike } from '../core/prompt';
+import type { ServiceContext } from '../core/service-context';
 import { DeploymentUnsuccessfulError } from '../deployments/deployment.errors';
-import { WatchTiming } from '../deployments/deployment.watcher';
-import { ApiErrorEntry, LaunchApiError } from '../transport/errors';
+import type { WatchTiming } from '../deployments/deployment.watcher';
+import type { ApiErrorEntry } from '../transport/errors';
+import { LaunchApiError } from '../transport/errors';
 import { GitConnectionMissingError } from '../git/git.errors';
-import { ApiSurface } from '../resources';
-import { CreateRequest, ProjectCreator, UPLOAD_PROGRESS_LABEL } from './project.create';
+import type { ApiSurface } from '../resources';
+import type { CreateRequest } from './project.create';
+import { ProjectCreator, UPLOAD_PROGRESS_LABEL } from './project.create';
 import {
   DuplicateProjectNameError,
   PROJECT_ERROR_MESSAGES,
@@ -27,7 +29,8 @@ jest.mock('./project.upload', () => ({
 }));
 
 import * as archiveModule from './project.archive';
-import { MAX_UPLOAD_BYTES, UploadOptions, uploadArchive } from './project.upload';
+import type { UploadOptions } from './project.upload';
+import { MAX_UPLOAD_BYTES, uploadArchive } from './project.upload';
 
 // Random, so it zips past the 1 KB Launch's storage providers accept as the smallest upload.
 const SITE_PAGE = `<h1>site</h1><!-- ${randomBytes(2048).toString('hex')} -->`;

@@ -1,14 +1,10 @@
 import { styled } from './style';
+import type { UxLike } from './prompt';
 
 export interface Pagination {
   count?: number;
   limit?: number;
   skip?: number | null;
-}
-
-export interface UxLike {
-  print(message: string): void;
-  inquire<T>(payload: unknown): Promise<T>;
 }
 
 export interface TableColumn<T> {

@@ -1,5 +1,6 @@
 import { EXIT_RUNTIME } from '../core/constants';
-import { ExitCode, LaunchError } from '../core/errors';
+import type { ExitCode } from '../core/errors';
+import { LaunchError } from '../core/errors';
 import type { ErrorMessages } from '../transport/errors';
 import { GIT_PROVIDER_ERROR_MESSAGES } from '../git/git.errors';
 

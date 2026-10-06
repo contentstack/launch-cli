@@ -1,8 +1,8 @@
 import { EXIT_USAGE, MAX_PAGES } from '../core/constants';
 import { PROJECT_SCAN_PAGE_SIZE } from './projects.api';
 import { LaunchApiError, parseErrorEnvelope } from '../transport/errors';
-import { RestApiClient, RestRequest } from '../transport/rest-client';
-import { ProjectsPage } from './types';
+import type { RestApiClient, RestRequest } from '../transport/rest-client';
+import type { ProjectsPage } from './types';
 import { buildApi } from '../resources';
 import { PROJECT_ERROR_MESSAGES } from './project.errors';
 import { ProjectScanLimitError, ProjectsApi } from './projects.api';

@@ -1,8 +1,9 @@
 import { randomUUID } from 'crypto';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
-import { createServer, Server } from 'http';
+import type { Server } from 'http';
+import { createServer } from 'http';
 import { request as httpRequest } from 'http';
-import { AddressInfo } from 'net';
+import type { AddressInfo } from 'net';
 import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 

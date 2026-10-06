@@ -1,5 +1,5 @@
+import type { SearchListClass } from './search-list';
 import {
-  SearchListClass,
   UnlistedAnswer,
   answerFor,
   launchSearchList,

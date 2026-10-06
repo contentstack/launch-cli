@@ -1,4 +1,5 @@
-import { cliux as ux, PrintOptions } from '@contentstack/cli-utilities';
+import type { PrintOptions } from '@contentstack/cli-utilities';
+import { cliux as ux } from '@contentstack/cli-utilities';
 import { existsSync } from 'node:fs';
 import { normalize, resolve } from 'node:path';
 import winston from 'winston';

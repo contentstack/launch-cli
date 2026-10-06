@@ -1,10 +1,11 @@
-import { ApiSurface, DEPENDENCIES, buildApi, catalog, resolutionTable } from './resources';
+import type { ApiSurface } from './resources';
+import { DEPENDENCIES, buildApi, catalog, resolutionTable } from './resources';
 import { DeploymentsApi } from './deployments/deployments.api';
 import { DeploymentLogsApi } from './deployments/deployment-logs.api';
 import { EnvironmentsApi } from './environments/environments.api';
 import { GitApi } from './git/git.api';
 import { ProjectsApi } from './projects/projects.api';
-import { UxLike } from './core/render';
+import type { UxLike } from './core/prompt';
 import * as prompt from './projects/project.prompt';
 import * as organizationPrompt from './organizations/organization.prompt';
 import { OrganizationsApi } from './organizations/organizations.api';

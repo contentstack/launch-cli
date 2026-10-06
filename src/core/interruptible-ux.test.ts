@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 
 import { CancelledError } from './errors';
 import { cancelOnInterrupt, holdEventLoop } from './interruptible-ux';
-import { UxLike } from './render';
+import type { UxLike } from './prompt';
 
 function pendingUx(): { ux: UxLike; payloads: unknown[]; printed: string[]; settle: (outcome: { value?: unknown; error?: Error }) => void } {
   const payloads: unknown[] = [];

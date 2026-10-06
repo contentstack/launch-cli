@@ -1,10 +1,11 @@
-import { ApiSurface } from '../resources';
+import type { ApiSurface } from '../resources';
 import { CancelledError, InputDependencyError, MissingInputError, UsageError } from './errors';
-import { UxLike } from './render';
-import { FlagKey } from '../resources';
-import { AnyInputs, inputs } from './inputs';
+import type { UxLike } from './prompt';
+import type { FlagKey } from '../resources';
+import type { AnyInputs } from './inputs';
+import { inputs } from './inputs';
 import * as resolutionModule from '../resources';
-import { AnyResolutionSpec } from './resolution';
+import type { AnyResolutionSpec } from './resolution';
 import { resolveInputs, resolveInputsTraced } from './resolve';
 import { atLeastOneOf, exactlyOneOf } from './rules';
 

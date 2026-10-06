@@ -3,7 +3,8 @@ import { Flags } from '@contentstack/cli-utilities';
 import type { ResolutionSpec } from '../core/resolution';
 import { onlyWithValueOf } from '../core/rules';
 import { oneOf, withinLength } from '../core/values';
-import { FrameworkPreset, SERVER_COMMAND_FRAMEWORKS } from './types';
+import type { FrameworkPreset } from './types';
+import { SERVER_COMMAND_FRAMEWORKS } from './types';
 
 export const ENVIRONMENT_NAME_MAX_LENGTH = 200;
 

@@ -1,5 +1,5 @@
 import { CloudFunctionsValidator } from './cloud-functions-validator';
-import { CloudFunctionResource } from './types';
+import type { CloudFunctionResource } from './types';
 
 import './types';
 

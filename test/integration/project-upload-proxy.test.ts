@@ -1,5 +1,7 @@
-import { createServer, IncomingHttpHeaders, Server } from 'node:http';
-import { AddressInfo, connect } from 'node:net';
+import type { IncomingHttpHeaders, Server } from 'node:http';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { connect } from 'node:net';
 
 import { randomBytes } from 'node:crypto';
 

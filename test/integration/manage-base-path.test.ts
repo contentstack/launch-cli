@@ -1,7 +1,7 @@
 import nock from 'nock';
 
 import { buildServiceContext } from '../../src/core/service-context';
-import { UxLike } from '../../src/core/render';
+import type { UxLike } from '../../src/core/prompt';
 import listFixture from '../fixtures/projects-list.json';
 import getFixture from '../fixtures/project-get.json';
 

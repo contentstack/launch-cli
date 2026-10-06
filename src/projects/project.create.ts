@@ -1,42 +1,40 @@
 import { LaunchError, MissingInputError, UsageError } from '../core/errors';
-import { ProjectConfig, ProjectConfigStore } from '../core/project-config';
+import type { ProjectConfig } from '../core/project-config';
+import { ProjectConfigStore } from '../core/project-config';
 import { requireValueOf } from '../core/rules';
 import type { ServiceContext } from '../core/service-context';
-import { Loader, silentLoader, terminalLoader } from '../core/loader';
-import { Progress, silentProgress, terminalProgress } from '../core/progress';
+import type { Loader } from '../core/loader';
+import { silentLoader, terminalLoader } from '../core/loader';
+import type { Progress } from '../core/progress';
+import { silentProgress, terminalProgress } from '../core/progress';
 import { DeploymentUnsuccessfulError } from '../deployments/deployment.errors';
 import { deploymentUrlOf } from '../deployments/deployment.presenter';
-import { WatchTiming, watchDeployment } from '../deployments/deployment.watcher';
+import type { WatchTiming } from '../deployments/deployment.watcher';
+import { watchDeployment } from '../deployments/deployment.watcher';
 import type { Deployment } from '../deployments/types';
+import type { ResponseMode, ToggleValue } from '../environments/environment.inputs';
 import {
   ENVIRONMENT_NAME_MAX_LENGTH,
   FRAMEWORK_CHOICES,
   FRAMEWORK_PRESET_BY_LABEL,
   OUTPUT_DIRECTORY_BY_FRAMEWORK,
   RESPONSE_MODES,
-  ResponseMode,
   TOGGLE_VALUES,
-  ToggleValue,
   frameworkPresetOf,
 } from '../environments/environment.inputs';
 import type { CreateEnvironmentInput, Environment, FrameworkPreset } from '../environments/types';
 import { SERVER_COMMAND_FRAMEWORKS } from '../environments/types';
 import { GitConnectionMissingError, isMissingGitConnection } from '../git/git.errors';
-import { gitConnectionLines } from '../git/git.presenter';
-import { detectGitHubRepository, LocalGitHubRepository } from '../git/local-repository';
-import { GIT_PROVIDER_GITHUB, GitRepository } from '../git/types';
+import { gitConnectionLines, repositoryLabel } from '../git/git.presenter';
+import type { LocalGitHubRepository } from '../git/local-repository';
+import { detectGitHubRepository } from '../git/local-repository';
+import type { GitRepository } from '../git/types';
+import { GIT_PROVIDER_GITHUB } from '../git/types';
 import { connectedAccountsUrl } from '../core/region';
 import { LaunchApiError } from '../transport/errors';
 import { archiveDirectory } from './project.archive';
-import {
-  askBranch,
-  askOption,
-  askOptionalText,
-  askText,
-  findRepository,
-  repositoryLabel,
-  repositorySearchTerm,
-} from './project.create.prompt';
+import { askOption, askOptionalText, askText } from '../core/prompt';
+import { askBranch, findRepository, repositorySearchTerm } from '../git/git.prompt';
 import {
   PREPARING_ARCHIVE,
   RENAME_PROJECT_QUESTION,
@@ -49,18 +47,17 @@ import {
   renameAndRerunLine,
   renameRetryLimitLine,
 } from './project.presenter';
+import type { GitOnlyFlag, ProjectTypeChoice } from './project.inputs';
 import {
   GIT_ONLY_FLAGS,
-  GitOnlyFlag,
-  PROJECT_NAME_MAX_LENGTH,
   PROJECT_TYPE_BY_CHOICE,
-  ProjectTypeChoice,
   askProjectType,
   projectTypeChoiceOf,
 } from './project.inputs';
 import { DuplicateProjectNameError, ProjectCreateFailedError } from './project.errors';
 import { refuseArchiveOutsideLimits, uploadArchive } from './project.upload';
 import type { CreateProjectInput, DetectedFramework, IdentifiedProject, SignedUploadUrl } from './types';
+import { PROJECT_NAME_MAX_LENGTH } from './types';
 
 export { DEPLOYMENT_WAIT_TIMEOUT_MS, defaultWatchTiming } from '../deployments/deployment.watcher';
 export { serverCommandFrameworkGate } from '../environments/environment.inputs';

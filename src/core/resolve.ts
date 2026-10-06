@@ -1,9 +1,10 @@
-import { ProjectConfig } from './project-config';
+import type { ProjectConfig } from './project-config';
 import { InputDependencyError, MissingInputError } from './errors';
-import { FlagKey, resolutionTable } from '../resources';
-import { AnyInputs, InputKeys, Resolved } from './inputs';
-import { AnyResolutionSpec, InputSource, ResolveServices } from './resolution';
-import { InputSources, Rule } from './rules';
+import type { FlagKey } from '../resources';
+import { resolutionTable } from '../resources';
+import type { AnyInputs, InputKeys, Resolved } from './inputs';
+import type { AnyResolutionSpec, InputSource, ResolveServices } from './resolution';
+import type { InputSources, Rule } from './rules';
 import { isAbsent } from './values';
 
 export function resolutionOrder<K extends FlagKey>(keys: K[]): K[] {
