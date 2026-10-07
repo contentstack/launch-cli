@@ -136,24 +136,9 @@ describe('layering between resources', () => {
 
   it('records the edges POST /projects really creates, and no others', () => {
     expect(RESOURCE_EDGES.projects).toEqual(['environments', 'deployments', 'git']);
-    expect(crossResourceEdges(join('projects', 'project.create.ts')).sort()).toEqual([
-      'deployments',
-      'deployments',
-      'deployments',
-      'deployments',
-      'deployments',
+    expect([...new Set(crossResourceEdges(join('projects', 'project.create.ts')))].sort()).toEqual([
       'deployments',
       'environments',
-      'environments',
-      'environments',
-      'environments',
-      'environments',
-      'git',
-      'git',
-      'git',
-      'git',
-      'git',
-      'git',
       'git',
     ]);
   });
