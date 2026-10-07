@@ -69,6 +69,7 @@ export const CREATE_PROMPT_REMEDIES = { config: false, prompt: true };
 export const UPLOAD_PROGRESS_LABEL = 'Uploading project.zip';
 export const DUPLICATE_PROJECT_NAME_CODE = 'launch.PROJECT.DUPLICATE_NAME';
 export const PROJECT_RENAME_ATTEMPTS = 3;
+export const SITE_OPEN_DELAY_MS = 6000;
 
 export function reasonOf(error: unknown): string {
   const text = (error instanceof Error ? error.message : String(error)).trim();
@@ -335,6 +336,7 @@ export class ProjectCreator {
 
       if (url !== undefined) {
         this.services.ux.print(deploymentUrlLine(url, this.services.outputIsTTY === true));
+        await this.openSite(url);
       }
 
       return;
@@ -464,6 +466,20 @@ export class ProjectCreator {
 
       throw error;
     }
+  }
+
+  /**
+   * V1 opened the live site once the deployment succeeded, waiting first because a site opened the
+   * moment it reports live can still answer "site not reachable". The wait is awaited rather than
+   * left on a timer so the browser opens before the command returns, whoever ends the process.
+   */
+  private async openSite(url: string): Promise<void> {
+    if (this.services.openUrl === undefined) {
+      return;
+    }
+
+    await this.timing.sleep(SITE_OPEN_DELAY_MS);
+    this.services.openUrl(url);
   }
 
   /**

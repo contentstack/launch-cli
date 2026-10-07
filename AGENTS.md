@@ -554,7 +554,11 @@ the prefix V1's `logs/graphql` used) and prints each line as V1 did, `YYYY-MM-DD
 any colour codes the build server put in the message stripped (`stripVTControlCharacters`) so every line is one
 shade, and in green when stdout is a terminal (`styled` in `src/core/style.ts`, plain ANSI codes gated on `outputIsTTY`;
 redirected output stays free of escape codes). On success create then prints V1's
-`Deployment URL <url>` line - label bold, url blue on a terminal - before the project summary.
+`Deployment URL <url>` line - label bold, url blue on a terminal - before the project summary,
+waits `SITE_OPEN_DELAY_MS` (six seconds, V1's wait, because a site opened the moment it reports
+live can still answer "site not reachable") and opens that url in the browser, terminal or not, as V1
+did. The wait goes through the injected `sleep`, so it is awaited and the browser opens before the
+command returns.
 The first read asks from `DEPLOYMENT_LOGS_FROM` (the epoch) and every later one from the last
 parseable timestamp printed: with a `timestamp` the service returns what came strictly after it in
 ascending order, and without one it returns the newest page in **descending** order, so never let the

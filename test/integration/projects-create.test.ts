@@ -11,12 +11,18 @@ import nock from 'nock';
 
 import open from 'open';
 
+import * as watcher from '../../src/deployments/deployment.watcher';
 import { CTRL_C, answerPrompts, onTerminal } from '../support/terminal';
 
 // Random, so it zips past the 1 KB Launch's storage providers accept as the smallest upload.
 const SITE_PAGE = `<h1>site</h1><!-- ${randomBytes(2048).toString('hex')} -->`;
 
 jest.mock('open', () => jest.fn().mockResolvedValue(undefined));
+
+// Waiting is faked like the browser is: the real timing runs, but a wait returns at once and is recorded,
+// so the six seconds create waits before opening the site neither slows the suite nor goes unasserted.
+const realWatchTiming = watcher.defaultWatchTiming;
+let slept: number[] = [];
 
 const LAUNCH_HUB_URL = 'https://launch-api.integration.test';
 const UPLOAD_HOST = 'https://uploads.integration.test';
@@ -257,6 +263,13 @@ describe('integration: launch:projects:create on the wire', () => {
     });
     jest.spyOn(configHandler, 'get').mockImplementation((key: string) => CONFIG[key]);
     jest.spyOn(authHandler, 'compareOAuthExpiry').mockResolvedValue(undefined);
+    slept = [];
+    jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => ({
+      ...realWatchTiming(),
+      sleep: async (ms: number) => {
+        slept.push(ms);
+      },
+    }));
   });
 
   afterEach(() => {
@@ -309,6 +322,8 @@ describe('integration: launch:projects:create on the wire', () => {
     });
     expect(stdout).toContain('Deployment URL https://my-site.example.test\n');
     expect(stdout).not.toContain('Deployment #1 is');
+    expect(open).toHaveBeenCalledWith('https://my-site.example.test');
+    expect(slept[slept.length - 1]).toBe(6000);
     expect(stdout).not.toContain('\u001b');
     expect(stdout).not.toContain(`uid   ${PROJECT_UID}`);
     expect(stdout).not.toContain('test-authtoken');

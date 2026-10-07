@@ -15,7 +15,7 @@ import { LaunchApiError } from '../transport/errors';
 import { GitConnectionMissingError } from '../git/git.errors';
 import type { ApiSurface } from '../resources';
 import type { CreateRequest } from './project.create';
-import { ProjectCreator, UPLOAD_PROGRESS_LABEL } from './project.create';
+import { ProjectCreator, SITE_OPEN_DELAY_MS, UPLOAD_PROGRESS_LABEL } from './project.create';
 import {
   DuplicateProjectNameError,
   PROJECT_ERROR_MESSAGES,
@@ -75,11 +75,12 @@ const SIGNED_UPLOAD = {
   fields: [{ formFieldKey: 'bucket', formFieldValue: 'launch-uploads' }],
 };
 
-function advancingTiming(): WatchTiming {
+function advancingTiming(timeline: string[] = []): WatchTiming {
   let clock = 0;
 
   return {
     sleep: async (ms: number) => {
+      timeline.push(`sleep ${ms}`);
       clock += ms;
     },
     now: () => clock,
@@ -117,6 +118,7 @@ let dataDir: string;
 
 function harness(scenario: Scenario = {}) {
   const printed: string[] = [];
+  const timeline: string[] = [];
   const asked: unknown[] = [];
   const askedPayloads: Record<string, unknown>[] = [];
   const created: unknown[] = [];
@@ -138,6 +140,7 @@ function harness(scenario: Scenario = {}) {
   const ux: UxLike = {
     print: (message: string) => {
       printed.push(message);
+      timeline.push(`print ${message}`);
     },
     inquire: async (payload: unknown) => {
       asked.push((payload as { message: string }).message);
@@ -265,12 +268,18 @@ function harness(scenario: Scenario = {}) {
     isTTY: scenario.isTTY ?? false,
     outputIsTTY: scenario.outputIsTTY,
     launchAppUrl: scenario.launchAppUrl,
-    openUrl: scenario.withoutOpenUrl ? undefined : (url) => opened.push(url),
+    openUrl: scenario.withoutOpenUrl
+      ? undefined
+      : (url) => {
+        opened.push(url);
+        timeline.push(`open ${url}`);
+      },
   };
 
   return {
-    creator: new ProjectCreator(services, advancingTiming()),
+    creator: new ProjectCreator(services, advancingTiming(timeline)),
     opened,
+    timeline,
     printed,
     asked,
     askedPayloads,
@@ -1392,6 +1401,63 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     expect(printed.join('\n')).not.toContain('Deployment URL');
     expect(printed.join('\n')).not.toContain('undefined');
+  });
+
+  it('opens the site after printing its url and waiting six seconds, as V1 did, even when output is piped', async () => {
+    const { creator, opened, timeline } = harness();
+
+    await creator.create(gitRequest());
+
+    expect(SITE_OPEN_DELAY_MS).toBe(6000);
+    expect(opened).toEqual(['https://my-site.example.test']);
+    expect(timeline.slice(-3)).toEqual([
+      'print Deployment URL https://my-site.example.test',
+      'sleep 6000',
+      'open https://my-site.example.test',
+    ]);
+  });
+
+  it('opens the site on a terminal too', async () => {
+    const { creator, opened } = harness({ isTTY: true, outputIsTTY: true });
+
+    await creator.create(gitRequest());
+
+    expect(opened).toEqual(['https://my-site.example.test']);
+  });
+
+  it('neither waits nor opens anything when the deployment has no url to open', async () => {
+    const { creator, opened, timeline } = harness({ environments: [{ uid: ENVIRONMENT_UID, name: 'Default' }] });
+
+    jest
+      .spyOn(
+        (creator as unknown as { services: { api: { deployments: { get: () => unknown } } } }).services.api.deployments,
+        'get',
+      )
+      .mockResolvedValue({ uid: DEPLOYMENT_UID, deploymentNumber: 1, status: 'LIVE' } as never);
+
+    await creator.create(gitRequest());
+
+    expect(opened).toEqual([]);
+    expect(timeline).not.toContain(`sleep ${SITE_OPEN_DELAY_MS}`);
+  });
+
+  it('prints the url without waiting when there is no way to open it', async () => {
+    const { creator, printed, timeline } = harness({ withoutOpenUrl: true });
+
+    await creator.create(gitRequest());
+
+    expect(printed).toEqual(['Deployment URL https://my-site.example.test']);
+    expect(timeline).not.toContain(`sleep ${SITE_OPEN_DELAY_MS}`);
+  });
+
+  it('opens nothing when the deployment fails', async () => {
+    const { creator, opened, timeline } = harness({ statuses: ['DEPLOYING', 'FAILED'] });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
+    expect(opened).toEqual([]);
+    expect(timeline).not.toContain(`sleep ${SITE_OPEN_DELAY_MS}`);
   });
 
   it('names the project by its uid when the API returned one with no name', async () => {
