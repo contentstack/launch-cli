@@ -3,11 +3,11 @@ import { tmpdir } from 'node:os';
 
 import { authHandler, cliux, configHandler } from '@contentstack/cli-utilities';
 import type { Interfaces } from '@oclif/core';
-import { Config, Plugin } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
 import { pretendTerminal } from '../support/terminal';
+import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
 
 import getFixture from '../fixtures/project-get.json';
 import listFixture from '../fixtures/projects-list.json';
@@ -86,9 +86,7 @@ async function onTerminal(args: string[]) {
 
 describe('integration: the organization prompt', () => {
   beforeAll(async () => {
-    const plugin = new Plugin({ ignoreManifest: true, isRoot: true, root: process.cwd() });
-    await plugin.load();
-    config = await Config.load({ plugins: new Map([[plugin.name, plugin]]), root: process.cwd() });
+    config = await loadCliConfig();
     nock.disableNetConnect();
   });
 
@@ -98,9 +96,7 @@ describe('integration: the organization prompt', () => {
     nock.emitter.on('no match', (request: { method?: string; path?: string }) => {
       onWire.push(`${request.method ?? 'UNKNOWN'} ${request.path ?? ''}`);
     });
-    jest.spyOn(console, 'log').mockImplementation((message: unknown) => {
-      process.stdout.write(`${String(message)}\n`);
-    });
+    routeConsoleLogToStdout();
     jest.spyOn(authHandler, 'compareOAuthExpiry').mockResolvedValue(undefined);
   });
 

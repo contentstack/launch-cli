@@ -5,11 +5,11 @@ import { join } from 'node:path';
 
 import { authHandler, cliux, configHandler } from '@contentstack/cli-utilities';
 import type { Interfaces } from '@oclif/core';
-import { Config, Plugin } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
 import { pretendTerminal } from '../support/terminal';
+import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
 
 import getFixture from '../fixtures/project-get.json';
 import listFixture from '../fixtures/projects-list.json';
@@ -52,16 +52,12 @@ function runLaunch(args: string[]) {
 
 describe('integration: end-to-end command flows', () => {
   beforeAll(async () => {
-    const plugin = new Plugin({ ignoreManifest: true, isRoot: true, root: process.cwd() });
-    await plugin.load();
-    config = await Config.load({ plugins: new Map([[plugin.name, plugin]]), root: process.cwd() });
+    config = await loadCliConfig();
   });
 
   beforeEach(() => {
     process.exitCode = 0;
-    jest.spyOn(console, 'log').mockImplementation((message: unknown) => {
-      process.stdout.write(`${String(message)}\n`);
-    });
+    routeConsoleLogToStdout();
     jest.spyOn(authHandler, 'compareOAuthExpiry').mockResolvedValue(undefined);
   });
 

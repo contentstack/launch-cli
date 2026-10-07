@@ -3,8 +3,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import type { Interfaces } from '@oclif/core';
-import { Config, Errors, Plugin } from '@oclif/core';
+import { Errors } from '@oclif/core';
 import { runCommand } from '@oclif/test';
+import { loadCliConfig } from '../support/oclif';
 
 const INVALID_PORT_RECORD =
   '{"level":"error","message":"Invalid port number. Please provide a valid port number between 0 and 65535."}\n';
@@ -25,9 +26,7 @@ async function errorLog(): Promise<string> {
 
 describe('integration: launch:functions:serve port handling', () => {
   beforeAll(async () => {
-    const plugin = new Plugin({ ignoreManifest: true, isRoot: true, root: process.cwd() });
-    await plugin.load();
-    config = await Config.load({ plugins: new Map([[plugin.name, plugin]]), root: process.cwd() });
+    config = await loadCliConfig();
   });
 
   beforeEach(() => {

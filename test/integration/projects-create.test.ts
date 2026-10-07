@@ -5,7 +5,6 @@ import { basename, join } from 'node:path';
 
 import { authHandler, configHandler } from '@contentstack/cli-utilities';
 import type { Interfaces } from '@oclif/core';
-import { Config, Plugin } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
@@ -13,6 +12,7 @@ import open from 'open';
 
 import * as watcher from '../../src/deployments/deployment.watcher';
 import { CTRL_C, answerPrompts, onTerminal } from '../support/terminal';
+import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
 
 // Random, so it zips past the 1 KB Launch's storage providers accept as the smallest upload.
 const SITE_PAGE = `<h1>site</h1><!-- ${randomBytes(2048).toString('hex')} -->`;
@@ -255,9 +255,7 @@ function captureCreate(): { scope: nock.Scope; body: () => unknown } {
 
 describe('integration: launch:projects:create on the wire', () => {
   beforeAll(async () => {
-    const plugin = new Plugin({ ignoreManifest: true, isRoot: true, root: process.cwd() });
-    await plugin.load();
-    config = await Config.load({ plugins: new Map([[plugin.name, plugin]]), root: process.cwd() });
+    config = await loadCliConfig();
     nock.disableNetConnect();
   });
 
@@ -267,9 +265,7 @@ describe('integration: launch:projects:create on the wire', () => {
     cloneOf('my-org/my-repo');
     writeFileSync(join(dataDir, 'index.html'), SITE_PAGE);
     recordWire();
-    jest.spyOn(console, 'log').mockImplementation((message: unknown) => {
-      process.stdout.write(`${String(message)}\n`);
-    });
+    routeConsoleLogToStdout();
     jest.spyOn(configHandler, 'get').mockImplementation((key: string) => CONFIG[key]);
     jest.spyOn(authHandler, 'compareOAuthExpiry').mockResolvedValue(undefined);
     slept = [];

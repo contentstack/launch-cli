@@ -1,6 +1,6 @@
 fileignoreconfig:
 - filename: test/integration/retired-commands.test.ts
-  checksum: ed3911c4dfc42bb7b2e4806f6785b15c839c87ddbd7ae7ad70f6e3a493ab76f8
+  checksum: 6eab66fd4393aa3e46e94bb7e21252775f4d809d0b3f2613d0146144589b12de
 - filename: test/integration/manage-base-path.test.ts
   checksum: 79eb9ad420ea47d5bee8045d812c45b010bbeeafcaf5f85d11653140b0cd0db1
 - filename: src/transport/rest-client.ts
@@ -183,7 +183,7 @@ fileignoreconfig:
 - filename: src/commands/launch/projects/delete.test.ts
   checksum: d67d8a804d14f9b809153d10b0cf9d5e52b70f9e0b65678ebb1663a7d2da22c1
 - filename: test/integration/projects-delete.test.ts
-  checksum: 61e5c6bb9c82260797552a1d9e263e7e0b6c88a627bcc996f5fd3b678d99f9b7
+  checksum: 78baba5c3e3aa5fd054dec04cee0e72a99e85cb8451b2346f53761f099509191
 - filename: src/core/launch-command.ts
   checksum: 85f86ea5f075bfdd78652dc05d20a2f6e89348466c6bd41ae903bcb1b7e8515d
 - filename: src/core/launch-command.test.ts
@@ -191,7 +191,7 @@ fileignoreconfig:
 - filename: src/projects/project.inputs.test.ts
   checksum: c20f69186e74bc5fe6deb73a9036fa2cb86aeff1bde48670f0c489d9e9121c62
 - filename: test/integration/projects-command-flows.test.ts
-  checksum: ae02de4f2bb6c577065a31351cb7e4a3456f085148de6779fd1f23c36f6b85ad
+  checksum: 786a470c71f3a7ce58463d0a08e9bf47e36f936c55a2ca7cd8ef2a058ac01e4a
 - filename: src/core/redact.test.ts
   checksum: ae497ea8c3a4c3f12217d2c4c028a1da3d1324e18362d68c355ba8120902bcb3
 - filename: src/commands/launch/projects/list.test.ts
@@ -199,7 +199,7 @@ fileignoreconfig:
 - filename: src/commands/launch/projects/get.test.ts
   checksum: fec6ca189bc3d93aefa109ee6405f8ce74a42318aa18a99045d40c3cb5561b9e
 - filename: test/integration/projects-list-command.test.ts
-  checksum: 1012c9fb505778c3ccd955da2d0877e16b69408ca460d78244e339c6afd28a8c
+  checksum: d9617f9ae02a32a03d707be711f495350e4a442e61ac1a3514b8bc9190e9e6a2
 - filename: src/functions/cloud-functions.test.ts
   checksum: 5faf7b0497efc9f620983220019736a0ec2e8c43f22316f888201912bbcb5d62
 - filename: src/transport/proxy.test.ts

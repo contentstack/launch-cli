@@ -2,12 +2,12 @@ import { tmpdir } from 'node:os';
 
 import { authHandler, configHandler } from '@contentstack/cli-utilities';
 import type { Interfaces } from '@oclif/core';
-import { Config, Plugin } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
 import listFixture from '../fixtures/projects-list.json';
 import notFoundFixture from '../fixtures/project-not-found.json';
+import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
 
 const LAUNCH_HUB_URL = 'https://launch-api.integration.test';
 const ORG_UID = 'blt4d9e2a7c1f6b3085';
@@ -39,18 +39,14 @@ function recordWire(): void {
 
 describe('integration: launch:projects:update on the wire', () => {
   beforeAll(async () => {
-    const plugin = new Plugin({ ignoreManifest: true, isRoot: true, root: process.cwd() });
-    await plugin.load();
-    config = await Config.load({ plugins: new Map([[plugin.name, plugin]]), root: process.cwd() });
+    config = await loadCliConfig();
     nock.disableNetConnect();
   });
 
   beforeEach(() => {
     process.exitCode = 0;
     recordWire();
-    jest.spyOn(console, 'log').mockImplementation((message: unknown) => {
-      process.stdout.write(`${String(message)}\n`);
-    });
+    routeConsoleLogToStdout();
     jest.spyOn(configHandler, 'get').mockImplementation((key: string) => CONFIG[key]);
     jest.spyOn(authHandler, 'compareOAuthExpiry').mockResolvedValue(undefined);
   });

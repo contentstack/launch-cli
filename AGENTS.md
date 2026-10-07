@@ -81,7 +81,9 @@ test green, look here first.
 **Integration tests.** `test/integration/` drives real code with only the network faked by `nock`.
 `projects-list-command.test.ts` runs whole commands through `@oclif/test`'s `runCommand`, which
 covers `init()`, the resolution chain, rendering and the `catch()` exit-code mapping in one pass.
-Two things make that reliable and both are load-bearing:
+Two things make that reliable and both are load-bearing. The config and the console redirect are
+written once, in `test/support/oclif.ts`: build the config with `loadCliConfig()` and call
+`routeConsoleLogToStdout()` in `beforeEach` rather than writing either out again.
 
 - The `Config` is built from a root `Plugin` constructed with `ignoreManifest: true`. Without it, a
   generated `oclif.manifest.json` — `npm run prepack` writes one, and it is gitignored — makes oclif
@@ -89,7 +91,8 @@ Two things make that reliable and both are load-bearing:
   and fail outright whenever `dist` is absent.
 - `console.log` is redirected straight to `process.stdout` so jest's console decoration stays out of
   the captured stdout, and `process.exitCode` is reset after each run because oclif sets it while
-  handling a simulated CLI failure and would otherwise fail the whole jest run.
+  handling a simulated CLI failure and would otherwise fail the whole jest run. The reset stays in
+  each file, in whichever hook that file needs it.
 
 Jest runs with `restoreMocks: true`, so a `jest.spyOn` does not layer a spy on a spy for
 the life of a file; `test/credential-guard.setup.ts` re-installs its guard each test.

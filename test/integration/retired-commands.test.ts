@@ -4,11 +4,11 @@ import { join } from 'node:path';
 
 import { authHandler, configHandler } from '@contentstack/cli-utilities';
 import type { Interfaces } from '@oclif/core';
-import { Config, Plugin } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
 import { productionSources } from '../support/sources';
+import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
 
 const LAUNCH_HUB_URL = 'https://launch-api.integration.test';
 const DATA_DIR = tmpdir();
@@ -47,16 +47,12 @@ function commandsNamedInSource(): string[] {
 
 describe('integration: retired V1 command names', () => {
   beforeAll(async () => {
-    const plugin = new Plugin({ ignoreManifest: true, isRoot: true, root: process.cwd() });
-    await plugin.load();
-    config = await Config.load({ plugins: new Map([[plugin.name, plugin]]), root: process.cwd() });
+    config = await loadCliConfig();
   });
 
   beforeEach(() => {
     process.exitCode = 0;
-    jest.spyOn(console, 'log').mockImplementation((message: unknown) => {
-      process.stdout.write(`${String(message)}\n`);
-    });
+    routeConsoleLogToStdout();
     jest.spyOn(configHandler, 'get').mockImplementation((key: string) => CONFIG[key]);
     jest.spyOn(authHandler, 'compareOAuthExpiry').mockResolvedValue(undefined);
   });

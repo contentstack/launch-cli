@@ -2,11 +2,11 @@ import { tmpdir } from 'node:os';
 
 import { authHandler, cliux, configHandler } from '@contentstack/cli-utilities';
 import type { Interfaces } from '@oclif/core';
-import { Config, Plugin } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
 import { CTRL_C, answerPrompts, onTerminal, pretendTerminal } from '../support/terminal';
+import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
 
 import getFixture from '../fixtures/project-get.json';
 import listFixture from '../fixtures/projects-list.json';
@@ -43,18 +43,14 @@ function recordWire(): void {
 
 describe('integration: launch:projects:delete on the wire', () => {
   beforeAll(async () => {
-    const plugin = new Plugin({ ignoreManifest: true, isRoot: true, root: process.cwd() });
-    await plugin.load();
-    config = await Config.load({ plugins: new Map([[plugin.name, plugin]]), root: process.cwd() });
+    config = await loadCliConfig();
     nock.disableNetConnect();
   });
 
   beforeEach(() => {
     process.exitCode = 0;
     recordWire();
-    jest.spyOn(console, 'log').mockImplementation((message: unknown) => {
-      process.stdout.write(`${String(message)}\n`);
-    });
+    routeConsoleLogToStdout();
     jest.spyOn(configHandler, 'get').mockImplementation((key: string) => CONFIG[key]);
     jest.spyOn(authHandler, 'compareOAuthExpiry').mockResolvedValue(undefined);
   });
