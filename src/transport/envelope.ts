@@ -15,22 +15,22 @@ function withArticle(noun: string): string {
   return `${/^[aeiou]/i.test(noun) ? 'an' : 'a'} ${noun}`;
 }
 
-export function unwrap<T>(response: unknown, key: string, subject: string): T {
-  if (!isRecord(response) || !isRecord(response[key])) {
-    throw malformed(`The Launch API returned ${withArticle(subject)} without ${withArticle(key)}.`);
+export function unwrap<T>(response: unknown, member: string, subject: string): T {
+  if (!isRecord(response) || !isRecord(response[member])) {
+    throw malformed(`The Launch API returned ${withArticle(subject)} without ${withArticle(member)}.`);
   }
 
-  return response[key] as T;
+  return response[member] as T;
 }
 
-export function assertArray(response: unknown, key: string, subject: string): void {
-  if (!isRecord(response) || !Array.isArray(response[key])) {
-    throw malformed(`The Launch API returned ${withArticle(subject)} without ${withArticle(key)} array.`);
+export function assertArray(response: unknown, member: string, subject: string): void {
+  if (!isRecord(response) || !Array.isArray(response[member])) {
+    throw malformed(`The Launch API returned ${withArticle(subject)} without ${withArticle(member)} array.`);
   }
 }
 
-export function assertPage(response: unknown, key: string, subject: string): void {
-  assertArray(response, key, subject);
+export function assertPage(response: unknown, member: string, subject: string): void {
+  assertArray(response, member, subject);
 
   if (!isRecord((response as Record<string, unknown>).pagination)) {
     throw malformed(`The Launch API returned ${withArticle(subject)} without a pagination block.`);

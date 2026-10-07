@@ -40,7 +40,7 @@ describe('response envelope', () => {
     expect(error.message).toBe('The Launch API returned a project response without a project.');
   });
 
-  it('chooses the article from the key so the wording reads correctly', () => {
+  it('chooses the article from the member so the wording reads correctly', () => {
     expect(failureFrom(() => unwrap({}, 'environment', 'environment response')).message).toBe(
       'The Launch API returned an environment response without an environment.',
     );
