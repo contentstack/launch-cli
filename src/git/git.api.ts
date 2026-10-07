@@ -11,7 +11,6 @@ export interface GitPageParams {
   skip?: number;
 }
 
-
 export interface ListRepositoriesParams extends GitPageParams {
   provider: string;
   namespace?: string;

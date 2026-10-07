@@ -7,7 +7,7 @@ export interface InputSpec {
   required?: boolean;
 }
 
-export type AnyInputs = { readonly [key: string]: InputSpec };
+export interface AnyInputs { readonly [key: string]: InputSpec }
 
 export type InputKeys<S> = Extract<keyof S, FlagKey>;
 

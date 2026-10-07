@@ -5,7 +5,7 @@ import { LaunchApiError } from '../transport/errors';
 import type { UxLike } from '../core/prompt';
 import { askFieldValue, checkFieldValue, promptForProject, promptForProjectUpdate } from './project.prompt';
 
-type FakeProject = { uid?: string; name?: string };
+interface FakeProject { uid?: string; name?: string }
 
 function fakeDeps(
   pages: FakeProject[][],

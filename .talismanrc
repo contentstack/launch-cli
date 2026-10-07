@@ -14,7 +14,7 @@ fileignoreconfig:
 - filename: src/projects/types.ts
   checksum: 563a1f339c7b1ba1a366e8cac087a52805af21d46f07e4078716358ed99270f5
 - filename: src/projects/projects.api.ts
-  checksum: 4bc980a0c0558046de0d8b0b98c45c34b7bacb18e91833d00f658c660ae1cc85
+  checksum: 55ef7c7759d54027cb6b1f3e751fafb52f008caf5c9837128fbb7954fd652db3
 - filename: src/core/service-context.test.ts
   checksum: 7bc4f6ca3ec8a960f84fb4c07453a287bb2bb0ccc7e06c5805a7f56df160024a
 - filename: src/core/rules.test.ts
@@ -105,7 +105,7 @@ fileignoreconfig:
   ignore_detectors:
     - filename
 - filename: src/git/git.api.ts
-  checksum: 57c98f5d7ba6da4fe4ecc211d803d67bb334244d947ea281b7994ab2d1e84b84
+  checksum: 6a7eb2f246c7b35217156c2439ffa7d0f91adc07cc742fc879a163e9b863e0d8
   allowed_patterns:
     - "assertArray\\(response, key, `\\$\\{key\\} response`\\)"
 - filename: src/environments/environment.inputs.ts
@@ -116,7 +116,7 @@ fileignoreconfig:
   ignore_detectors:
     - filename
 - filename: src/core/inputs.ts
-  checksum: 6af3bfdfd7473eff2cce16acb6e7feb377eab05c68ad96a05101b20873582c49
+  checksum: 638c1093562cc19038395b498202d06aef53b8d2537ee80b715611f19f83c78b
   allowed_patterns:
     - "FlagKey"
     - "InputKeys"

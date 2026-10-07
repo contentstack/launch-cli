@@ -22,7 +22,6 @@ function contentTypeNames(headers: Record<string, string>): string[] {
   return names.filter((header) => header.toLowerCase() === 'content-type');
 }
 
-
 const ARCHIVE = Buffer.from('PK\u0003\u0004zip-bytes');
 const UPLOAD_URL = 'https://uploads.example.test/bucket';
 const UPLOAD_UID = 'upload-uid';

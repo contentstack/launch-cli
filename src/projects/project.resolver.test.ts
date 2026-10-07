@@ -7,7 +7,7 @@ import type { ProjectPages } from './project.resolver';
 import { ProjectResolver } from './project.resolver';
 import type { ProjectsPage } from './types';
 
-type FakeProject = { uid?: string | null; name?: string };
+interface FakeProject { uid?: string | null; name?: string }
 
 const PRIMARY_UID = randomBytes(12).toString('hex');
 const SECOND_UID = randomBytes(12).toString('hex');
