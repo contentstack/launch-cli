@@ -1,7 +1,7 @@
 import fs from 'fs';
 import { join, normalize } from 'path';
 
-export async function* walkFileSystem(directory: string): any {
+export async function* walkFileSystem(directory: string): AsyncGenerator<string> {
   const fileSystemIterator = await fs.promises.opendir(directory);
 
   for await (const fileSystemElement of fileSystemIterator) {

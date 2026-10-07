@@ -35,12 +35,6 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/**/*.{js,ts}'],
-    rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
-    },
-  },
-  {
     files: ['src/**/*.ts', 'test/**/*.ts'],
     rules: {
       '@typescript-eslint/consistent-type-imports': ['error'],

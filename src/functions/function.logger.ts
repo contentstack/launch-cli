@@ -6,6 +6,10 @@ import winston from 'winston';
 
 export type LoggerType = 'info' | 'warn' | 'error' | 'debug';
 
+export interface LoggerConfig {
+  projectBasePath: string;
+}
+
 const ansiRegexPattern = [
   '[\\u001B\\u009B][[\\]()#;?]*' +
     '(?:(?:(?:(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]+)*|[a-zA-Z\\d]+(?:;[-a-zA-Z\\d\\/#&.:=?%@~_]*)*)?\\u0007)',
@@ -35,7 +39,7 @@ function toText(value: unknown): string {
 export class Logger {
   private infoLogger!: winston.Logger;
   private errorLogger!: winston.Logger;
-  private config!: Record<string, any>;
+  private config!: LoggerConfig;
 
   get loggerOptions(): winston.transports.FileTransportOptions {
     return {
@@ -46,7 +50,7 @@ export class Logger {
     };
   }
 
-  constructor(config: Record<string, any>) {
+  constructor(config: LoggerConfig) {
     this.config = config;
     this.infoLogger = this.getLoggerInstance('info');
     this.errorLogger = this.getLoggerInstance('error');
@@ -93,7 +97,7 @@ export class Logger {
     process.exit(1);
   }
 
-  log(message: string | any, logType?: LoggerType | PrintOptions | undefined): void {
+  log(message: unknown, logType?: LoggerType | PrintOptions | undefined): void {
     const logString = this.returnString(message);
 
     switch (logType) {
@@ -106,15 +110,15 @@ export class Logger {
       this.errorLogger.error(logString);
       break;
     default:
-      ux.print(logString, logType || {});
+      ux.print(String(logString), logType || {});
       break;
     }
   }
 
-  returnString(message: any): string {
-    let returnStr = '';
+  returnString(message: unknown): string | object {
+    let text: unknown;
 
-    const replaceCredentials = (item: any) => {
+    const replaceCredentials = (item: object): string | object => {
       try {
         return JSON.stringify(item).replace(/authtoken":"blt................/g, 'authtoken":"blt....');
       } catch {
@@ -123,8 +127,8 @@ export class Logger {
     };
 
     if (Array.isArray(message) && message.length) {
-      returnStr = message
-        .map((item: any) => {
+      text = message
+        .map((item: unknown) => {
           if (item && typeof item === 'object') {
             return replaceCredentials(item);
           }
@@ -136,11 +140,9 @@ export class Logger {
     } else if (isObject(message)) {
       return replaceCredentials(message);
     } else {
-      returnStr = message;
+      text = message;
     }
 
-    returnStr = toText(returnStr).replace(new RegExp(ansiRegexPattern, 'g'), '').trim();
-
-    return returnStr;
+    return toText(text).replace(new RegExp(ansiRegexPattern, 'g'), '').trim();
   }
 }

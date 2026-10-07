@@ -9,6 +9,7 @@ import type { Server } from 'http';
 import path from 'path';
 
 import { styled } from '../core/style';
+import { isRecord } from '../core/values';
 import { CloudFunctionsValidator } from './cloud-functions-validator';
 import {
   CLOUD_FUNCTIONS_DIRECTORY,
@@ -19,6 +20,12 @@ import {
 import { FunctionsDirectoryNotFoundError, PortInUseError } from './function.errors';
 import { walkFileSystem, checkIfDirectoryExists } from './os-helper';
 import type { CloudFunctionResource } from './types';
+
+type CloudFunctionHandler = CloudFunctionResource['handler'];
+
+function isHandler(value: unknown): value is CloudFunctionHandler {
+  return typeof value === 'function';
+}
 
 import { loadDataURL } from './load-data-url';
 
@@ -219,7 +226,7 @@ export class CloudFunctions {
     return { exactRouteResources, dynamicRouteResources };
   }
 
-  private async buildHandlerForFilepath(cloudFunctionFilePath: string) {
+  private async buildHandlerForFilepath(cloudFunctionFilePath: string): Promise<CloudFunctionHandler | null> {
     const [{ rollup }, { nodeResolve }, { default: commonjs }, { default: json }] = await Promise.all([
       import('rollup'),
       import('@rollup/plugin-node-resolve'),
@@ -243,16 +250,16 @@ export class CloudFunctions {
 
     const module = await loadDataURL(builtCodeInDataURLFormat);
 
-    let handler = null;
-    const isDefaultExportESModuleFunction = typeof module.default === 'function';
-    const isDefaultExportCommonjsFunction = typeof module.default?.default === 'function';
-    if (isDefaultExportESModuleFunction) {
-      handler = module.default;
-    }
-    else if (isDefaultExportCommonjsFunction) {
-      handler = module.default.default;
+    const exported = module.default;
+
+    if (isHandler(exported)) {
+      return exported;
     }
 
-    return handler;
+    if (isRecord(exported) && isHandler(exported.default)) {
+      return exported.default;
+    }
+
+    return null;
   }
 }

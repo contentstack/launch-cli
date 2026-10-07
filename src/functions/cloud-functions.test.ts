@@ -116,8 +116,10 @@ describe('loadDataURL', () => {
   it('exposes a default exported function that can be invoked', async () => {
     const module = await loadDataURL(toDataURL('export default function handler() { return "ok"; }'));
 
-    expect(typeof module.default).toBe('function');
-    expect(module.default()).toBe('ok');
+    const handler = module.default;
+
+    expect(typeof handler).toBe('function');
+    expect(typeof handler === 'function' && handler()).toBe('ok');
   });
 
   it('rejects when the data url holds a syntax error', async () => {
