@@ -39,6 +39,19 @@ export interface DeploymentOutcome {
   deployment: Deployment;
 }
 
+interface LogCursor {
+  at: number;
+  printed: Map<string, number>;
+}
+
+function logIdentity(log: DeploymentLog): string {
+  return JSON.stringify([log.stage, log.message]);
+}
+
+function logsSince(cursor: LogCursor | undefined): string {
+  return cursor === undefined ? DEPLOYMENT_LOGS_FROM : new Date(cursor.at - 1).toISOString();
+}
+
 export function defaultWatchTiming(): WatchTiming {
   return {
     sleep: (ms: number) => new Promise<void>((done) => setTimeout(done, ms)),
@@ -71,7 +84,7 @@ async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
   const deadline = deps.now() + deps.timeoutMs;
   let attempt = 0;
   let consecutiveErrors = 0;
-  let logsAfter = DEPLOYMENT_LOGS_FROM;
+  let cursor: LogCursor | undefined;
   let logsFailureReported = false;
 
   for (;;) {
@@ -100,7 +113,7 @@ async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
     let logs: DeploymentLog[] = [];
 
     try {
-      logs = await deps.logs(logsAfter);
+      logs = await deps.logs(logsSince(cursor));
     } catch (error) {
       if (!logsFailureReported) {
         deps.ux.print(deploymentLogsUnavailableLine(error));
@@ -108,12 +121,30 @@ async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
       }
     }
 
+    const resumeAt = cursor?.at;
+    const repeats = new Map(cursor?.printed);
+
     for (const log of logs) {
+      const at = log.timestamp ? Date.parse(log.timestamp) : Number.NaN;
+      const identity = logIdentity(log);
+      const seen = repeats.get(identity) ?? 0;
+
+      if (at === resumeAt && seen > 0) {
+        repeats.set(identity, seen - 1);
+        continue;
+      }
+
       deps.ux.print(deploymentLogLine(log, deps.outputIsTTY, process.stdout.columns));
 
-      if (log.timestamp && !Number.isNaN(Date.parse(log.timestamp))) {
-        logsAfter = log.timestamp;
+      if (Number.isNaN(at)) {
+        continue;
       }
+
+      if (cursor === undefined || at !== cursor.at) {
+        cursor = { at, printed: new Map() };
+      }
+
+      cursor.printed.set(identity, (cursor.printed.get(identity) ?? 0) + 1);
     }
 
     if (terminal) {

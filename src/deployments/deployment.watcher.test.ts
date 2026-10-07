@@ -416,7 +416,7 @@ describe('deployment log streaming', () => {
     ]);
   });
 
-  it('asks for everything on the first fetch and then only for what came after the last line it printed', async () => {
+  it('asks for everything on the first fetch and then from one millisecond before the last line it printed', async () => {
     const { deps, since } = streamingHarness(
       ['DEPLOYING', 'DEPLOYING', 'DEPLOYING', 'LIVE'],
       [
@@ -434,9 +434,9 @@ describe('deployment log streaming', () => {
 
     expect(since).toEqual([
       DEPLOYMENT_LOGS_FROM,
-      '2026-09-25T10:00:01.456Z',
-      '2026-09-25T10:00:01.456Z',
-      '2026-09-25T10:00:02.000Z',
+      '2026-09-25T10:00:01.455Z',
+      '2026-09-25T10:00:01.455Z',
+      '2026-09-25T10:00:01.999Z',
     ]);
     expect(DEPLOYMENT_LOGS_FROM).toBe('1970-01-01T00:00:00.000Z');
   });
@@ -463,7 +463,59 @@ describe('deployment log streaming', () => {
       DEPLOYMENT_LOGS_FROM,
       DEPLOYMENT_LOGS_FROM,
       DEPLOYMENT_LOGS_FROM,
-      '2026-09-25T10:00:05.000Z',
+      '2026-09-25T10:00:04.999Z',
+    ]);
+  });
+
+  it('prints a line that shares the last printed millisecond but arrived after the fetch, and none twice', async () => {
+    const { deps, lines } = streamingHarness(
+      ['DEPLOYING', 'LIVE'],
+      [
+        [
+          { message: 'one', timestamp: '2026-09-25T10:00:00.123Z' },
+          { message: 'two', timestamp: '2026-09-25T10:00:00.123Z' },
+        ],
+        [
+          { message: 'one', timestamp: '2026-09-25T10:00:00.123Z' },
+          { message: 'two', timestamp: '2026-09-25T10:00:00.123Z' },
+          { message: 'three', timestamp: '2026-09-25T10:00:00.123Z' },
+          { message: 'four', timestamp: '2026-09-25T10:00:00.500Z' },
+        ],
+      ],
+    );
+
+    await watchDeployment(deps);
+
+    expect(lines).toEqual([
+      '2026-09-25 10:00:00.123:  one',
+      '2026-09-25 10:00:00.123:  two',
+      '2026-09-25 10:00:00.123:  three',
+      '2026-09-25 10:00:00.500:  four',
+    ]);
+  });
+
+  it('prints a repeated line again when more copies of it arrive at the last printed millisecond', async () => {
+    const { deps, lines } = streamingHarness(
+      ['DEPLOYING', 'LIVE'],
+      [
+        [
+          { message: 'retrying', timestamp: '2026-09-25T10:00:00.123Z' },
+          { message: 'retrying', timestamp: '2026-09-25T10:00:00.123Z' },
+        ],
+        [
+          { message: 'retrying', timestamp: '2026-09-25T10:00:00.123Z' },
+          { message: 'retrying', timestamp: '2026-09-25T10:00:00.123Z' },
+          { message: 'retrying', timestamp: '2026-09-25T10:00:00.123Z' },
+        ],
+      ],
+    );
+
+    await watchDeployment(deps);
+
+    expect(lines).toEqual([
+      '2026-09-25 10:00:00.123:  retrying',
+      '2026-09-25 10:00:00.123:  retrying',
+      '2026-09-25 10:00:00.123:  retrying',
     ]);
   });
 
@@ -483,7 +535,7 @@ describe('deployment log streaming', () => {
 
       await watchDeployment(deps);
 
-      expect(since).toEqual([DEPLOYMENT_LOGS_FROM, '2026-09-25T10:00:00.123Z']);
+      expect(since).toEqual([DEPLOYMENT_LOGS_FROM, '2026-09-25T10:00:00.122Z']);
       expect(lines).toContain('two');
     },
   );
