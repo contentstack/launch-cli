@@ -1,5 +1,7 @@
 import { Flags } from '@oclif/core';
 
+import { coreFlags } from '../core/catalog';
+
 export const DEFAULT_SERVE_PORT = '3000';
 
 export const serveFlags = {
@@ -8,10 +10,7 @@ export const serveFlags = {
     default: DEFAULT_SERVE_PORT,
     description: 'Port number',
   }),
-  'data-dir': Flags.string({
-    char: 'd',
-    description: 'Current working directory',
-  }),
+  'data-dir': coreFlags['data-dir'],
 };
 
 export function isValidPort(input: string): boolean {
