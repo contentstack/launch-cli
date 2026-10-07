@@ -64,9 +64,6 @@ import { refuseArchiveOutsideLimits, uploadArchive } from './project.upload';
 import type { CreateProjectInput, DetectedFramework, IdentifiedProject, SignedUploadUrl } from './types';
 import { PROJECT_NAME_MAX_LENGTH } from './types';
 
-export { DEPLOYMENT_WAIT_TIMEOUT_MS, defaultWatchTiming } from '../deployments/deployment.watcher';
-export { serverCommandFrameworkGate } from '../environments/environment.inputs';
-
 export const NO_DEPLOYMENT_STATUS = 'NONE';
 export const DEFAULT_ENVIRONMENT_NAME = 'Default';
 export const FIRST_LOOKUP_ATTEMPTS = 3;

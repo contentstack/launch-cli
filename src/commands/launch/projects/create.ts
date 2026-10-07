@@ -1,6 +1,8 @@
 import { LaunchCommand } from '../../../core/launch-command';
 import { flagsFor, inputs } from '../../../core/inputs';
-import { ProjectCreator, defaultWatchTiming, serverCommandFrameworkGate } from '../../../projects/project.create';
+import { defaultWatchTiming } from '../../../deployments/deployment.watcher';
+import { serverCommandFrameworkGate } from '../../../environments/environment.inputs';
+import { ProjectCreator } from '../../../projects/project.create';
 
 const createInputs = inputs({
   org: { required: true },

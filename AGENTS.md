@@ -153,6 +153,9 @@ never import each other's wording. A resource imports `core` and `transport` fre
 source in `core/` and `transport/`, tests included, and fails on an import of a resource folder,
 and it collects every cross-resource import in the non-test resource sources and fails on one the
 allow-list does not name.
+A command under `commands/launch/<resource>/` imports that resource and the resources its allow-list
+names - `projects:create` takes the watch timing from `deployments` directly - so nothing needs
+re-exporting through a resource just to be reachable from its command.
 That is why `Pagination` lives in `src/core/render.ts` beside `renderPagination` and
 `src/projects/types.ts` re-exports it, not the other way round.
 `resources.ts` is the only file every resource touches; everything else about projects

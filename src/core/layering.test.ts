@@ -66,10 +66,11 @@ function crossResourceEdges(relativePath: string): string[] {
 function commandEdges(relativePath: string): string[] {
   const owner = relativePath.split(sep)[2];
   const directory = directoryOf(relativePath);
+  const allowed = RESOURCE_EDGES[owner] ?? [];
 
   return importedPaths(relativePath)
     .map((specifier) => resourceOf(specifier, directory))
-    .filter((target): target is string => target !== undefined && target !== owner);
+    .filter((target): target is string => target !== undefined && target !== owner && !allowed.includes(target));
 }
 
 function resourceImports(relativePath: string): string[] {
@@ -154,7 +155,7 @@ describe('layering between resources', () => {
 
 describe('layering of the command files', () => {
   it.each(filesUnder(join('commands', 'launch')).filter((path) => path.split(sep).length > 3))(
-    '%s reaches its own resource and no other',
+    '%s reaches only its own resource and the resources that one may use',
     (relativePath) => {
       expect(commandEdges(relativePath)).toEqual([]);
     },
