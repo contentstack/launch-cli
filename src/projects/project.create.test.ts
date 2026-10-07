@@ -1695,11 +1695,39 @@ describe('ProjectCreator writing the project config', () => {
 
     expect(failure).toBeInstanceOf(UsageError);
     expect((failure as UsageError).message).toBe(
-      `This folder is already linked to the project other-project in ${configPathIn(dataDir)}. ` +
-      'To create a new project, remove that file or pass --config with a different path.',
+      'This folder already belongs to project other-project.\n' +
+      `To create a new project, rename or delete ${configPathIn(dataDir)}.`,
     );
     expect(created).toEqual([]);
     expect(configFileIn(dataDir)).toEqual(existing);
+  });
+
+  it('names the linked config file by its bare name when it sits in the working directory', async () => {
+    writeFileSync(configPathIn(dataDir), JSON.stringify({ project: { uid: 'other-project', organizationUid: ORG } }));
+    jest.spyOn(process, 'cwd').mockReturnValue(dataDir);
+    const { creator } = harness();
+
+    const failure = await creator.create(gitRequest({ configPath: configPathIn(dataDir) })).catch((error: Error) => error);
+
+    expect((failure as UsageError).message).toBe(
+      'This folder already belongs to project other-project.\n' +
+      'To create a new project, rename or delete .cs-launch.json.',
+    );
+  });
+
+  it('names the linked config file relative to the working directory when it sits in a folder below it', async () => {
+    const site = join(dataDir, 'site');
+    mkdirSync(site);
+    writeFileSync(configPathIn(site), JSON.stringify({ project: { uid: 'other-project', organizationUid: ORG } }));
+    jest.spyOn(process, 'cwd').mockReturnValue(dataDir);
+    const { creator } = harness();
+
+    const failure = await creator.create(gitRequest({ configPath: configPathIn(site) })).catch((error: Error) => error);
+
+    expect((failure as UsageError).message).toBe(
+      'This folder already belongs to project other-project.\n' +
+      `To create a new project, rename or delete ${join('site', '.cs-launch.json')}.`,
+    );
   });
 
   it('reports the miss and leaves an unparseable config file untouched, still completing the create', async () => {

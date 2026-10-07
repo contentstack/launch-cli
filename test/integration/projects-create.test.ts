@@ -1008,8 +1008,9 @@ describe('integration: launch:projects:create on the wire', () => {
     );
 
     expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toContain(`already linked to the project ${other}`);
-    expect(error?.message).toContain('--config');
+    expect(error?.message).toContain(`This folder already belongs to project ${other}.`);
+    expect(error?.message).toContain(`To create a new project, rename or delete ${join(dataDir, '.cs-launch.json')}.`);
+    expect(error?.message).not.toContain('--config');
     expect(signed.isDone()).toBe(false);
     expect(create.scope.isDone()).toBe(false);
   });

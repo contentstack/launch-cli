@@ -1,4 +1,4 @@
-import { basename, resolve } from 'node:path';
+import { basename, relative, resolve, sep } from 'node:path';
 
 import { LaunchError, MissingInputError, UsageError } from '../core/errors';
 import type { ProjectConfig } from '../core/project-config';
@@ -113,6 +113,13 @@ interface SourceSelection {
   namespace?: string;
   branch?: string;
   uploadUid?: string;
+}
+
+function shownPath(path: string): string {
+  const absolute = resolve(path);
+  const fromHere = relative(process.cwd(), absolute);
+
+  return fromHere.split(sep)[0] === '..' ? absolute : fromHere;
 }
 
 function emptyEnvironmentVariables(): [] {
@@ -720,8 +727,8 @@ export class ProjectCreator {
     }
 
     throw new UsageError(
-      `This folder is already linked to the project ${linked.uid} in ${request.configPath}. ` +
-        'To create a new project, remove that file or pass --config with a different path.',
+      `This folder already belongs to project ${linked.uid}.\n` +
+        `To create a new project, rename or delete ${shownPath(request.configPath)}.`,
     );
   }
 
