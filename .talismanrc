@@ -195,7 +195,7 @@ fileignoreconfig:
 - filename: src/core/redact.test.ts
   checksum: ae497ea8c3a4c3f12217d2c4c028a1da3d1324e18362d68c355ba8120902bcb3
 - filename: src/commands/launch/projects/list.test.ts
-  checksum: ad565f30c957dc4463d13e242dd8bb0cbae9270d345cb59e28999474855693dc
+  checksum: d01cbf70469a771425c8258fb1800b70a6ff0b807208fc76f3060b69a2cc05bc
 - filename: src/commands/launch/projects/get.test.ts
   checksum: fec6ca189bc3d93aefa109ee6405f8ce74a42318aa18a99045d40c3cb5561b9e
 - filename: test/integration/projects-list-command.test.ts

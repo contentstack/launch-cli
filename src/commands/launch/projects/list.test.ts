@@ -103,7 +103,7 @@ describe('launch:projects:list', () => {
   it('passes a non-default limit and skip through to the api and reports the rows it printed', async () => {
     const { command, lines, listed } = commandUnderTest(
       {
-        pagination: { count: 120, limit: 10, skip: 20 },
+        pagination: { count: 120, limit: 10, skip: null },
         projects: [{ uid: 'p1', name: 'site', projectType: 'FILEUPLOAD', updatedAt: '2026-09-01' }],
       },
       { org: 'org1', limit: 10, skip: 20 },

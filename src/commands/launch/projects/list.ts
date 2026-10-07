@@ -29,6 +29,6 @@ export default class ProjectsList extends LaunchCommand<typeof listInputs> {
       undefined,
       this.services.outputIsTTY,
     );
-    renderPagination(this.ux, page.pagination, page.projects.length);
+    renderPagination(this.ux, { ...page.pagination, skip: this.resolved.skip }, page.projects.length);
   }
 }
