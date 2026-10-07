@@ -20,6 +20,7 @@ const GITHUB_HOST = '(?:https?:\\/\\/(?:[^@/]+@)?github\\.com\\/|(?:ssh:\\/\\/)?
 const GITHUB_NAME = '[A-Za-z0-9._-]+';
 const GITHUB_URL = new RegExp(`^${GITHUB_HOST}(${GITHUB_NAME})\\/(${GITHUB_NAME}?)(?:\\.git)?\\/?$`);
 const DEFAULT_REMOTE = 'origin';
+const LOCAL_REMOTE = '.';
 
 function readText(path: string): string | undefined {
   try {
@@ -70,7 +71,7 @@ function trackedRemote(entries: ConfigEntry[], directory: string): string {
   const branch = checkedOutBranch(directory);
   const remote = branch === undefined ? undefined : valueOf(entries, 'branch', branch, 'remote');
 
-  return remote ?? DEFAULT_REMOTE;
+  return remote === undefined || remote === LOCAL_REMOTE ? DEFAULT_REMOTE : remote;
 }
 
 export function detectGitHubRepository(directory: string): LocalGitHubRepository | undefined {

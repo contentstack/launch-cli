@@ -103,6 +103,19 @@ describe('detectGitHubRepository', () => {
     });
   });
 
+  it('falls back to origin when the checked-out branch tracks a local branch, which git records as remote "."', () => {
+    gitDirectory(
+      '[remote "origin"]\n\turl = https://github.com/SakshiKoli-CS/next-partial-prerendering.git\n' +
+        '[branch "feat"]\n\tremote = .\n\tmerge = refs/heads/main\n',
+      'ref: refs/heads/feat\n',
+    );
+
+    expect(detectGitHubRepository(dir)).toEqual({
+      namespace: 'SakshiKoli-CS',
+      repoName: 'SakshiKoli-CS/next-partial-prerendering',
+    });
+  });
+
   it.each<[string, string | undefined]>([
     ['the folder is not a working copy', undefined],
     ['the config names no remote', '[core]\n\tbare = false\n'],
