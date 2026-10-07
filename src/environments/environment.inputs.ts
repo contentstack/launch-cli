@@ -3,38 +3,10 @@ import { Flags } from '@contentstack/cli-utilities';
 import type { ResolutionSpec } from '../core/resolution';
 import { onlyWithValueOf } from '../core/rules';
 import { oneOf, withinLength } from '../core/values';
-import type { FrameworkPreset } from './types';
-import { SERVER_COMMAND_FRAMEWORKS } from './types';
+import type { FrameworkPreset } from './frameworks';
+import { FRAMEWORK_CHOICES, FRAMEWORK_PRESET_BY_LABEL, SERVER_COMMAND_FRAMEWORKS } from './frameworks';
 
 export const ENVIRONMENT_NAME_MAX_LENGTH = 200;
-
-export const FRAMEWORK_CHOICES = [
-  'Gatsby',
-  'NextJs',
-  'CRA',
-  'CSR',
-  'Analog',
-  'Angular',
-  'Nuxt',
-  'Astro',
-  'VueJs',
-  'Remix',
-  'Other',
-] as const;
-
-export const FRAMEWORK_PRESET_BY_LABEL: Record<string, FrameworkPreset> = {
-  gatsby: 'GATSBY',
-  nextjs: 'NEXTJS',
-  cra: 'CRA',
-  csr: 'CSR',
-  analog: 'ANALOG',
-  angular: 'ANGULAR',
-  nuxt: 'NUXT',
-  astro: 'ASTRO',
-  vuejs: 'VUEJS',
-  remix: 'REMIX',
-  other: 'OTHER',
-};
 
 export const RESPONSE_MODES = ['buffered', 'streaming'] as const;
 
@@ -43,20 +15,6 @@ export type ResponseMode = (typeof RESPONSE_MODES)[number];
 export const TOGGLE_VALUES = ['enable', 'disable'] as const;
 
 export type ToggleValue = (typeof TOGGLE_VALUES)[number];
-
-export const OUTPUT_DIRECTORY_BY_FRAMEWORK: Record<FrameworkPreset, string> = {
-  GATSBY: './public',
-  NEXTJS: './.next',
-  CRA: './build',
-  CSR: './',
-  ANALOG: './dist/analog/public',
-  ANGULAR: './dist',
-  NUXT: './.output',
-  ASTRO: './dist',
-  VUEJS: './dist',
-  REMIX: './build',
-  OTHER: './',
-};
 
 export function frameworkPresetOf(value: string): FrameworkPreset {
   return FRAMEWORK_PRESET_BY_LABEL[oneOf('framework', value, FRAMEWORK_CHOICES).toLowerCase()];

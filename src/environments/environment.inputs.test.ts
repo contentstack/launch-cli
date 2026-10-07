@@ -4,8 +4,6 @@ import type { ApiSurface } from '../resources';
 import type { UxLike } from '../core/prompt';
 import {
   ENVIRONMENT_NAME_MAX_LENGTH,
-  FRAMEWORK_CHOICES,
-  FRAMEWORK_PRESET_BY_LABEL,
   RESPONSE_MODES,
   TOGGLE_VALUES,
   environmentFlags,
@@ -13,7 +11,7 @@ import {
   frameworkPresetOf,
   serverCommandFrameworkGate,
 } from './environment.inputs';
-import { FRAMEWORK_PRESETS, SERVER_COMMAND_FRAMEWORKS } from './types';
+import { FRAMEWORK_CHOICES, FRAMEWORK_PRESETS, FRAMEWORK_PRESET_BY_LABEL, SERVER_COMMAND_FRAMEWORKS } from './frameworks';
 
 function services(): ResolveServices {
   const ux: UxLike = { print: () => undefined, inquire: async () => undefined as never };

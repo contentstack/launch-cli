@@ -759,6 +759,10 @@ the management service is the wire contract, and for two flags they differ:
 `GitHub -> GITPROVIDER` is a **rename**, not a case change, and `NextJs -> NEXTJS` does not survive a
 naive `toUpperCase()` round trip in reverse. Both are explicit tables, and a test asserts the
 framework table is a bijection onto the service enum so a preset cannot be added on one side only.
+Every framework is one row of `FRAMEWORKS` in `src/environments/frameworks.ts` - label, preset,
+default output directory and whether it takes `--server-cmd`, each written out - and
+`FRAMEWORK_CHOICES`, `FRAMEWORK_PRESETS`, `FRAMEWORK_PRESET_BY_LABEL`, `OUTPUT_DIRECTORY_BY_FRAMEWORK`
+and `SERVER_COMMAND_FRAMEWORKS` are built from it. Adding a framework is adding one row.
 
 **Flag names are the short forms the code ships.** `--org`, `--env`, `--env-name`, `--build-cmd`,
 `--server-cmd`, `--output-dir` and `--res-mode`, with no long-form aliases. The Commands Details page

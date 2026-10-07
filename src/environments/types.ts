@@ -1,31 +1,7 @@
 import type { Pagination } from '../core/render';
+import type { FrameworkPreset } from './frameworks';
 
 export type { Pagination };
-
-export const FRAMEWORK_PRESETS = [
-  'GATSBY',
-  'NEXTJS',
-  'CRA',
-  'CSR',
-  'ANALOG',
-  'ANGULAR',
-  'NUXT',
-  'ASTRO',
-  'VUEJS',
-  'REMIX',
-  'OTHER',
-] as const;
-
-export type FrameworkPreset = (typeof FRAMEWORK_PRESETS)[number];
-
-export const SERVER_COMMAND_FRAMEWORKS: readonly FrameworkPreset[] = [
-  'ANALOG',
-  'ANGULAR',
-  'NUXT',
-  'ASTRO',
-  'REMIX',
-  'OTHER',
-];
 
 export interface EnvironmentVariableInput {
   key: string;

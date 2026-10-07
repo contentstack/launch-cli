@@ -112,7 +112,7 @@ fileignoreconfig:
   ignore_detectors:
     - filename
 - filename: src/environments/environment.inputs.test.ts
-  checksum: 87139e8df1adc655cabff993774dea596e1f5c55cdc243da21a7fab30115ce14
+  checksum: ba38924cf2b2b0df4044e8aba4c4cd0bfa7edcb1f09654cf37a7edb06365de06
   ignore_detectors:
     - filename
 - filename: src/core/inputs.ts

@@ -18,15 +18,18 @@ import type { Deployment } from '../deployments/types';
 import type { ResponseMode, ToggleValue } from '../environments/environment.inputs';
 import {
   ENVIRONMENT_NAME_MAX_LENGTH,
-  FRAMEWORK_CHOICES,
-  FRAMEWORK_PRESET_BY_LABEL,
-  OUTPUT_DIRECTORY_BY_FRAMEWORK,
   RESPONSE_MODES,
   TOGGLE_VALUES,
   frameworkPresetOf,
 } from '../environments/environment.inputs';
-import type { CreateEnvironmentInput, Environment, FrameworkPreset } from '../environments/types';
-import { SERVER_COMMAND_FRAMEWORKS } from '../environments/types';
+import type { FrameworkPreset } from '../environments/frameworks';
+import {
+  FRAMEWORK_CHOICES,
+  FRAMEWORK_PRESET_BY_LABEL,
+  OUTPUT_DIRECTORY_BY_FRAMEWORK,
+  SERVER_COMMAND_FRAMEWORKS,
+} from '../environments/frameworks';
+import type { CreateEnvironmentInput, Environment } from '../environments/types';
 import { GitConnectionMissingError, isMissingGitConnection } from '../git/git.errors';
 import { gitConnectionIdentifiedLine, gitConnectionLines, repositoryLabel } from '../git/git.presenter';
 import type { LocalGitHubRepository } from '../git/local-repository';
