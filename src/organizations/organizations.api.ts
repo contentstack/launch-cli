@@ -1,4 +1,5 @@
 import { MAX_PAGES } from '../core/constants';
+import { isRecord } from '../core/values';
 import type { CmaCollection, CmaSession } from '../transport/cma-client';
 import { OrganizationLookupError } from './organization.errors';
 
@@ -14,10 +15,6 @@ export interface AvailableOrganizations {
 
 export const ORGANIZATION_PAGE_SIZE = 100;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
 function textOf(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() !== '' ? value : undefined;
 }
@@ -32,7 +29,7 @@ function organizationOf(value: unknown): Organization[] {
   return uid === undefined ? [] : [{ uid, name: textOf(value.name) }];
 }
 
-function reasonOf(error: unknown): string {
+function cmaFailureReason(error: unknown): string {
   if (isRecord(error)) {
     const reason = textOf(error.errorMessage) ?? textOf(error.message);
 
@@ -88,7 +85,7 @@ export class OrganizationsApi {
     try {
       return await call();
     } catch (error) {
-      throw new OrganizationLookupError(reasonOf(error));
+      throw new OrganizationLookupError(cmaFailureReason(error));
     }
   }
 }

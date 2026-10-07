@@ -1,7 +1,35 @@
 import { UsageError } from './errors';
-import { oneOf, withinLength } from './values';
+import { asSentence, isRecord, messageOf, oneOf, withinLength } from './values';
 
 describe('input value helpers', () => {
+  it.each([
+    [{}, true],
+    [{ a: 1 }, true],
+    [[], true],
+    [null, false],
+    [undefined, false],
+    ['', false],
+    [0, false],
+    [false, false],
+  ])('treats %p as a record: %p', (value, expected) => {
+    expect(isRecord(value)).toBe(expected);
+  });
+
+  it.each([
+    [new Error('the socket closed'), 'the socket closed'],
+    ['a thrown string', 'a thrown string'],
+    [404, '404'],
+  ])('reads the message out of the thrown value %p', (thrown, message) => {
+    expect(messageOf(thrown)).toBe(message);
+  });
+
+  it.each([
+    ['The repository is private', 'The repository is private.'],
+    ['  The repository is private.  ', 'The repository is private.'],
+  ])('ends %j as one sentence with a single full stop', (text, sentence) => {
+    expect(asSentence(text)).toBe(sentence);
+  });
+
   it('returns a value at or under the limit unchanged', async () => {
     await expect(withinLength('name', 'abc', 3)).resolves.toBe('abc');
     await expect(withinLength('name', '', 3)).resolves.toBe('');

@@ -1,5 +1,6 @@
 import { cliux } from '@contentstack/cli-utilities';
 
+import { BYTES_PER_KB, BYTES_PER_MB } from './constants';
 import { styled } from './style';
 
 export interface Progress {
@@ -14,8 +15,6 @@ interface ProgressBar {
   stop(): void;
 }
 
-const BYTES_PER_KB = 1024;
-const BYTES_PER_MB = 1024 * 1024;
 const BAR_WIDTH = 24;
 const BAR_COMPLETE = '█';
 const BAR_INCOMPLETE = '░';

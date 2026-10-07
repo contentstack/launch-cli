@@ -1,6 +1,7 @@
 import { MAX_PAGES } from '../core/constants';
 import { UsageError } from '../core/errors';
-import { assertPage, hasUid, isRecord, malformed, unwrap } from '../transport/envelope';
+import { isRecord } from '../core/values';
+import { assertPage, hasUid, malformed, unwrap } from '../transport/envelope';
 import type { RestApiClient, RestRequest } from '../transport/rest-client';
 import { PROJECT_ERROR_MESSAGES } from './project.errors';
 import type {

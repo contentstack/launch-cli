@@ -1,5 +1,19 @@
 import { UsageError } from './errors';
 
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+export function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+export function asSentence(text: string): string {
+  const trimmed = text.trim();
+
+  return trimmed.endsWith('.') ? trimmed : `${trimmed}.`;
+}
+
 export function isAbsent(value: unknown): boolean {
   if (value === undefined || value === null) {
     return true;

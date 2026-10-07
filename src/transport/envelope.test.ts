@@ -1,5 +1,5 @@
 import { LaunchApiError } from './errors';
-import { MALFORMED_CODE, assertArray, assertPage, hasUid, isRecord, malformed, unwrap } from './envelope';
+import { MALFORMED_CODE, assertArray, assertPage, hasUid, malformed, unwrap } from './envelope';
 
 function failureFrom(act: () => unknown): LaunchApiError {
   try {
@@ -20,19 +20,6 @@ describe('response envelope', () => {
     expect(error.code).toBe(MALFORMED_CODE);
     expect(MALFORMED_CODE).toBe('launch.RESPONSE.MALFORMED');
     expect(error.message).toBe('The Launch API returned nonsense.');
-  });
-
-  it.each([
-    [{}, true],
-    [{ a: 1 }, true],
-    [[], true],
-    [null, false],
-    [undefined, false],
-    ['', false],
-    [0, false],
-    [false, false],
-  ])('treats %p as a record: %p', (value, expected) => {
-    expect(isRecord(value)).toBe(expected);
   });
 
   it('returns the member the envelope carries', () => {

@@ -1,5 +1,6 @@
 import { basename, relative, resolve, sep } from 'node:path';
 
+import { PICKER_PAGE_SIZE } from '../core/constants';
 import { LaunchError, MissingInputError, UsageError } from '../core/errors';
 import type { ProjectConfig } from '../core/project-config';
 import { ProjectConfigStore } from '../core/project-config';
@@ -36,6 +37,7 @@ import { connectedAccountsUrl } from '../core/region';
 import { LaunchApiError } from '../transport/errors';
 import { archiveDirectory } from './project.archive';
 import { askOption, askOptionalText, askText } from '../core/prompt';
+import { asSentence, messageOf } from '../core/values';
 import { askBranch, findRepository, repositorySearchTerm } from '../git/git.prompt';
 import {
   PREPARING_ARCHIVE,
@@ -74,12 +76,6 @@ export const DUPLICATE_PROJECT_NAME_CODE = 'launch.PROJECT.DUPLICATE_NAME';
 export const PROJECT_RENAME_ATTEMPTS = 3;
 export const SITE_OPEN_DELAY_MS = 6000;
 export const GIT_NAMESPACE_PAGE_SIZE = 100;
-
-export function reasonOf(error: unknown): string {
-  const text = (error instanceof Error ? error.message : String(error)).trim();
-
-  return text.endsWith('.') ? text : `${text}.`;
-}
 
 export interface CreateRequest {
   org: string;
@@ -301,7 +297,7 @@ export class ProjectCreator {
     try {
       new ProjectConfigStore(path).save(config);
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
+      const reason = messageOf(error);
 
       this.services.ux.print(
         `Could not record this project in ${path}: ${reason} ` +
@@ -382,7 +378,7 @@ export class ProjectCreator {
     try {
       return await step();
     } catch (error) {
-      throw this.unsuccessful({ ...survivors, status: NO_DEPLOYMENT_STATUS, reason: reasonOf(error) });
+      throw this.unsuccessful({ ...survivors, status: NO_DEPLOYMENT_STATUS, reason: asSentence(messageOf(error)) });
     }
   }
 
@@ -487,7 +483,7 @@ export class ProjectCreator {
         provider: GIT_PROVIDER_GITHUB,
         namespace: local.namespace,
         search: repositorySearchTerm(local.repoName),
-        limit: 100,
+        limit: PICKER_PAGE_SIZE,
         skip: 0,
       });
 
@@ -498,7 +494,7 @@ export class ProjectCreator {
       }
 
       if (error instanceof LaunchApiError) {
-        throw new UsageError(unreachableRepository(request, local, reasonOf(error)));
+        throw new UsageError(unreachableRepository(request, local, asSentence(messageOf(error))));
       }
 
       throw error;

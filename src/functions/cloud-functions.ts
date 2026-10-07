@@ -13,6 +13,7 @@ import { CloudFunctionsValidator } from './cloud-functions-validator';
 import {
   CLOUD_FUNCTIONS_DIRECTORY,
   CLOUD_FUNCTIONS_SUPPORTED_EXTENSION,
+  DYNAMIC_ROUTE_SEGMENT,
   ENV_FILE_NAME,
 } from './constants';
 import { FunctionsDirectoryNotFoundError, PortInUseError } from './function.errors';
@@ -191,18 +192,17 @@ export class CloudFunctions {
     exactRouteResources: CloudFunctionResource[];
     dynamicRouteResources: CloudFunctionResource[];
   } {
-    const matchDyanmicRouteRegex = /\[(.*?)\]/g;
     const exactRouteResources: CloudFunctionResource[] = [];
     const dynamicRouteResources: CloudFunctionResource[] = [];
 
     cloudFunctionResources.forEach(
       (cloudFunctionResource: CloudFunctionResource) => {
         if (
-          cloudFunctionResource.apiResourceURI.match(matchDyanmicRouteRegex) !==
+          cloudFunctionResource.apiResourceURI.match(DYNAMIC_ROUTE_SEGMENT) !==
           null
         ) {
           const apiResourceURI = cloudFunctionResource.apiResourceURI.replace(
-            matchDyanmicRouteRegex,
+            DYNAMIC_ROUTE_SEGMENT,
             ':$1'
           );
 

@@ -1,13 +1,10 @@
+import { isRecord } from '../core/values';
 import { LaunchApiError } from './errors';
 
 export const MALFORMED_CODE = 'launch.RESPONSE.MALFORMED';
 
 export function malformed(message: string): LaunchApiError {
   return new LaunchApiError(200, [{ code: MALFORMED_CODE, message }]);
-}
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
 }
 
 export function hasUid<T extends { uid?: unknown }>(entity: T): entity is T & { uid: string } {

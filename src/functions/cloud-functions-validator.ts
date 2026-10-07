@@ -1,3 +1,4 @@
+import { DYNAMIC_ROUTE_SEGMENT } from './constants';
 import {
   ExistingDynamicRouteAtSameLevelError,
   IndistinctDynamicRouteNamesInPathError,
@@ -55,8 +56,7 @@ export class CloudFunctionsValidator {
   }
 
   private hasIndistinctDynamicRouteNamesInPath(filepath: string): boolean {
-    const matchDistinctDynamicRoutesInPath = /\[(.*?)\]/g;
-    const dynamicRouteNames = filepath.match(matchDistinctDynamicRoutesInPath);
+    const dynamicRouteNames = filepath.match(DYNAMIC_ROUTE_SEGMENT);
 
     if (dynamicRouteNames === null) {
       return false;
@@ -67,9 +67,8 @@ export class CloudFunctionsValidator {
   }
 
   private getDynamicRouteAtSameLevel(filepath: string): string | undefined {
-    const matchDyanmicRouteRegex = /\[(.*?)\]/g;
     const dynamicRouteNameReplacer = '[id]';
-    const transformedFilePathWithDynamicRoute = filepath.replace(matchDyanmicRouteRegex, dynamicRouteNameReplacer);
+    const transformedFilePathWithDynamicRoute = filepath.replace(DYNAMIC_ROUTE_SEGMENT, dynamicRouteNameReplacer);
 
     if (this.dynamicRoutes[transformedFilePathWithDynamicRoute]) {
       return this.dynamicRoutes[transformedFilePathWithDynamicRoute];

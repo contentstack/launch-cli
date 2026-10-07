@@ -4,6 +4,7 @@ import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
 import { URL } from 'node:url';
 
+import { BYTES_PER_KB, BYTES_PER_MB } from '../core/constants';
 import { UsageError } from '../core/errors';
 import { isAbsent } from '../core/values';
 import { PROXY_ERROR_CODES } from '../transport/errors';
@@ -17,9 +18,6 @@ export const UPLOAD_IDLE_TIMEOUT_MS = 120_000;
 export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 export const MIN_UPLOAD_BYTES = 1024;
 export const UPLOAD_CHUNK_BYTES = 256 * 1024;
-
-const BYTES_PER_KB = 1024;
-const BYTES_PER_MB = 1024 * 1024;
 
 /**
  * Every storage provider Launch uploads to enforces the same 1 KB - 100 MB range (management-service's

@@ -1,6 +1,7 @@
 import { stripVTControlCharacters } from 'node:util';
 
 import { styled } from '../core/style';
+import { messageOf } from '../core/values';
 import type { Deployment, DeploymentLog } from './types';
 
 const GUTTER = '  ';
@@ -131,7 +132,7 @@ export function deploymentLogLine(log: DeploymentLog, outputIsTTY: boolean, colu
 }
 
 export function deploymentLogsUnavailableLine(error: unknown): string {
-  const reason = error instanceof Error ? error.message : String(error);
+  const reason = messageOf(error);
 
   return `  ! Could not read the deployment logs (${reason}). Still waiting on the deployment.`;
 }

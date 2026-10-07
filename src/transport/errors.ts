@@ -1,5 +1,6 @@
 import { EXIT_RUNTIME } from '../core/constants';
 import { LaunchError } from '../core/errors';
+import { isRecord } from '../core/values';
 import { proxyFailureMessage, proxyUrl } from './proxy';
 
 export interface ApiErrorEntry {
@@ -33,10 +34,6 @@ export class LaunchApiError extends LaunchError {
   }
 }
 
-function isObject(value: unknown): value is object {
-  return typeof value === 'object' && value !== null;
-}
-
 function fieldNamedEntry(value: object): ApiErrorEntry | undefined {
   const fields = Object.getOwnPropertyNames(value);
 
@@ -47,13 +44,13 @@ function fieldNamedEntry(value: object): ApiErrorEntry | undefined {
   const [field] = fields;
   const nested: unknown = (value as Record<string, unknown>)[field];
 
-  return isObject(nested) ? { field, ...entryFrom(nested) } : undefined;
+  return isRecord(nested) ? { field, ...entryFrom(nested) } : undefined;
 }
 
 function entryFrom(value: unknown): ApiErrorEntry {
   const entry: ApiErrorEntry = {};
 
-  if (!isObject(value)) {
+  if (!isRecord(value)) {
     return entry;
   }
 
