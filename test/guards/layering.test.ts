@@ -50,14 +50,18 @@ function crossResourceEdges(relativePath: string): string[] {
     .filter((target): target is string => target !== undefined && target !== owner);
 }
 
-function commandEdges(relativePath: string): string[] {
+function commandEdgesOf(relativePath: string, specifiers: string[]): string[] {
   const owner = relativePath.split('/')[2];
   const directory = directoryOf(relativePath);
   const allowed = RESOURCE_EDGES[owner] ?? [];
 
-  return importedPaths(relativePath)
+  return specifiers
     .map((specifier) => resourceOf(specifier, directory))
     .filter((target): target is string => target !== undefined && target !== owner && !allowed.includes(target));
+}
+
+function commandEdges(relativePath: string): string[] {
+  return commandEdgesOf(relativePath, importedPaths(relativePath));
 }
 
 function resourceImports(relativePath: string): string[] {
@@ -122,11 +126,10 @@ describe('layering between resources', () => {
     }
   });
 
-  it('records the edges POST /projects really creates, and no others', () => {
+  it('records the edges the projects resource really uses, and no others', () => {
     expect(RESOURCE_EDGES.projects).toEqual(['environments', 'deployments', 'git']);
-    const createFiles = ['create', 'source', 'environment', 'follow'].map((part) => `projects/project.${part}.ts`);
 
-    expect([...new Set(createFiles.flatMap((path) => crossResourceEdges(path)))].sort()).toEqual([
+    expect([...new Set(sourceFilesIn('projects').flatMap((path) => crossResourceEdges(path)))].sort()).toEqual([
       'deployments',
       'environments',
       'git',
@@ -162,10 +165,20 @@ describe('layering of the command files', () => {
       'deployments',
     );
     expect(resourceOf('../../../projects/project.create', 'commands/launch/projects')).toBe('projects');
+    expect(commandEdgesOf('commands/launch/projects/create.ts', ['../../../deployments/deployment.watcher'])).toEqual(
+      [],
+    );
+    expect(commandEdgesOf('commands/launch/projects/create.ts', ['../../../organizations/organizations.api'])).toEqual([
+      'organizations',
+    ]);
+    expect(commandEdgesOf('commands/launch/functions/serve.ts', ['../../../projects/project.create'])).toEqual([
+      'projects',
+    ]);
   });
 });
 
 const READS_RESOURCES = ['core/inputs.ts', 'core/launch-command.ts', 'core/resolve.ts', 'core/service-context.ts'];
+const LOOP_TARGETS = [...READS_RESOURCES, 'resources.ts'];
 
 function isEntryPoint(relativePath: string): boolean {
   return relativePath === 'index.ts' || relativePath.startsWith('commands/');
@@ -181,11 +194,11 @@ function readsResourcesImports(relativePath: string, text: string): string[] {
   return runtimeImports(text)
     .filter((specifier) => specifier.startsWith('.'))
     .map((specifier) => `${posix.normalize(posix.join(directory, specifier))}.ts`)
-    .filter((target) => READS_RESOURCES.includes(target));
+    .filter((target) => LOOP_TARGETS.includes(target));
 }
 
 describe('import loops through resources.ts', () => {
-  it('keeps everything resources.ts loads from importing a core file that reads resources.ts', () => {
+  it('keeps everything resources.ts loads from importing resources.ts, or a core file that reads it', () => {
     const violations = productionSources()
       .filter((source) => !isEntryPoint(source.path) && !READS_RESOURCES.includes(source.path))
       .flatMap((source) => readsResourcesImports(source.path, source.text).map((target) => `${source.path} -> ${target}`));
@@ -220,6 +233,10 @@ describe('import loops through resources.ts', () => {
       'core/resolve.ts',
     ]);
     expect(readsResourcesImports('projects/probe.ts', "import type { AnyInputs } from '../core/inputs';")).toEqual([]);
+    expect(readsResourcesImports('projects/probe.ts', "import { catalog } from '../resources';")).toEqual([
+      'resources.ts',
+    ]);
+    expect(readsResourcesImports('projects/probe.ts', "import type { FlagKey } from '../resources';")).toEqual([]);
     expect(
       readsResourcesImports('core/probe.ts', "import {\n  buildServiceContext,\n} from './service-context';"),
     ).toEqual(['core/service-context.ts']);
