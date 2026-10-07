@@ -1,3 +1,5 @@
+import { basename, resolve } from 'node:path';
+
 import { LaunchError, MissingInputError, UsageError } from '../core/errors';
 import type { ProjectConfig } from '../core/project-config';
 import { ProjectConfigStore } from '../core/project-config';
@@ -25,10 +27,10 @@ import {
 import type { CreateEnvironmentInput, Environment, FrameworkPreset } from '../environments/types';
 import { SERVER_COMMAND_FRAMEWORKS } from '../environments/types';
 import { GitConnectionMissingError, isMissingGitConnection } from '../git/git.errors';
-import { gitConnectionLines, repositoryLabel } from '../git/git.presenter';
+import { gitConnectionIdentifiedLine, gitConnectionLines, repositoryLabel } from '../git/git.presenter';
 import type { LocalGitHubRepository } from '../git/local-repository';
 import { detectGitHubRepository } from '../git/local-repository';
-import type { GitRepository } from '../git/types';
+import type { GitNamespacesPage, GitRepository } from '../git/types';
 import { GIT_PROVIDER_GITHUB } from '../git/types';
 import { connectedAccountsUrl } from '../core/region';
 import { LaunchApiError } from '../transport/errors';
@@ -43,6 +45,7 @@ import {
   createFailureCauseLine,
   duplicateProjectNameLine,
   gitOnlyFlagLine,
+  projectCreatedLine,
   projectCreationFailedLine,
   renameAndRerunLine,
   renameRetryLimitLine,
@@ -70,6 +73,7 @@ export const UPLOAD_PROGRESS_LABEL = 'Uploading project.zip';
 export const DUPLICATE_PROJECT_NAME_CODE = 'launch.PROJECT.DUPLICATE_NAME';
 export const PROJECT_RENAME_ATTEMPTS = 3;
 export const SITE_OPEN_DELAY_MS = 6000;
+export const GIT_NAMESPACE_PAGE_SIZE = 100;
 
 export function reasonOf(error: unknown): string {
   const text = (error instanceof Error ? error.message : String(error)).trim();
@@ -144,15 +148,22 @@ export class ProjectCreator {
 
     const choice = await this.projectType(request);
     this.warnGitFlagsOffGitHub(request, choice);
+
+    if (choice === 'GitHub') {
+      await this.requireGitConnection(request.org);
+    }
+
+    const local = choice === 'GitHub' ? this.localRepository(request) : undefined;
     const autoDeploy = choice === 'GitHub' ? request.autoDeploy : undefined;
     const upload = choice === 'GitHub' ? undefined : await this.selectUploadSource(request);
+    const suggestedName = this.suggestedName(request, local);
     const name = await this.need('name', request.name, () =>
-      askText(this.services.ux, 'Project name', undefined, PROJECT_NAME_MAX_LENGTH),
+      askText(this.services.ux, 'Project name', suggestedName, PROJECT_NAME_MAX_LENGTH),
     );
     const envName = await this.need('env-name', request.envName, () =>
       askText(this.services.ux, 'Environment name', DEFAULT_ENVIRONMENT_NAME, ENVIRONMENT_NAME_MAX_LENGTH),
     );
-    const source = upload ?? (await this.selectGitSource(request));
+    const source = upload ?? (await this.selectGitSource(request, local as LocalGitHubRepository));
     const framework = await this.selectFramework(request, source.detected);
 
     const environment: CreateEnvironmentInput = {
@@ -200,8 +211,9 @@ export class ProjectCreator {
       input.fileUpload = { uploadUid: source.uploadUid };
     }
 
-    const project = await this.createProject(request.org, input);
+    const project = await this.createProject(request.org, input, suggestedName);
 
+    this.services.ux.print(projectCreatedLine(this.services.outputIsTTY === true));
     this.remember(request, project);
 
     await this.follow(request.org, project, envName);
@@ -213,7 +225,12 @@ export class ProjectCreator {
    * nothing is zipped twice. V1 allowed three renames. Declining, running out of renames, or having no
    * terminal to ask on all exit 1 as V1 did; the last says how to fix it, where V1 hung on its prompt.
    */
-  private async createProject(org: string, input: CreateProjectInput, renames = 0): Promise<IdentifiedProject> {
+  private async createProject(
+    org: string,
+    input: CreateProjectInput,
+    suggestedName: string,
+    renames = 0,
+  ): Promise<IdentifiedProject> {
     try {
       return await this.services.api.projects.create({ org, input });
     } catch (error) {
@@ -233,7 +250,7 @@ export class ProjectCreator {
       this.services.ux.print(duplicateProjectNameLine(colour));
 
       if (this.services.isTTY) {
-        return this.askToRename(org, input, renames, colour);
+        return this.askToRename(org, input, suggestedName, renames, colour);
       }
 
       this.services.ux.print(renameAndRerunLine(colour));
@@ -244,6 +261,7 @@ export class ProjectCreator {
   private async askToRename(
     org: string,
     input: CreateProjectInput,
+    suggestedName: string,
     renames: number,
     colour: boolean,
   ): Promise<IdentifiedProject> {
@@ -263,9 +281,9 @@ export class ProjectCreator {
       throw new DuplicateProjectNameError();
     }
 
-    const name = await askText(this.services.ux, 'Project name', undefined, PROJECT_NAME_MAX_LENGTH);
+    const name = await askText(this.services.ux, 'Project name', suggestedName, PROJECT_NAME_MAX_LENGTH);
 
-    return this.createProject(org, { ...input, name }, renames + 1);
+    return this.createProject(org, { ...input, name }, suggestedName, renames + 1);
   }
 
   private remember(request: CreateRequest, project: IdentifiedProject): void {
@@ -399,7 +417,7 @@ export class ProjectCreator {
     return projectTypeChoiceOf(await this.need('type', undefined, () => askProjectType(this.services.ux)));
   }
 
-  private async selectGitSource(request: CreateRequest): Promise<SourceSelection> {
+  private localRepository(request: CreateRequest): LocalGitHubRepository {
     const local = detectGitHubRepository(request.dataDir);
 
     if (local === undefined) {
@@ -409,6 +427,18 @@ export class ProjectCreator {
       );
     }
 
+    return local;
+  }
+
+  /**
+   * V1 offered the repository's name for a GitHub project and the folder's name for an upload, both as
+   * the project name prompt's initial value and again when a taken name was renamed.
+   */
+  private suggestedName(request: CreateRequest, local: LocalGitHubRepository | undefined): string {
+    return local === undefined ? basename(resolve(request.dataDir)) : repositorySearchTerm(local.repoName);
+  }
+
+  private async selectGitSource(request: CreateRequest, local: LocalGitHubRepository): Promise<SourceSelection> {
     const namespace = local.namespace;
     const repository = await this.detectedRepository(request, local);
     const repoName = repositoryLabel(repository);
@@ -466,6 +496,41 @@ export class ProjectCreator {
 
       throw error;
     }
+  }
+
+  /**
+   * V1 looked for the user's GitHub connection before asking anything about the project, said so in
+   * green when it found one, and sent the user to the connected-accounts page when it did not, so a
+   * missing connection never cost them a round of prompts first.
+   *
+   * `GET /git-namespaces` also asks every external git provider of the organization for its namespaces
+   * and fails whole when any one of them does, so any other answer the API refuses with proves nothing
+   * about GitHub: create carries on unannounced and the GitHub-only repository lookup decides, as it did
+   * before this check existed. Only a failure that is not an API answer, such as an expired session,
+   * stops the command here.
+   */
+  private async requireGitConnection(org: string): Promise<void> {
+    let page: GitNamespacesPage;
+
+    try {
+      page = await this.services.api.git.namespaces({ org, limit: GIT_NAMESPACE_PAGE_SIZE, skip: 0 });
+    } catch (error) {
+      if (isMissingGitConnection(error)) {
+        throw this.noGitConnection();
+      }
+
+      if (error instanceof LaunchApiError) {
+        return;
+      }
+
+      throw error;
+    }
+
+    if (!page.namespaces.some((namespace) => namespace.provider === GIT_PROVIDER_GITHUB && Boolean(namespace.name))) {
+      throw this.noGitConnection();
+    }
+
+    this.services.ux.print(gitConnectionIdentifiedLine(GIT_PROVIDER_GITHUB, this.services.outputIsTTY === true));
   }
 
   /**

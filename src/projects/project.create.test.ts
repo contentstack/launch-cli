@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { cliux } from '@contentstack/cli-utilities';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 import { CancelledError, MissingInputError, SessionExpiredError, UsageError } from '../core/errors';
 import type { UxLike } from '../core/prompt';
@@ -103,6 +103,8 @@ interface Scenario {
   createFails?: Error;
   createFailures?: Error[];
   repositoriesFails?: Error;
+  namespaces?: unknown[];
+  namespacesFails?: Error;
   launchAppUrl?: string;
   withoutOpenUrl?: boolean;
   pollFails?: Error;
@@ -113,6 +115,8 @@ interface Scenario {
 }
 
 const CONNECT_URL = 'https://dev11-app.csnonprod.com/#!/launch/settings/connected-accounts';
+const CONNECTION_IDENTIFIED = 'info: GitHub connection identified!';
+const PROJECT_CREATED = 'info: New project created successfully';
 
 let dataDir: string;
 
@@ -123,7 +127,8 @@ function harness(scenario: Scenario = {}) {
   const askedPayloads: Record<string, unknown>[] = [];
   const created: unknown[] = [];
   const gitCalls: unknown[] = [];
-  const calls: Record<'signedUploadUrl' | 'environments' | 'latest' | 'get' | 'branches', unknown[]> = {
+  const calls: Record<'signedUploadUrl' | 'environments' | 'latest' | 'get' | 'branches' | 'namespaces', unknown[]> = {
+    namespaces: [],
     signedUploadUrl: [],
     environments: [],
     latest: [],
@@ -230,6 +235,18 @@ function harness(scenario: Scenario = {}) {
       after: async () => [],
     },
     git: {
+      namespaces: async (params: unknown) => {
+        calls.namespaces.push(params);
+
+        if (scenario.namespacesFails) {
+          throw scenario.namespacesFails;
+        }
+
+        return {
+          pagination: { count: 1, limit: 100 },
+          namespaces: scenario.namespaces ?? [{ name: 'my-org', type: 'User', provider: 'GitHub' }],
+        };
+      },
       repositories: async (params: unknown) => {
         gitCalls.push(params);
 
@@ -387,7 +404,7 @@ describe('ProjectCreator on the GitHub path', () => {
         gitProviderMetadata: { gitProvider: 'GitHub' },
       },
     });
-    expect(printed).toEqual(['Deployment URL https://my-site.example.test']);
+    expect(printed).toEqual([CONNECTION_IDENTIFIED, PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
   });
 
   it('sends the project description and the two toggles only when they were supplied', async () => {
@@ -540,6 +557,7 @@ describe('ProjectCreator on the GitHub path', () => {
 
       expect(failure).toBeInstanceOf(GitConnectionMissingError);
       expect(printed).toEqual([
+        CONNECTION_IDENTIFIED,
         'error: GitHub connection not found!',
         'info: You can connect your GitHub account to the UI using the following URL:',
         CONNECT_URL,
@@ -559,10 +577,99 @@ describe('ProjectCreator on the GitHub path', () => {
     await creator.create(gitRequest()).catch(() => undefined);
 
     expect(printed).toEqual([
+      `\u001b[32m${CONNECTION_IDENTIFIED}\u001b[39m`,
       '\u001b[31merror: GitHub connection not found!\u001b[39m',
       '\u001b[32minfo: You can connect your GitHub account to the UI using the following URL:\u001b[39m',
       `\u001b[32m${CONNECT_URL}\u001b[39m`,
     ]);
+  });
+
+  it('says the GitHub connection was identified, as V1 did, after asking which namespaces the user has connected', async () => {
+    const { creator, printed, calls } = harness({ outputIsTTY: true });
+
+    await creator.create(gitRequest());
+
+    expect(calls.namespaces).toEqual([{ org: ORG, limit: 100, skip: 0 }]);
+    expect(printed[0]).toBe(`\u001b[32m${CONNECTION_IDENTIFIED}\u001b[39m`);
+  });
+
+  it.each<[string, unknown[]]>([
+    ['no namespace at all', []],
+    ['only another provider', [{ name: 'acme', type: 'Organization', provider: 'ExternalGitProvider' }]],
+    ['a GitHub namespace with no name', [{ type: 'User', provider: 'GitHub' }]],
+  ])('sends the user to the connected-accounts page before asking anything when they have %s', async (_has, namespaces) => {
+    const { creator, opened, printed, asked, gitCalls, created } = harness({
+      isTTY: true,
+      launchAppUrl: 'https://dev11-app.csnonprod.com',
+      namespaces,
+    });
+
+    const failure = await creator.create(gitRequest({ name: undefined, envName: undefined })).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(GitConnectionMissingError);
+    expect((failure as GitConnectionMissingError).exitCode).toBe(1);
+    expect(printed).toEqual([
+      'error: GitHub connection not found!',
+      'info: You can connect your GitHub account to the UI using the following URL:',
+      CONNECT_URL,
+    ]);
+    expect(opened).toEqual([CONNECT_URL]);
+    expect(asked).toEqual([]);
+    expect(gitCalls).toEqual([]);
+    expect(created).toEqual([]);
+  });
+
+  it('reads a missing-connection rejection of the namespace lookup as a missing connection', async () => {
+    const { creator, printed, gitCalls } = harness({
+      launchAppUrl: 'https://dev11-app.csnonprod.com',
+      namespacesFails: new LaunchApiError(404, [{ code: 'launch.USERCONNECTION.NOT_FOUND', message: 'No user connection found' }]),
+    });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(GitConnectionMissingError);
+    expect(printed[0]).toBe('error: GitHub connection not found!');
+    expect(gitCalls).toEqual([]);
+  });
+
+  it.each<[string, LaunchApiError]>([
+    ['a broken external git provider', new LaunchApiError(502, [{ code: 'launch.PROVIDER.UNAVAILABLE', message: 'Bitbucket is unreachable' }])],
+    ['a server error', new LaunchApiError(500, [{ code: 'launch.INTERNAL', message: 'down' }])],
+  ])('carries on unannounced when the namespace lookup is refused for %s, and lets the repository lookup decide', async (_cause, refusal) => {
+    const { creator, printed, gitCalls, created } = harness({ namespacesFails: refusal });
+
+    await creator.create(gitRequest());
+
+    expect(printed).not.toContain(CONNECTION_IDENTIFIED);
+    expect(printed).toEqual([PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
+    expect(gitCalls[0]).toEqual({ org: ORG, provider: 'GitHub', namespace: 'my-org', search: 'my-repo', limit: 100, skip: 0 });
+    expect(created).toHaveLength(1);
+  });
+
+  it('still reports a missing connection the repository lookup finds after a refused namespace lookup', async () => {
+    const { creator, printed, created } = harness({
+      launchAppUrl: 'https://dev11-app.csnonprod.com',
+      namespacesFails: new LaunchApiError(502, [{ message: 'Bitbucket is unreachable' }]),
+      repositoriesFails: new LaunchApiError(404, [{ message: 'No user connection found' }]),
+    });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(GitConnectionMissingError);
+    expect(printed[0]).toBe('error: GitHub connection not found!');
+    expect(created).toEqual([]);
+  });
+
+  it('stops on a namespace lookup failure that is not an API answer, before anything is looked up or created', async () => {
+    const boom = new SessionExpiredError();
+    const { creator, printed, gitCalls, created } = harness({ namespacesFails: boom });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBe(boom);
+    expect(printed).toEqual([]);
+    expect(gitCalls).toEqual([]);
+    expect(created).toEqual([]);
   });
 
   it('is reported by its own lines, so the command exits on its code without printing it again', async () => {
@@ -585,7 +692,7 @@ describe('ProjectCreator on the GitHub path', () => {
     const failure = await creator.create(gitRequest()).catch((error: Error) => error);
 
     expect(failure).toBeInstanceOf(GitConnectionMissingError);
-    expect(printed).toEqual(['error: GitHub connection not found!']);
+    expect(printed).toEqual([CONNECTION_IDENTIFIED, 'error: GitHub connection not found!']);
     expect(opened).toEqual([]);
   });
 
@@ -875,6 +982,15 @@ describe('ProjectCreator on the FileUpload path', () => {
 
     expect(gitCalls).toEqual([{ org: ORG, uploadUid: 'upload-uid' }]);
     expect(bodyOf(created).repository).toBeUndefined();
+  });
+
+  it('never looks for a GitHub connection, which an upload does not need', async () => {
+    const { creator, calls, printed } = harness({ namespaces: [] });
+
+    await creator.create(uploadRequest());
+
+    expect(calls.namespaces).toEqual([]);
+    expect(printed).not.toContain(CONNECTION_IDENTIFIED);
   });
 
   it('zips the data dir, uploads it, and creates the project with the upload uid', async () => {
@@ -1227,7 +1343,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed.slice(0, 1)).toEqual(['Deployment URL https://my-site.example.test']);
+    expect(printed).toEqual([CONNECTION_IDENTIFIED, PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
   });
 
   it.each([
@@ -1241,7 +1357,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
       await creator.create(gitRequest());
 
-      expect(printed[0]).toBe(line);
+      expect(printed[2]).toBe(line);
     },
   );
 
@@ -1417,6 +1533,17 @@ describe('ProjectCreator waiting on the first deployment', () => {
     ]);
   });
 
+  it('says the project was created, as V1 did, between creating it and following its deployment', async () => {
+    const { creator, printed, timeline } = harness({ outputIsTTY: true });
+
+    await creator.create(gitRequest());
+
+    expect(printed[1]).toBe(`\u001b[32m${PROJECT_CREATED}\u001b[39m`);
+    expect(timeline.indexOf(`print \u001b[32m${PROJECT_CREATED}\u001b[39m`)).toBeLessThan(
+      timeline.findIndex((entry) => entry.includes('Deployment URL')),
+    );
+  });
+
   it('opens the site on a terminal too', async () => {
     const { creator, opened } = harness({ isTTY: true, outputIsTTY: true });
 
@@ -1446,7 +1573,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed).toEqual(['Deployment URL https://my-site.example.test']);
+    expect(printed).toEqual([CONNECTION_IDENTIFIED, PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
     expect(timeline).not.toContain(`sleep ${SITE_OPEN_DELAY_MS}`);
   });
 
@@ -1493,6 +1620,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
     expect(failure).toBeInstanceOf(ProjectCreateFailedError);
     expect((failure as ProjectCreateFailedError).exitCode).toBe(2);
     expect(printed).toEqual([
+      CONNECTION_IDENTIFIED,
       'error: New project creation failed!',
       'error: Project name contains characters that are not allowed.',
     ]);
@@ -1657,8 +1785,42 @@ describe('ProjectCreator when the project name is already taken', () => {
     return uploadRequest({ serverCmd: 'npm start' });
   }
 
+  it('offers the cloned repository name, as V1 did, as the project name prompt\'s initial value', async () => {
+    cloneOf('my-org/my-repo');
+    const { creator, asked, askedPayloads, created } = harness({ isTTY: true, answers: ['My Site'] });
+
+    await creator.create(gitRequest({ name: undefined }));
+
+    expect(asked).toEqual(['Project name']);
+    expect(askedPayloads[0]).toMatchObject({ default: 'my-repo' });
+    expect(bodyOf(created)).toMatchObject({ name: 'My Site' });
+  });
+
+  it('offers the cloned repository name again when a taken name is renamed', async () => {
+    cloneOf('my-org/my-repo');
+    const { creator, asked, askedPayloads } = harness({
+      isTTY: true,
+      createFailures: [duplicate()],
+      answers: [true, 'My Site 2'],
+    });
+
+    await creator.create(gitRequest());
+
+    expect(asked).toEqual(['Would you like to change the project\'s name and try again?', 'Project name']);
+    expect(askedPayloads[1]).toMatchObject({ default: 'my-repo' });
+  });
+
+  it('offers the folder name, as V1 did, as the project name prompt\'s initial value for an upload', async () => {
+    const { creator, asked, askedPayloads } = harness({ isTTY: true, answers: ['My Site'] });
+
+    await creator.create(uploadRequest({ serverCmd: 'npm start', name: undefined }));
+
+    expect(asked).toEqual(['Project name']);
+    expect(askedPayloads[0]).toMatchObject({ default: basename(dataDir) });
+  });
+
   it('offers a new name in a terminal and retries with it, reusing the upload rather than zipping again', async () => {
-    const { creator, created, printed, asked } = harness({
+    const { creator, created, printed, asked, askedPayloads } = harness({
       isTTY: true,
       createFailures: [duplicate()],
       answers: [true, 'My Site 2'],
@@ -1671,6 +1833,7 @@ describe('ProjectCreator when the project name is already taken', () => {
       'error: Duplicate project name identified',
     ]));
     expect(asked).toEqual(['Would you like to change the project\'s name and try again?', 'Project name']);
+    expect(askedPayloads[1]).toMatchObject({ default: basename(dataDir) });
     expect(created).toHaveLength(2);
     expect(bodyOf(created.slice(1))).toMatchObject({ name: 'My Site 2', fileUpload: { uploadUid: 'upload-uid' } });
     expect(uploadArchive).toHaveBeenCalledTimes(1);

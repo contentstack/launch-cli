@@ -43,6 +43,10 @@ const FILE_SIZE_CODES: readonly string[] = [
   'launch.DEPLOYMENT.FILE_UPLOAD_FAILED',
 ];
 
+export function projectCreatedLine(outputIsTTY: boolean): string {
+  return styled('info: New project created successfully', 'green', outputIsTTY);
+}
+
 /**
  * V1 opened every create failure with this line, then named the cause on the next - in its own words for
  * the limit and file-size cases, by the error's message otherwise. A duplicate name goes on to the rename

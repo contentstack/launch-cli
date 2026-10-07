@@ -23,6 +23,23 @@ function fakeRestClient(result: unknown) {
 }
 
 describe('GitApi', () => {
+  it('lists the connected namespaces of the organization with the paging it was given', async () => {
+    const page = { pagination: { count: 1, limit: 100 }, namespaces: [{ name: 'my-org', provider: 'GitHub' }] };
+    const { client, requests, messages } = fakeRestClient(page);
+
+    const result = await new GitApi(client).namespaces({ org: ORG, limit: 100, skip: 0 });
+
+    expect(result).toBe(page);
+    expect(requests[0]).toEqual({ method: 'GET', path: '/git-namespaces', orgUid: ORG, query: { limit: 100, skip: 0 } });
+    expect(messages[0]).toBe(GIT_ERROR_MESSAGES);
+  });
+
+  it('refuses a namespace response that carries no namespace list', async () => {
+    const { client } = fakeRestClient({ pagination: { count: 0 } });
+
+    await expect(new GitApi(client).namespaces({ org: ORG })).rejects.toThrow('namespaces');
+  });
+
   it('lists repositories carrying the provider, namespace and search it was given', async () => {
     const page = { pagination: { count: 1, limit: 100 }, repositories: [{ fullName: 'my-org/my-repo' }] };
     const { client, requests } = fakeRestClient(page);

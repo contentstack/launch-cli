@@ -13,6 +13,12 @@ export interface GitRepository {
   isPrivate?: boolean;
 }
 
+export interface GitNamespace {
+  name?: string;
+  type?: string;
+  provider?: string;
+}
+
 export interface GitBranch {
   name?: string;
 }
@@ -25,4 +31,9 @@ export interface GitRepositoriesPage {
 export interface GitBranchesPage {
   pagination: Pagination;
   branches: GitBranch[];
+}
+
+export interface GitNamespacesPage {
+  pagination: Pagination;
+  namespaces: GitNamespace[];
 }

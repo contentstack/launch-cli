@@ -1,7 +1,7 @@
 import { assertArray } from '../transport/envelope';
 import type { RestApiClient, RestRequest } from '../transport/rest-client';
 import { GIT_ERROR_MESSAGES } from './git.errors';
-import type { GitBranchesPage, GitRepositoriesPage } from './types';
+import type { GitBranchesPage, GitNamespacesPage, GitRepositoriesPage } from './types';
 
 export * from './types';
 
@@ -37,6 +37,18 @@ export class GitApi {
     assertArray(response, key, `${key} response`);
 
     return response;
+  }
+
+  namespaces(params: GitPageParams): Promise<GitNamespacesPage> {
+    return this.page<GitNamespacesPage>(
+      {
+        method: 'GET',
+        path: '/git-namespaces',
+        orgUid: params.org,
+        query: { limit: params.limit, skip: params.skip },
+      },
+      'namespaces',
+    );
   }
 
   repositories(params: ListRepositoriesParams): Promise<GitRepositoriesPage> {

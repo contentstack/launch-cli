@@ -553,7 +553,9 @@ contentfly-logs-service (`DeploymentLogsApi`, on its own `RestApiClient` at `<la
 the prefix V1's `logs/graphql` used) and prints each line as V1 did, `YYYY-MM-DD HH:MM:SS.mmm:  message`, without V1's `info:` prefix, with
 any colour codes the build server put in the message stripped (`stripVTControlCharacters`) so every line is one
 shade, and in green when stdout is a terminal (`styled` in `src/core/style.ts`, plain ANSI codes gated on `outputIsTTY`;
-redirected output stays free of escape codes). On success create then prints V1's
+redirected output stays free of escape codes). Once `POST /projects` succeeds, before the config file is
+written or anything is watched, create prints V1's green `info: New project created successfully`
+(`projectCreatedLine`); a failed create never prints it. On success create then prints V1's
 `Deployment URL <url>` line - label bold, url blue on a terminal - before the project summary,
 waits `SITE_OPEN_DELAY_MS` (six seconds, V1's wait, because a site opened the moment it reports
 live can still answer "site not reachable") and opens that url in the browser, terminal or not, as V1
@@ -609,6 +611,10 @@ exception: with no `--cs-auth` the field is left out of the body and the service
 prompt defaults. Type, project name and environment name have nothing to infer and stay required.
 The environment name prompt does carry V1's `Default` as its initial value, so enter alone answers it -
 an empty answer is a cancel, and a required field whose prompt offers nothing cannot be answered that way.
+The project name prompt carries V1's suggestion the same way: the cloned repository's name for GitHub (the
+part after the owner, read from the local clone, so it costs no request) and the data dir's folder name for
+FileUpload. The rename prompt after a taken name offers it again. It stays a prompt default only - without a
+terminal `--name` is still required, because a project name is not something to settle by guessing.
 
 **A missing GitHub connection names the page that fixes it.** `GET /git-repositories` answers
 `No user connection found` when the organization has no GitHub connection, which is not a fact about the
@@ -619,6 +625,18 @@ prints V1's three lines through `gitConnectionLines` (`src/git/git.presenter.ts`
 an `error:` label, the way out in green under an `info:` one, and the connected-accounts URL green on a
 line of its own so it can be copied whole. Those are the colours V1 inherited from winston, and they are
 gated on `outputIsTTY` like every other drawn thing. As V1 did, create then opens that URL.
+
+**The connection is checked before anything is asked.** V1 looked up the user's GitHub connections right
+after the project type and printed `info: GitHub connection identified!` in green. A GitHub create does
+the same through `GET /git-namespaces`, the REST form of V1's `userConnections` query: one GitHub namespace
+with a name is a connection, and it prints that line (`gitConnectionIdentifiedLine`). No such namespace, or
+a missing-connection rejection, takes the three-line path above before the project name is asked for, so a
+missing connection never costs a round of prompts. Any other refusal is **not** fatal: the endpoint also
+asks every external git provider of the organization and fails whole when one of them does, so a broken
+Bitbucket or GitLab connection says nothing about GitHub. Create then carries on without the line and the
+GitHub-only `GET /git-repositories` decides, as it did before the check; only a failure that is not an API
+answer (an expired session, say) stops it. The endpoint is organization-scoped, so the line comes
+after the organization is chosen, one step later than V1 printed it. A FileUpload create never looks.
 
 The URL is **per region**, never a constant: `resolveLaunchAppUrl` takes the region's `uiHost` -
 cli-utilities sets it from the region's `endpoints.application` - and falls back to V1's rule of reading

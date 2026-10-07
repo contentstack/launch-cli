@@ -105,7 +105,7 @@ fileignoreconfig:
   ignore_detectors:
     - filename
 - filename: src/git/git.api.ts
-  checksum: 6a7eb2f246c7b35217156c2439ffa7d0f91adc07cc742fc879a163e9b863e0d8
+  checksum: 80c8dceec63e1bb85f23004975f491e97cf2b6dfae15b7f3bafa294b3a0bba08
   allowed_patterns:
     - "assertArray\\(response, key, `\\$\\{key\\} response`\\)"
 - filename: src/environments/environment.inputs.ts

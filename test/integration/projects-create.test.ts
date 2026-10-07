@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 import { authHandler, configHandler } from '@contentstack/cli-utilities';
 import type { Interfaces } from '@oclif/core';
@@ -153,7 +153,15 @@ const MY_REPO = {
   isPrivate: false,
 };
 
+function stubConnection(namespaces: unknown[] = [{ name: 'my-org', type: 'User', provider: 'GitHub' }]): nock.Scope {
+  return hub()
+    .get('/manage/git-namespaces')
+    .query({ limit: 100, skip: 0 })
+    .reply(200, { pagination: { count: namespaces.length, limit: 100, skip: null }, namespaces });
+}
+
 function stubGitLookups(): void {
+  stubConnection();
   hub()
     .get('/manage/git-repositories')
     .query({ provider: 'GitHub', namespace: 'my-org', search: 'my-repo', limit: 100, skip: 0 })
@@ -218,6 +226,7 @@ function cloneOf(repoName: string): void {
 }
 
 function stubRepositoryLookup(): void {
+  stubConnection();
   hub()
     .get('/manage/git-repositories')
     .query({ provider: 'GitHub', namespace: 'my-org', search: 'my-repo', limit: 100, skip: 0 })
@@ -320,6 +329,8 @@ describe('integration: launch:projects:create on the wire', () => {
         gitProviderMetadata: { gitProvider: 'GitHub' },
       },
     });
+    expect(stdout).toContain('info: GitHub connection identified!\n');
+    expect(stdout).toContain('info: New project created successfully\n');
     expect(stdout).toContain('Deployment URL https://my-site.example.test\n');
     expect(stdout).not.toContain('Deployment #1 is');
     expect(open).toHaveBeenCalledWith('https://my-site.example.test');
@@ -536,6 +547,7 @@ describe('integration: launch:projects:create on the wire', () => {
       'Response mode',
       'Contentstack Authentication',
     ]);
+    expect(prompts.payloads[2].default).toBe(basename(dataDir));
     expect(onWire).toEqual([]);
   });
 
@@ -631,7 +643,7 @@ describe('integration: launch:projects:create on the wire', () => {
     expect(prompts.payloads.map((payload) => payload.default)).toEqual([
       undefined,
       undefined,
-      undefined,
+      'my-repo',
       'Default',
       'main',
       'NextJs',
@@ -758,10 +770,7 @@ describe('integration: launch:projects:create on the wire', () => {
 
   it('sends a missing GitHub connection to the connected-accounts page and opens it, as V1 did', async () => {
     (open as unknown as jest.Mock).mockClear();
-    const repositories = hub()
-      .get('/manage/git-repositories')
-      .query({ provider: 'GitHub', namespace: 'my-org', search: 'my-repo', limit: 100, skip: 0 })
-      .reply(404, { errors: [{ message: 'No user connection found' }], status: 404 });
+    const connection = stubConnection([]);
 
     const { error, stdout } = await runCommand(gitFlags(), config);
 
@@ -772,7 +781,9 @@ describe('integration: launch:projects:create on the wire', () => {
         'https://app.integration.test/#!/launch/settings/connected-accounts\n',
     );
     expect(open).toHaveBeenCalledWith('https://app.integration.test/#!/launch/settings/connected-accounts');
-    expect(repositories.isDone()).toBe(true);
+    expect(connection.isDone()).toBe(true);
+    expect(stdout).not.toContain('connection identified');
+    expect(onWire).toEqual([]);
   });
 
   it('shows the message of a field-named validation error instead of a bare status', async () => {

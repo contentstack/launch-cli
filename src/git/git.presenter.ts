@@ -20,6 +20,10 @@ export function gitConnectionLines(provider: string, connectUrl: string | undefi
   ];
 }
 
+export function gitConnectionIdentifiedLine(provider: string, colour: boolean): string {
+  return styled(`info: ${provider} connection identified!`, 'green', colour);
+}
+
 export function repositoryLabel(repository: GitRepository): string {
   return repository.fullName || repository.name || '';
 }
