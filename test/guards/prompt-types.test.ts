@@ -1,9 +1,9 @@
 import { authHandler } from '@contentstack/cli-utilities';
 
-import { LaunchCommand } from './launch-command';
-import { utilitiesLoader } from './search-list';
-import type { SourceFile } from '../../test/support/sources';
-import { balancedCall, productionSources } from '../../test/support/sources';
+import { LaunchCommand } from '../../src/core/launch-command';
+import { utilitiesLoader } from '../../src/core/search-list';
+import type { SourceFile } from '../support/sources';
+import { balancedCall, productionSources } from '../support/sources';
 
 interface PromptRegistry {
   prompt: { prompts: Record<string, unknown> };

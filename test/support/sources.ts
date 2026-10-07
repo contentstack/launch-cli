@@ -8,15 +8,15 @@ export interface SourceFile {
   text: string;
 }
 
-function filesUnder(directory: string): string[] {
+export function filesUnder(directory: string, includeTests = false): string[] {
   return readdirSync(join(SRC, directory), { withFileTypes: true }).flatMap((entry) => {
     const child = directory === '' ? entry.name : `${directory}/${entry.name}`;
 
     if (entry.isDirectory()) {
-      return filesUnder(child);
+      return filesUnder(child, includeTests);
     }
 
-    return entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts') ? [child] : [];
+    return entry.name.endsWith('.ts') && (includeTests || !entry.name.endsWith('.test.ts')) ? [child] : [];
   });
 }
 

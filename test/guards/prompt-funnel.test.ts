@@ -1,11 +1,11 @@
 import { cliux } from '@contentstack/cli-utilities';
 
-import { EXIT_CANCELLED } from './constants';
-import { CancelledError } from './errors';
-import { LaunchCommand } from './launch-command';
-import type { UxLike } from './prompt';
-import type { Occurrence, SourceFile } from '../../test/support/sources';
-import { describeOccurrence, occurrences, productionSources } from '../../test/support/sources';
+import { EXIT_CANCELLED } from '../../src/core/constants';
+import { CancelledError } from '../../src/core/errors';
+import { LaunchCommand } from '../../src/core/launch-command';
+import type { UxLike } from '../../src/core/prompt';
+import type { Occurrence, SourceFile } from '../support/sources';
+import { describeOccurrence, occurrences, productionSources } from '../support/sources';
 
 const FUNNEL_FILE = 'core/launch-command.ts';
 const FUNNEL_CALL = 'cancelOnInterrupt(cliux)';

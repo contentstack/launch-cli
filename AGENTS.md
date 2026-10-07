@@ -55,11 +55,11 @@ file and line that broke its rule, and each was proven red by reintroducing its 
 
 | Guard | Rule it enforces | Found by |
 |---|---|---|
-| `src/core/prompt-types.guard.test.ts` | Every prompt call in `src` names a literal `type`, and every such type is registered with the real inquirer `cliux.inquire` uses once `LaunchCommand.init` has run. inquirer silently turns an unregistered type into a plain text box. | D1: `search-list` used, never registered |
+| `test/guards/prompt-types.test.ts` | Every prompt call in `src` names a literal `type`, and every such type is registered with the real inquirer `cliux.inquire` uses once `LaunchCommand.init` has run. inquirer silently turns an unregistered type into a plain text box. | D1: `search-list` used, never registered |
 | `test/integration/transport-content-type.test.ts` | For every method in `HTTP_METHODS`, a bodyless request carries no content type and a request with a body carries `application/json`, asserted on the wire. `withoutDefaultContentType` suppresses the utility client's default, so a bodyless POST, PUT or PATCH (for example `deployments:cancel`) no longer goes out as `application/x-www-form-urlencoded`. Only `utility-http-client.ts` builds an `HttpClient` and only `rest-client.ts` sets the JSON type. | D5: every DELETE sent `Content-Type: application/json` |
-| `src/core/tty-streams.guard.test.ts` | `stdin.isTTY`, and the `isTTY` it becomes on the service context, are read only to decide whether the CLI may prompt (a read next to a prompt or a refusal to prompt) or on the plumbing lines that carry it there. Anything deciding what to draw reads `outputIsTTY` / `process.stdout.isTTY`. | D6: heartbeat drawn into a redirected file |
+| `test/guards/tty-streams.test.ts` | `stdin.isTTY`, and the `isTTY` it becomes on the service context, are read only to decide whether the CLI may prompt (a read next to a prompt or a refusal to prompt) or on the plumbing lines that carry it there. Anything deciding what to draw reads `outputIsTTY` / `process.stdout.isTTY`. | D6: heartbeat drawn into a redirected file |
 | `test/integration/retired-commands.test.ts` (named commands) | Every `launch:…` command named anywhere in `src` - a retirement message, a failure hint, an example - is either a registered command or on `PLANNED_COMMANDS` with the ticket that builds it, and a command drops off that list once it ships. | Review: retirement messages and hints pointed at commands the beta does not have |
-| `src/core/prompt-funnel.guard.test.ts` | Every prompt goes through `LaunchCommand`'s `ux`, built once as `cancelOnInterrupt(cliux)`, so Ctrl-C at any prompt exits 3. No source calls `cliux.inquire` / `prompt` / `confirm` under any name, hands `cliux` on as a value, or imports a prompt library; `search-list.ts` may register a type but never prompt. | D2: Ctrl-C exited 130 |
+| `test/guards/prompt-funnel.test.ts` | Every prompt goes through `LaunchCommand`'s `ux`, built once as `cancelOnInterrupt(cliux)`, so Ctrl-C at any prompt exits 3. No source calls `cliux.inquire` / `prompt` / `confirm` under any name, hands `cliux` on as a value, or imports a prompt library; `search-list.ts` may register a type but never prompt. | D2: Ctrl-C exited 130 |
 
 A new prompt, request, render path or command is covered by these guards without being listed in
 them. Do not add an exemption to a guard to make a new file pass: if a guard is wrong about a file,
@@ -149,7 +149,7 @@ src/
 
 `core` and `transport` never import a resource except through `resources.ts`, and they
 never import each other's wording. A resource imports `core` and `transport` freely.
-`src/core/layering.test.ts` asserts this rather than leaving it to review: it reads every
+`test/guards/layering.test.ts` asserts this rather than leaving it to review: it reads every
 source in `core/` and `transport/`, tests included, and fails on an import of a resource folder,
 and it collects every cross-resource import in the non-test resource sources and fails on one the
 allow-list does not name.

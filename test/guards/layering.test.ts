@@ -1,7 +1,8 @@
 import { readFileSync, readdirSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
+import { join, posix } from 'node:path';
 
-const SRC = join(__dirname, '..');
+import { SRC, filesUnder } from '../support/sources';
+
 const LAYERS = ['core', 'transport'];
 const NOT_RESOURCES = [...LAYERS, 'commands'];
 const RESOURCES = readdirSync(SRC, { withFileTypes: true })
@@ -17,20 +18,8 @@ const RESOURCE_EDGES: Record<string, string[]> = {
   organizations: [],
 };
 
-function filesUnder(directory: string): string[] {
-  return readdirSync(join(SRC, directory), { withFileTypes: true }).flatMap((entry) => {
-    const child = join(directory, entry.name);
-
-    if (entry.isDirectory()) {
-      return filesUnder(child);
-    }
-
-    return entry.name.endsWith('.ts') ? [child] : [];
-  });
-}
-
 function sourceFilesIn(layer: string): string[] {
-  return filesUnder(layer).filter((path) => !path.endsWith('.test.ts'));
+  return filesUnder(layer);
 }
 
 function importedPaths(relativePath: string): string[] {
@@ -43,20 +32,18 @@ function resourceOf(specifier: string, fromDirectory: string): string | undefine
     return undefined;
   }
 
-  const resolved = relative(SRC, join(SRC, fromDirectory, specifier));
-  const head = resolved.split(sep)[0];
+  const head = posix.normalize(posix.join(fromDirectory, specifier)).split('/')[0];
 
   return RESOURCES.includes(head) ? head : undefined;
 }
 
 function directoryOf(relativePath: string): string {
-  const parts = relativePath.split(sep);
-  return parts.slice(0, -1).join(sep);
+  return posix.dirname(relativePath);
 }
 
 function crossResourceEdges(relativePath: string): string[] {
   const directory = directoryOf(relativePath);
-  const owner = directory.split(sep)[0];
+  const owner = directory.split('/')[0];
 
   return importedPaths(relativePath)
     .map((specifier) => resourceOf(specifier, directory))
@@ -64,7 +51,7 @@ function crossResourceEdges(relativePath: string): string[] {
 }
 
 function commandEdges(relativePath: string): string[] {
-  const owner = relativePath.split(sep)[2];
+  const owner = relativePath.split('/')[2];
   const directory = directoryOf(relativePath);
   const allowed = RESOURCE_EDGES[owner] ?? [];
 
@@ -80,7 +67,7 @@ function resourceImports(relativePath: string): string[] {
 }
 
 describe('layering', () => {
-  it.each(LAYERS.flatMap((layer) => filesUnder(layer)))('%s imports no resource directly', (relativePath) => {
+  it.each(LAYERS.flatMap((layer) => filesUnder(layer, true)))('%s imports no resource directly', (relativePath) => {
     expect(resourceImports(relativePath)).toEqual([]);
   });
 
@@ -90,14 +77,14 @@ describe('layering', () => {
   });
 
   it('checks the test files in core and transport too, not only the production ones', () => {
-    const checked = LAYERS.flatMap((layer) => filesUnder(layer));
+    const checked = LAYERS.flatMap((layer) => filesUnder(layer, true));
 
-    expect(checked).toContain(join('core', 'layering.test.ts'));
+    expect(checked).toContain('core/launch-command.test.ts');
     expect(checked.filter((path) => path.endsWith('.test.ts')).length).toBeGreaterThan(0);
   });
 
   it('reports a resource import when one is present, so the check cannot pass vacuously', () => {
-    const contrived = importedPaths(join('projects', 'project.inputs.ts'));
+    const contrived = importedPaths('projects/project.inputs.ts');
 
     expect(contrived).toContain('../core/resolution');
     expect(
@@ -112,15 +99,15 @@ describe('layering between resources', () => {
   it('finds no resource source reaching a resource its allow-list does not name', () => {
     const checked = RESOURCES.flatMap((resource) => sourceFilesIn(resource));
     const violations = checked.flatMap((relativePath) => {
-      const owner = relativePath.split(sep)[0];
+      const owner = relativePath.split('/')[0];
 
       return crossResourceEdges(relativePath)
         .filter((target) => !RESOURCE_EDGES[owner].includes(target))
         .map((target) => `${relativePath} -> ${target}`);
     });
 
-    expect(checked).toContain(join('projects', 'project.create.ts'));
-    expect(checked).toContain(join('organizations', 'organizations.api.ts'));
+    expect(checked).toContain('projects/project.create.ts');
+    expect(checked).toContain('organizations/organizations.api.ts');
     expect(checked.filter((path) => path.endsWith('.test.ts'))).toEqual([]);
     expect(violations).toEqual([]);
   });
@@ -137,7 +124,7 @@ describe('layering between resources', () => {
 
   it('records the edges POST /projects really creates, and no others', () => {
     expect(RESOURCE_EDGES.projects).toEqual(['environments', 'deployments', 'git']);
-    expect([...new Set(crossResourceEdges(join('projects', 'project.create.ts')))].sort()).toEqual([
+    expect([...new Set(crossResourceEdges('projects/project.create.ts'))].sort()).toEqual([
       'deployments',
       'environments',
       'git',
@@ -147,14 +134,14 @@ describe('layering between resources', () => {
   it('reports a disallowed edge rather than passing vacuously', () => {
     const owner = 'git';
 
-    expect(crossResourceEdges(join('projects', 'project.create.ts')).length).toBeGreaterThan(0);
+    expect(crossResourceEdges('projects/project.create.ts').length).toBeGreaterThan(0);
     expect(RESOURCE_EDGES[owner]).not.toContain('projects');
     expect(resourceOf('../projects/types', 'git')).toBe('projects');
   });
 });
 
 describe('layering of the command files', () => {
-  it.each(filesUnder(join('commands', 'launch')).filter((path) => path.split(sep).length > 3))(
+  it.each(filesUnder('commands/launch', true).filter((path) => path.split('/').length > 3))(
     '%s reaches only its own resource and the resources that one may use',
     (relativePath) => {
       expect(commandEdges(relativePath)).toEqual([]);
@@ -162,16 +149,16 @@ describe('layering of the command files', () => {
   );
 
   it('finds the command files it claims to be checking', () => {
-    const checked = filesUnder(join('commands', 'launch')).filter((path) => path.split(sep).length > 3);
+    const checked = filesUnder('commands/launch', true).filter((path) => path.split('/').length > 3);
 
-    expect(checked).toContain(join('commands', 'launch', 'projects', 'create.ts'));
-    expect(checked).toContain(join('commands', 'launch', 'functions', 'serve.ts'));
+    expect(checked).toContain('commands/launch/projects/create.ts');
+    expect(checked).toContain('commands/launch/functions/serve.ts');
   });
 
   it('reports a command reaching another resource rather than passing vacuously', () => {
-    expect(resourceOf('../../../deployments/deployment.watcher', join('commands', 'launch', 'projects'))).toBe(
+    expect(resourceOf('../../../deployments/deployment.watcher', 'commands/launch/projects')).toBe(
       'deployments',
     );
-    expect(resourceOf('../../../projects/project.create', join('commands', 'launch', 'projects'))).toBe('projects');
+    expect(resourceOf('../../../projects/project.create', 'commands/launch/projects')).toBe('projects');
   });
 });
