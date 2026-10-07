@@ -156,6 +156,10 @@ allow-list does not name.
 A command under `commands/launch/<resource>/` imports that resource and the resources its allow-list
 names - `projects:create` takes the watch timing from `deployments` directly - so nothing needs
 re-exporting through a resource just to be reachable from its command.
+`core/inputs`, `core/launch-command`, `core/resolve` and `core/service-context` read values out of
+`resources.ts`, so only the commands and the package entry `src/index.ts` may import them at runtime -
+anything `resources.ts` loads importing one would close an import loop. The same test asserts that,
+and that those four are exactly the `core` files reading `resources.ts`.
 That is why `Pagination` lives in `src/core/render.ts` beside `renderPagination` and
 `src/projects/types.ts` re-exports it, not the other way round.
 `resources.ts` is the only file every resource touches; everything else about projects

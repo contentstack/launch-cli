@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join, posix } from 'node:path';
 
-import { SRC, filesUnder } from '../support/sources';
+import { SRC, filesUnder, productionSources } from '../support/sources';
 
 const LAYERS = ['core', 'transport'];
 const NOT_RESOURCES = [...LAYERS, 'commands'];
@@ -160,5 +160,66 @@ describe('layering of the command files', () => {
       'deployments',
     );
     expect(resourceOf('../../../projects/project.create', 'commands/launch/projects')).toBe('projects');
+  });
+});
+
+const READS_RESOURCES = ['core/inputs.ts', 'core/launch-command.ts', 'core/resolve.ts', 'core/service-context.ts'];
+
+function isEntryPoint(relativePath: string): boolean {
+  return relativePath === 'index.ts' || relativePath.startsWith('commands/');
+}
+
+function runtimeImports(text: string): string[] {
+  return [...text.matchAll(/^(?:import|export)\s+(?!type\b)[^;]*?\bfrom\s+'([^']+)'/gm)].map((match) => match[1]);
+}
+
+function readsResourcesImports(relativePath: string, text: string): string[] {
+  const directory = posix.dirname(relativePath);
+
+  return runtimeImports(text)
+    .filter((specifier) => specifier.startsWith('.'))
+    .map((specifier) => `${posix.normalize(posix.join(directory, specifier))}.ts`)
+    .filter((target) => READS_RESOURCES.includes(target));
+}
+
+describe('import loops through resources.ts', () => {
+  it('keeps everything resources.ts loads from importing a core file that reads resources.ts', () => {
+    const violations = productionSources()
+      .filter((source) => !isEntryPoint(source.path) && !READS_RESOURCES.includes(source.path))
+      .flatMap((source) => readsResourcesImports(source.path, source.text).map((target) => `${source.path} -> ${target}`));
+
+    expect(violations).toEqual([]);
+  });
+
+  it('names every core file that reads resources.ts at runtime, and only those', () => {
+    const reading = productionSources()
+      .filter((source) => source.path.startsWith('core/'))
+      .filter((source) => runtimeImports(source.text).includes('../resources'))
+      .map((source) => source.path);
+
+    expect(reading.sort()).toEqual([...READS_RESOURCES].sort());
+  });
+
+  it('treats only the package entry and the commands as entry points, and nothing in src imports the entry', () => {
+    expect(isEntryPoint('index.ts')).toBe(true);
+    expect(isEntryPoint('commands/launch/projects/create.ts')).toBe(true);
+    expect(isEntryPoint('projects/index.ts')).toBe(false);
+    expect(
+      productionSources().filter((source) =>
+        runtimeImports(source.text).some(
+          (specifier) => posix.normalize(posix.join(posix.dirname(source.path), specifier)) === 'index',
+        ),
+      ),
+    ).toEqual([]);
+  });
+
+  it('reports a runtime import of one of them and ignores a type-only one, so it cannot pass vacuously', () => {
+    expect(readsResourcesImports('projects/probe.ts', "import { resolveInputsTraced } from '../core/resolve';")).toEqual([
+      'core/resolve.ts',
+    ]);
+    expect(readsResourcesImports('projects/probe.ts', "import type { AnyInputs } from '../core/inputs';")).toEqual([]);
+    expect(
+      readsResourcesImports('core/probe.ts', "import {\n  buildServiceContext,\n} from './service-context';"),
+    ).toEqual(['core/service-context.ts']);
   });
 });
