@@ -378,7 +378,7 @@ promoting these to `src/core/catalog.ts` now.
 
 | Code | Constant | Meaning |
 |---|---|---|
-| 0 | `EXIT_OK` | the command did what it was asked to do |
+| 0 | none - oclif exits 0 implicitly | the command did what it was asked to do |
 | 1 | `EXIT_RUNTIME` | a runtime failure - `LaunchApiError`, `LaunchNetworkError`, `UnauthenticatedError`, anything oclif handles |
 | 2 | `EXIT_USAGE` | a usage error - `UsageError`, `MissingInputError`, a failing cross-flag rule |
 | 3 | `EXIT_CANCELLED` | the user declined a confirmation or chose nothing at a picker (`CancelledError`) |
