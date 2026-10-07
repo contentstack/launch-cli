@@ -18,16 +18,6 @@ export type FrameworkPreset = Framework['preset'];
 
 export type FrameworkLabel = Framework['label'];
 
-function byPreset<V>(valueOf: (framework: Framework) => V): Record<FrameworkPreset, V> {
-  const table = {} as Record<FrameworkPreset, V>;
-
-  for (const framework of FRAMEWORKS) {
-    table[framework.preset] = valueOf(framework);
-  }
-
-  return table;
-}
-
 export const FRAMEWORK_PRESETS: readonly FrameworkPreset[] = FRAMEWORKS.map((framework) => framework.preset);
 
 export const FRAMEWORK_CHOICES: readonly FrameworkLabel[] = FRAMEWORKS.map((framework) => framework.label);
@@ -36,7 +26,9 @@ export const FRAMEWORK_PRESET_BY_LABEL: Record<string, FrameworkPreset> = Object
   FRAMEWORKS.map((framework) => [framework.label.toLowerCase(), framework.preset]),
 );
 
-export const OUTPUT_DIRECTORY_BY_FRAMEWORK = byPreset<string>((framework) => framework.outputDirectory);
+export const OUTPUT_DIRECTORY_BY_FRAMEWORK = Object.fromEntries(
+  FRAMEWORKS.map((framework) => [framework.preset, framework.outputDirectory]),
+) as Record<FrameworkPreset, string>;
 
 export const SERVER_COMMAND_FRAMEWORKS: readonly FrameworkPreset[] = FRAMEWORKS.filter(
   (framework) => framework.serverCommand,

@@ -765,12 +765,14 @@ the management service is the wire contract, and for two flags they differ:
 | `--framework` | `Gatsby`, `NextJs`, `CRA`, `CSR`, `Analog`, `Angular`, `Nuxt`, `Astro`, `VueJs`, `Remix`, `Other` | `GATSBY`, `NEXTJS`, `CRA`, `CSR`, `ANALOG`, `ANGULAR`, `NUXT`, `ASTRO`, `VUEJS`, `REMIX`, `OTHER` | `FRAMEWORK_PRESET_BY_LABEL` |
 
 `GitHub -> GITPROVIDER` is a **rename**, not a case change, and `NextJs -> NEXTJS` does not survive a
-naive `toUpperCase()` round trip in reverse. Both are explicit tables, and a test asserts the
-framework table is a bijection onto the service enum so a preset cannot be added on one side only.
+naive `toUpperCase()` round trip in reverse. Both are explicit tables.
 Every framework is one row of `FRAMEWORKS` in `src/environments/frameworks.ts` - label, preset,
 default output directory and whether it takes `--server-cmd`, each written out - and
 `FRAMEWORK_CHOICES`, `FRAMEWORK_PRESETS`, `FRAMEWORK_PRESET_BY_LABEL`, `OUTPUT_DIRECTORY_BY_FRAMEWORK`
-and `SERVER_COMMAND_FRAMEWORKS` are built from it. Adding a framework is adding one row.
+and `SERVER_COMMAND_FRAMEWORKS` are built from it. Because those lists come from the same rows, a
+test comparing one with another proves nothing: `frameworks.test.ts` pins every row to the preset
+the service accepts and the values the V1 CLI used, written out a second time. Adding a framework is
+one row in the table and one in that test.
 
 **Flag names are the short forms the code ships.** `--org`, `--env`, `--env-name`, `--build-cmd`,
 `--server-cmd`, `--output-dir` and `--res-mode`, with no long-form aliases. The Commands Details page
