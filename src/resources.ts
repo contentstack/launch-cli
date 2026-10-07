@@ -3,7 +3,6 @@ import { coreResolution, type AnyResolutionSpec } from './core/resolution';
 import { organizationFlags, organizationResolution } from './organizations/organization.inputs';
 import { PROJECT_DEPENDENCIES, projectFlags, projectResolution } from './projects/project.inputs';
 import { environmentFlags, environmentResolution } from './environments/environment.inputs';
-import { gitFlags, gitResolution } from './git/git.inputs';
 import { ProjectsApi } from './projects/projects.api';
 import { EnvironmentsApi } from './environments/environments.api';
 import { DeploymentsApi } from './deployments/deployments.api';
@@ -13,7 +12,7 @@ import { OrganizationsApi } from './organizations/organizations.api';
 import type { CmaSession } from './transport/cma-client';
 import type { RestApiClient } from './transport/rest-client';
 
-export const catalog = { ...organizationFlags, ...coreFlags, ...projectFlags, ...environmentFlags, ...gitFlags };
+export const catalog = { ...organizationFlags, ...coreFlags, ...projectFlags, ...environmentFlags };
 
 export type Catalog = typeof catalog;
 export type FlagKey = keyof Catalog;
@@ -23,7 +22,6 @@ export const resolution = {
   ...organizationResolution,
   ...coreResolution,
   ...environmentResolution,
-  ...gitResolution,
 };
 
 export type Resolution = typeof resolution;

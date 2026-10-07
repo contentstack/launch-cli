@@ -204,7 +204,8 @@ A new resource - environments, variables, deployments, logs, cache - is a folder
 3. **`src/<resource>/<resource>.presenter.ts`** - columns and detail fields. Presentation
    never lives in a command file: a test that wants the columns imports the presenter.
 4. **`src/<resource>/<resource>.inputs.ts`** - the flags this resource introduces and
-   their resolution specs. Transcribe a flag from the Commands Details page
+   their resolution specs; a resource that introduces none, as `git` does today, has no
+   inputs file rather than an empty one. Transcribe a flag from the Commands Details page
    §"All flags" tables and never set `required: true`. Catalog flag definition objects
    are shared by reference across every command that uses them - never mutate one in
    place. A resolution spec is written `{ ... } satisfies ResolutionSpec<T, D>`, where
