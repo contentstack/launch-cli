@@ -1,7 +1,9 @@
 import { Flags } from '@contentstack/cli-utilities';
 
+import { MissingInputError } from '../core/errors';
 import type { UxLike } from '../core/prompt';
 import type { ResolutionSpec } from '../core/resolution';
+import type { ServiceContext } from '../core/service-context';
 import { oneOf, withinLength } from '../core/values';
 import { ProjectRef } from './project-ref';
 import type { ProjectType } from './types';
@@ -31,6 +33,25 @@ export function askProjectType(ux: UxLike): Promise<string> {
     PROJECT_TYPE_QUESTION,
     PROJECT_TYPE_CHOICES.map((value) => ({ name: `Continue with ${value}`, value })),
   );
+}
+
+export const CREATE_PROMPT_REMEDIES = { config: false, prompt: true };
+
+export async function needInput<T extends string | undefined>(
+  services: ServiceContext,
+  flag: string,
+  supplied: string | undefined,
+  ask: () => Promise<T>,
+): Promise<string | T> {
+  if (supplied !== undefined) {
+    return supplied;
+  }
+
+  if (!services.isTTY) {
+    throw new MissingInputError(flag, CREATE_PROMPT_REMEDIES);
+  }
+
+  return ask();
 }
 
 export const GIT_ONLY_FLAGS = ['branch', 'auto-deploy'] as const;

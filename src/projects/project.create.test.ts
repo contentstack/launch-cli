@@ -15,7 +15,9 @@ import { LaunchApiError } from '../transport/errors';
 import { GitConnectionMissingError } from '../git/git.errors';
 import type { ApiSurface } from '../resources';
 import type { CreateRequest } from './project.create';
-import { ProjectCreator, SITE_OPEN_DELAY_MS, UPLOAD_PROGRESS_LABEL } from './project.create';
+import { ProjectCreator } from './project.create';
+import { SITE_OPEN_DELAY_MS } from './project.follow';
+import { UPLOAD_PROGRESS_LABEL } from './project.source';
 import {
   DuplicateProjectNameError,
   PROJECT_ERROR_MESSAGES,

@@ -124,7 +124,9 @@ describe('layering between resources', () => {
 
   it('records the edges POST /projects really creates, and no others', () => {
     expect(RESOURCE_EDGES.projects).toEqual(['environments', 'deployments', 'git']);
-    expect([...new Set(crossResourceEdges('projects/project.create.ts'))].sort()).toEqual([
+    const createFiles = ['create', 'source', 'environment', 'follow'].map((part) => `projects/project.${part}.ts`);
+
+    expect([...new Set(createFiles.flatMap((path) => crossResourceEdges(path)))].sort()).toEqual([
       'deployments',
       'environments',
       'git',

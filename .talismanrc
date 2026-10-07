@@ -111,6 +111,9 @@ fileignoreconfig:
 - filename: src/environments/environment.inputs.ts
   ignore_detectors:
     - filename
+- filename: src/projects/project.environment.ts
+  ignore_detectors:
+    - filename
 - filename: src/environments/environment.inputs.test.ts
   checksum: ba38924cf2b2b0df4044e8aba4c4cd0bfa7edcb1f09654cf37a7edb06365de06
   ignore_detectors:
@@ -177,7 +180,7 @@ fileignoreconfig:
 - filename: src/git/local-repository.ts
   checksum: ae976d4623a6ae3dea63a096f7b6bcbd3aefa1b1a860a6c5df2bfe4fa5b70d75
 - filename: test/guards/layering.test.ts
-  checksum: 68183ed8a1e2b6ef9ae409e5eb8a58f2c414f09d00c2df0f63a3e002c1e22e4e
+  checksum: b1bccd91b7000ea8e5111eaeef919a11d6696254e44e4127822031b0c9da1250
 - filename: src/commands/launch/projects/create.test.ts
   checksum: 1d5063992d0a7cfb91871ab00f79123bf71806ddc9faac80952cf279d165aec5
 - filename: src/commands/launch/projects/delete.test.ts

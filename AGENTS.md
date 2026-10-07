@@ -298,7 +298,7 @@ the yellow `Project not deleted.` and exits 3 (`EXIT_CANCELLED`) without the `Er
 the green `✔ Project deleted successfully.`, matching `projects:update`.
 
 **A prompt never answers with something that is not on its list.** Two mechanisms, chosen by
-whether the choices need searching. `askOption` in `src/projects/project.create.prompt.ts` is the
+whether the choices need searching. `askOption` in `src/core/prompt.ts` is the
 default and the only choice helper left; the two prompts that still need a search box build their
 payload inline.
 
@@ -587,8 +587,16 @@ makes the deadline unreachable and the suite **hangs** rather than failing - the
 as the `loadDataURL` rule below. Have `sleep` advance the same counter `now` reads.
 
 **`projects:create`.** The command is thin; `ProjectCreator` in `src/projects/project.create.ts` is
-the domain service, and the prompts it asks come from `src/core/prompt.ts` (text, choice, cancel) and
-`src/git/git.prompt.ts` (branch picker), adapters that render choices and nothing more.
+the domain service. It runs the steps in order and owns what is about the project itself - the
+linked-folder refusal, the type, the name and its rename retries, the request, `.cs-launch.json` -
+and hands the rest to three collaborators: `ProjectSource` in `project.source.ts` (the GitHub
+connection, repository and branch, or the zip and its upload), `EnvironmentBuilder` in
+`project.environment.ts` (framework, commands, output directory, response mode, Contentstack
+Authentication) and `DeploymentFollower` in `project.follow.ts` (waiting on the first deployment,
+its log, the site URL and opening it). A value create needs and may ask for goes through `needInput`
+in `project.inputs.ts`: the flag when supplied, a refusal off a terminal, the prompt otherwise. The
+prompts themselves come from `src/core/prompt.ts` (text, choice, cancel) and `src/git/git.prompt.ts`
+(branch picker), adapters that render choices and nothing more.
 
 Interactive order is pinned by a test against the order a real `csdx launch` run prompts in: type ->
 organization -> (FileUpload only: zip + upload) -> project name -> environment name -> (GitHub only:
