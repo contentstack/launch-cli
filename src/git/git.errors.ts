@@ -41,6 +41,23 @@ export function isMissingGitConnection(error: unknown): boolean {
   );
 }
 
+export class GitNamespaceNotConnectedError extends LaunchError {
+  readonly exitCode = EXIT_RUNTIME;
+
+  readonly reported = true;
+
+  readonly namespace: string;
+
+  readonly connected: readonly string[];
+
+  constructor(namespace: string, connected: readonly string[]) {
+    super(`No GitHub connection for "${namespace}".`);
+    this.name = 'GitNamespaceNotConnectedError';
+    this.namespace = namespace;
+    this.connected = connected;
+  }
+}
+
 export class GitConnectionMissingError extends LaunchError {
   readonly exitCode = EXIT_RUNTIME;
 

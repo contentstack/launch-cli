@@ -20,6 +20,37 @@ export function gitConnectionLines(provider: string, connectUrl: string | undefi
   ];
 }
 
+function quotedList(names: readonly string[]): string {
+  const quoted = names.map((name) => `"${name}"`);
+
+  return quoted.length < 2 ? quoted.join('') : `${quoted.slice(0, -1).join(', ')} and ${quoted[quoted.length - 1]}`;
+}
+
+/**
+ * The accounts are named because the pair of them is the whole point: a user who reads only that a
+ * connection is missing goes and makes the one they already have again, which is what V1 left them
+ * doing. The repository's owner is the account that has to be connected, and it may not be theirs
+ * to connect, so the line stops short of telling them to go and connect it.
+ */
+export function namespaceNotConnectedLines(
+  namespace: string,
+  connected: readonly string[],
+  connectUrl: string | undefined,
+  colour: boolean,
+): string[] {
+  const owns = connected.length === 1 ? 'does not own' : 'do not own';
+  const manage = connectUrl === undefined ? '' : ` Manage your GitHub connections: ${connectUrl}`;
+
+  return [
+    styled(
+      `error: You are connected to GitHub as ${quotedList(connected)}, which ${owns} this repository.`,
+      'red',
+      colour,
+    ),
+    styled(`info: This repository belongs to "${namespace}".${manage}`, 'green', colour),
+  ];
+}
+
 export function gitConnectionIdentifiedLine(provider: string, colour: boolean): string {
   return styled(`info: ${provider} connection identified!`, 'green', colour);
 }

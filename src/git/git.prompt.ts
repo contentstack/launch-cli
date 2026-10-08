@@ -10,7 +10,12 @@ export function repositorySearchTerm(wanted: string): string {
 }
 
 export function findRepository(repositories: GitRepository[], wanted: string): GitRepository | undefined {
-  return repositories.find((repository) => repositoryLabel(repository) === wanted || repository.name === wanted);
+  const name = wanted.toLowerCase();
+
+  return repositories.find(
+    (repository) =>
+      repositoryLabel(repository).toLowerCase() === name || (repository.name ?? '').toLowerCase() === name,
+  );
 }
 
 export async function askBranch(

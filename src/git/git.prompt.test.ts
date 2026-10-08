@@ -1,5 +1,6 @@
 import type { UxLike } from '../core/prompt';
 import type { ApiSurface } from '../resources';
+import { findRepository, repositorySearchTerm } from './git.prompt';
 import { askBranch } from './git.prompt';
 
 const GIT = { org: 'org1', provider: 'GitHub', namespace: 'my-org' };
@@ -69,5 +70,30 @@ describe('askBranch', () => {
     await askBranch(d, { ...GIT, repoName: 'my-org/my-repo' });
 
     expect(printed).toEqual(['Showing the first 1 of 120 branches. Use --branch to reach any of them.']);
+  });
+});
+
+describe('findRepository', () => {
+  const repositories = [{ name: 'my-repo', fullName: 'My-Org/My-Repo' }];
+
+  it('matches a full name however the clone url spelled it, since GitHub names ignore case', () => {
+    expect(findRepository(repositories, 'my-org/my-repo')).toBe(repositories[0]);
+    expect(findRepository(repositories, 'MY-ORG/MY-REPO')).toBe(repositories[0]);
+  });
+
+  it('falls back to the bare name, and still ignores case', () => {
+    expect(findRepository([{ name: 'My-Repo' }], 'my-repo')).toEqual({ name: 'My-Repo' });
+  });
+
+  it('finds nothing when the name belongs to another repository', () => {
+    expect(findRepository(repositories, 'my-org/other')).toBeUndefined();
+    expect(findRepository([{}], 'my-repo')).toBeUndefined();
+  });
+});
+
+describe('repositorySearchTerm', () => {
+  it('searches on the repository name alone, which is what the API matches', () => {
+    expect(repositorySearchTerm('my-org/my-repo')).toBe('my-repo');
+    expect(repositorySearchTerm('my-repo')).toBe('my-repo');
   });
 });

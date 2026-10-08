@@ -12,7 +12,7 @@ import { DeploymentUnsuccessfulError } from '../deployments/deployment.errors';
 import type { WatchTiming } from '../deployments/deployment.watcher';
 import type { ApiErrorEntry } from '../transport/errors';
 import { LaunchApiError } from '../transport/errors';
-import { GitConnectionMissingError } from '../git/git.errors';
+import { GitConnectionMissingError, GitNamespaceNotConnectedError } from '../git/git.errors';
 import type { ApiSurface } from '../resources';
 import type { CreateRequest } from './types';
 import { ProjectCreator } from './project.create';
@@ -575,6 +575,76 @@ describe('ProjectCreator on the GitHub path', () => {
       expect(opened).toEqual([CONNECT_URL]);
     },
   );
+
+  it('names the owner the user is not connected to, rather than claiming no connection at all', async () => {
+    const { creator, opened, printed } = harness({
+      launchAppUrl: 'https://dev11-app.csnonprod.com',
+      namespaces: [{ name: 'harshi-xyz', type: 'User', provider: 'GitHub' }],
+      repositoriesFails: new LaunchApiError(404, [{ message: 'No user connection found' }]),
+    });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(GitNamespaceNotConnectedError);
+    expect(printed).toEqual([
+      CONNECTION_IDENTIFIED,
+      repositoryFound(),
+      'error: You are connected to GitHub as "harshi-xyz", which does not own this repository.',
+      `info: This repository belongs to "my-org". Manage your GitHub connections: ${CONNECT_URL}`,
+    ]);
+    expect(opened).toEqual([]);
+  });
+
+  it('looks the repository up under the spelling the connection carries, not the one the clone url used', async () => {
+    cloneOf('MY-ORG/MY-REPO');
+    const { creator, gitCalls, created } = harness();
+
+    await creator.create(gitRequest());
+
+    expect(gitCalls[0]).toEqual(expect.objectContaining({ namespace: 'my-org', search: 'MY-REPO' }));
+    expect(created).toHaveLength(1);
+  });
+
+  it('reads the owner the same however either side spells it, since GitHub account names ignore case', async () => {
+    cloneOf('MY-ORG/my-repo');
+    const { creator, printed } = harness({
+      repositoriesFails: new LaunchApiError(404, [{ message: 'No user connection found' }]),
+    });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(GitConnectionMissingError);
+    expect(printed).toContain('error: GitHub connection not found!');
+  });
+
+  it('lists every account it is connected to when none of them owns the repository', async () => {
+    const { creator, printed } = harness({
+      namespaces: [
+        { name: 'harshi-xyz', type: 'User', provider: 'GitHub' },
+        { name: 'acme-org', type: 'User', provider: 'GitHub' },
+      ],
+      repositoriesFails: new LaunchApiError(404, [{ message: 'No user connection found' }]),
+    });
+
+    await creator.create(gitRequest()).catch(() => undefined);
+
+    expect(printed).toContain(
+      'error: You are connected to GitHub as "harshi-xyz" and "acme-org", which do not own this repository.',
+    );
+  });
+
+  it('keeps V1\'s message when the namespace list never arrived, since nothing then contradicts it', async () => {
+    const { creator, printed } = harness({
+      launchAppUrl: 'https://dev11-app.csnonprod.com',
+      namespacesFails: new LaunchApiError(502, [{ message: 'Bitbucket is unreachable' }]),
+      repositoriesFails: new LaunchApiError(404, [{ message: 'No user connection found' }]),
+    });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(GitConnectionMissingError);
+    expect(printed).toContain('error: GitHub connection not found!');
+  });
 
   it('colours the missing-connection lines only when stdout is a terminal', async () => {
     const { creator, printed } = harness({
