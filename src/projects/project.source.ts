@@ -14,14 +14,13 @@ import type { GitNamespacesPage, GitRepository } from '../git/types';
 import { GIT_PROVIDER_GITHUB } from '../git/types';
 import { LaunchApiError } from '../transport/errors';
 import { archiveDirectory } from './project.archive';
-import type { CreateRequest } from './project.create';
 import { needInput } from './project.inputs';
 import { PREPARING_ARCHIVE } from './project.presenter';
 import { refuseArchiveOutsideLimits, uploadArchive } from './project.upload';
-import type { DetectedFramework, SignedUploadUrl } from './types';
+import type { CreateRequest, DetectedFramework, SignedUploadUrl } from './types';
 
 export const UPLOAD_PROGRESS_LABEL = 'Uploading project.zip';
-export const GIT_NAMESPACE_PAGE_SIZE = 100;
+const GIT_NAMESPACE_PAGE_SIZE = 100;
 
 export interface SourceSelection {
   detected: DetectedFramework;

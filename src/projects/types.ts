@@ -1,5 +1,8 @@
 import type { Pagination } from '../core/render';
+import type { ResponseMode, ToggleValue } from '../environments/environment.inputs';
+import type { FrameworkPreset } from '../environments/frameworks';
 import type { CreateEnvironmentInput } from '../environments/types';
+import type { ProjectTypeChoice } from './project.inputs';
 
 export type { Pagination };
 
@@ -95,4 +98,22 @@ export interface ProjectResponse {
 export interface ProjectsPage {
   pagination: Pagination;
   projects: Project[];
+}
+
+export interface CreateRequest {
+  org: string;
+  dataDir: string;
+  configPath: string;
+  type?: ProjectTypeChoice;
+  name?: string;
+  description?: string;
+  envName?: string;
+  branch?: string;
+  framework?: FrameworkPreset;
+  buildCmd?: string;
+  outputDir?: string;
+  serverCmd?: string;
+  resMode?: ResponseMode;
+  autoDeploy?: ToggleValue;
+  csAuth?: ToggleValue;
 }

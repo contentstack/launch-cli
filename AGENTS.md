@@ -619,7 +619,8 @@ The framework gate is the declarative rule `onlyWithValueOf('server-cmd', 'frame
 exported as `serverCommandFrameworkGate` and declared in `static rules` with `gitOnlyFlagRules`
 (`--branch`, `--namespace`, `--repo` only with `--type GitHub`). A rule judges its gate only when the
 user supplied the gate: with `--framework` on argv, a bad pairing costs exit 2 and nothing on the
-wire. When the framework is prompted or detected later, `ProjectCreator` applies the same check
+wire. When the framework is prompted or detected later, `EnvironmentBuilder` in
+`src/projects/project.environment.ts` applies the same check
 (`requireValueOf`) once it knows the framework, still before `POST /projects`.
 
 **Without a terminal, create uses what it can infer.** The framework is the detected one (exit 2 naming

@@ -7,9 +7,7 @@ import { askText } from '../core/prompt';
 import type { ServiceContext } from '../core/service-context';
 import { messageOf } from '../core/values';
 import type { WatchTiming } from '../deployments/deployment.watcher';
-import type { ResponseMode, ToggleValue } from '../environments/environment.inputs';
 import { ENVIRONMENT_NAME_MAX_LENGTH } from '../environments/environment.inputs';
-import type { FrameworkPreset } from '../environments/frameworks';
 import { repositoryLabel } from '../git/git.presenter';
 import { repositorySearchTerm } from '../git/git.prompt';
 import type { LocalGitHubRepository } from '../git/local-repository';
@@ -37,30 +35,12 @@ import {
   renameRetryLimitLine,
 } from './project.presenter';
 import { ProjectSource } from './project.source';
-import type { CreateProjectInput, IdentifiedProject } from './types';
+import type { CreateProjectInput, CreateRequest, IdentifiedProject } from './types';
 import { PROJECT_NAME_MAX_LENGTH } from './types';
 
-export const DEFAULT_ENVIRONMENT_NAME = 'Default';
-export const DUPLICATE_PROJECT_NAME_CODE = 'launch.PROJECT.DUPLICATE_NAME';
-export const PROJECT_RENAME_ATTEMPTS = 3;
-
-export interface CreateRequest {
-  org: string;
-  dataDir: string;
-  configPath: string;
-  type?: ProjectTypeChoice;
-  name?: string;
-  description?: string;
-  envName?: string;
-  branch?: string;
-  framework?: FrameworkPreset;
-  buildCmd?: string;
-  outputDir?: string;
-  serverCmd?: string;
-  resMode?: ResponseMode;
-  autoDeploy?: ToggleValue;
-  csAuth?: ToggleValue;
-}
+const DEFAULT_ENVIRONMENT_NAME = 'Default';
+const DUPLICATE_PROJECT_NAME_CODE = 'launch.PROJECT.DUPLICATE_NAME';
+const PROJECT_RENAME_ATTEMPTS = 3;
 
 function shownPath(path: string): string {
   const absolute = resolve(path);

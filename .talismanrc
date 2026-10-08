@@ -12,7 +12,7 @@ fileignoreconfig:
 - filename: src/transport/auth-strategy.test.ts
   checksum: a4f3e3ea7db10dbf82abbac0207d2231ee740916f476fcda836a2268505295ef
 - filename: src/projects/types.ts
-  checksum: 563a1f339c7b1ba1a366e8cac087a52805af21d46f07e4078716358ed99270f5
+  checksum: 6139553ef747421f5b7ee701f82dcdb7071f0cb614c977967a2cb3974495e43c
 - filename: src/projects/projects.api.ts
   checksum: 29d53afdfa763ea00f8922e7ff48459a88d6acccc865c14831cbc6070c657dda
 - filename: src/core/service-context.test.ts

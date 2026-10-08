@@ -11,8 +11,8 @@ import type { Environment } from '../environments/types';
 import { deploymentFailureMessage, deploymentUrlLine } from './project.presenter';
 import type { IdentifiedProject } from './types';
 
-export const NO_DEPLOYMENT_STATUS = 'NONE';
-export const FIRST_LOOKUP_ATTEMPTS = 3;
+const NO_DEPLOYMENT_STATUS = 'NONE';
+const FIRST_LOOKUP_ATTEMPTS = 3;
 export const SITE_OPEN_DELAY_MS = 6000;
 
 interface Survivors {

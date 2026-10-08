@@ -12,10 +12,9 @@ import {
   SERVER_COMMAND_FRAMEWORKS,
 } from '../environments/frameworks';
 import type { CreateEnvironmentInput } from '../environments/types';
-import type { CreateRequest } from './project.create';
 import { CREATE_PROMPT_REMEDIES } from './project.inputs';
 import type { SourceSelection } from './project.source';
-import type { DetectedFramework } from './types';
+import type { CreateRequest, DetectedFramework } from './types';
 
 function emptyEnvironmentVariables(): [] {
   return [];

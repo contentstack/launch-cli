@@ -14,7 +14,7 @@ import type { ApiErrorEntry } from '../transport/errors';
 import { LaunchApiError } from '../transport/errors';
 import { GitConnectionMissingError } from '../git/git.errors';
 import type { ApiSurface } from '../resources';
-import type { CreateRequest } from './project.create';
+import type { CreateRequest } from './types';
 import { ProjectCreator } from './project.create';
 import { SITE_OPEN_DELAY_MS } from './project.follow';
 import { UPLOAD_PROGRESS_LABEL } from './project.source';
