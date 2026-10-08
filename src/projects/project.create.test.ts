@@ -314,6 +314,12 @@ function cloneOf(repoName: string): void {
   writeFileSync(join(dataDir, '.git', 'config'), `[remote "origin"]\n\turl = https://github.com/${repoName}.git\n`);
 }
 
+function repositoryFound(colour = false): string {
+  const folder = colour ? `\u001b[36m${dataDir}\u001b[39m` : dataDir;
+
+  return `Using the GitHub repository my-org/my-repo from ${folder}.`;
+}
+
 function configPathIn(dir: string): string {
   return join(dir, '.cs-launch.json');
 }
@@ -406,7 +412,7 @@ describe('ProjectCreator on the GitHub path', () => {
         gitProviderMetadata: { gitProvider: 'GitHub' },
       },
     });
-    expect(printed).toEqual([CONNECTION_IDENTIFIED, PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
+    expect(printed).toEqual([CONNECTION_IDENTIFIED, repositoryFound(), PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
   });
 
   it('sends the project description and the two toggles only when they were supplied', async () => {
@@ -513,18 +519,18 @@ describe('ProjectCreator on the GitHub path', () => {
   });
 
   it.each([[true], [false]])('refuses when the folder is not a GitHub working copy (terminal: %p)', async (isTTY) => {
-    const notAClone = join(dataDir, 'sub');
-    mkdirSync(notAClone, { recursive: true });
+    const notAClone = mkdtempSync(join(tmpdir(), 'launch-not-a-clone-'));
     const { creator, asked } = harness({ isTTY });
 
     const failure = await creator
       .create(gitRequest({ dataDir: notAClone, configPath: configPathIn(notAClone) }))
       .catch((error: Error) => error);
+    rmSync(notAClone, { recursive: true, force: true });
 
     expect(failure).toBeInstanceOf(UsageError);
     expect((failure as Error).message).toBe(
-      `No GitHub repository was found in ${notAClone}. Run this command from a GitHub working copy, ` +
-      'or pass --data-dir with the folder holding one.',
+      `No GitHub repository was found in ${notAClone} or any folder above it. Run this command inside a ` +
+      'working copy of a GitHub repository, or pass --data-dir with one.',
     );
     expect(asked).toEqual([]);
   });
@@ -560,6 +566,7 @@ describe('ProjectCreator on the GitHub path', () => {
       expect(failure).toBeInstanceOf(GitConnectionMissingError);
       expect(printed).toEqual([
         CONNECTION_IDENTIFIED,
+        repositoryFound(),
         'error: GitHub connection not found!',
         'info: You can connect your GitHub account to the UI using the following URL:',
         CONNECT_URL,
@@ -580,10 +587,29 @@ describe('ProjectCreator on the GitHub path', () => {
 
     expect(printed).toEqual([
       `\u001b[32m${CONNECTION_IDENTIFIED}\u001b[39m`,
+      repositoryFound(true),
       '\u001b[31merror: GitHub connection not found!\u001b[39m',
       '\u001b[32minfo: You can connect your GitHub account to the UI using the following URL:\u001b[39m',
       `\u001b[32m${CONNECT_URL}\u001b[39m`,
     ]);
+  });
+
+  it('says which GitHub repository it found and the top folder it found it in, from a folder below that one', async () => {
+    const app = join(dataDir, 'apps', 'web');
+    mkdirSync(app, { recursive: true });
+    const { creator, printed } = harness();
+
+    await creator.create(gitRequest({ dataDir: app, configPath: configPathIn(app) }));
+
+    expect(printed).toContain(`Using the GitHub repository my-org/my-repo from ${dataDir}.`);
+  });
+
+  it('colours only the folder in that line cyan, and only when stdout is a terminal', async () => {
+    const { creator, printed } = harness({ outputIsTTY: true });
+
+    await creator.create(gitRequest());
+
+    expect(printed).toContain(repositoryFound(true));
   });
 
   it('says the GitHub connection was identified, as V1 did, after asking which namespaces the user has connected', async () => {
@@ -643,7 +669,7 @@ describe('ProjectCreator on the GitHub path', () => {
     await creator.create(gitRequest());
 
     expect(printed).not.toContain(CONNECTION_IDENTIFIED);
-    expect(printed).toEqual([PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
+    expect(printed).toEqual([repositoryFound(), PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
     expect(gitCalls[0]).toEqual({ org: ORG, provider: 'GitHub', namespace: 'my-org', search: 'my-repo', limit: 100, skip: 0 });
     expect(created).toHaveLength(1);
   });
@@ -658,7 +684,7 @@ describe('ProjectCreator on the GitHub path', () => {
     const failure = await creator.create(gitRequest()).catch((error: Error) => error);
 
     expect(failure).toBeInstanceOf(GitConnectionMissingError);
-    expect(printed[0]).toBe('error: GitHub connection not found!');
+    expect(printed[1]).toBe('error: GitHub connection not found!');
     expect(created).toEqual([]);
   });
 
@@ -694,7 +720,7 @@ describe('ProjectCreator on the GitHub path', () => {
     const failure = await creator.create(gitRequest()).catch((error: Error) => error);
 
     expect(failure).toBeInstanceOf(GitConnectionMissingError);
-    expect(printed).toEqual([CONNECTION_IDENTIFIED, 'error: GitHub connection not found!']);
+    expect(printed).toEqual([CONNECTION_IDENTIFIED, repositoryFound(), 'error: GitHub connection not found!']);
     expect(opened).toEqual([]);
   });
 
@@ -1345,7 +1371,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed).toEqual([CONNECTION_IDENTIFIED, PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
+    expect(printed).toEqual([CONNECTION_IDENTIFIED, repositoryFound(), PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
   });
 
   it.each([
@@ -1359,7 +1385,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
       await creator.create(gitRequest());
 
-      expect(printed[2]).toBe(line);
+      expect(printed.at(-1)).toBe(line);
     },
   );
 
@@ -1540,7 +1566,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed[1]).toBe(`\u001b[32m${PROJECT_CREATED}\u001b[39m`);
+    expect(printed[2]).toBe(`\u001b[32m${PROJECT_CREATED}\u001b[39m`);
     expect(timeline.indexOf(`print \u001b[32m${PROJECT_CREATED}\u001b[39m`)).toBeLessThan(
       timeline.findIndex((entry) => entry.includes('Deployment URL')),
     );
@@ -1575,7 +1601,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed).toEqual([CONNECTION_IDENTIFIED, PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
+    expect(printed).toEqual([CONNECTION_IDENTIFIED, repositoryFound(), PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
     expect(timeline).not.toContain(`sleep ${SITE_OPEN_DELAY_MS}`);
   });
 
@@ -1623,6 +1649,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
     expect((failure as ProjectCreateFailedError).exitCode).toBe(2);
     expect(printed).toEqual([
       CONNECTION_IDENTIFIED,
+      repositoryFound(),
       'error: New project creation failed!',
       'error: Project name contains characters that are not allowed.',
     ]);

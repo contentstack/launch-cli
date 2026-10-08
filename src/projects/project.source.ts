@@ -6,7 +6,12 @@ import { connectedAccountsUrl } from '../core/region';
 import type { ServiceContext } from '../core/service-context';
 import { asSentence, messageOf } from '../core/values';
 import { GitConnectionMissingError, isMissingGitConnection } from '../git/git.errors';
-import { gitConnectionIdentifiedLine, gitConnectionLines, repositoryLabel } from '../git/git.presenter';
+import {
+  gitConnectionIdentifiedLine,
+  gitConnectionLines,
+  localRepositoryLine,
+  repositoryLabel,
+} from '../git/git.presenter';
 import { askBranch, findRepository, repositorySearchTerm } from '../git/git.prompt';
 import type { LocalGitHubRepository } from '../git/local-repository';
 import { detectGitHubRepository } from '../git/local-repository';
@@ -46,10 +51,12 @@ export class ProjectSource {
 
     if (local === undefined) {
       throw new UsageError(
-        `No GitHub repository was found in ${request.dataDir}. Run this command from a GitHub working copy, ` +
-          'or pass --data-dir with the folder holding one.',
+        `No GitHub repository was found in ${request.dataDir} or any folder above it. Run this command inside a ` +
+          'working copy of a GitHub repository, or pass --data-dir with one.',
       );
     }
+
+    this.services.ux.print(localRepositoryLine(local.repoName, local.root, this.services.outputIsTTY === true));
 
     return local;
   }

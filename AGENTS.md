@@ -637,6 +637,19 @@ part after the owner, read from the local clone, so it costs no request) and the
 FileUpload. The rename prompt after a taken name offers it again. It stays a prompt default only - without a
 terminal `--name` is still required, because a project name is not something to settle by guessing.
 
+**The local clone is found the way git finds it.** `detectGitHubRepository` (`src/git/local-repository.ts`)
+starts at `--data-dir` (the working directory by default) and walks up to the first folder holding a
+`.git`, so a monorepo app folder such as `apps/web` finds the repository above it. When that `.git` is a
+**file**, its `gitdir:` line names the real git directory, resolved against the folder holding the file
+(a submodule writes a relative path); a worktree's git directory also has a `commondir`, and the remotes
+are read from the repository it names while `HEAD` - which branch, so which tracked remote - comes from the
+worktree's own directory. The nearest `.git` decides: a broken one finds nothing rather than looking further
+up. It reads files only, never runs the `git` program; `url.insteadOf` rewrites and `[include]` files are not
+followed. Create prints `Using the GitHub repository <owner/repo> from <top folder>.`, the folder cyan when
+stdout is a terminal, so a repository found above the data dir is visible before anything is created. The
+`.cs-launch.json` is still written to `--data-dir`, not to the repository's top folder, and Launch builds the
+repository root either way - finding the clone from `apps/web` does not make Launch build `apps/web`.
+
 **A missing GitHub connection names the page that fixes it.** `GET /git-repositories` answers
 `No user connection found` when the organization has no GitHub connection, which is not a fact about the
 local clone, so create does not report it with the "not available to this organization's connected GitHub

@@ -337,6 +337,22 @@ describe('integration: launch:projects:create on the wire', () => {
     expect(onWire).toEqual([]);
   });
 
+  it('finds the clone from a monorepo app folder run without --data-dir, and says where it found it', async () => {
+    const app = join(dataDir, 'apps', 'web');
+    mkdirSync(app, { recursive: true });
+    jest.spyOn(process, 'cwd').mockReturnValue(app);
+    const { scope, body } = captureCreate();
+    stubGitLookups();
+    stubFollowUp('LIVE');
+
+    const { error, stdout } = await runCommand(withoutFlags(gitFlags(), '--data-dir'), config);
+
+    expect(error).toBeUndefined();
+    expect(scope.isDone()).toBe(true);
+    expect(body()).toMatchObject({ repository: { repositoryName: 'my-org/my-repo', username: 'my-org' } });
+    expect(stdout).toContain(`Using the GitHub repository my-org/my-repo from ${dataDir}.\n`);
+  });
+
   it('streams the deployment logs from the logs service before reporting the terminal status', async () => {
     stubGitLookups();
     hub().post('/manage/projects').query({}).reply(201, { project: CREATED_PROJECT });

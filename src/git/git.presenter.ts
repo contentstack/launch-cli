@@ -24,6 +24,10 @@ export function gitConnectionIdentifiedLine(provider: string, colour: boolean): 
   return styled(`info: ${provider} connection identified!`, 'green', colour);
 }
 
+export function localRepositoryLine(repoName: string, root: string, colour: boolean): string {
+  return `Using the GitHub repository ${repoName} from ${styled(root, 'cyan', colour)}.`;
+}
+
 export function repositoryLabel(repository: GitRepository): string {
   return repository.fullName || repository.name || '';
 }
