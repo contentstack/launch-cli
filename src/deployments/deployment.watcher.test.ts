@@ -1,12 +1,12 @@
 import { randomBytes } from 'node:crypto';
 
 import type { UxLike } from '../core/prompt';
+import { DEPLOYMENT_LOGS_FROM } from './deployment.log-tail';
 import {
   DEPLOYMENT_MAX_BACKOFF_STEPS,
   DEPLOYMENT_MAX_POLL_ERRORS,
   DEPLOYMENT_POLL_DELAY_MS,
   DEPLOYMENT_LOADER_MESSAGE,
-  DEPLOYMENT_LOGS_FROM,
   DEPLOYMENT_WAIT_TIMEOUT_MS,
   defaultWatchTiming,
   watchDeployment,

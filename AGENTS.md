@@ -139,8 +139,8 @@ src/
   environments/ the environment DTOs, the framework preset table, and the environment
                 flags every create command contributes
   deployments/  the deployment repository, the status classification, and the
-                wait/stream loop that projects:create, deployments:create and logs:get
-                all drive
+                wait/stream loop and LogTail that projects:create, deployments:create
+                and logs:get all drive
   git/          the internal git-namespace / repository / branch lookups
   organizations/ the --org flag, its organization picker, and the lookup behind it,
                 which reads the Contentstack Management API rather than Launch

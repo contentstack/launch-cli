@@ -1,6 +1,7 @@
 import type { Loader } from '../core/loader';
 import type { UxLike } from '../core/prompt';
 import { RetryPolicy } from '../transport/retry-policy';
+import { LogTail } from './deployment.log-tail';
 import { classifyStatus, normalizeStatus } from './deployment.status';
 import {
   deploymentLogLine,
@@ -12,7 +13,6 @@ export const DEPLOYMENT_POLL_DELAY_MS = 2000;
 export const DEPLOYMENT_MAX_BACKOFF_STEPS = 5;
 export const DEPLOYMENT_WAIT_TIMEOUT_MS = 20 * 60 * 1000;
 export const DEPLOYMENT_MAX_POLL_ERRORS = 3;
-export const DEPLOYMENT_LOGS_FROM = new Date(0).toISOString();
 export const DEPLOYMENT_LOADER_MESSAGE = 'Loading deployment logs...';
 
 export interface WatchTiming {
@@ -37,19 +37,6 @@ export interface DeploymentOutcome {
   kind: DeploymentOutcomeKind;
   status: string;
   deployment: Deployment;
-}
-
-interface LogCursor {
-  at: number;
-  printed: Map<string, number>;
-}
-
-function logIdentity(log: DeploymentLog): string {
-  return JSON.stringify([log.stage, log.message]);
-}
-
-function logsSince(cursor: LogCursor | undefined): string {
-  return cursor === undefined ? DEPLOYMENT_LOGS_FROM : new Date(cursor.at - 1).toISOString();
 }
 
 export function defaultWatchTiming(): WatchTiming {
@@ -84,7 +71,7 @@ async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
   const deadline = deps.now() + deps.timeoutMs;
   let attempt = 0;
   let consecutiveErrors = 0;
-  let cursor: LogCursor | undefined;
+  const tail = new LogTail();
   let logsFailureReported = false;
 
   for (;;) {
@@ -113,7 +100,7 @@ async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
     let logs: DeploymentLog[] = [];
 
     try {
-      logs = await deps.logs(logsSince(cursor));
+      logs = tail.fresh(await deps.logs(tail.since()));
     } catch (error) {
       if (!logsFailureReported) {
         deps.ux.print(deploymentLogsUnavailableLine(error));
@@ -121,30 +108,8 @@ async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
       }
     }
 
-    const resumeAt = cursor?.at;
-    const repeats = new Map(cursor?.printed);
-
     for (const log of logs) {
-      const at = log.timestamp ? Date.parse(log.timestamp) : Number.NaN;
-      const identity = logIdentity(log);
-      const seen = repeats.get(identity) ?? 0;
-
-      if (at === resumeAt && seen > 0) {
-        repeats.set(identity, seen - 1);
-        continue;
-      }
-
       deps.ux.print(deploymentLogLine(log, deps.outputIsTTY, process.stdout.columns));
-
-      if (Number.isNaN(at)) {
-        continue;
-      }
-
-      if (cursor === undefined || at !== cursor.at) {
-        cursor = { at, printed: new Map() };
-      }
-
-      cursor.printed.set(identity, (cursor.printed.get(identity) ?? 0) + 1);
     }
 
     if (terminal) {
