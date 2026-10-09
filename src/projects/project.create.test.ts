@@ -597,6 +597,21 @@ describe('ProjectCreator on the GitHub path', () => {
     expect(opened).toEqual([]);
   });
 
+  it('refuses an owner it is not connected to before asking for a project name, as V1 refused a missing connection', async () => {
+    const { creator, asked, gitCalls } = harness({
+      isTTY: true,
+      namespaces: [{ name: 'harshi-xyz', type: 'User', provider: 'GitHub' }],
+    });
+
+    const failure = await creator
+      .create(gitRequest({ name: undefined, envName: undefined }))
+      .catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(GitNamespaceNotConnectedError);
+    expect(asked).toEqual([]);
+    expect(gitCalls).toEqual([]);
+  });
+
   it('looks the repository up under the spelling the connection carries, not the one the clone url used', async () => {
     cloneOf('MY-ORG/MY-REPO');
     const { creator, gitCalls, created } = harness();
@@ -830,7 +845,7 @@ describe('ProjectCreator on the GitHub path', () => {
   });
 
   it('names the local folder and the flags when the detected repository is not connected', async () => {
-    cloneOf('other-org/missing-repo');
+    cloneOf('my-org/missing-repo');
     const { creator } = harness({ isTTY: true });
 
     const failure = await creator
@@ -839,7 +854,7 @@ describe('ProjectCreator on the GitHub path', () => {
 
     expect(failure).toBeInstanceOf(UsageError);
     expect((failure as Error).message).toBe(
-      `The GitHub repository "other-org/missing-repo" checked out in ${dataDir} is not available to this ` +
+      `The GitHub repository "my-org/missing-repo" checked out in ${dataDir} is not available to this ` +
       'organization\'s connected GitHub account: no repository with that name was found. ' +
       'Connect it in the Launch app, or pass --data-dir with a folder whose repository is connected.',
     );

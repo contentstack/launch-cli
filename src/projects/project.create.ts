@@ -72,6 +72,7 @@ export class ProjectCreator {
     const connected = choice === 'GitHub' ? await this.source.requireGitConnection(request.org) : undefined;
 
     const local = choice === 'GitHub' ? this.source.localRepository(request) : undefined;
+    const namespace = local === undefined ? undefined : this.source.requireConnectedOwner(local, connected);
     const autoDeploy = choice === 'GitHub' ? request.autoDeploy : undefined;
     const upload = choice === 'GitHub' ? undefined : await this.source.selectUploadSource(request);
     const suggestedName = this.suggestedName(request, local);
@@ -81,7 +82,8 @@ export class ProjectCreator {
     const envName = await needInput(this.services, 'env-name', request.envName, () =>
       askText(this.services.ux, 'Environment name', DEFAULT_ENVIRONMENT_NAME, ENVIRONMENT_NAME_MAX_LENGTH),
     );
-    const source = upload ?? (await this.source.selectGitSource(request, local as LocalGitHubRepository, connected));
+    const source =
+      upload ?? (await this.source.selectGitSource(request, local as LocalGitHubRepository, namespace as string));
     const environment = await this.environments.build(request, envName, source, autoDeploy);
 
     const input: CreateProjectInput = {

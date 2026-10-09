@@ -33,17 +33,6 @@ export interface SourceSelection extends EnvironmentSource {
   namespace?: string;
 }
 
-/**
- * GitHub account names ignore case, the remote carries whatever was typed at clone time, and the
- * service matches a connection's namespace exactly - so the spelling the connection was stored under
- * is the one every lookup has to use, or a lowercase clone url of a connected account is refused.
- */
-function connectedSpelling(namespace: string, connected: string[] | undefined): string {
-  const wanted = namespace.toLowerCase();
-
-  return connected?.find((name) => name.toLowerCase() === wanted) ?? namespace;
-}
-
 function unreachableRepository(request: CreateRequest, local: LocalGitHubRepository, reason: string): string {
   return (
     `The GitHub repository "${local.repoName}" checked out in ${request.dataDir} is not available to this ` +
@@ -73,10 +62,9 @@ export class ProjectSource {
   async selectGitSource(
     request: CreateRequest,
     local: LocalGitHubRepository,
-    connected: string[] | undefined,
+    namespace: string,
   ): Promise<SourceSelection> {
-    const namespace = connectedSpelling(local.namespace, connected);
-    const repository = await this.detectedRepository(request, local, namespace, connected);
+    const repository = await this.detectedRepository(request, local, namespace);
     const repoName = repositoryLabel(repository);
     const branch = await needInput(this.services, 'branch', request.branch, () =>
       askBranch(
@@ -151,9 +139,8 @@ export class ProjectSource {
     request: CreateRequest,
     local: LocalGitHubRepository,
     namespace: string,
-    connected: string[] | undefined,
   ): Promise<GitRepository> {
-    const match = await this.reachableRepository(request, local, namespace, connected);
+    const match = await this.reachableRepository(request, local, namespace);
 
     if (match === undefined) {
       throw new UsageError(unreachableRepository(request, local, 'no repository with that name was found.'));
@@ -166,7 +153,6 @@ export class ProjectSource {
     request: CreateRequest,
     local: LocalGitHubRepository,
     namespace: string,
-    connected: string[] | undefined,
   ): Promise<GitRepository | undefined> {
     try {
       const page = await this.services.api.git.repositories({
@@ -181,7 +167,7 @@ export class ProjectSource {
       return findRepository(page.repositories, local.repoName);
     } catch (error) {
       if (isMissingGitConnection(error)) {
-        throw this.notConnectedTo(local, connected) ?? this.noGitConnection();
+        throw this.noGitConnection();
       }
 
       if (error instanceof LaunchApiError) {
@@ -194,19 +180,23 @@ export class ProjectSource {
 
   /**
    * The service answers "no user connection found" both when the user has connected nothing and when
-   * they have connected accounts that simply do not include this repository's owner, which is the
-   * common case for a repository someone else owns. The namespaces fetched before any prompt tell the
-   * two apart, so the second is named for what it is rather than reported as the first. A list that
-   * never arrived says nothing either way, and V1's message stands.
+   * the accounts they have connected simply do not include this repository's owner, which is the
+   * ordinary case for a repository someone else owns. The namespaces requireGitConnection already
+   * fetched tell the two apart, so the second is named for what it is rather than reported as the
+   * first - and named here, before create asks for a project name, since reconnecting cannot help and
+   * a prompt answered first is a prompt wasted. A list that never arrived says nothing either way:
+   * the lookup goes ahead under the remote's own spelling and V1's message stands behind it.
+   *
+   * It also answers that way when the owner is connected under another spelling, because GitHub
+   * account names ignore case while the service matches a namespace exactly and a remote keeps
+   * whatever was typed at clone time. The connection's spelling is what every lookup then uses.
    */
-  private notConnectedTo(
-    local: LocalGitHubRepository,
-    connected: string[] | undefined,
-  ): GitNamespaceNotConnectedError | undefined {
+  requireConnectedOwner(local: LocalGitHubRepository, connected: string[] | undefined): string {
     const owner = local.namespace.toLowerCase();
+    const match = connected?.find((name) => name.toLowerCase() === owner);
 
-    if (connected === undefined || connected.some((name) => name.toLowerCase() === owner)) {
-      return undefined;
+    if (connected === undefined || match !== undefined) {
+      return match ?? local.namespace;
     }
 
     const appUrl = this.services.launchAppUrl;
@@ -221,7 +211,7 @@ export class ProjectSource {
       this.services.ux.print(line);
     }
 
-    return new GitNamespaceNotConnectedError(local.namespace, connected);
+    throw new GitNamespaceNotConnectedError(local.namespace, connected);
   }
 
   /**
