@@ -12,9 +12,9 @@ fileignoreconfig:
 - filename: src/transport/auth-strategy.test.ts
   checksum: a4f3e3ea7db10dbf82abbac0207d2231ee740916f476fcda836a2268505295ef
 - filename: src/projects/types.ts
-  checksum: 6139553ef747421f5b7ee701f82dcdb7071f0cb614c977967a2cb3974495e43c
+  checksum: 73826a3686cd0793e7813e80c54bfdc78cddb72b085d2861854f20064a23fdc8
 - filename: src/projects/projects.api.ts
-  checksum: 29d53afdfa763ea00f8922e7ff48459a88d6acccc865c14831cbc6070c657dda
+  checksum: 29fb58c181bab1c76b6827608a77f21b9e72ce0e34eff9fd06fe5d74419c5aad
 - filename: src/core/service-context.test.ts
   checksum: 7bc4f6ca3ec8a960f84fb4c07453a287bb2bb0ccc7e06c5805a7f56df160024a
 - filename: src/core/rules.test.ts
@@ -185,7 +185,7 @@ fileignoreconfig:
 - filename: src/git/local-repository.ts
   checksum: b9091ed135dfebdf590a5412bbfba2b2f96d4a177cf944a20909b93405268e9f
 - filename: test/guards/layering.test.ts
-  checksum: 58257c778e1465c61000e95025231a6c1c24aa171ca73bd45e9866c4721b171b
+  checksum: d856282fd15bfc6fa7b5eb32ff419e66eb5fd20ff8dc79af9e82c0eb3afcd4f6
 - filename: src/commands/launch/projects/create.test.ts
   checksum: 1d5063992d0a7cfb91871ab00f79123bf71806ddc9faac80952cf279d165aec5
 - filename: src/commands/launch/projects/delete.test.ts
@@ -213,5 +213,5 @@ fileignoreconfig:
 - filename: src/transport/proxy.test.ts
   checksum: 06db291bb40ec55774179b02e3e1a9644bbaa116ec511c163e8d6012aebb3868
 - filename: test/integration/project-upload-proxy.test.ts
-  checksum: 6e3ebdd77f0bb99bc2cd2fc778c46c8a77b601d1a6bfdd40590cdf21d41009b6
+  checksum: 502adf95d5c1b41e58a8500929597741e8f8a178a3aaa69f517451cb7bedac4a
 version: "1.0"
