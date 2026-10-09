@@ -4,6 +4,7 @@ import {
   colouredLogMessage,
   deploymentLogLine,
   deploymentLogsUnavailableLine,
+  deploymentUrlLine,
   deploymentUrlOf,
   wrapLogMessage,
 } from './deployment.presenter';
@@ -15,6 +16,13 @@ const GREEN = '\u001b[38;2;34;139;34m';
 const RESET = '\u001b[0m';
 
 describe('deployment presenter', () => {
+  it.each([
+    [true, '\u001b[1mDeployment URL\u001b[22m \u001b[36mhttps://site.example.test\u001b[39m'],
+    [false, 'Deployment URL https://site.example.test'],
+  ])('labels the deployment url in bold and the url in cyan only on a terminal (terminal: %s)', (outputIsTTY, line) => {
+    expect(deploymentUrlLine('https://site.example.test', outputIsTTY)).toBe(line);
+  });
+
   it('leaves an absolute deployment url alone and gives a bare host a scheme', () => {
     expect(deploymentUrlOf({ uid: UID, deploymentUrl: 'https://site.example.test' })).toBe('https://site.example.test');
     expect(deploymentUrlOf({ uid: UID, deploymentUrl: 'site.example.test' })).toBe('https://site.example.test');

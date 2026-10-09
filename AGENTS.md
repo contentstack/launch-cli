@@ -138,9 +138,10 @@ src/
                 error wording, prompt adapter, and the flags it contributes
   environments/ the environment DTOs, the framework preset table, and the environment
                 flags every create command contributes
-  deployments/  the deployment repository, the status classification, and the
+  deployments/  the deployment repository, the status classification, the
                 wait/stream loop and LogTail that projects:create, deployments:create
-                and logs:get all drive
+                and logs:get all drive, and the DeploymentFollower that watches one
+                deployment and announces its live URL
   git/          the internal git-namespace / repository / branch lookups
   organizations/ the --org flag, its organization picker, and the lookup behind it,
                 which reads the Contentstack Management API rather than Launch
@@ -593,8 +594,10 @@ linked-folder refusal, the type, the name and its rename retries, the request, `
 and hands the rest to three collaborators: `ProjectSource` in `project.source.ts` (the GitHub
 connection, repository and branch, or the zip and its upload), `EnvironmentBuilder` in
 `project.environment.ts` (framework, commands, output directory, response mode, Contentstack
-Authentication) and `DeploymentFollower` in `project.follow.ts` (waiting on the first deployment,
-its log, the site URL and opening it). A value create needs and may ask for goes through `needInput`
+Authentication) and `FirstDeploymentFollower` in `project.follow.ts` (waiting for the first
+environment and deployment to appear and wording a failure with the project's rerun flags; the
+watch, its log, the site URL and opening it are `DeploymentFollower` in
+`src/deployments/deployment.follower.ts`). A value create needs and may ask for goes through `needInput`
 in `project.inputs.ts`: the flag when supplied, a refusal off a terminal, the prompt otherwise. The
 prompts themselves come from `src/core/prompt.ts` (text, choice, cancel) and `src/git/git.prompt.ts`
 (branch picker), adapters that render choices and nothing more.

@@ -16,7 +16,7 @@ import { GitConnectionMissingError, GitNamespaceNotConnectedError } from '../git
 import type { ApiSurface } from '../resources';
 import type { CreateRequest } from './types';
 import { ProjectCreator } from './project.create';
-import { SITE_OPEN_DELAY_MS } from './project.follow';
+import { SITE_OPEN_DELAY_MS } from '../deployments/deployment.follower';
 import { UPLOAD_PROGRESS_LABEL } from './project.source';
 import {
   DuplicateProjectNameError,

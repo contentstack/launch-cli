@@ -102,10 +102,6 @@ export interface PartialCreateFailure {
   timedOut?: boolean;
 }
 
-export function deploymentUrlLine(url: string, outputIsTTY: boolean): string {
-  return `${styled('Deployment URL', 'bold', outputIsTTY)} ${styled(url, 'cyan', outputIsTTY)}`;
-}
-
 export function deploymentFailureMessage(failure: PartialCreateFailure): string {
   const scope = `--org ${failure.org} --project ${failure.projectUid}`;
   const environment = failure.environmentUid === undefined ? '' : ` --env ${failure.environmentUid}`;

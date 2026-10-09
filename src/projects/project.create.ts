@@ -15,7 +15,7 @@ import { GIT_PROVIDER_GITHUB } from '../git/types';
 import { LaunchApiError } from '../transport/errors';
 import { EnvironmentBuilder } from './project.environment';
 import { DuplicateProjectNameError, ProjectCreateFailedError } from './project.errors';
-import { DeploymentFollower } from './project.follow';
+import { FirstDeploymentFollower } from './project.follow';
 import type { GitOnlyFlag, ProjectTypeChoice } from './project.inputs';
 import {
   GIT_ONLY_FLAGS,
@@ -52,7 +52,7 @@ function shownPath(path: string): string {
 export class ProjectCreator {
   private readonly source: ProjectSource;
   private readonly environments: EnvironmentBuilder;
-  private readonly follower: DeploymentFollower;
+  private readonly follower: FirstDeploymentFollower;
 
   constructor(
     private readonly services: ServiceContext,
@@ -60,7 +60,7 @@ export class ProjectCreator {
   ) {
     this.source = new ProjectSource(services);
     this.environments = new EnvironmentBuilder(services);
-    this.follower = new DeploymentFollower(services, this.timing);
+    this.follower = new FirstDeploymentFollower(services, this.timing);
   }
 
   async create(request: CreateRequest): Promise<void> {

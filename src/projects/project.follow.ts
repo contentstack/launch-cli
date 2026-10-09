@@ -1,19 +1,15 @@
-import type { Loader } from '../core/loader';
-import { silentLoader, terminalLoader } from '../core/loader';
 import type { ServiceContext } from '../core/service-context';
 import { asSentence, messageOf } from '../core/values';
+import { DeploymentFollower } from '../deployments/deployment.follower';
 import { DeploymentUnsuccessfulError } from '../deployments/deployment.errors';
-import { deploymentUrlOf } from '../deployments/deployment.presenter';
 import type { WatchTiming } from '../deployments/deployment.watcher';
-import { watchDeployment } from '../deployments/deployment.watcher';
 import type { Deployment } from '../deployments/types';
 import type { Environment } from '../environments/types';
-import { deploymentFailureMessage, deploymentUrlLine } from './project.presenter';
+import { deploymentFailureMessage } from './project.presenter';
 import type { IdentifiedProject } from './types';
 
 const NO_DEPLOYMENT_STATUS = 'NONE';
 const FIRST_LOOKUP_ATTEMPTS = 3;
-export const SITE_OPEN_DELAY_MS = 6000;
 
 interface Survivors {
   org: string;
@@ -23,11 +19,15 @@ interface Survivors {
   deployment?: Deployment;
 }
 
-export class DeploymentFollower {
+export class FirstDeploymentFollower {
+  private readonly follower: DeploymentFollower;
+
   constructor(
     private readonly services: ServiceContext,
     private readonly timing: WatchTiming,
-  ) {}
+  ) {
+    this.follower = new DeploymentFollower(services, timing);
+  }
 
   async follow(org: string, project: IdentifiedProject, envName: string): Promise<void> {
     const environment = await this.explaining({ org, project, envName }, () =>
@@ -50,24 +50,11 @@ export class DeploymentFollower {
 
     const scope = { org, project: project.uid, environment: environment.uid, deployment: deployment.uid };
     const outcome = await this.explaining({ org, project, envName, environment, deployment }, () =>
-      watchDeployment({
-        ...this.timing,
-        ux: this.services.ux,
-        outputIsTTY: this.services.outputIsTTY === true,
-        loader: this.loader(),
-        logs: (after) => this.services.api.deploymentLogs.after({ ...scope, timestamp: after }),
-        poll: () => this.services.api.deployments.get(scope),
-      }),
+      this.follower.watch(scope),
     );
 
     if (outcome.kind === 'success') {
-      const url = this.siteUrl(outcome.deployment, environment);
-
-      if (url !== undefined) {
-        this.services.ux.print(deploymentUrlLine(url, this.services.outputIsTTY === true));
-        await this.openSite(url);
-      }
-
+      await this.follower.announceLive(outcome.deployment, environment.domains);
       return;
     }
 
@@ -120,35 +107,5 @@ export class DeploymentFollower {
         timedOut: failure.timedOut,
       }),
     );
-  }
-
-  private siteUrl(deployment: Deployment, environment: Environment): string | undefined {
-    const fromDeployment = deploymentUrlOf(deployment);
-
-    if (fromDeployment !== undefined) {
-      return fromDeployment;
-    }
-
-    const domain = (environment.domains ?? []).find((entry) => Boolean(entry.url));
-
-    return domain === undefined ? undefined : deploymentUrlOf({ uid: deployment.uid, deploymentUrl: domain.url });
-  }
-
-  /**
-   * V1 opened the live site once the deployment succeeded, waiting first because a site opened the
-   * moment it reports live can still answer "site not reachable". The wait is awaited rather than
-   * left on a timer so the browser opens before the command returns, whoever ends the process.
-   */
-  private async openSite(url: string): Promise<void> {
-    if (this.services.openUrl === undefined) {
-      return;
-    }
-
-    await this.timing.sleep(SITE_OPEN_DELAY_MS);
-    this.services.openUrl(url);
-  }
-
-  private loader(): Loader {
-    return this.services.outputIsTTY === true ? terminalLoader() : silentLoader;
   }
 }
