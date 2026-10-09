@@ -144,7 +144,9 @@ src/
                 and logs:get all drive, and the DeploymentFollower that watches one
                 deployment and announces its live URL
   uploads/      zipping a folder, the signed upload URL, and the transfer behind every
-                FileUpload source (FolderUploader)
+                FileUpload source (FolderUploader). The UploadScope picks the endpoint:
+                { org } for a new project, { org, project } for a new environment,
+                { org, project, environment } for a deployment
   git/          the internal git-namespace / repository / branch lookups
   organizations/ the --org flag, its organization picker, and the lookup behind it,
                 which reads the Contentstack Management API rather than Launch
@@ -596,13 +598,13 @@ the domain service. It runs the steps in order and owns what is about the projec
 linked-folder refusal, the type, the name and its rename retries, the request, `.cs-launch.json` -
 and hands the rest to three collaborators: `ProjectSource` in `project.source.ts` (the GitHub
 connection, repository and branch, or the zip and its upload through `FolderUploader` in
-`src/uploads/`), `EnvironmentBuilder` in
-`src/environments/environment.builder.ts` (framework, commands, output directory, response mode, Contentstack
-Authentication) and `FirstDeploymentFollower` in `project.follow.ts` (waiting for the first
-environment and deployment to appear and wording a failure with the project's rerun flags; the
-watch, its log, the site URL and opening it are `DeploymentFollower` in
-`src/deployments/deployment.follower.ts`). A value create needs and may ask for goes through `needInput`
-in `project.inputs.ts`: the flag when supplied, a refusal off a terminal, the prompt otherwise. The
+`src/uploads/`), `EnvironmentBuilder` in `src/environments/environment.builder.ts` (framework,
+commands, output directory, response mode, Contentstack Authentication) and
+`FirstDeploymentFollower` in `project.follow.ts` (waiting for the first environment and deployment
+to appear and wording a failure with the project's rerun flags; the watch, its log, the site URL
+and opening it are `DeploymentFollower` in `src/deployments/deployment.follower.ts`). A value create
+needs and may ask for goes through `needInput` in `project.inputs.ts`: the flag when supplied, a
+refusal off a terminal, the prompt otherwise. The
 prompts themselves come from `src/core/prompt.ts` (text, choice, cancel) and `src/git/git.prompt.ts`
 (branch picker), adapters that render choices and nothing more.
 

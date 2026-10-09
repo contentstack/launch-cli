@@ -14,4 +14,8 @@ export class UploadFailedError extends LaunchError {
 export const UPLOAD_ERROR_MESSAGES: ErrorMessages = {
   'launch.PROJECT.FILE_UPLOAD_SIGNED_URL.GET_FAILED':
     'The Launch API could not prepare an upload for your project files.',
+  'launch.ENVIRONMENT.FILE_UPLOAD_SIGNED_URL.GET_FAILED':
+    'The Launch API could not prepare an upload for your environment files.',
+  'launch.DEPLOYMENT.FILE_UPLOAD_SIGNED_URL.GET_FAILED':
+    'The Launch API could not prepare an upload for your deployment files.',
 };

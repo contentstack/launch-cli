@@ -139,7 +139,7 @@ export class ProjectSource {
   }
 
   async selectUploadSource(request: CreateRequest): Promise<SourceSelection> {
-    const uploadUid = await new FolderUploader(this.services).upload(request.org, request.dataDir, [
+    const uploadUid = await new FolderUploader(this.services).upload({ org: request.org }, request.dataDir, [
       request.configPath,
     ]);
     const detected = await this.services.api.projects.fileFramework({ org: request.org, uploadUid });

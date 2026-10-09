@@ -6,8 +6,20 @@ import type { SignedUploadUrl } from './types';
 
 export * from './types';
 
-export interface SignedUploadUrlParams {
-  org: string;
+export type UploadScope =
+  | { org: string; project?: undefined; environment?: undefined }
+  | { org: string; project: string; environment?: string };
+
+function signedUploadPath(scope: UploadScope): string {
+  if (scope.project === undefined) {
+    return '/projects/upload/signed_url';
+  }
+
+  if (scope.environment === undefined) {
+    return `/projects/${scope.project}/environments/upload/signed_url`;
+  }
+
+  return `/projects/${scope.project}/environments/${scope.environment}/deployments/upload/signed_url`;
 }
 
 function isSignedUploadUrl(value: unknown): value is SignedUploadUrl {
@@ -17,9 +29,9 @@ function isSignedUploadUrl(value: unknown): value is SignedUploadUrl {
 export class UploadsApi {
   constructor(private readonly client: RestApiClient) {}
 
-  async signedUploadUrl(params: SignedUploadUrlParams): Promise<SignedUploadUrl> {
+  async signedUploadUrl(scope: UploadScope): Promise<SignedUploadUrl> {
     const response = await this.client.request<SignedUploadUrl>(
-      { method: 'GET', path: '/projects/upload/signed_url', orgUid: params.org },
+      { method: 'GET', path: signedUploadPath(scope), orgUid: scope.org, projectUid: scope.project },
       UPLOAD_ERROR_MESSAGES,
     );
 

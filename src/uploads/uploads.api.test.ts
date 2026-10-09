@@ -14,6 +14,8 @@ function fakeRestClient(result: unknown) {
   return { client, requests };
 }
 
+const SIGNED = { uploadUrl: 'https://uploads.example.test/x', uploadUid: 'upload-uid' };
+
 describe('UploadsApi', () => {
   it('asks for a signed upload url as an org-scoped GET', async () => {
     const signed = {
@@ -29,6 +31,32 @@ describe('UploadsApi', () => {
 
     expect(result).toBe(signed);
     expect(requests[0]).toEqual({ method: 'GET', path: '/projects/upload/signed_url', orgUid: 'org1' });
+  });
+
+  it('asks the environment upload url, scoped to the project, for a new environment', async () => {
+    const { client, requests } = fakeRestClient(SIGNED);
+
+    await new UploadsApi(client).signedUploadUrl({ org: 'org1', project: 'p1' });
+
+    expect(requests[0]).toEqual({
+      method: 'GET',
+      path: '/projects/p1/environments/upload/signed_url',
+      orgUid: 'org1',
+      projectUid: 'p1',
+    });
+  });
+
+  it('asks the deployment upload url, scoped to the project, for a redeploy of an environment', async () => {
+    const { client, requests } = fakeRestClient(SIGNED);
+
+    await new UploadsApi(client).signedUploadUrl({ org: 'org1', project: 'p1', environment: 'e1' });
+
+    expect(requests[0]).toEqual({
+      method: 'GET',
+      path: '/projects/p1/environments/e1/deployments/upload/signed_url',
+      orgUid: 'org1',
+      projectUid: 'p1',
+    });
   });
 
   it('raises a malformed-response error when the signed url response is unusable', async () => {
@@ -47,21 +75,27 @@ describe('UploadsApi', () => {
     }
   });
 
-  it('rewords a refused signed url in the upload wording', async () => {
+  it.each([
+    ['launch.PROJECT.FILE_UPLOAD_SIGNED_URL.GET_FAILED', 'The Launch API could not prepare an upload for your project files.'],
+    [
+      'launch.ENVIRONMENT.FILE_UPLOAD_SIGNED_URL.GET_FAILED',
+      'The Launch API could not prepare an upload for your environment files.',
+    ],
+    [
+      'launch.DEPLOYMENT.FILE_UPLOAD_SIGNED_URL.GET_FAILED',
+      'The Launch API could not prepare an upload for your deployment files.',
+    ],
+  ])('rewords the refused signed url %s in the upload wording', async (code, wording) => {
     const client = {
       request: async (_req: RestRequest, messages?: Record<string, string>) => {
-        throw parseErrorEnvelope(
-          500,
-          { errors: [{ code: 'launch.PROJECT.FILE_UPLOAD_SIGNED_URL.GET_FAILED' }] },
-          messages,
-        );
+        throw parseErrorEnvelope(500, { errors: [{ code }] }, messages);
       },
     } as unknown as RestApiClient;
 
     const error = (await new UploadsApi(client).signedUploadUrl({ org: 'org1' }).catch((e) => e)) as LaunchApiError;
 
     expect(error).toBeInstanceOf(LaunchApiError);
-    expect(error.message).toBe('The Launch API could not prepare an upload for your project files.');
+    expect(error.message).toBe(wording);
   });
 });
 
@@ -70,6 +104,10 @@ describe('UPLOAD_ERROR_MESSAGES', () => {
     expect(UPLOAD_ERROR_MESSAGES).toEqual({
       'launch.PROJECT.FILE_UPLOAD_SIGNED_URL.GET_FAILED':
         'The Launch API could not prepare an upload for your project files.',
+      'launch.ENVIRONMENT.FILE_UPLOAD_SIGNED_URL.GET_FAILED':
+        'The Launch API could not prepare an upload for your environment files.',
+      'launch.DEPLOYMENT.FILE_UPLOAD_SIGNED_URL.GET_FAILED':
+        'The Launch API could not prepare an upload for your deployment files.',
     });
   });
 });

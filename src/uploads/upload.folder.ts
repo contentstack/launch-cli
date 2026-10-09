@@ -5,11 +5,12 @@ import { archiveDirectory } from './upload.archive';
 import { PREPARING_ARCHIVE, UPLOAD_PROGRESS_LABEL, skippedLinksLine } from './upload.presenter';
 import { refuseArchiveOutsideLimits, uploadArchive } from './upload.transfer';
 import type { SignedUploadUrl } from './types';
+import type { UploadScope } from './uploads.api';
 
 export class FolderUploader {
   constructor(private readonly services: ServiceContext) {}
 
-  async upload(org: string, folder: string, excludedFiles: readonly string[] = []): Promise<string> {
+  async upload(scope: UploadScope, folder: string, excludedFiles: readonly string[] = []): Promise<string> {
     this.services.ux.print(PREPARING_ARCHIVE);
     const archive = archiveDirectory(folder, excludedFiles);
     refuseArchiveOutsideLimits(archive.buffer.length);
@@ -18,7 +19,7 @@ export class FolderUploader {
       this.services.ux.print(skippedLinksLine(archive.skippedLinks));
     }
 
-    const signed = await this.services.api.uploads.signedUploadUrl({ org });
+    const signed = await this.services.api.uploads.signedUploadUrl(scope);
     await this.uploading(signed, archive.buffer);
 
     return signed.uploadUid;
