@@ -62,7 +62,7 @@ fileignoreconfig:
     - "mockImplementation\\(\\(key: string\\) => values\\[key\\]\\)"
     - "Pass --org, set it in \\.cs-launch\\.json"
     - "when --org is passed"
-- filename: src/commands/launch/projects/update.ts
+- filename: src/projects/project.update.ts
   allowed_patterns:
     - "Pass at least one of --name, --description"
 - filename: src/projects/project.presenter.ts

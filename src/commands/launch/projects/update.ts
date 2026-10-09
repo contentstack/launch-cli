@@ -1,9 +1,6 @@
 import { LaunchCommand } from '../../../core/launch-command';
-import { UsageError } from '../../../core/errors';
 import { flagsFor, inputs } from '../../../core/inputs';
-import { projectNotUpdatedLine, projectUpdatedLine } from '../../../projects/project.presenter';
-import { PROJECT_UPDATABLE_FIELDS, promptForProjectUpdate } from '../../../projects/project.prompt';
-import type { ProjectUpdate } from '../../../projects/types';
+import { ProjectUpdater } from '../../../projects/project.update';
 
 const updateInputs = inputs({
   org: { required: true },
@@ -27,38 +24,7 @@ export default class ProjectsUpdate extends LaunchCommand<typeof updateInputs> {
 
   async run(): Promise<void> {
     const { org, project, name, description } = this.resolved;
-    const requested = await this.completeUpdate(org, project, { name, description });
 
-    if (requested === undefined) {
-      return;
-    }
-
-    await this.services.api.projects.update({ org, project, update: requested });
-
-    this.ux.print(projectUpdatedLine(this.services.outputIsTTY === true));
-  }
-
-  private async completeUpdate(
-    org: string,
-    project: string,
-    supplied: ProjectUpdate,
-  ): Promise<ProjectUpdate | undefined> {
-    if (PROJECT_UPDATABLE_FIELDS.some((field) => supplied[field] !== undefined)) {
-      return supplied;
-    }
-
-    if (!this.services.isTTY) {
-      throw new UsageError('Pass at least one of --name, --description; none was supplied.');
-    }
-
-    const current = await this.services.api.projects.get({ org, project });
-    const prompted = await promptForProjectUpdate(this.services.ux, current);
-
-    if (!PROJECT_UPDATABLE_FIELDS.some((field) => prompted[field] !== undefined)) {
-      this.ux.print(projectNotUpdatedLine(this.services.outputIsTTY === true));
-      return undefined;
-    }
-
-    return prompted;
+    await new ProjectUpdater(this.services).update({ org, project, name, description });
   }
 }
