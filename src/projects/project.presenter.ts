@@ -20,8 +20,6 @@ export const PROJECT_DESCRIPTION_COLUMN = PROJECT_DETAIL_COLUMNS.length - 1;
 
 export const PROJECT_DELETE_QUESTION = 'Are you sure you want to delete this project?';
 
-export const PREPARING_ARCHIVE = 'Preparing zip file...';
-
 export const PROJECT_DELETED = '\u2714 Project deleted successfully.';
 
 export function projectDeletedLine(outputIsTTY: boolean): string {

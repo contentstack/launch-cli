@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { UsageError } from '../core/errors';
-import { UPLOAD_EXCLUDED_NAMES, archiveDirectory, isExcludedName } from './project.archive';
+import { UPLOAD_EXCLUDED_NAMES, archiveDirectory, isExcludedName } from './upload.archive';
 
 let root: string;
 

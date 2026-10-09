@@ -1,7 +1,7 @@
 import nock from 'nock';
 
-import { UploadFailedError } from '../../src/projects/project.errors';
-import { UPLOAD_CHUNK_BYTES, UPLOAD_IDLE_TIMEOUT_MS, uploadArchive } from '../../src/projects/project.upload';
+import { UploadFailedError } from '../../src/uploads/upload.errors';
+import { UPLOAD_CHUNK_BYTES, UPLOAD_IDLE_TIMEOUT_MS, uploadArchive } from '../../src/uploads/upload.transfer';
 
 const HOST = 'https://uploads.integration.test';
 const ARCHIVE = Buffer.from('archive-bytes');

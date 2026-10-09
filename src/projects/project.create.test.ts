@@ -17,22 +17,22 @@ import type { ApiSurface } from '../resources';
 import type { CreateRequest } from './types';
 import { ProjectCreator } from './project.create';
 import { SITE_OPEN_DELAY_MS } from '../deployments/deployment.follower';
-import { UPLOAD_PROGRESS_LABEL } from './project.source';
+import { UploadFailedError } from '../uploads/upload.errors';
+import { UPLOAD_PROGRESS_LABEL } from '../uploads/upload.presenter';
 import {
   DuplicateProjectNameError,
   PROJECT_ERROR_MESSAGES,
   ProjectCreateFailedError,
-  UploadFailedError,
 } from './project.errors';
 
-jest.mock('./project.upload', () => ({
-  ...jest.requireActual('./project.upload'),
+jest.mock('../uploads/upload.transfer', () => ({
+  ...jest.requireActual('../uploads/upload.transfer'),
   uploadArchive: jest.fn(async () => undefined),
 }));
 
-import * as archiveModule from './project.archive';
-import type { UploadOptions } from './project.upload';
-import { MAX_UPLOAD_BYTES, uploadArchive } from './project.upload';
+import * as archiveModule from '../uploads/upload.archive';
+import type { UploadOptions } from '../uploads/upload.transfer';
+import { MAX_UPLOAD_BYTES, uploadArchive } from '../uploads/upload.transfer';
 
 // Random, so it zips past the 1 KB Launch's storage providers accept as the smallest upload.
 const SITE_PAGE = `<h1>site</h1><!-- ${randomBytes(2048).toString('hex')} -->`;
@@ -159,6 +159,17 @@ function harness(scenario: Scenario = {}) {
   };
 
   const api = {
+    uploads: {
+      signedUploadUrl: async (params: unknown) => {
+        calls.signedUploadUrl.push(params);
+
+        if (scenario.signedUrlFails) {
+          throw scenario.signedUrlFails;
+        }
+
+        return SIGNED_UPLOAD;
+      },
+    },
     projects: {
       create: async (params: unknown) => {
         created.push(params);
@@ -174,15 +185,6 @@ function harness(scenario: Scenario = {}) {
         }
 
         return scenario.createdProject ?? { uid: PROJECT_UID, name: 'My Site', projectType: 'GITPROVIDER' };
-      },
-      signedUploadUrl: async (params: unknown) => {
-        calls.signedUploadUrl.push(params);
-
-        if (scenario.signedUrlFails) {
-          throw scenario.signedUrlFails;
-        }
-
-        return SIGNED_UPLOAD;
       },
       gitFramework: async (params: unknown) => {
         gitCalls.push(params);

@@ -4,15 +4,6 @@ import { LaunchError } from '../core/errors';
 import type { ErrorMessages } from '../transport/errors';
 import { GIT_PROVIDER_ERROR_MESSAGES } from '../git/git.errors';
 
-export class UploadFailedError extends LaunchError {
-  readonly exitCode = EXIT_RUNTIME;
-
-  constructor(message: string) {
-    super(message);
-    this.name = 'UploadFailedError';
-  }
-}
-
 /**
  * A taken name, reported the way V1 did: its lines are already printed when this is thrown, so the
  * command exits 1 without printing the message a second time.
@@ -56,6 +47,4 @@ export const PROJECT_ERROR_MESSAGES: ErrorMessages = {
   'launch.PROJECT.NAME.TOO_LONG': 'Project name must be 200 characters or fewer.',
   'launch.PROJECT.UPLOADED_FILE_NOT_FOUND_ERROR':
     'Your uploaded project files could not be found; the upload may have expired. Run the command again.',
-  'launch.PROJECT.FILE_UPLOAD_SIGNED_URL.GET_FAILED':
-    'The Launch API could not prepare an upload for your project files.',
 };

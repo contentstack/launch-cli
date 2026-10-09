@@ -9,7 +9,7 @@ import { UsageError } from '../core/errors';
 import { isAbsent } from '../core/values';
 import { PROXY_ERROR_CODES } from '../transport/errors';
 import { proxyFailureMessage, proxyRouteFor } from '../transport/proxy';
-import { UploadFailedError } from './project.errors';
+import { UploadFailedError } from './upload.errors';
 import type { SignedUploadFormField, SignedUploadHeader, SignedUploadUrl } from './types';
 
 export const UPLOAD_FILE_NAME = 'project.zip';

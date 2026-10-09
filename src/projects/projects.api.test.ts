@@ -355,8 +355,6 @@ describe('PROJECT_ERROR_MESSAGES', () => {
       'launch.PROJECT.NAME.TOO_LONG': 'Project name must be 200 characters or fewer.',
       'launch.PROJECT.UPLOADED_FILE_NOT_FOUND_ERROR':
         'Your uploaded project files could not be found; the upload may have expired. Run the command again.',
-      'launch.PROJECT.FILE_UPLOAD_SIGNED_URL.GET_FAILED':
-        'The Launch API could not prepare an upload for your project files.',
     });
   });
 });
@@ -532,32 +530,6 @@ describe('ProjectsApi create and detection endpoints', () => {
     await expect(new ProjectsApi(client).create({ org: 'org1', input: CREATE_INPUT })).rejects.toThrow(
       LaunchApiError,
     );
-  });
-
-  it('asks for a signed upload url as an org-scoped GET', async () => {
-    const signed = {
-      uploadUrl: 'https://uploads.example.test/x',
-      expiresIn: 600,
-      uploadUid: 'upload-uid',
-      method: 'POST',
-      fields: [{ formFieldKey: 'bucket', formFieldValue: 'launch-uploads' }],
-    };
-    const { client, requests } = fakeRestClient(signed);
-
-    const result = await new ProjectsApi(client).signedUploadUrl({ org: 'org1' });
-
-    expect(result).toBe(signed);
-    expect(requests[0]).toEqual({ method: 'GET', path: '/projects/upload/signed_url', orgUid: 'org1' });
-  });
-
-  it('raises a malformed-response error when the signed url response is unusable', async () => {
-    for (const body of [undefined, {}, { uploadUrl: 'https://x' }, { uploadUid: 'u' }, { uploadUrl: 1, uploadUid: 'u' }]) {
-      const { client } = fakeRestClient(body);
-
-      await expect(new ProjectsApi(client).signedUploadUrl({ org: 'org1' })).rejects.toThrow(
-        'The Launch API returned an upload response without an upload URL and uid.',
-      );
-    }
   });
 
   it('detects a framework from a git repository and branch', async () => {

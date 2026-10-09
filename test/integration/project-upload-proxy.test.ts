@@ -5,9 +5,9 @@ import { connect } from 'node:net';
 
 import { randomBytes } from 'node:crypto';
 
-import { UploadFailedError } from '../../src/projects/project.errors';
-import { uploadArchive } from '../../src/projects/project.upload';
-import type { SignedUploadUrl } from '../../src/projects/types';
+import { UploadFailedError } from '../../src/uploads/upload.errors';
+import { uploadArchive } from '../../src/uploads/upload.transfer';
+import type { SignedUploadUrl } from '../../src/uploads/types';
 
 const PROXY_VARIABLES = ['HTTPS_PROXY', 'HTTP_PROXY', 'https_proxy', 'http_proxy', 'NO_PROXY', 'no_proxy'];
 const ARCHIVE = Buffer.from('archive-bytes');

@@ -1,7 +1,5 @@
 import { PICKER_PAGE_SIZE } from '../core/constants';
 import { UsageError } from '../core/errors';
-import type { Progress } from '../core/progress';
-import { silentProgress, terminalProgress } from '../core/progress';
 import { connectedAccountsUrl } from '../core/region';
 import type { ServiceContext } from '../core/service-context';
 import { asSentence, messageOf } from '../core/values';
@@ -23,14 +21,11 @@ import { detectGitHubRepository } from '../git/local-repository';
 import type { GitNamespacesPage, GitRepository } from '../git/types';
 import { GIT_PROVIDER_GITHUB } from '../git/types';
 import { LaunchApiError } from '../transport/errors';
-import { archiveDirectory } from './project.archive';
 import { needInput } from './project.inputs';
-import { PREPARING_ARCHIVE } from './project.presenter';
-import { refuseArchiveOutsideLimits, uploadArchive } from './project.upload';
+import { FolderUploader } from '../uploads/upload.folder';
 import type { EnvironmentSource } from '../environments/types';
-import type { CreateRequest, SignedUploadUrl } from './types';
+import type { CreateRequest } from './types';
 
-export const UPLOAD_PROGRESS_LABEL = 'Uploading project.zip';
 const GIT_NAMESPACE_PAGE_SIZE = 100;
 
 export interface SourceSelection extends EnvironmentSource {
@@ -144,26 +139,12 @@ export class ProjectSource {
   }
 
   async selectUploadSource(request: CreateRequest): Promise<SourceSelection> {
-    this.services.ux.print(PREPARING_ARCHIVE);
-    const archive = archiveDirectory(request.dataDir, [request.configPath]);
-    refuseArchiveOutsideLimits(archive.buffer.length);
+    const uploadUid = await new FolderUploader(this.services).upload(request.org, request.dataDir, [
+      request.configPath,
+    ]);
+    const detected = await this.services.api.projects.fileFramework({ org: request.org, uploadUid });
 
-    if (archive.skippedLinks.length > 0) {
-      this.services.ux.print(
-        `Skipping ${archive.skippedLinks.length} symbolic link(s), which are never uploaded: ` +
-          archive.skippedLinks.join(', '),
-      );
-    }
-
-    const signed = await this.services.api.projects.signedUploadUrl({ org: request.org });
-    await this.uploading(signed, archive.buffer);
-
-    const detected = await this.services.api.projects.fileFramework({
-      org: request.org,
-      uploadUid: signed.uploadUid,
-    });
-
-    return { detected, uploadUid: signed.uploadUid };
+    return { detected, uploadUid };
   }
 
   private async detectedRepository(
@@ -260,24 +241,5 @@ export class ProjectSource {
     }
 
     return new GitConnectionMissingError(GIT_PROVIDER_GITHUB, connectUrl);
-  }
-
-  private async uploading(signed: SignedUploadUrl, body: Buffer): Promise<void> {
-    const progress = this.progress();
-
-    try {
-      await uploadArchive(signed, body, {
-        onProgress: (sent, total) => {
-          progress.start(total);
-          progress.advance(sent);
-        },
-      });
-    } finally {
-      progress.stop();
-    }
-  }
-
-  private progress(): Progress {
-    return this.services.outputIsTTY === true ? terminalProgress(UPLOAD_PROGRESS_LABEL) : silentProgress;
   }
 }

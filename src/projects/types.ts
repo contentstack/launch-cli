@@ -64,25 +64,6 @@ export interface CreateProjectInput {
   fileUpload?: FileUploadInput;
 }
 
-export interface SignedUploadFormField {
-  formFieldKey?: string;
-  formFieldValue?: string;
-}
-
-export interface SignedUploadHeader {
-  key?: string;
-  value?: string;
-}
-
-export interface SignedUploadUrl {
-  uploadUrl: string;
-  uploadUid: string;
-  method?: string;
-  expiresIn?: number;
-  fields?: SignedUploadFormField[] | null;
-  headers?: SignedUploadHeader[] | null;
-}
-
 export interface ProjectResponse {
   project: Project;
 }

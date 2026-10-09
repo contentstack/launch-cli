@@ -9,6 +9,7 @@ import { DeploymentsApi } from './deployments/deployments.api';
 import { DeploymentLogsApi } from './deployments/deployment-logs.api';
 import { GitApi } from './git/git.api';
 import { OrganizationsApi } from './organizations/organizations.api';
+import { UploadsApi } from './uploads/uploads.api';
 import type { CmaSession } from './transport/cma-client';
 import type { RestApiClient } from './transport/rest-client';
 
@@ -41,6 +42,7 @@ export interface ApiSurface {
   deployments: DeploymentsApi;
   deploymentLogs: DeploymentLogsApi;
   git: GitApi;
+  uploads: UploadsApi;
 }
 
 export function buildApi(client: RestApiClient, cma: CmaSession, logsClient: RestApiClient): ApiSurface {
@@ -51,5 +53,6 @@ export function buildApi(client: RestApiClient, cma: CmaSession, logsClient: Res
     deployments: new DeploymentsApi(client),
     deploymentLogs: new DeploymentLogsApi(logsClient),
     git: new GitApi(client),
+    uploads: new UploadsApi(client),
   };
 }

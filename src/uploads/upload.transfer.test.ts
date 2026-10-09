@@ -6,7 +6,7 @@ import {
   UPLOAD_FILE_NAME,
   prepareUpload,
   refuseArchiveOutsideLimits,
-} from './project.upload';
+} from './upload.transfer';
 import type { SignedUploadFormField, SignedUploadHeader } from './types';
 
 function header(name: string, contents: string): SignedUploadHeader {

@@ -10,12 +10,13 @@ const RESOURCES = readdirSync(SRC, { withFileTypes: true })
   .map((entry) => entry.name);
 
 const RESOURCE_EDGES: Record<string, string[]> = {
-  projects: ['environments', 'deployments', 'git'],
+  projects: ['environments', 'deployments', 'git', 'uploads'],
   functions: [],
   environments: [],
   deployments: [],
   git: [],
   organizations: [],
+  uploads: [],
 };
 
 function sourceFilesIn(layer: string): string[] {
@@ -127,12 +128,13 @@ describe('layering between resources', () => {
   });
 
   it('records the edges the projects resource really uses, and no others', () => {
-    expect(RESOURCE_EDGES.projects).toEqual(['environments', 'deployments', 'git']);
+    expect(RESOURCE_EDGES.projects).toEqual(['environments', 'deployments', 'git', 'uploads']);
 
     expect([...new Set(sourceFilesIn('projects').flatMap((path) => crossResourceEdges(path)))].sort()).toEqual([
       'deployments',
       'environments',
       'git',
+      'uploads',
     ]);
   });
 

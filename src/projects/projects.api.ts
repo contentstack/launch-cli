@@ -12,16 +12,11 @@ import type {
   ProjectResponse,
   ProjectUpdate,
   ProjectsPage,
-  SignedUploadUrl,
 } from './types';
 
 export * from './types';
 
 export const PROJECT_SCAN_PAGE_SIZE = 100;
-
-function isSignedUploadUrl(value: unknown): value is SignedUploadUrl {
-  return isRecord(value) && typeof value.uploadUrl === 'string' && typeof value.uploadUid === 'string';
-}
 
 export interface ListProjectsParams {
   org: string;
@@ -47,10 +42,6 @@ export interface DeleteProjectParams {
 export interface CreateProjectParams {
   org: string;
   input: CreateProjectInput;
-}
-
-export interface SignedUploadUrlParams {
-  org: string;
 }
 
 export interface GitFrameworkParams {
@@ -179,20 +170,6 @@ export class ProjectsApi {
     }
 
     return project;
-  }
-
-  async signedUploadUrl(params: SignedUploadUrlParams): Promise<SignedUploadUrl> {
-    const response = await this.request<SignedUploadUrl>({
-      method: 'GET',
-      path: '/projects/upload/signed_url',
-      orgUid: params.org,
-    });
-
-    if (!isSignedUploadUrl(response)) {
-      throw malformed('The Launch API returned an upload response without an upload URL and uid.');
-    }
-
-    return response;
   }
 
   gitFramework(params: GitFrameworkParams): Promise<DetectedFramework> {

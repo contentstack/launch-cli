@@ -143,6 +143,8 @@ src/
                 wait/stream loop and LogTail that projects:create, deployments:create
                 and logs:get all drive, and the DeploymentFollower that watches one
                 deployment and announces its live URL
+  uploads/      zipping a folder, the signed upload URL, and the transfer behind every
+                FileUpload source (FolderUploader)
   git/          the internal git-namespace / repository / branch lookups
   organizations/ the --org flag, its organization picker, and the lookup behind it,
                 which reads the Contentstack Management API rather than Launch
@@ -593,7 +595,8 @@ as the `loadDataURL` rule below. Have `sleep` advance the same counter `now` rea
 the domain service. It runs the steps in order and owns what is about the project itself - the
 linked-folder refusal, the type, the name and its rename retries, the request, `.cs-launch.json` -
 and hands the rest to three collaborators: `ProjectSource` in `project.source.ts` (the GitHub
-connection, repository and branch, or the zip and its upload), `EnvironmentBuilder` in
+connection, repository and branch, or the zip and its upload through `FolderUploader` in
+`src/uploads/`), `EnvironmentBuilder` in
 `src/environments/environment.builder.ts` (framework, commands, output directory, response mode, Contentstack
 Authentication) and `FirstDeploymentFollower` in `project.follow.ts` (waiting for the first
 environment and deployment to appear and wording a failure with the project's rerun flags; the
@@ -701,7 +704,7 @@ invocation was wrong. A wait that runs out is worded differently: the deployment
 the message says not to start another one and names `deployments:get` and `logs:get` instead of
 `deployments:create`.
 
-**The FileUpload archive.** `src/projects/project.archive.ts` owns the exclusion list
+**The FileUpload archive.** `src/uploads/upload.archive.ts` owns the exclusion list
 (`node_modules`, `.git`, `.env`, `.env.local`, `.next`, `logs`, `.vscode`, `.cs-launch.json`) and
 applies it at **every** depth, except `logs`, which is left out only at the root (the CLI's own log
 folder, as in V1) because a nested `logs/` is source such as a Next.js route. A `.zip` file at the root
@@ -711,7 +714,7 @@ that file lives inside the data dir, compared after path resolution, so a config
 name is not deployed with the site. It skips symbolic links rather than following one
 into a loop or out of the folder, and create prints which ones it skipped. A path that is not a directory, and a directory that is empty once the exclusions apply,
 are both `UsageError` naming `--data-dir` - uploading an empty or wrong archive silently is worse
-than refusing. `src/projects/project.upload.ts` splits into `prepareUpload` (pure: raw body, or
+than refusing. `src/uploads/upload.transfer.ts` splits into `prepareUpload` (pure: raw body, or
 multipart when the signed URL carries form fields) and `uploadArchive` (the socket). A blank
 `Content-Type` supplied by the presign is absent, as blank values are everywhere else, so the zip
 content type is sent; anything outside 200-299, a 3xx redirect included, is an `UploadFailedError`,

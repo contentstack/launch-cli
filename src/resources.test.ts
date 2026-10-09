@@ -3,6 +3,7 @@ import { DEPENDENCIES, buildApi, catalog, resolutionTable } from './resources';
 import { DeploymentsApi } from './deployments/deployments.api';
 import { DeploymentLogsApi } from './deployments/deployment-logs.api';
 import { EnvironmentsApi } from './environments/environments.api';
+import { UploadsApi } from './uploads/uploads.api';
 import { GitApi } from './git/git.api';
 import { ProjectsApi } from './projects/projects.api';
 import type { UxLike } from './core/prompt';
@@ -170,6 +171,7 @@ describe('the api surface', () => {
       'git',
       'organizations',
       'projects',
+      'uploads',
     ]);
     expect(api.deploymentLogs).toBeInstanceOf(DeploymentLogsApi);
     expect(api.organizations).toBeInstanceOf(OrganizationsApi);
@@ -177,6 +179,7 @@ describe('the api surface', () => {
     expect(api.environments).toBeInstanceOf(EnvironmentsApi);
     expect(api.deployments).toBeInstanceOf(DeploymentsApi);
     expect(api.git).toBeInstanceOf(GitApi);
+    expect(api.uploads).toBeInstanceOf(UploadsApi);
   });
 
   it('sends deployment log reads through the logs client and nothing else through it', async () => {
