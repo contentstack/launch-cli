@@ -136,8 +136,9 @@ src/
                 and LaunchApiError / LaunchNetworkError - no CLI wording lives here
   projects/     one resource: repository, value object, domain service, presenter,
                 error wording, prompt adapter, and the flags it contributes
-  environments/ the environment DTOs, the framework preset table, and the environment
-                flags every create command contributes
+  environments/ the environment DTOs, the framework preset table, the environment
+                flags every create command contributes, and the EnvironmentBuilder that
+                turns them into a CreateEnvironmentInput
   deployments/  the deployment repository, the status classification, the
                 wait/stream loop and LogTail that projects:create, deployments:create
                 and logs:get all drive, and the DeploymentFollower that watches one
@@ -593,7 +594,7 @@ the domain service. It runs the steps in order and owns what is about the projec
 linked-folder refusal, the type, the name and its rename retries, the request, `.cs-launch.json` -
 and hands the rest to three collaborators: `ProjectSource` in `project.source.ts` (the GitHub
 connection, repository and branch, or the zip and its upload), `EnvironmentBuilder` in
-`project.environment.ts` (framework, commands, output directory, response mode, Contentstack
+`src/environments/environment.builder.ts` (framework, commands, output directory, response mode, Contentstack
 Authentication) and `FirstDeploymentFollower` in `project.follow.ts` (waiting for the first
 environment and deployment to appear and wording a failure with the project's rerun flags; the
 watch, its log, the site URL and opening it are `DeploymentFollower` in
@@ -623,7 +624,7 @@ exported as `serverCommandFrameworkGate` and declared in `static rules` with `gi
 (`--branch`, `--namespace`, `--repo` only with `--type GitHub`). A rule judges its gate only when the
 user supplied the gate: with `--framework` on argv, a bad pairing costs exit 2 and nothing on the
 wire. When the framework is prompted or detected later, `EnvironmentBuilder` in
-`src/projects/project.environment.ts` applies the same check
+`src/environments/environment.builder.ts` applies the same check
 (`requireValueOf`) once it knows the framework, still before `POST /projects`.
 
 **Without a terminal, create uses what it can infer.** The framework is the detected one (exit 2 naming

@@ -8,6 +8,8 @@ import { FRAMEWORK_CHOICES, FRAMEWORK_PRESET_BY_LABEL, SERVER_COMMAND_FRAMEWORKS
 
 export const ENVIRONMENT_NAME_MAX_LENGTH = 200;
 
+export const CREATE_PROMPT_REMEDIES = { config: false, prompt: true };
+
 export const RESPONSE_MODES = ['buffered', 'streaming'] as const;
 
 export type ResponseMode = (typeof RESPONSE_MODES)[number];

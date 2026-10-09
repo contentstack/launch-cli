@@ -2,19 +2,16 @@ import { MissingInputError } from '../core/errors';
 import { askOption, askOptionalText, askText } from '../core/prompt';
 import { requireValueOf } from '../core/rules';
 import type { ServiceContext } from '../core/service-context';
-import type { ResponseMode, ToggleValue } from '../environments/environment.inputs';
-import { RESPONSE_MODES, TOGGLE_VALUES, frameworkPresetOf } from '../environments/environment.inputs';
-import type { FrameworkPreset } from '../environments/frameworks';
+import type { ResponseMode, ToggleValue } from './environment.inputs';
+import { CREATE_PROMPT_REMEDIES, RESPONSE_MODES, TOGGLE_VALUES, frameworkPresetOf } from './environment.inputs';
+import type { FrameworkPreset } from './frameworks';
 import {
   FRAMEWORK_CHOICES,
   FRAMEWORK_PRESET_BY_LABEL,
   OUTPUT_DIRECTORY_BY_FRAMEWORK,
   SERVER_COMMAND_FRAMEWORKS,
-} from '../environments/frameworks';
-import type { CreateEnvironmentInput } from '../environments/types';
-import { CREATE_PROMPT_REMEDIES } from './project.inputs';
-import type { SourceSelection } from './project.source';
-import type { CreateRequest, DetectedFramework } from './types';
+} from './frameworks';
+import type { CreateEnvironmentInput, DetectedFramework, EnvironmentRequest, EnvironmentSource } from './types';
 
 function emptyEnvironmentVariables(): [] {
   return [];
@@ -34,9 +31,9 @@ export class EnvironmentBuilder {
   constructor(private readonly services: ServiceContext) {}
 
   async build(
-    request: CreateRequest,
+    request: EnvironmentRequest,
     envName: string,
-    source: SourceSelection,
+    source: EnvironmentSource,
     autoDeploy: ToggleValue | undefined,
   ): Promise<CreateEnvironmentInput> {
     const framework = await this.selectFramework(request, source.detected);
@@ -66,7 +63,7 @@ export class EnvironmentBuilder {
     return environment;
   }
 
-  private async selectFramework(request: CreateRequest, detected: DetectedFramework): Promise<FrameworkPreset> {
+  private async selectFramework(request: EnvironmentRequest, detected: DetectedFramework): Promise<FrameworkPreset> {
     if (request.framework !== undefined) {
       return request.framework;
     }
@@ -95,7 +92,7 @@ export class EnvironmentBuilder {
   }
 
   private async serverCommand(
-    request: CreateRequest,
+    request: EnvironmentRequest,
     framework: FrameworkPreset,
     detected: DetectedFramework,
   ): Promise<string | undefined> {
@@ -116,7 +113,7 @@ export class EnvironmentBuilder {
     return this.detectedValue(detected.serverCommand, 'server command', '--server-cmd');
   }
 
-  private async buildCommand(request: CreateRequest, detected: DetectedFramework): Promise<string | undefined> {
+  private async buildCommand(request: EnvironmentRequest, detected: DetectedFramework): Promise<string | undefined> {
     if (request.buildCmd !== undefined) {
       return request.buildCmd;
     }
@@ -129,7 +126,7 @@ export class EnvironmentBuilder {
   }
 
   private async outputDirectory(
-    request: CreateRequest,
+    request: EnvironmentRequest,
     framework: FrameworkPreset,
     detected: DetectedFramework,
   ): Promise<string> {
@@ -166,7 +163,7 @@ export class EnvironmentBuilder {
     return value;
   }
 
-  private async streaming(request: CreateRequest): Promise<boolean> {
+  private async streaming(request: EnvironmentRequest): Promise<boolean> {
     if (request.resMode !== undefined) {
       return request.resMode === ('streaming' satisfies ResponseMode);
     }
@@ -187,7 +184,7 @@ export class EnvironmentBuilder {
     return false;
   }
 
-  private async contentstackAuthentication(request: CreateRequest): Promise<string | undefined> {
+  private async contentstackAuthentication(request: EnvironmentRequest): Promise<string | undefined> {
     if (request.csAuth !== undefined) {
       return request.csAuth;
     }

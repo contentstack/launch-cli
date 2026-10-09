@@ -3,10 +3,10 @@ import { UsageError } from '../core/errors';
 import { isRecord } from '../core/values';
 import { assertPage, hasUid, malformed, unwrap } from '../transport/envelope';
 import type { RestApiClient, RestRequest } from '../transport/rest-client';
+import type { DetectedFramework } from '../environments/types';
 import { PROJECT_ERROR_MESSAGES } from './project.errors';
 import type {
   CreateProjectInput,
-  DetectedFramework,
   IdentifiedProject,
   Project,
   ProjectResponse,

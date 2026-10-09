@@ -27,17 +27,15 @@ import { archiveDirectory } from './project.archive';
 import { needInput } from './project.inputs';
 import { PREPARING_ARCHIVE } from './project.presenter';
 import { refuseArchiveOutsideLimits, uploadArchive } from './project.upload';
-import type { CreateRequest, DetectedFramework, SignedUploadUrl } from './types';
+import type { EnvironmentSource } from '../environments/types';
+import type { CreateRequest, SignedUploadUrl } from './types';
 
 export const UPLOAD_PROGRESS_LABEL = 'Uploading project.zip';
 const GIT_NAMESPACE_PAGE_SIZE = 100;
 
-export interface SourceSelection {
-  detected: DetectedFramework;
+export interface SourceSelection extends EnvironmentSource {
   repository?: GitRepository;
   namespace?: string;
-  branch?: string;
-  uploadUid?: string;
 }
 
 /**

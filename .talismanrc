@@ -111,7 +111,10 @@ fileignoreconfig:
 - filename: src/environments/environment.inputs.ts
   ignore_detectors:
     - filename
-- filename: src/projects/project.environment.ts
+- filename: src/environments/environment.builder.ts
+  ignore_detectors:
+    - filename
+- filename: src/environments/environment.builder.test.ts
   ignore_detectors:
     - filename
 - filename: src/environments/environment.inputs.test.ts

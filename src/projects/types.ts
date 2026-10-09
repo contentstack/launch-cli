@@ -1,7 +1,6 @@
 import type { Pagination } from '../core/render';
-import type { ResponseMode, ToggleValue } from '../environments/environment.inputs';
-import type { FrameworkPreset } from '../environments/frameworks';
-import type { CreateEnvironmentInput } from '../environments/types';
+import type { ToggleValue } from '../environments/environment.inputs';
+import type { CreateEnvironmentInput, EnvironmentRequest } from '../environments/types';
 import type { ProjectTypeChoice } from './project.inputs';
 
 export type { Pagination };
@@ -65,13 +64,6 @@ export interface CreateProjectInput {
   fileUpload?: FileUploadInput;
 }
 
-export interface DetectedFramework {
-  framework?: string;
-  outputDirectory?: string;
-  serverCommand?: string;
-  buildCommand?: string;
-}
-
 export interface SignedUploadFormField {
   formFieldKey?: string;
   formFieldValue?: string;
@@ -100,7 +92,7 @@ export interface ProjectsPage {
   projects: Project[];
 }
 
-export interface CreateRequest {
+export interface CreateRequest extends EnvironmentRequest {
   org: string;
   dataDir: string;
   configPath: string;
@@ -109,11 +101,5 @@ export interface CreateRequest {
   description?: string;
   envName?: string;
   branch?: string;
-  framework?: FrameworkPreset;
-  buildCmd?: string;
-  outputDir?: string;
-  serverCmd?: string;
-  resMode?: ResponseMode;
   autoDeploy?: ToggleValue;
-  csAuth?: ToggleValue;
 }
