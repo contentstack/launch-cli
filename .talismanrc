@@ -22,7 +22,7 @@ fileignoreconfig:
 - filename: src/core/inputs.test.ts
   checksum: c5b4be7a0aa2f0878153f062e1500b2bdbd53bdd2d84bb7c13c731db3c3699c4
 - filename: .github/workflows/secrets-scan.yml
-  checksum: aa468892940460dd050b7bc2ec997d589fe88c3557779dabdb1583645e45b79b
+  checksum: 84da8e208ace349bd6eb2b3eef1d6aa17a85cda0feaa127b0282de52814e37bb
 - filename: .husky/secrets-scan.sh
   checksum: 5a44edca8d209ca4b7f6eefc4ce2caab838679f8916ef6136ad68584c0705cb6
 - filename: package-lock.json
