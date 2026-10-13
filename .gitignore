@@ -17,3 +17,10 @@ dependabot.yml
 .editorconfig
 /functions
 coverage/
+.compiled-loader-*/
+
+# Holds a registry auth token. Never commit it.
+.npmrc
+
+# Written by functions:serve into the project directory, as V1 did.
+logs/

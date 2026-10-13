@@ -1,0 +1,1037 @@
+import { randomBytes } from 'node:crypto';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, join } from 'node:path';
+
+import { authHandler, configHandler } from '@contentstack/cli-utilities';
+import type { Interfaces } from '@oclif/core';
+import { runCommand } from '@oclif/test';
+import nock from 'nock';
+
+import open from 'open';
+
+import * as watcher from '../../src/deployments/deployment.watcher';
+import { CTRL_C, answerPrompts, onTerminal } from '../support/terminal';
+import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
+
+// Random, so it zips past the 1 KB Launch's storage providers accept as the smallest upload.
+const SITE_PAGE = `<h1>site</h1><!-- ${randomBytes(2048).toString('hex')} -->`;
+
+jest.mock('open', () => jest.fn().mockResolvedValue(undefined));
+
+// Waiting is faked like the browser is: the real timing runs, but a wait returns at once and is recorded,
+// so the six seconds create waits before opening the site neither slows the suite nor goes unasserted.
+const realWatchTiming = watcher.defaultWatchTiming;
+let slept: number[] = [];
+
+const LAUNCH_HUB_URL = 'https://launch-api.integration.test';
+const UPLOAD_HOST = 'https://uploads.integration.test';
+const ORG_UID = `blt${randomBytes(8).toString('hex')}`;
+const PROJECT_UID = randomBytes(12).toString('hex');
+const ENVIRONMENT_UID = randomBytes(12).toString('hex');
+const DEPLOYMENT_UID = randomBytes(12).toString('hex');
+
+const CONFIG: Record<string, unknown> = {
+  authorisationType: 'BASIC',
+  authtoken: 'test-authtoken',
+  email: 'cli-user@example.test',
+  region: {
+    name: 'integration',
+    cma: 'https://cma.integration.test',
+    cda: 'https://cda.integration.test',
+    uiHost: 'https://app.integration.test',
+    launchHubUrl: LAUNCH_HUB_URL,
+  },
+};
+
+const CREATED_PROJECT = { uid: PROJECT_UID, name: 'My Site', projectType: 'GITPROVIDER' };
+
+const S3_FORM_FIELD_KEYS = [
+  'bucket',
+  'X-Amz-Algorithm',
+  'X-Amz-Credential',
+  'X-Amz-Date',
+  'X-Amz-Security-Token',
+  'key',
+  'Policy',
+  'X-Amz-Signature',
+];
+
+function awsSignedUpload() {
+  return {
+    uploadUrl: `${UPLOAD_HOST}/bucket`,
+    expiresIn: 600,
+    uploadUid: 'upload-uid',
+    method: 'POST',
+    fields: S3_FORM_FIELD_KEYS.map((formFieldKey) => ({
+      formFieldKey,
+      formFieldValue: randomBytes(6).toString('hex'),
+    })),
+  };
+}
+
+function azureSignedUpload() {
+  return {
+    uploadUrl: `${UPLOAD_HOST}/bucket`,
+    expiresIn: Date.now() + 600_000,
+    uploadUid: 'upload-uid',
+    method: 'PUT',
+    headers: [
+      { key: 'x-ms-blob-type', value: 'BlockBlob' },
+      { key: 'Content-Type', value: 'application/zip' },
+    ],
+  };
+}
+
+function asSent(body: unknown): string {
+  const text = String(body);
+
+  return /^[0-9a-f]+$/.test(text) ? Buffer.from(text, 'hex').toString('binary') : text;
+}
+
+function carriesEveryFormField(signed: ReturnType<typeof awsSignedUpload>, body: unknown): boolean {
+  const sent = asSent(body);
+
+  return (
+    signed.fields.every(
+      ({ formFieldKey, formFieldValue }) =>
+        sent.includes(`name="${formFieldKey}"\r\n\r\n${formFieldValue}\r\n`),
+    ) && sent.includes('name="file"; filename="project.zip"')
+  );
+}
+
+let config: Interfaces.Config;
+let onWire: string[];
+let dataDir: string;
+
+function hub(): nock.Scope {
+  return nock(LAUNCH_HUB_URL).matchHeader('x-organization-uid', ORG_UID);
+}
+
+function recordWire(): void {
+  onWire = [];
+  nock.emitter.on('no match', (request: { method?: string; path?: string }) => {
+    onWire.push(`${request.method ?? 'UNKNOWN'} ${request.path ?? ''}`);
+  });
+}
+
+function gitFlags(): string[] {
+  return [
+    'launch:projects:create',
+    '--org',
+    ORG_UID,
+    '--type',
+    'GitHub',
+    '--name',
+    '"My Site"',
+    '--env-name',
+    'Default',
+    '--branch',
+    'main',
+    '--framework',
+    'NextJs',
+    '--build-cmd',
+    '"npm run build"',
+    '--output-dir',
+    '.next',
+    '--res-mode',
+    'buffered',
+    '--cs-auth',
+    'enable',
+    '--data-dir',
+    dataDir,
+  ];
+}
+
+const MY_REPO = {
+  id: '24567',
+  name: 'my-repo',
+  fullName: 'my-org/my-repo',
+  url: 'https://github.com/my-org/my-repo',
+  defaultBranch: 'main',
+  updatedAt: '2026-06-20T10:00:00.000Z',
+  isPrivate: false,
+};
+
+function stubConnection(namespaces: unknown[] = [{ name: 'my-org', type: 'User', provider: 'GitHub' }]): nock.Scope {
+  return hub()
+    .get('/manage/git-namespaces')
+    .query({ limit: 100, skip: 0 })
+    .reply(200, { pagination: { count: namespaces.length, limit: 100, skip: null }, namespaces });
+}
+
+function stubGitLookups(): void {
+  stubConnection();
+  hub()
+    .get('/manage/git-repositories')
+    .query({ provider: 'GitHub', namespace: 'my-org', search: 'my-repo', limit: 100, skip: 0 })
+    .reply(200, { pagination: { count: 1, limit: 100, skip: null }, repositories: [MY_REPO] });
+
+  hub()
+    .get('/manage/projects/framework')
+    .query({ provider: 'GitHub', repoName: 'my-org/my-repo', branchName: 'main', namespace: 'my-org' })
+    .reply(200, { framework: 'NEXTJS', buildCommand: 'npm run build', outputDirectory: '.next' });
+}
+
+function stubFollowUp(status: string, deploymentLogs: unknown[] = []): nock.Scope {
+  hub()
+    .get(`/manage/projects/${PROJECT_UID}/environments`)
+    .query({ limit: 1, skip: 0 })
+    .reply(200, {
+      pagination: { count: 1, limit: 1, skip: null },
+      environments: [{ uid: ENVIRONMENT_UID, name: 'Default', domains: [{ url: 'my-site.example.test' }] }],
+    });
+
+  hub()
+    .get(`/manage/projects/${PROJECT_UID}/environments/${ENVIRONMENT_UID}/deployments`)
+    .query({ limit: 1, skip: 0 })
+    .reply(200, {
+      pagination: { count: 1, limit: 1, skip: null },
+      deployments: [{ uid: DEPLOYMENT_UID, deploymentNumber: 1, status: 'QUEUED' }],
+    });
+
+  hub()
+    .get(`/manage/projects/${PROJECT_UID}/environments/${ENVIRONMENT_UID}/deployments/${DEPLOYMENT_UID}`)
+    .query({})
+    .reply(200, {
+      deployment: { uid: DEPLOYMENT_UID, deploymentNumber: 1, status, deploymentUrl: 'my-site.example.test' },
+    });
+
+  return hub()
+    .get(`/logs/projects/${PROJECT_UID}/environments/${ENVIRONMENT_UID}/deployments/${DEPLOYMENT_UID}/logs/deployment-logs`)
+    .matchHeader('x-project-uid', PROJECT_UID)
+    .query({ timestamp: '1970-01-01T00:00:00.000Z' })
+    .reply(200, { deploymentLogs });
+}
+
+function withoutFlags(args: string[], ...names: string[]): string[] {
+  const kept: string[] = [];
+
+  for (let index = 0; index < args.length; index += 1) {
+    if (names.includes(args[index])) {
+      index += 1;
+      continue;
+    }
+
+    kept.push(args[index]);
+  }
+
+  return kept;
+}
+
+function cloneOf(repoName: string): void {
+  mkdirSync(join(dataDir, '.git'), { recursive: true });
+  writeFileSync(join(dataDir, '.git', 'HEAD'), 'ref: refs/heads/main\n');
+  writeFileSync(join(dataDir, '.git', 'config'), `[remote "origin"]\n\turl = git@github.com:${repoName}.git\n`);
+}
+
+function stubRepositoryLookup(): void {
+  stubConnection();
+  hub()
+    .get('/manage/git-repositories')
+    .query({ provider: 'GitHub', namespace: 'my-org', search: 'my-repo', limit: 100, skip: 0 })
+    .reply(200, { pagination: { count: 1, limit: 100, skip: null }, repositories: [MY_REPO] });
+}
+
+function stubDetection(detected: Record<string, unknown>): void {
+  hub()
+    .get('/manage/projects/framework')
+    .query({ provider: 'GitHub', repoName: 'my-org/my-repo', branchName: 'main', namespace: 'my-org' })
+    .reply(200, detected);
+}
+
+function captureCreate(): { scope: nock.Scope; body: () => unknown } {
+  let sent: unknown;
+  const scope = hub()
+    .post('/manage/projects', (body: unknown) => {
+      sent = body;
+      return true;
+    })
+    .query({})
+    .reply(201, { project: CREATED_PROJECT });
+
+  return { scope, body: () => sent };
+}
+
+describe('integration: launch:projects:create on the wire', () => {
+  beforeAll(async () => {
+    config = await loadCliConfig();
+    nock.disableNetConnect();
+  });
+
+  beforeEach(() => {
+    process.exitCode = 0;
+    dataDir = mkdtempSync(join(tmpdir(), 'launch-create-wire-'));
+    cloneOf('my-org/my-repo');
+    writeFileSync(join(dataDir, 'index.html'), SITE_PAGE);
+    recordWire();
+    routeConsoleLogToStdout();
+    jest.spyOn(configHandler, 'get').mockImplementation((key: string) => CONFIG[key]);
+    jest.spyOn(authHandler, 'compareOAuthExpiry').mockResolvedValue(undefined);
+    slept = [];
+    jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => ({
+      ...realWatchTiming(),
+      sleep: async (ms: number) => {
+        slept.push(ms);
+      },
+    }));
+  });
+
+  afterEach(() => {
+    process.exitCode = 0;
+    rmSync(dataDir, { recursive: true, force: true });
+    nock.emitter.removeAllListeners('no match');
+    nock.cleanAll();
+  });
+
+  afterAll(() => {
+    nock.enableNetConnect();
+    nock.restore();
+  });
+
+  it('posts the create body to /manage/projects, waits for LIVE and exits 0 printing the site url', async () => {
+    let body: unknown;
+    stubGitLookups();
+    const create = hub()
+      .post('/manage/projects', (sent: unknown) => {
+        body = sent;
+        return true;
+      })
+      .query({})
+      .reply(201, { project: CREATED_PROJECT });
+    stubFollowUp('LIVE');
+
+    const { error, stdout } = await runCommand(gitFlags(), config);
+
+    expect(error).toBeUndefined();
+    expect(create.isDone()).toBe(true);
+    expect(body).toEqual({
+      name: 'My Site',
+      projectType: 'GITPROVIDER',
+      environment: {
+        name: 'Default',
+        gitBranch: 'main',
+        buildCommand: 'npm run build',
+        outputDirectory: '.next',
+        frameworkPreset: 'NEXTJS',
+        environmentVariables: [],
+        isStreamingEnabled: false,
+        isContentstackAuthenticationEnabled: true,
+      },
+      repository: {
+        repositoryName: 'my-org/my-repo',
+        username: 'my-org',
+        repositoryUrl: 'https://github.com/my-org/my-repo',
+        gitProviderMetadata: { gitProvider: 'GitHub' },
+      },
+    });
+    expect(stdout).toContain('info: GitHub connection identified!\n');
+    expect(stdout).toContain('info: New project created successfully\n');
+    expect(stdout).toContain('Deployment URL https://my-site.example.test\n');
+    expect(stdout).not.toContain('Deployment #1 is');
+    expect(open).toHaveBeenCalledWith('https://my-site.example.test');
+    expect(slept[slept.length - 1]).toBe(6000);
+    expect(stdout).not.toContain('\u001b');
+    expect(stdout).not.toContain(`uid   ${PROJECT_UID}`);
+    expect(stdout).not.toContain('test-authtoken');
+    expect(onWire).toEqual([]);
+  });
+
+  it('finds the clone from a monorepo app folder run without --data-dir, and says where it found it', async () => {
+    const app = join(dataDir, 'apps', 'web');
+    mkdirSync(app, { recursive: true });
+    jest.spyOn(process, 'cwd').mockReturnValue(app);
+    const { scope, body } = captureCreate();
+    stubGitLookups();
+    stubFollowUp('LIVE');
+
+    const { error, stdout } = await runCommand(withoutFlags(gitFlags(), '--data-dir'), config);
+
+    expect(error).toBeUndefined();
+    expect(scope.isDone()).toBe(true);
+    expect(body()).toMatchObject({ repository: { repositoryName: 'my-org/my-repo', username: 'my-org' } });
+    expect(stdout).toContain(`Using the GitHub repository my-org/my-repo from ${dataDir}.\n`);
+  });
+
+  it('streams the deployment logs from the logs service before reporting the terminal status', async () => {
+    stubGitLookups();
+    hub().post('/manage/projects').query({}).reply(201, { project: CREATED_PROJECT });
+    const logs = stubFollowUp('LIVE', [
+      { deploymentUid: DEPLOYMENT_UID, message: 'Installing dependencies...', timestamp: '2026-09-25T10:00:00.123Z' },
+      { deploymentUid: DEPLOYMENT_UID, message: 'Deployed successfully', timestamp: '2026-09-25T10:00:09.000Z' },
+    ]);
+
+    const { error, stdout } = await runCommand(gitFlags(), config);
+
+    expect(error).toBeUndefined();
+    expect(logs.isDone()).toBe(true);
+    const lines = stdout.split('\n');
+    const first = lines.indexOf('2026-09-25 10:00:00.123:  Installing dependencies...');
+    expect(first).toBeGreaterThan(-1);
+    expect(lines[first + 1]).toBe('2026-09-25 10:00:09.000:  Deployed successfully');
+    expect(lines[first + 2]).toBe('Deployment URL https://my-site.example.test');
+    expect(stdout).not.toContain('Could not read the deployment logs');
+    expect(onWire).toEqual([]);
+  });
+
+  it('exits 1 on a failed deployment, saying the project survived and naming both follow-up commands', async () => {
+    stubGitLookups();
+    hub().post('/manage/projects').query({}).reply(201, { project: CREATED_PROJECT });
+    stubFollowUp('FAILED');
+
+    const { error } = await runCommand(gitFlags(), config);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.message).toContain('its last status was FAILED');
+    expect(error?.message).toContain(`The project "My Site" (${PROJECT_UID})`);
+    expect(error?.message).toContain('have not been rolled back');
+    expect(error?.message).toContain(
+      `Run csdx launch:deployments:create --org ${ORG_UID} --project ${PROJECT_UID} --env ${ENVIRONMENT_UID}`,
+    );
+    expect(error?.message).toContain(`csdx launch:logs:get --org ${ORG_UID} --project ${PROJECT_UID}`);
+    expect(error?.message).toContain(`--deployment ${DEPLOYMENT_UID}`);
+    expect(onWire).toEqual([]);
+  });
+
+  it('refuses --server-cmd on an unsupported framework with exit 2 before any request', async () => {
+    const create = hub().post('/manage/projects').query({}).reply(201, { project: CREATED_PROJECT });
+
+    const { error } = await runCommand([...gitFlags(), '--server-cmd', 'npm-start'], config);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe(
+      '--server-cmd is only supported when --framework is one of ANALOG, ANGULAR, NUXT, ASTRO, REMIX, OTHER; ' +
+        '--framework is NEXTJS.',
+    );
+    expect(create.isDone()).toBe(false);
+    expect(onWire).toEqual([]);
+  });
+
+  it('refuses a framework outside the documented set with exit 2 before any request', async () => {
+    const create = hub().post('/manage/projects').query({}).reply(201, { project: CREATED_PROJECT });
+    const args = gitFlags();
+    args[args.indexOf('NextJs')] = 'Svelte';
+
+    const { error } = await runCommand(args, config);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toContain('--framework must be one of');
+    expect(create.isDone()).toBe(false);
+  });
+
+  it('uploads the zipped data dir and creates a FILEUPLOAD project from the upload uid', async () => {
+    let body: unknown;
+    const signedUpload = awsSignedUpload();
+    const signed = hub().get('/manage/projects/upload/signed_url').query({}).reply(200, signedUpload);
+    const upload = nock(UPLOAD_HOST)
+      .matchHeader('content-type', /^multipart\/form-data; boundary=\S+$/)
+      .post('/bucket', (sent: unknown) => carriesEveryFormField(signedUpload, sent))
+      .reply(204);
+    const detect = hub()
+      .get('/manage/projects/file-framework')
+      .query({ uploadUid: 'upload-uid' })
+      .reply(200, { framework: 'OTHER' });
+    const create = hub()
+      .post('/manage/projects', (sent: unknown) => {
+        body = sent;
+        return true;
+      })
+      .query({})
+      .reply(201, { project: { ...CREATED_PROJECT, projectType: 'FILEUPLOAD' } });
+    stubFollowUp('DEPLOYED');
+
+    const { error, stdout } = await runCommand(
+      [
+        'launch:projects:create',
+        '--org',
+        ORG_UID,
+        '--type',
+        'FileUpload',
+        '--name',
+        '"My Site"',
+        '--env-name',
+        'Default',
+        '--framework',
+        'Other',
+        '--build-cmd',
+        '"npm run build"',
+        '--output-dir',
+        './',
+        '--res-mode',
+        'buffered',
+        '--data-dir',
+        dataDir,
+      ],
+      config,
+    );
+
+    expect(error).toBeUndefined();
+    expect([signed.isDone(), upload.isDone(), detect.isDone(), create.isDone()]).toEqual([true, true, true, true]);
+    expect(body).toMatchObject({
+      projectType: 'FILEUPLOAD',
+      fileUpload: { uploadUid: 'upload-uid' },
+      environment: { uploadUid: 'upload-uid', frameworkPreset: 'OTHER', environmentVariables: [] },
+    });
+    expect(body).not.toHaveProperty('repository');
+    expect(stdout).toContain('Deployment URL');
+    expect(onWire).toEqual([]);
+  });
+
+  it('exits 2 naming --data-dir when there is no local project directory to upload', async () => {
+    const signed = hub().get('/manage/projects/upload/signed_url').query({}).reply(200, awsSignedUpload());
+
+    const { error } = await runCommand(
+      [
+        'launch:projects:create',
+        '--org',
+        ORG_UID,
+        '--type',
+        'FileUpload',
+        '--name',
+        '"My Site"',
+        '--env-name',
+        'Default',
+        '--framework',
+        'Other',
+        '--build-cmd',
+        '"npm run build"',
+        '--output-dir',
+        './',
+        '--res-mode',
+        'buffered',
+        '--data-dir',
+        join(dataDir, 'no-such-folder'),
+      ],
+      config,
+    );
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toContain('--data-dir');
+    expect(signed.isDone()).toBe(false);
+    expect(onWire).toEqual([]);
+  });
+
+  it('asks on a terminal in the pinned order: type, organization, project name, environment name, then the build and Contentstack Authentication', async () => {
+    const prompts = answerPrompts({
+      'Choose a project type to proceed': 'FileUpload',
+      'Choose an organization': ORG_UID,
+      'Project name': 'My Site',
+      'Environment name': 'Default',
+      'Framework preset': 'Gatsby',
+      'Build command': 'npm run build',
+      'Output directory': './public',
+      'Response mode': 'buffered',
+      'Contentstack Authentication': 'enable',
+    });
+    const organizations = nock('https://cma.integration.test')
+      .get('/v3/organizations')
+      .query({ limit: '100', asc: 'name', include_count: 'true', skip: '0' })
+      .reply(200, { organizations: [{ uid: ORG_UID, name: 'Acme' }], count: 1 });
+    hub().get('/manage/projects/upload/signed_url').query({}).reply(200, azureSignedUpload());
+    nock(UPLOAD_HOST)
+      .matchHeader('x-ms-blob-type', 'BlockBlob')
+      .matchHeader('content-type', 'application/zip')
+      .put('/bucket')
+      .reply(201, '');
+    hub()
+      .get('/manage/projects/file-framework')
+      .query({ uploadUid: 'upload-uid' })
+      .reply(200, { framework: 'GATSBY' });
+    const create = hub()
+      .post('/manage/projects')
+      .query({})
+      .reply(201, { project: { ...CREATED_PROJECT, projectType: 'FILEUPLOAD' } });
+    stubFollowUp('DEPLOYED');
+
+    const { error } = await onTerminal(() => runCommand(['launch:projects:create', '--data-dir', dataDir], config));
+
+    expect(error).toBeUndefined();
+    expect(organizations.isDone()).toBe(true);
+    expect(create.isDone()).toBe(true);
+    expect(prompts.messages).toEqual([
+      'Choose a project type to proceed',
+      'Choose an organization',
+      'Project name',
+      'Environment name',
+      'Framework preset',
+      'Build command',
+      'Output directory',
+      'Response mode',
+      'Contentstack Authentication',
+    ]);
+    expect(prompts.payloads[2].default).toBe(basename(dataDir));
+    expect(onWire).toEqual([]);
+  });
+
+  it('exits 3 as cancelled, not 130, and creates nothing when Ctrl-C is pressed at the last create prompt', async () => {
+    const prompts = answerPrompts({
+      'Choose a project type to proceed': 'FileUpload',
+      'Choose an organization': ORG_UID,
+      'Project name': 'My Site',
+      'Environment name': 'Default',
+      'Framework preset': 'Gatsby',
+      'Build command': 'npm run build',
+      'Output directory': './public',
+      'Response mode': 'buffered',
+      'Contentstack Authentication': CTRL_C,
+    });
+    nock('https://cma.integration.test')
+      .get('/v3/organizations')
+      .query({ limit: '100', asc: 'name', include_count: 'true', skip: '0' })
+      .reply(200, { organizations: [{ uid: ORG_UID, name: 'Acme' }], count: 1 });
+    hub().get('/manage/projects/upload/signed_url').query({}).reply(200, azureSignedUpload());
+    nock(UPLOAD_HOST).put('/bucket').reply(201, '');
+    hub()
+      .get('/manage/projects/file-framework')
+      .query({ uploadUid: 'upload-uid' })
+      .reply(200, { framework: 'GATSBY' });
+    const create = hub()
+      .post('/manage/projects')
+      .query({})
+      .reply(201, { project: { ...CREATED_PROJECT, projectType: 'FILEUPLOAD' } });
+
+    const { error } = await onTerminal(() => runCommand(['launch:projects:create', '--data-dir', dataDir], config));
+
+    expect(error?.oclif?.exit).toBe(3);
+    expect(error?.message).toBe('Cancelled. Nothing was changed.');
+    expect(prompts.messages.at(-1)).toBe('Contentstack Authentication');
+    expect(create.isDone()).toBe(false);
+    expect(onWire).toEqual([]);
+    expect(process.listenerCount('SIGINT')).toBe(0);
+  });
+
+  it('asks all ten GitHub prompts in the pinned order and submits exactly what was answered', async () => {
+    let body: unknown;
+    const prompts = answerPrompts({
+      'Choose a project type to proceed': 'GitHub',
+      'Choose an organization': ORG_UID,
+      'Project name': 'My Site',
+      'Environment name': 'Default',
+      'Choose a branch': 'main',
+      'Framework preset': 'NextJs',
+      'Build command': 'npm run build',
+      'Output directory': '.next',
+      'Response mode': 'streaming',
+      'Contentstack Authentication': 'disable',
+    });
+    nock('https://cma.integration.test')
+      .get('/v3/organizations')
+      .query({ limit: '100', asc: 'name', include_count: 'true', skip: '0' })
+      .reply(200, { organizations: [{ uid: ORG_UID, name: 'Acme' }], count: 1 });
+    stubRepositoryLookup();
+    const branches = hub()
+      .get('/manage/git-branches')
+      .query({ provider: 'GitHub', repoName: 'my-org/my-repo', namespace: 'my-org', limit: 100, skip: 0 })
+      .reply(200, { pagination: { count: 1, limit: 100, skip: null }, branches: [{ name: 'main' }] });
+    hub()
+      .get('/manage/projects/framework')
+      .query({ provider: 'GitHub', repoName: 'my-org/my-repo', branchName: 'main', namespace: 'my-org' })
+      .reply(200, { framework: 'NEXTJS', buildCommand: 'npm run build', outputDirectory: '.next' });
+    const create = hub()
+      .post('/manage/projects', (sent: unknown) => {
+        body = sent;
+        return true;
+      })
+      .query({})
+      .reply(201, { project: CREATED_PROJECT });
+    stubFollowUp('LIVE');
+
+    const { error } = await onTerminal(() => runCommand(['launch:projects:create', '--data-dir', dataDir], config));
+
+    expect(error).toBeUndefined();
+    expect([branches.isDone(), create.isDone()]).toEqual([true, true]);
+    expect(prompts.messages).toEqual([
+      'Choose a project type to proceed',
+      'Choose an organization',
+      'Project name',
+      'Environment name',
+      'Choose a branch',
+      'Framework preset',
+      'Build command',
+      'Output directory',
+      'Response mode',
+      'Contentstack Authentication',
+    ]);
+    expect(prompts.payloads.map((payload) => payload.default)).toEqual([
+      undefined,
+      undefined,
+      'my-repo',
+      'Default',
+      'main',
+      'NextJs',
+      'npm run build',
+      '.next',
+      'buffered',
+      'enable',
+    ]);
+    expect(body).toEqual({
+      name: 'My Site',
+      projectType: 'GITPROVIDER',
+      environment: {
+        name: 'Default',
+        gitBranch: 'main',
+        buildCommand: 'npm run build',
+        outputDirectory: '.next',
+        frameworkPreset: 'NEXTJS',
+        environmentVariables: [],
+        isStreamingEnabled: true,
+        isContentstackAuthenticationEnabled: false,
+      },
+      repository: {
+        repositoryName: 'my-org/my-repo',
+        username: 'my-org',
+        repositoryUrl: 'https://github.com/my-org/my-repo',
+        gitProviderMetadata: { gitProvider: 'GitHub' },
+      },
+    });
+    expect(onWire).toEqual([]);
+  });
+
+  it('skips the namespace and repository prompts when the data dir is a GitHub clone', async () => {
+    cloneOf('my-org/my-repo');
+    let body: unknown;
+    const prompts = answerPrompts({
+      'Choose a project type to proceed': 'GitHub',
+      'Project name': 'My Site',
+      'Environment name': 'Default',
+      'Choose a branch': 'main',
+      'Framework preset': 'NextJs',
+      'Build command': 'npm run build',
+      'Output directory': '.next',
+      'Response mode': 'buffered',
+      'Contentstack Authentication': 'enable',
+    });
+    stubRepositoryLookup();
+    const branches = hub()
+      .get('/manage/git-branches')
+      .query({ provider: 'GitHub', repoName: 'my-org/my-repo', namespace: 'my-org', limit: 100, skip: 0 })
+      .reply(200, { pagination: { count: 1, limit: 100, skip: null }, branches: [{ name: 'main' }] });
+    stubDetection({ framework: 'NEXTJS', buildCommand: 'npm run build', outputDirectory: '.next' });
+    const create = hub()
+      .post('/manage/projects', (sent: unknown) => {
+        body = sent;
+        return true;
+      })
+      .query({})
+      .reply(201, { project: CREATED_PROJECT });
+    stubFollowUp('LIVE');
+
+    const { error } = await onTerminal(() =>
+      runCommand(['launch:projects:create', '--org', ORG_UID, '--data-dir', dataDir], config),
+    );
+
+    expect(error).toBeUndefined();
+    expect(prompts.messages).toEqual([
+      'Choose a project type to proceed',
+      'Project name',
+      'Environment name',
+      'Choose a branch',
+      'Framework preset',
+      'Build command',
+      'Output directory',
+      'Response mode',
+      'Contentstack Authentication',
+    ]);
+    expect([branches.isDone(), create.isDone()]).toEqual([true, true]);
+    expect((body as { repository: unknown }).repository).toEqual({
+      repositoryName: 'my-org/my-repo',
+      username: 'my-org',
+      repositoryUrl: 'https://github.com/my-org/my-repo',
+      gitProviderMetadata: { gitProvider: 'GitHub' },
+    });
+    expect(onWire).toEqual([]);
+  });
+
+  it('asks on a terminal only for what argv left out, and nothing that a flag supplied', async () => {
+    const prompts = answerPrompts({ 'Framework preset': 'NextJs' });
+    stubGitLookups();
+    const create = hub().post('/manage/projects').query({}).reply(201, { project: CREATED_PROJECT });
+    stubFollowUp('LIVE');
+    const args = gitFlags().filter((arg) => arg !== '--framework' && arg !== 'NextJs');
+
+    const { error } = await onTerminal(() => runCommand(args, config));
+
+    expect(error).toBeUndefined();
+    expect(prompts.messages).toEqual(['Framework preset']);
+    expect(create.isDone()).toBe(true);
+    expect(onWire).toEqual([]);
+  });
+
+  it('reports a GitHub authorisation failure as a GitHub problem, never as an expired Contentstack login, and posts once', async () => {
+    stubGitLookups();
+    const create = hub()
+      .post('/manage/projects')
+      .query({})
+      .reply(401, {
+        errors: [{ code: 'launch.GIT_PROVIDER.UNAUTHORIZED_ACCESS', message: 'Unauthorized access to git provider.' }],
+        status: 401,
+      });
+    const resent = hub().post('/manage/projects').query({}).reply(201, { project: CREATED_PROJECT });
+
+    const { error, stdout } = await runCommand(gitFlags(), config);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(stdout).toContain(
+      'error: New project creation failed!\n' +
+        'error: Launch could not access your GitHub account. Reconnect GitHub in the Launch app, then try again.\n',
+    );
+    expect(stdout).not.toContain('auth:login');
+    expect(create.isDone()).toBe(true);
+    expect(resent.isDone()).toBe(false);
+  });
+
+  it('sends a missing GitHub connection to the connected-accounts page and opens it, as V1 did', async () => {
+    (open as unknown as jest.Mock).mockClear();
+    const connection = stubConnection([]);
+
+    const { error, stdout } = await runCommand(gitFlags(), config);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(stdout).toContain('error: GitHub connection not found!\n');
+    expect(stdout).toContain(
+      'info: You can connect your GitHub account to the UI using the following URL:\n' +
+        'https://app.integration.test/#!/launch/settings/connected-accounts\n',
+    );
+    expect(open).toHaveBeenCalledWith('https://app.integration.test/#!/launch/settings/connected-accounts');
+    expect(connection.isDone()).toBe(true);
+    expect(stdout).not.toContain('connection identified');
+    expect(onWire).toEqual([]);
+  });
+
+  it('shows the message of a field-named validation error instead of a bare status', async () => {
+    stubGitLookups();
+    hub()
+      .post('/manage/projects')
+      .query({})
+      .reply(400, {
+        errors: [{ name: { code: 'launch.PROJECTS.NAME.INVALID', message: 'Project name contains characters that are not allowed.' } }],
+        status: 400,
+      });
+
+    const { error, stdout } = await runCommand(gitFlags(), config);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(stdout).toContain(
+      'error: New project creation failed!\nerror: Project name contains characters that are not allowed.\n',
+    );
+  });
+
+  it('prints the V1 duplicate-name lines and exits 1 without prompting when there is no terminal', async () => {
+    stubGitLookups();
+    const create = hub()
+      .post('/manage/projects')
+      .query({})
+      .reply(409, { errors: [{ code: 'launch.PROJECT.DUPLICATE_NAME' }], status: 409 });
+
+    const { error, stdout } = await runCommand(gitFlags(), config);
+
+    expect(create.isDone()).toBe(true);
+    expect(error?.oclif?.exit).toBe(1);
+    expect(stdout).toContain(
+      'error: New project creation failed!\n' +
+        'error: Duplicate project name identified\n' +
+        'info: Change the project name and re-run the command.\n',
+    );
+  });
+
+  it('uses the detected framework, build command and output directory and the buffered default when there is no terminal', async () => {
+    stubGitLookups();
+    const create = captureCreate();
+    stubFollowUp('LIVE');
+
+    const { error, stdout } = await runCommand(
+      withoutFlags(gitFlags(), '--framework', '--build-cmd', '--output-dir', '--res-mode'),
+      config,
+    );
+
+    expect(error).toBeUndefined();
+    expect(create.body()).toMatchObject({
+      environment: {
+        frameworkPreset: 'NEXTJS',
+        buildCommand: 'npm run build',
+        outputDirectory: '.next',
+        isStreamingEnabled: false,
+      },
+    });
+    expect(stdout).toContain('Using the detected framework NEXTJS. Pass --framework to choose another.');
+    expect(stdout).toContain('Using the detected build command "npm run build". Pass --build-cmd to change it.');
+    expect(stdout).toContain('Using the detected output directory ".next". Pass --output-dir to change it.');
+    expect(stdout).toContain('Using the buffered response mode. Pass --res-mode streaming to stream responses.');
+  });
+
+  it("falls back to the framework's V1 output directory and sends no build command when detection found neither", async () => {
+    stubRepositoryLookup();
+    stubDetection({ framework: 'NEXTJS' });
+    const create = captureCreate();
+    stubFollowUp('LIVE');
+
+    const { error, stdout } = await runCommand(
+      withoutFlags(gitFlags(), '--framework', '--build-cmd', '--output-dir', '--res-mode'),
+      config,
+    );
+
+    expect(error).toBeUndefined();
+    expect((create.body() as { environment: Record<string, unknown> }).environment.outputDirectory).toBe('./.next');
+    expect((create.body() as { environment: Record<string, unknown> }).environment).not.toHaveProperty('buildCommand');
+    expect(stdout).toContain('Using the default output directory "./.next" for NEXTJS. Pass --output-dir to change it.');
+  });
+
+  it('exits 2 naming --framework when there is no terminal and nothing was detected', async () => {
+    stubRepositoryLookup();
+    stubDetection({});
+    const create = captureCreate();
+
+    const { error } = await runCommand(withoutFlags(gitFlags(), '--framework'), config);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toContain('--framework');
+    expect(create.scope.isDone()).toBe(false);
+  });
+
+  it('uses a detected server command for a server framework when there is no terminal', async () => {
+    stubRepositoryLookup();
+    stubDetection({ framework: 'NUXT', buildCommand: 'npm run build', outputDirectory: './.output', serverCommand: 'node .output/server/index.mjs' });
+    const create = captureCreate();
+    stubFollowUp('LIVE');
+
+    const { error } = await runCommand(
+      withoutFlags(gitFlags(), '--framework', '--build-cmd', '--output-dir', '--res-mode'),
+      config,
+    );
+
+    expect(error).toBeUndefined();
+    expect((create.body() as { environment: Record<string, unknown> }).environment).toMatchObject({
+      frameworkPreset: 'NUXT',
+      serverCommand: 'node .output/server/index.mjs',
+    });
+  });
+
+  it('accepts --server-cmd without --framework when the framework it lands on supports one', async () => {
+    stubRepositoryLookup();
+    stubDetection({ framework: 'NUXT' });
+    const create = captureCreate();
+    stubFollowUp('LIVE');
+
+    const { error } = await runCommand(
+      [...withoutFlags(gitFlags(), '--framework'), '--server-cmd', '"node server.mjs"'],
+      config,
+    );
+
+    expect(error).toBeUndefined();
+    expect((create.body() as { environment: Record<string, unknown> }).environment.serverCommand).toBe('node server.mjs');
+  });
+
+  it('refuses --server-cmd before creating anything when the framework it lands on does not support one', async () => {
+    stubRepositoryLookup();
+    stubDetection({ framework: 'NEXTJS', buildCommand: 'npm run build', outputDirectory: '.next' });
+    const create = captureCreate();
+
+    const { error } = await runCommand(
+      [...withoutFlags(gitFlags(), '--framework'), '--server-cmd', 'npm-start'],
+      config,
+    );
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe(
+      '--server-cmd is only supported when --framework is one of ANALOG, ANGULAR, NUXT, ASTRO, REMIX, OTHER; ' +
+        '--framework is NEXTJS.',
+    );
+    expect(create.scope.isDone()).toBe(false);
+  });
+
+  it('warns that --branch and --auto-deploy are not supported with --type FileUpload and creates the project without them', async () => {
+    let body: unknown;
+    const signedUpload = awsSignedUpload();
+    hub().get('/manage/projects/upload/signed_url').query({}).reply(200, signedUpload);
+    nock(UPLOAD_HOST).post('/bucket').reply(204);
+    hub().get('/manage/projects/file-framework').query({ uploadUid: 'upload-uid' }).reply(200, { framework: 'OTHER' });
+    const create = hub()
+      .post('/manage/projects', (sent: unknown) => {
+        body = sent;
+        return true;
+      })
+      .query({})
+      .reply(201, { project: { ...CREATED_PROJECT, projectType: 'FILEUPLOAD' } });
+    stubFollowUp('DEPLOYED');
+
+    const { error, stdout } = await runCommand(
+      [
+        'launch:projects:create',
+        '--org',
+        ORG_UID,
+        '--type',
+        'FileUpload',
+        '--name',
+        'Site',
+        '--env-name',
+        'Default',
+        '--framework',
+        'Other',
+        '--build-cmd',
+        '"npm run build"',
+        '--output-dir',
+        './',
+        '--res-mode',
+        'buffered',
+        '--data-dir',
+        dataDir,
+        '--branch',
+        'main',
+        '--auto-deploy',
+        'enable',
+      ],
+      config,
+    );
+
+    expect(error).toBeUndefined();
+    expect(stdout).toContain('warn: --branch is not supported for FileUpload projects.');
+    expect(stdout).toContain('warn: --auto-deploy is not supported for FileUpload projects.');
+    expect(create.isDone()).toBe(true);
+    expect((body as { environment: Record<string, unknown> }).environment).not.toHaveProperty('autoDeployOnPush');
+    expect((body as { environment: Record<string, unknown> }).environment).not.toHaveProperty('gitBranch');
+  });
+
+  it('refuses before uploading or creating anything when the folder is already linked to another project', async () => {
+    const other = randomBytes(12).toString('hex');
+    writeFileSync(
+      join(dataDir, '.cs-launch.json'),
+      JSON.stringify({ project: { uid: other, organizationUid: ORG_UID } }),
+    );
+    const signed = hub().get('/manage/projects/upload/signed_url').query({}).reply(200, awsSignedUpload());
+    const create = captureCreate();
+
+    const { error } = await runCommand(
+      [
+        'launch:projects:create',
+        '--org',
+        ORG_UID,
+        '--type',
+        'FileUpload',
+        '--name',
+        'Site',
+        '--env-name',
+        'Default',
+        '--framework',
+        'Other',
+        '--data-dir',
+        dataDir,
+      ],
+      config,
+    );
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toContain(`This folder already belongs to project ${other}.`);
+    expect(error?.message).toContain(`To create a new project, rename or delete ${join(dataDir, '.cs-launch.json')}.`);
+    expect(error?.message).not.toContain('--config');
+    expect(signed.isDone()).toBe(false);
+    expect(create.scope.isDone()).toBe(false);
+  });
+
+  it('exits 2 naming the first missing value when there is no terminal to prompt on', async () => {
+    const { error } = await runCommand(['launch:projects:create', '--org', ORG_UID, '--data-dir', dataDir], config);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe('Missing required value for --type. Pass --type or run in an interactive terminal.');
+    expect(onWire).toEqual([]);
+  });
+});

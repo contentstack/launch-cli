@@ -1,0 +1,12 @@
+export const PROJECT_CONFIG_FILE = '.cs-launch.json';
+export const API_VERSION = '1.0';
+export const EXIT_RUNTIME = 1;
+export const EXIT_USAGE = 2;
+export const EXIT_CANCELLED = 3;
+export const DEFAULT_LIMIT = 100;
+export const CLIENT_MAX_LIMIT = 1000;
+export const PICKER_PAGE_SIZE = 100;
+export const MAX_PAGES = 100;
+export const STDIN_MAX_LISTENERS = 50;
+export const BYTES_PER_KB = 1024;
+export const BYTES_PER_MB = 1024 * 1024;

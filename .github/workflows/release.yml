@@ -21,5 +21,14 @@ jobs:
       - run: npm ci
       - name: Update npm
         run: npm install -g npm@latest
+      - name: Determine npm dist-tag
+        id: dist-tag
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          case "$version" in
+            *-alpha*|*-beta*|*-rc*) tag=beta ;;
+            *) tag=latest ;;
+          esac
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
       - name: Release
-        run: npm publish --access public
+        run: npm publish --access public --tag ${{ steps.dist-tag.outputs.tag }}

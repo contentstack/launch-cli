@@ -1,0 +1,168 @@
+import { EXIT_RUNTIME } from '../core/constants';
+import { LaunchError } from '../core/errors';
+import { isRecord } from '../core/values';
+import { proxyFailureMessage, proxyUrl } from './proxy';
+
+export interface ApiErrorEntry {
+  field?: string;
+  code?: string;
+  message?: string;
+}
+
+export type ErrorMessages = Record<string, string>;
+
+export function messageForCode(messages: ErrorMessages, code?: string): string | undefined {
+  return code === undefined ? undefined : messages[code];
+}
+
+export class LaunchApiError extends LaunchError {
+  readonly exitCode = EXIT_RUNTIME;
+
+  readonly status: number;
+  readonly code: string;
+  readonly errors: ApiErrorEntry[];
+
+  constructor(status: number, errors: ApiErrorEntry[], messages: ErrorMessages = {}) {
+    const [primary] = errors;
+    super(
+      messageForCode(messages, primary?.code) ?? primary?.message ?? `Launch API request failed with status ${status}.`,
+    );
+    this.name = 'LaunchApiError';
+    this.status = status;
+    this.code = primary?.code ?? 'launch.UNKNOWN';
+    this.errors = errors;
+  }
+}
+
+function fieldNamedEntry(value: object): ApiErrorEntry | undefined {
+  const fields = Object.getOwnPropertyNames(value);
+
+  if (fields.length !== 1 || 'code' in value || 'message' in value) {
+    return undefined;
+  }
+
+  const [field] = fields;
+  const nested: unknown = (value as Record<string, unknown>)[field];
+
+  return isRecord(nested) ? { field, ...entryFrom(nested) } : undefined;
+}
+
+function entryFrom(value: unknown): ApiErrorEntry {
+  const entry: ApiErrorEntry = {};
+
+  if (!isRecord(value)) {
+    return entry;
+  }
+
+  const named = fieldNamedEntry(value);
+
+  if (named !== undefined) {
+    return named;
+  }
+
+  if ('code' in value && typeof value.code === 'string') {
+    entry.code = value.code;
+  }
+
+  if ('message' in value && typeof value.message === 'string') {
+    entry.message = value.message;
+  }
+
+  return entry;
+}
+
+export function parseErrorEnvelope(status: number, body: unknown, messages: ErrorMessages = {}): LaunchApiError {
+  const errors = typeof body === 'object' && body !== null && 'errors' in body ? body.errors : undefined;
+
+  return new LaunchApiError(status, Array.isArray(errors) ? errors.map(entryFrom) : [], messages);
+}
+
+export const PROXY_ERROR_CODES: readonly string[] = ['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'ERR_BAD_RESPONSE'];
+
+export const NETWORK_ERROR_CODES: readonly string[] = [
+  'ECONNRESET',
+  'ECONNABORTED',
+  'ECONNREFUSED',
+  'ETIMEDOUT',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'EPIPE',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+];
+
+export const NETWORK_ERROR_MESSAGES: readonly string[] = [
+  'timeout',
+  'Network Error',
+  'socket hang up',
+  'getaddrinfo',
+];
+
+export class LaunchNetworkError extends LaunchError {
+  readonly exitCode = EXIT_RUNTIME;
+
+  readonly cause: unknown;
+
+  readonly retryable: boolean;
+
+  constructor(message: string, cause: unknown, retryable = false) {
+    super(message);
+    this.name = 'LaunchNetworkError';
+    this.cause = cause;
+    this.retryable = retryable;
+  }
+}
+
+function looksLikeProxyFailure(error: unknown): boolean {
+  const { code, message } = (error ?? {}) as { code?: unknown; message?: unknown };
+
+  if (typeof code === 'string' && PROXY_ERROR_CODES.includes(code)) {
+    return true;
+  }
+
+  return typeof message === 'string' && message.includes('ERR_BAD_RESPONSE');
+}
+
+function errorCode(error: unknown): string | undefined {
+  const { code } = (error ?? {}) as { code?: unknown };
+  return typeof code === 'string' && code !== '' ? code : undefined;
+}
+
+function looksLikeNetworkFailure(error: unknown): boolean {
+  const code = errorCode(error);
+
+  if (code !== undefined && NETWORK_ERROR_CODES.includes(code)) {
+    return true;
+  }
+
+  const { message } = (error ?? {}) as { message?: unknown };
+
+  return typeof message === 'string' && NETWORK_ERROR_MESSAGES.some((fragment) => message.includes(fragment));
+}
+
+function unreachableMessage(error: unknown): string {
+  const code = errorCode(error);
+  const detail = code === undefined ? '' : ` (${code})`;
+
+  return `Could not reach the Launch API${detail}. Check your network connection and try again.`;
+}
+
+export function diagnoseTransportError(error: unknown): unknown {
+  if (error instanceof LaunchError) {
+    return error;
+  }
+
+  if (looksLikeProxyFailure(error)) {
+    const url = proxyUrl();
+
+    if (url !== undefined) {
+      return new LaunchNetworkError(proxyFailureMessage(url), error);
+    }
+  }
+
+  if (looksLikeNetworkFailure(error)) {
+    return new LaunchNetworkError(unreachableMessage(error), error, true);
+  }
+
+  return error;
+}

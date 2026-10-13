@@ -1,0 +1,56 @@
+import type { Interfaces } from '@oclif/core';
+
+import type { Catalog, DependenciesOf, FlagKey, Resolution } from '../resources';
+import { catalog } from '../resources';
+
+export interface InputSpec {
+  required?: boolean;
+}
+
+export interface AnyInputs { readonly [key: string]: InputSpec }
+
+export type InputKeys<S> = Extract<keyof S, FlagKey>;
+
+export type ValueOf<F> = F extends Interfaces.OptionFlag<infer T>
+  ? NonNullable<T>
+  : F extends Interfaces.BooleanFlag<infer B>
+    ? B
+    : never;
+
+export type NormalizedValueOf<P extends FlagKey> = Resolution[P] extends {
+  normalize: (...args: never[]) => Promise<infer R>;
+}
+  ? R
+  : ValueOf<Catalog[P]>;
+
+type HasDefault<P extends FlagKey> = 'default' extends keyof Resolution[P] ? true : false;
+
+type IsCertain<S, P extends FlagKey> = P extends keyof S
+  ? S[P] extends { required: true }
+    ? true
+    : HasDefault<P>
+  : false;
+
+export type Resolved<S> = {
+  [P in InputKeys<S>]: IsCertain<S, P> extends true ? NormalizedValueOf<P> : NormalizedValueOf<P> | undefined;
+};
+
+export type MissingDependencies<S> = {
+  [P in Exclude<DependenciesOf<InputKeys<S>>, InputKeys<S>>]: InputSpec;
+};
+
+export type UnknownFlags<S> = Record<Exclude<keyof S, FlagKey>, never>;
+
+export function inputs<const S extends AnyInputs>(spec: S & MissingDependencies<S> & UnknownFlags<S>): S {
+  return spec;
+}
+
+export function flagsFor<S extends AnyInputs>(spec: S): Pick<Catalog, InputKeys<S>> {
+  const picked = {} as Pick<Catalog, InputKeys<S>>;
+
+  for (const key of Object.keys(spec) as InputKeys<S>[]) {
+    picked[key] = catalog[key];
+  }
+
+  return picked;
+}

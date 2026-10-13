@@ -1,0 +1,265 @@
+import dotenv from 'dotenv';
+import type {
+  Request,
+  Response,
+} from 'express';
+import express from 'express';
+import type { Express } from 'express-serve-static-core';
+import type { Server } from 'http';
+import path from 'path';
+
+import { styled } from '../core/style';
+import { isRecord } from '../core/values';
+import { CloudFunctionsValidator } from './cloud-functions-validator';
+import {
+  CLOUD_FUNCTIONS_DIRECTORY,
+  CLOUD_FUNCTIONS_SUPPORTED_EXTENSION,
+  DYNAMIC_ROUTE_SEGMENT,
+  ENV_FILE_NAME,
+} from './constants';
+import { FunctionsDirectoryNotFoundError, PortInUseError } from './function.errors';
+import { walkFileSystem, checkIfDirectoryExists } from './os-helper';
+import type { CloudFunctionResource } from './types';
+
+type CloudFunctionHandler = CloudFunctionResource['handler'];
+
+function isHandler(value: unknown): value is CloudFunctionHandler {
+  return typeof value === 'function';
+}
+
+import { loadDataURL } from './load-data-url';
+
+export function listenFailure(error: NodeJS.ErrnoException, servingPort: number): Error {
+  return error.code === 'EADDRINUSE' ? new PortInUseError(servingPort) : error;
+}
+
+export class CloudFunctions {
+  private cloudFunctionsDirectoryPath: string;
+  private pathToSourceCode: string;
+
+  constructor(pathToSourceCode: string) {
+    this.cloudFunctionsDirectoryPath = path.join(
+      pathToSourceCode.replace(/^(\.\.(\/|\\|$))+/, ''),
+      CLOUD_FUNCTIONS_DIRECTORY
+    );
+    this.pathToSourceCode = pathToSourceCode;
+  }
+
+  async serve(servingPort: number): Promise<Server | undefined> {
+    const directoryExists = checkIfDirectoryExists(
+      this.cloudFunctionsDirectoryPath
+    );
+    if (!directoryExists) {
+      throw new FunctionsDirectoryNotFoundError(this.pathToSourceCode);
+    }
+    const cloudFunctionResources = await this.parseCloudFunctionResources();
+
+    const hasCloudFunctionResources = cloudFunctionResources.length;
+    if (!hasCloudFunctionResources) {
+      console.log('No Serverless functions detected.');
+      return;
+    }
+
+    const cloudFunctionsValidator = new CloudFunctionsValidator(
+      cloudFunctionResources
+    );
+    const error = cloudFunctionsValidator.validate();
+    if (error) {
+      throw error;
+    }
+    const { exactRouteResources, dynamicRouteResources } =
+      this.transformAndSegregateResourcesByRoutes(cloudFunctionResources);
+
+    const app = express();
+    app.disable('x-powered-by');
+
+    await this.applyAppRouter(exactRouteResources, app);
+    await this.applyAppRouter(dynamicRouteResources, app);
+
+    dotenv.config({ path: path.join(this.pathToSourceCode, ENV_FILE_NAME) });
+
+    return this.startServer(app, servingPort, [
+      ...exactRouteResources,
+      ...dynamicRouteResources,
+    ]);
+  }
+
+  private printServing(
+    servingPort: number,
+    cloudFunctionResources: CloudFunctionResource[]
+  ): void {
+    console.log('Detected Serverless Functions:');
+    cloudFunctionResources.forEach(({ apiResourceURI }) => {
+      console.log(`  λ ${apiResourceURI}`);
+    });
+    console.log('');
+    const url = styled(`http://localhost:${servingPort}`, 'cyan', process.stdout.isTTY === true);
+    console.log(`Serving Cloud Functions at ${url}`);
+  }
+
+  private startServer(
+    app: Express,
+    servingPort: number,
+    cloudFunctionResources: CloudFunctionResource[]
+  ): Promise<Server> {
+    return new Promise<Server>((resolve, reject) => {
+      const refuse = (error: NodeJS.ErrnoException): void => {
+        reject(listenFailure(error, servingPort));
+      };
+
+      const server = app.listen(servingPort, () => {
+        server.off('error', refuse);
+        this.printServing(servingPort, cloudFunctionResources);
+        resolve(server);
+      });
+
+      server.once('error', refuse);
+    });
+  }
+
+  private async applyAppRouter(
+    cloudFunctionResources: CloudFunctionResource[],
+    app: Express
+  ): Promise<void> {
+    await Promise.all(
+      cloudFunctionResources.map(async (cloudFunctionResource) => {
+
+        app.use(express.json());
+        app.use(express.urlencoded({ extended: true }));
+
+        app.use((_request: Request, response: Response, next) => {
+          if (!response.getHeader('cache-control')) {
+            response.setHeader('cache-control', 'no-store');
+          }
+          next();
+        });
+
+        app.all(
+          cloudFunctionResource.apiResourceURI,
+          async (request: Request, response: Response) => {
+            try {
+              await cloudFunctionResource.handler(request, response);
+            } catch (error) {
+              console.error(error);
+              response.status(500).send();
+            }
+          }
+        );
+      })
+    );
+  }
+
+  private isProxyEdgeFile(filename: string): boolean {
+    const PROXY_EDGE_FILENAME = '[proxy].edge.js';
+    return filename === PROXY_EDGE_FILENAME;
+  }
+
+  private async parseCloudFunctionResources(): Promise<
+    CloudFunctionResource[]
+    > {
+    const filePaths = await walkFileSystem(this.cloudFunctionsDirectoryPath);
+
+    const cloudFunctionResources: CloudFunctionResource[] = [];
+    for await (const filePath of filePaths) {
+      const parsedPath = path.parse(filePath);
+
+      if (this.isProxyEdgeFile(parsedPath.base)
+        || parsedPath.ext !== CLOUD_FUNCTIONS_SUPPORTED_EXTENSION
+      ) {
+        continue;
+      }
+
+      const handler = await this.buildHandlerForFilepath(filePath);
+      if (!handler) {
+        continue;
+      }
+
+      const relativeParsedPath = path.parse(
+        path.relative(this.cloudFunctionsDirectoryPath, filePath)
+      );
+
+      const apiResourceURI = `/${path.join(
+        relativeParsedPath.dir,
+        relativeParsedPath.name
+      )}`;
+
+      cloudFunctionResources.push({
+        cloudFunctionFilePath: filePath,
+        apiResourceURI,
+        handler
+      });
+    }
+
+    return cloudFunctionResources;
+  }
+
+  private transformAndSegregateResourcesByRoutes(
+    cloudFunctionResources: CloudFunctionResource[]
+  ): {
+    exactRouteResources: CloudFunctionResource[];
+    dynamicRouteResources: CloudFunctionResource[];
+  } {
+    const exactRouteResources: CloudFunctionResource[] = [];
+    const dynamicRouteResources: CloudFunctionResource[] = [];
+
+    cloudFunctionResources.forEach(
+      (cloudFunctionResource: CloudFunctionResource) => {
+        if (
+          cloudFunctionResource.apiResourceURI.match(DYNAMIC_ROUTE_SEGMENT) !==
+          null
+        ) {
+          const apiResourceURI = cloudFunctionResource.apiResourceURI.replace(
+            DYNAMIC_ROUTE_SEGMENT,
+            ':$1'
+          );
+
+          dynamicRouteResources.push({
+            ...cloudFunctionResource,
+            apiResourceURI,
+          });
+        } else {
+          exactRouteResources.push(cloudFunctionResource);
+        }
+      }
+    );
+
+    return { exactRouteResources, dynamicRouteResources };
+  }
+
+  private async buildHandlerForFilepath(cloudFunctionFilePath: string): Promise<CloudFunctionHandler | null> {
+    const [{ rollup }, { nodeResolve }, { default: commonjs }, { default: json }] = await Promise.all([
+      import('rollup'),
+      import('@rollup/plugin-node-resolve'),
+      import('@rollup/plugin-commonjs'),
+      import('@rollup/plugin-json'),
+    ]);
+    const bundle = await rollup({
+      input: cloudFunctionFilePath,
+      plugins: [nodeResolve({ preferBuiltins: true }), commonjs(), json()],
+    });
+
+    const { output } = await bundle.generate({
+      format: 'esm',
+      inlineDynamicImports: true,
+    });
+
+    const builtCode = output[0].code;
+
+    const builtCodeInDataURLFormat =
+      'data:text/javascript;base64,' + Buffer.from(builtCode).toString('base64');
+
+    const module = await loadDataURL(builtCodeInDataURLFormat);
+
+    const exported = module.default;
+
+    if (isHandler(exported)) {
+      return exported;
+    }
+
+    if (isRecord(exported) && isHandler(exported.default)) {
+      return exported.default;
+    }
+
+    return null;
+  }
+}

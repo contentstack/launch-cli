@@ -1,0 +1,50 @@
+import { assertPage, hasUid, malformed } from '../transport/envelope';
+import type { RestApiClient, RestRequest } from '../transport/rest-client';
+import { ENVIRONMENT_ERROR_MESSAGES } from './environment.errors';
+import type { EnvironmentsPage, IdentifiedEnvironment } from './types';
+
+export * from './types';
+
+export interface ListEnvironmentsParams {
+  org: string;
+  project: string;
+  limit?: number;
+  skip?: number;
+}
+
+export class EnvironmentsApi {
+  constructor(private readonly client: RestApiClient) {}
+
+  private request<T>(req: RestRequest): Promise<T> {
+    return this.client.request<T>(req, ENVIRONMENT_ERROR_MESSAGES);
+  }
+
+  async list(params: ListEnvironmentsParams): Promise<EnvironmentsPage> {
+    const response = await this.request<EnvironmentsPage>({
+      method: 'GET',
+      path: `/projects/${params.project}/environments`,
+      orgUid: params.org,
+      projectUid: params.project,
+      query: { limit: params.limit, skip: params.skip },
+    });
+
+    assertPage(response, 'environments', 'environment list');
+
+    return response;
+  }
+
+  async first(params: { org: string; project: string }): Promise<IdentifiedEnvironment | undefined> {
+    const page = await this.list({ ...params, limit: 1, skip: 0 });
+    const [environment] = page.environments;
+
+    if (environment === undefined) {
+      return undefined;
+    }
+
+    if (!hasUid(environment)) {
+      throw malformed('The Launch API returned an environment without an environment uid.');
+    }
+
+    return environment;
+  }
+}

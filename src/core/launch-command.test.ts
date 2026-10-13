@@ -1,0 +1,791 @@
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolve as resolvePath, join } from 'node:path';
+
+import { HttpClient, authHandler, configHandler } from '@contentstack/cli-utilities';
+
+import { EXIT_RUNTIME, PROJECT_CONFIG_FILE } from './constants';
+import { ProjectConfigStore } from './project-config';
+import { getManageApiBaseUrl } from './region';
+import { CancelledError, MissingInputError, UsageError } from './errors';
+import { exactlyOneOf } from './rules';
+import { LaunchApiError } from '../transport/errors';
+import type { UxLike } from './prompt';
+import type { FlagKey } from '../resources';
+import { LaunchCommand, projectConfigLoader, resolveLaunchContext } from './launch-command';
+import * as serviceContext from './service-context';
+import type { SearchListClass } from './search-list';
+import { utilitiesLoader } from './search-list';
+import { pretendTerminal, stdinReportingTTY, stdoutReportingTTY } from '../../test/support/terminal';
+
+class Probe extends LaunchCommand {
+  static flags = {};
+  static inputs = {};
+
+  async run(): Promise<void> {
+    return undefined;
+  }
+}
+
+class ProbeWithoutInputs extends LaunchCommand {
+  static flags = {};
+
+  async run(): Promise<void> {
+    return undefined;
+  }
+}
+
+class ProbeWithRules extends LaunchCommand {
+  static flags = {};
+  static inputs = { org: {}, limit: {} };
+  static rules = [exactlyOneOf('org', 'limit')];
+
+  async run(): Promise<void> {
+    return undefined;
+  }
+}
+
+class ProbeWithYes extends LaunchCommand {
+  static flags = {};
+  static inputs = { yes: {} };
+
+  async run(): Promise<void> {
+    return undefined;
+  }
+}
+
+function probe(): Probe & { error: jest.Mock } {
+  const instance = new Probe([], {} as never) as Probe & { error: jest.Mock };
+  (instance as unknown as { error: unknown }).error = jest.fn();
+  return instance;
+}
+
+interface Wire {
+  queries: unknown[];
+  bodies: unknown[];
+  sent: [string, string][];
+}
+
+function fakeHttpClient(
+  onBaseUrl: (url: string) => void,
+  onHeaders: (headers: Record<string, string>) => void = () => undefined,
+  wire: Wire = { queries: [], bodies: [], sent: [] },
+) {
+  const client: Record<string, unknown> = {};
+  client.baseUrl = (url: string) => {
+    onBaseUrl(url);
+    return client;
+  };
+  client.interceptors = { response: { use: () => 0 } };
+  client.requestConfig = () => ({});
+  client.asJson = () => client;
+  client.timeout = () => client;
+  client.headers = (headers: Record<string, string>) => {
+    onHeaders(headers);
+    return client;
+  };
+  client.queryParams = (query: unknown) => {
+    wire.queries.push(query);
+    return client;
+  };
+  client.payload = (body: unknown) => {
+    wire.bodies.push(body);
+    return client;
+  };
+  client.send = async (method: string, path: string) => {
+    wire.sent.push([method, path]);
+    return {
+      status: 200,
+      data: { projects: [], pagination: { count: 0, limit: 0, skip: 0 }, project: { uid: 'p1', name: 'Renamed' } },
+    };
+  };
+  return client as unknown as ReturnType<typeof HttpClient.create>;
+}
+
+describe('LaunchCommand.catch', () => {
+  it('reports a missing input as a usage error', async () => {
+    const instance = probe();
+
+    await instance['catch'](new MissingInputError('org', { config: true, prompt: true }));
+
+    expect(instance.error).toHaveBeenCalledWith(expect.stringContaining('Missing required value for --org'), {
+      exit: 2,
+    });
+  });
+
+  it('reports a usage error as a usage error', async () => {
+    const instance = probe();
+
+    await instance['catch'](new UsageError('No project named "ghost" found in this organization.'));
+
+    expect(instance.error).toHaveBeenCalledWith('No project named "ghost" found in this organization.', {
+      exit: 2,
+    });
+  });
+
+  it('reports a declined confirmation with the dedicated cancellation exit code', async () => {
+    const instance = probe();
+
+    await instance['catch'](new CancelledError());
+
+    expect(instance.error).toHaveBeenCalledWith('Cancelled. Nothing was changed.', { exit: 3 });
+  });
+
+  it('reports an API failure as a runtime error', async () => {
+    const instance = probe();
+
+    await instance['catch'](new LaunchApiError(404, [{ code: 'launch.SOMETHING.ELSE', message: 'the api said no' }]));
+
+    expect(instance.error).toHaveBeenCalledWith('the api said no', { exit: 1 });
+  });
+
+  it('maps a cancelled confirmation, a usage failure and an api failure through one LaunchError branch', async () => {
+    const instance = probe();
+
+    await instance['catch'](new CancelledError());
+    await instance['catch'](new UsageError('Pass --org.'));
+    await instance['catch'](new LaunchApiError(500, []));
+
+    expect(instance.error).toHaveBeenNthCalledWith(1, 'Cancelled. Nothing was changed.', { exit: 3 });
+    expect(instance.error).toHaveBeenNthCalledWith(2, 'Pass --org.', { exit: 2 });
+    expect(instance.error).toHaveBeenNthCalledWith(3, 'Launch API request failed with status 500.', { exit: 1 });
+  });
+
+  it('delegates anything else to oclif, which sets process.exitCode before rethrowing', async () => {
+    const instance = probe();
+    const other = new Error('boom');
+    const previousExitCode = process.exitCode;
+    process.exitCode = undefined;
+
+    await expect(instance['catch'](other)).rejects.toThrow('boom');
+
+    expect(instance.error).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
+    process.exitCode = previousExitCode;
+  });
+});
+
+afterEach(() => {
+  process.exitCode = undefined;
+});
+
+describe('LaunchCommand.confirm', () => {
+  function gated(yes: boolean, isTTY: boolean, answer?: boolean) {
+    const instance = new ProbeWithYes([], {} as never) as ProbeWithYes & { error: jest.Mock };
+    (instance as unknown as { error: unknown }).error = jest.fn();
+    const inquired: unknown[] = [];
+    const ux: UxLike = {
+      print: () => undefined,
+      inquire: async (payload: unknown) => {
+        inquired.push(payload);
+        return answer as never;
+      },
+    };
+    (instance as unknown as { ux: UxLike }).ux = ux;
+    (instance as unknown as { services: { ux: UxLike; isTTY: boolean } }).services = { ux, isTTY };
+    (instance as unknown as { resolved: Record<string, unknown> }).resolved = { yes };
+    return { instance, inquired };
+  }
+
+  it('throws a developer error when the command has not declared yes: {} in its static inputs', async () => {
+    const instance = probe();
+    (instance as unknown as { services: { ux: UxLike; isTTY: boolean } }).services = {
+      ux: { print: () => undefined, inquire: async () => undefined as never },
+      isTTY: false,
+    };
+    (instance as unknown as { resolved: Record<string, unknown> }).resolved = {};
+
+    await expect(instance['confirm']('Delete project "marketing-site"?')).rejects.toThrow(
+      'Probe calls confirm() but does not declare yes: {} in its static inputs.',
+    );
+  });
+
+  it('resolves true without prompting when --yes was supplied, even with no TTY', async () => {
+    const { instance, inquired } = gated(true, false);
+
+    await expect(instance['confirm']('Delete project "marketing-site"?')).resolves.toBe(true);
+
+    expect(inquired).toEqual([]);
+    expect(instance.error).not.toHaveBeenCalled();
+  });
+
+  it('prompts on a TTY and resolves true when the user accepts', async () => {
+    const { instance, inquired } = gated(false, true, true);
+
+    await expect(instance['confirm']('Delete project "marketing-site"?')).resolves.toBe(true);
+
+    expect(inquired).toEqual([
+      { type: 'confirm', name: 'confirm', message: 'Delete project "marketing-site"?', default: false },
+    ]);
+  });
+
+  it('resolves false when the user declines on a TTY, leaving the command to report it', async () => {
+    const { instance, inquired } = gated(false, true, false);
+
+    await expect(instance['confirm']('Delete project "marketing-site"?')).resolves.toBe(false);
+
+    expect(inquired).toHaveLength(1);
+    expect(instance.error).not.toHaveBeenCalled();
+  });
+
+  it('fails as a usage error without prompting when there is no TTY and no --yes', async () => {
+    const { instance, inquired } = gated(false, false);
+
+    const rejection = await instance['confirm']('Delete project "marketing-site"?').catch((err: Error) => err);
+    await instance['catch'](rejection as Error);
+
+    expect(rejection).toBeInstanceOf(UsageError);
+    expect(inquired).toEqual([]);
+    expect(instance.error).toHaveBeenCalledWith(
+      'Delete project "marketing-site"? Pass --yes to confirm without an interactive terminal.',
+      { exit: 2 },
+    );
+  });
+
+  it('does not accept a truthy non-boolean yes value as a confirmation', async () => {
+    const { instance, inquired } = gated('true' as unknown as boolean, false);
+
+    const rejection = await instance['confirm']('Delete project "marketing-site"?').catch((err: Error) => err);
+
+    expect(rejection).toBeInstanceOf(UsageError);
+    expect(inquired).toEqual([]);
+  });
+});
+
+describe('LaunchCommand.requireAuth', () => {
+  it('does nothing when the user is authenticated', () => {
+    const instance = probe();
+    const spy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
+
+    instance['requireAuth']();
+
+    expect(instance.error).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('reports a runtime error when the user is not authenticated', () => {
+    const instance = probe();
+    const spy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(false);
+
+    instance['requireAuth']();
+
+    expect(instance.error).toHaveBeenCalledWith('You are not logged in. Run csdx auth:login to continue.', {
+      exit: EXIT_RUNTIME,
+    });
+    spy.mockRestore();
+  });
+});
+
+describe('LaunchCommand.init', () => {
+  it('never reaches the real authHandler/configHandler singletons that api calls in this suite fall through to', () => {
+    expect(jest.isMockFunction(configHandler.get)).toBe(true);
+    expect(jest.isMockFunction(authHandler.compareOAuthExpiry)).toBe(true);
+  });
+
+  it('parses using the declared flags and base flags, and wires the hub url into the built client', async () => {
+    const instance = probe();
+    const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
+    const restoreTTY = pretendTerminal();
+    Object.defineProperty(instance, 'launchRegion', {
+      value: { launchHubUrl: 'https://launch-api.test' },
+      configurable: true,
+    });
+    Object.defineProperty(instance, 'config', { value: { userAgent: 'cli/2.0.0' }, configurable: true });
+    const parseMock = jest.fn().mockResolvedValue({ flags: {} });
+    (instance as unknown as { parse: jest.Mock }).parse = parseMock;
+    let capturedBaseUrl: string | undefined;
+    const createSpy = jest.spyOn(HttpClient, 'create').mockReturnValue(fakeHttpClient((url) => {
+      capturedBaseUrl = url;
+    }));
+
+    await instance.init();
+    await instance['services'].api.projects.list({ org: 'org1' });
+
+    expect(parseMock).toHaveBeenCalledWith({ flags: Probe.flags, baseFlags: LaunchCommand.baseFlags, strict: true });
+    expect(capturedBaseUrl).toBe(getManageApiBaseUrl('https://launch-api.test'));
+    expect(instance['services'].isTTY).toBe(true);
+    expect(instance['services'].ux).toBe(instance['ux']);
+    expect(instance['resolved']).toEqual({});
+
+    createSpy.mockRestore();
+    authSpy.mockRestore();
+    restoreTTY();
+  });
+
+  it('registers the searchable picker on the inquirer cliux prompts with before anything can prompt', async () => {
+    const load = utilitiesLoader();
+    const prompts = (load('inquirer') as { prompt: { prompts: Record<string, unknown> } }).prompt.prompts;
+    delete prompts['search-list'];
+    const instance = probe();
+    const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
+    Object.defineProperty(instance, 'launchRegion', { value: { launchHubUrl: 'https://launch-api.test' }, configurable: true });
+    Object.defineProperty(instance, 'config', { value: { userAgent: 'cli/2.0.0' }, configurable: true });
+    let registeredWhenParsed: unknown;
+    (instance as unknown as { parse: jest.Mock }).parse = jest.fn(async () => {
+      registeredWhenParsed = prompts['search-list'];
+      return { flags: {} };
+    });
+
+    await instance.init();
+
+    expect((registeredWhenParsed as SearchListClass).prototype).toBeInstanceOf(
+      load('inquirer-search-list') as SearchListClass,
+    );
+    expect(prompts['search-list']).toBe(registeredWhenParsed);
+    authSpy.mockRestore();
+  });
+
+  it('raises the stdin listener limit so a long run of prompts does not warn of a leak', async () => {
+    const instance = probe();
+    const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
+    Object.defineProperty(instance, 'launchRegion', { value: { launchHubUrl: 'https://launch-api.test' }, configurable: true });
+    Object.defineProperty(instance, 'config', { value: { userAgent: 'cli/2.0.0' }, configurable: true });
+    (instance as unknown as { parse: jest.Mock }).parse = jest.fn().mockResolvedValue({ flags: {} });
+    const previous = process.stdin.getMaxListeners();
+
+    await instance.init();
+
+    expect(process.stdin.getMaxListeners()).toBe(50);
+    process.stdin.setMaxListeners(previous);
+    authSpy.mockRestore();
+  });
+
+  it('derives the hub url from the configured region cma when the region declares no launch hub url', async () => {
+    const instance = probe();
+    const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
+    const regionSpy = jest.spyOn(configHandler, 'get').mockImplementation((key: string) => {
+      if (key === 'region') return { cma: 'api.contentstack.io' };
+      return key === 'authorisationType' ? 'BASIC' : undefined;
+    });
+    Object.defineProperty(instance, 'config', { value: { userAgent: 'cli/2.0.0' }, configurable: true });
+    (instance as unknown as { parse: jest.Mock }).parse = jest.fn().mockResolvedValue({ flags: {} });
+    let capturedBaseUrl: string | undefined;
+    const createSpy = jest.spyOn(HttpClient, 'create').mockReturnValue(fakeHttpClient((url) => {
+      capturedBaseUrl = url;
+    }));
+
+    const contextSpy = jest.spyOn(serviceContext, 'buildServiceContext');
+
+    await instance.init();
+    await instance['services'].api.projects.list({ org: 'org1' });
+
+    expect(capturedBaseUrl).toBe(getManageApiBaseUrl('https://launch-api.contentstack.com'));
+    expect(contextSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ launchHubUrl: 'https://launch-api.contentstack.com', cma: 'api.contentstack.io' }),
+    );
+
+    createSpy.mockRestore();
+    regionSpy.mockRestore();
+    authSpy.mockRestore();
+  });
+
+  it('fails with a usage error instead of a type error when no region is configured', async () => {
+    const instance = probe();
+    const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
+    Object.defineProperty(instance, 'config', { value: { userAgent: 'cli/2.0.0' }, configurable: true });
+    (instance as unknown as { parse: jest.Mock }).parse = jest.fn().mockResolvedValue({ flags: {} });
+
+    await expect(instance.init()).rejects.toBeInstanceOf(UsageError);
+    await expect(instance.init()).rejects.toThrow(
+      'Region not configured. Please set the region with command $ csdx config:set:region',
+    );
+
+    authSpy.mockRestore();
+  });
+
+  it('resolves no inputs instead of throwing when the subclass declares no static inputs', async () => {
+    const instance = new ProbeWithoutInputs([], {} as never) as ProbeWithoutInputs & { error: jest.Mock };
+    (instance as unknown as { error: unknown }).error = jest.fn();
+    const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
+    Object.defineProperty(instance, 'launchRegion', {
+      value: { launchHubUrl: 'https://launch-api.test' },
+      configurable: true,
+    });
+    Object.defineProperty(instance, 'config', { value: { userAgent: 'cli/2.0.0' }, configurable: true });
+    (instance as unknown as { parse: jest.Mock }).parse = jest.fn().mockResolvedValue({ flags: {} });
+
+    await instance.init();
+
+    expect(instance['resolved']).toEqual({});
+    authSpy.mockRestore();
+  });
+});
+
+describe('LaunchCommand.init authentication gate', () => {
+  it('parses the flags first, so a bad flag is a usage error, then stops at the auth check without building the service context', async () => {
+    const instance = new Probe([], {} as never) as Probe & { error: jest.Mock };
+    const failure = new Error('You are not logged in. Run csdx auth:login to continue.');
+    (instance as unknown as { error: unknown }).error = jest.fn(() => {
+      throw failure;
+    });
+    const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(false);
+    const parseMock = jest.fn().mockResolvedValue({ flags: {} });
+    (instance as unknown as { parse: jest.Mock }).parse = parseMock;
+    const createSpy = jest.spyOn(HttpClient, 'create');
+
+    await expect(instance.init()).rejects.toBe(failure);
+
+    expect(instance.error).toHaveBeenCalledWith('You are not logged in. Run csdx auth:login to continue.', {
+      exit: EXIT_RUNTIME,
+    });
+    expect(parseMock).toHaveBeenCalledTimes(1);
+    expect(createSpy).not.toHaveBeenCalled();
+    expect(instance['services']).toBeUndefined();
+    expect(instance['resolved']).toBeUndefined();
+
+    createSpy.mockRestore();
+    authSpy.mockRestore();
+  });
+});
+
+describe('LaunchCommand.init terminal detection', () => {
+  it.each([[false], [undefined]])('resolves isTTY to false when process.stdin.isTTY is %p', async (isTTY) => {
+    const instance = probe();
+    const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
+    const restoreTTY = stdinReportingTTY(isTTY);
+    Object.defineProperty(instance, 'launchRegion', {
+      value: { launchHubUrl: 'https://launch-api.test' },
+      configurable: true,
+    });
+    Object.defineProperty(instance, 'config', { value: { userAgent: 'cli/2.0.0' }, configurable: true });
+    (instance as unknown as { parse: jest.Mock }).parse = jest.fn().mockResolvedValue({ flags: {} });
+
+    await instance.init();
+
+    expect(instance['services'].isTTY).toBe(false);
+
+    authSpy.mockRestore();
+    restoreTTY();
+  });
+
+  it.each([
+    [true, false],
+    [false, true],
+    [true, undefined],
+  ])(
+    'takes whether output reaches a terminal from stdout, not stdin (stdin %p, stdout %p)',
+    async (stdin, stdout) => {
+      const instance = probe();
+      const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
+      const restoreStdin = stdinReportingTTY(stdin);
+      const restoreStdout = stdoutReportingTTY(stdout);
+      Object.defineProperty(instance, 'launchRegion', {
+        value: { launchHubUrl: 'https://launch-api.test' },
+        configurable: true,
+      });
+      Object.defineProperty(instance, 'config', { value: { userAgent: 'cli/2.0.0' }, configurable: true });
+      (instance as unknown as { parse: jest.Mock }).parse = jest.fn().mockResolvedValue({ flags: {} });
+
+      try {
+        await instance.init();
+      } finally {
+        restoreStdout();
+        restoreStdin();
+        authSpy.mockRestore();
+      }
+
+      expect(instance['services'].isTTY).toBe(stdin);
+      expect(instance['services'].outputIsTTY).toBe(stdout === true);
+    },
+  );
+
+  it('sends the oclif user agent, the query and the body on the requests the context makes', async () => {
+    const instance = probe();
+    const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
+    Object.defineProperty(instance, 'launchRegion', {
+      value: { launchHubUrl: 'https://launch-api.test' },
+      configurable: true,
+    });
+    Object.defineProperty(instance, 'config', { value: { userAgent: 'csdx-cli/2.0.0 darwin-arm64' }, configurable: true });
+    (instance as unknown as { parse: jest.Mock }).parse = jest.fn().mockResolvedValue({ flags: {} });
+    let capturedHeaders: Record<string, string> | undefined;
+    const wire: Wire = { queries: [], bodies: [], sent: [] };
+    const createSpy = jest.spyOn(HttpClient, 'create').mockReturnValue(
+      fakeHttpClient(
+        () => undefined,
+        (headers) => {
+          capturedHeaders = headers;
+        },
+        wire,
+      ),
+    );
+
+    await instance.init();
+    await instance['services'].api.projects.list({ org: 'org1', limit: 5, skip: 10 });
+    await instance['services'].api.projects.update({ org: 'org1', project: 'p1', update: { name: 'Renamed' } });
+
+    expect(capturedHeaders?.['X-CS-CLI']).toBe('csdx-cli/2.0.0 darwin-arm64');
+    expect(wire.sent).toEqual([
+      ['GET', '/projects'],
+      ['PUT', '/projects/p1'],
+    ]);
+    expect(wire.queries).toEqual([{ limit: 5, skip: 10 }]);
+    expect(wire.bodies).toEqual([{ name: 'Renamed' }]);
+
+    createSpy.mockRestore();
+    authSpy.mockRestore();
+  });
+});
+
+class ProbeWithOrg extends LaunchCommand {
+  static flags = {};
+  static inputs = { org: {} };
+
+  async run(): Promise<void> {
+    return undefined;
+  }
+}
+
+describe('LaunchCommand.init config file notice', () => {
+  const tempDirs: string[] = [];
+
+  afterEach(() => {
+    tempDirs.forEach((dir) => rmSync(dir, { recursive: true, force: true }));
+    tempDirs.length = 0;
+  });
+
+  async function initInFolderHoldingAnOrg(
+    flags: Record<string, unknown>,
+  ): Promise<{ printed: string[]; configFile: string }> {
+    const dir = mkdtempSync(join(tmpdir(), 'launch-cli-'));
+    tempDirs.push(dir);
+    writeFileSync(join(dir, PROJECT_CONFIG_FILE), JSON.stringify({ project: { organizationUid: 'org-from-cwd' } }));
+    jest.spyOn(process, 'cwd').mockReturnValue(dir);
+    jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
+    const instance = new ProbeWithOrg([], {} as never);
+    Object.defineProperty(instance, 'launchRegion', {
+      value: { launchHubUrl: 'https://launch-api.test' },
+      configurable: true,
+    });
+    Object.defineProperty(instance, 'config', { value: { userAgent: 'cli/2.0.0' }, configurable: true });
+    (instance as unknown as { parse: jest.Mock }).parse = jest.fn().mockResolvedValue({ flags });
+    const printed: string[] = [];
+    const ux: UxLike = { print: (message) => printed.push(message), inquire: async () => undefined as never };
+    Object.defineProperty(instance, 'ux', { value: ux, configurable: true });
+
+    await instance.init();
+
+    return { printed, configFile: join(dir, PROJECT_CONFIG_FILE) };
+  }
+
+  it('prints the notice on stdout when a value came from the config file', async () => {
+    const { printed, configFile } = await initInFolderHoldingAnOrg({});
+
+    expect(printed).toEqual([`Using the organization UID from ${configFile}.`]);
+  });
+
+  it('colours only the config file path cyan when stdout is a terminal', async () => {
+    const restore = stdoutReportingTTY(true);
+
+    const { printed, configFile } = await initInFolderHoldingAnOrg({});
+    restore();
+
+    expect(printed).toEqual([`Using the organization UID from \u001b[36m${configFile}\u001b[39m.`]);
+  });
+
+  it('prints nothing when every value came from a flag', async () => {
+    const { printed } = await initInFolderHoldingAnOrg({ org: 'org-from-flag' });
+
+    expect(printed).toEqual([]);
+  });
+});
+
+describe('LaunchCommand.init rules', () => {
+  it('evaluates the rules the subclass declares as a static rules array', async () => {
+    const instance = new ProbeWithRules([], {} as never) as ProbeWithRules & { error: jest.Mock };
+    (instance as unknown as { error: unknown }).error = jest.fn();
+    const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
+    Object.defineProperty(instance, 'launchRegion', {
+      value: { launchHubUrl: 'https://launch-api.test' },
+      configurable: true,
+    });
+    Object.defineProperty(instance, 'config', { value: { userAgent: 'cli/2.0.0' }, configurable: true });
+    (instance as unknown as { parse: jest.Mock }).parse = jest
+      .fn()
+      .mockResolvedValue({ flags: { org: 'org1', limit: 10 } });
+
+    await expect(instance.init()).rejects.toThrow('Pass exactly one of --org, --limit; --org, --limit were supplied.');
+
+    authSpy.mockRestore();
+  });
+});
+
+describe('resolveLaunchContext rules', () => {
+  it('passes the declared rules through to the resolver, which evaluates them', async () => {
+    const promise = resolveLaunchContext({
+      flags: { org: 'org1', limit: 10 },
+      inputs: { org: {}, limit: {} },
+      rules: [exactlyOneOf('org', 'limit')],
+      launchHubUrl: 'https://launch-api.test',
+      analyticsInfo: 'cli/2.0.0',
+      ux: { print: () => undefined, inquire: async () => undefined as never },
+      isTTY: false,
+    });
+
+    await expect(promise).rejects.toBeInstanceOf(UsageError);
+    await expect(promise).rejects.toThrow('Pass exactly one of --org, --limit; --org, --limit were supplied.');
+  });
+});
+
+describe('resolveLaunchContext', () => {
+  const tempDirs: string[] = [];
+
+  afterEach(() => {
+    tempDirs.forEach((dir) => rmSync(dir, { recursive: true, force: true }));
+    tempDirs.length = 0;
+  });
+
+  it('reads .cs-launch.json from the default data-dir/config path when neither flag is supplied', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'launch-cli-'));
+    tempDirs.push(dir);
+    writeFileSync(join(dir, PROJECT_CONFIG_FILE), JSON.stringify({ project: { organizationUid: 'org-from-cwd' } }));
+    const cwdSpy = jest.spyOn(process, 'cwd').mockReturnValue(dir);
+    const loadSpy = jest.spyOn(ProjectConfigStore.prototype, 'load');
+
+    const result = await resolveLaunchContext({
+      flags: {},
+      inputs: { org: {} },
+      launchHubUrl: 'https://launch-api.test',
+      analyticsInfo: 'cli/2.0.0',
+      ux: { print: () => undefined, inquire: async () => undefined as never },
+      isTTY: false,
+    });
+
+    expect((loadSpy.mock.instances[0] as ProjectConfigStore).path).toBe(resolvePath(dir, PROJECT_CONFIG_FILE));
+    expect(result.configPath).toBe(resolvePath(dir, PROJECT_CONFIG_FILE));
+    expect(result.dataDir).toBe(dir);
+    expect(result.resolved).toEqual({ org: 'org-from-cwd' });
+    expect(result.services.isTTY).toBe(false);
+    cwdSpy.mockRestore();
+    loadSpy.mockRestore();
+  });
+
+  it('reads the config file from the supplied data-dir using the default file name when no config flag is given', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'launch-cli-'));
+    tempDirs.push(dir);
+    writeFileSync(
+      join(dir, PROJECT_CONFIG_FILE),
+      JSON.stringify({ project: { organizationUid: 'org-from-data-dir' } }),
+    );
+
+    const result = await resolveLaunchContext({
+      flags: { 'data-dir': dir },
+      inputs: { org: {} },
+      launchHubUrl: 'https://launch-api.test',
+      analyticsInfo: 'cli/2.0.0',
+      ux: { print: () => undefined, inquire: async () => undefined as never },
+      isTTY: false,
+    });
+
+    expect(result.resolved).toEqual({ org: 'org-from-data-dir' });
+    expect(result.configPath).toBe(resolvePath(dir, PROJECT_CONFIG_FILE));
+  });
+
+  it('reads the exact file named by the config flag, ignoring data-dir and the default file name', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'launch-cli-'));
+    tempDirs.push(dir);
+    const customPath = join(dir, 'custom.json');
+    writeFileSync(customPath, JSON.stringify({ project: { organizationUid: 'org-from-custom-config' } }));
+    const ux = { print: () => undefined, inquire: async () => undefined as never };
+
+    const result = await resolveLaunchContext({
+      flags: { 'data-dir': '/should/not/be/used', config: customPath },
+      inputs: { org: {} },
+      launchHubUrl: 'https://launch-api.test',
+      analyticsInfo: 'cli/2.0.0',
+      ux,
+      isTTY: true,
+    });
+
+    expect(result.resolved).toEqual({ org: 'org-from-custom-config' });
+    expect(result.configPath).toBe(customPath);
+    expect(result.services.ux).toBe(ux);
+    expect(result.services.isTTY).toBe(true);
+  });
+
+  async function contextInFolderHoldingAnOrg(flags: Partial<Record<FlagKey, unknown>>) {
+    const dir = mkdtempSync(join(tmpdir(), 'launch-cli-'));
+    tempDirs.push(dir);
+    writeFileSync(join(dir, PROJECT_CONFIG_FILE), JSON.stringify({ project: { organizationUid: 'org-from-cwd' } }));
+    jest.spyOn(process, 'cwd').mockReturnValue(dir);
+
+    return resolveLaunchContext({
+      flags,
+      inputs: { org: {} },
+      launchHubUrl: 'https://launch-api.test',
+      analyticsInfo: 'cli/2.0.0',
+      ux: { print: () => undefined, inquire: async () => undefined as never },
+      isTTY: false,
+    });
+  }
+
+  it('words a notice naming the values the config file supplied and where that file is', async () => {
+    const result = await contextInFolderHoldingAnOrg({});
+
+    expect(result.configNotice).toBe(`Using the organization UID from ${result.configPath}.`);
+  });
+
+  it('names a config file passed by a relative --config path by its full path', async () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'launch-cli-')));
+    tempDirs.push(dir);
+    writeFileSync(join(dir, 'staging.json'), JSON.stringify({ project: { organizationUid: 'org-from-staging' } }));
+    const startedIn = process.cwd();
+    process.chdir(dir);
+
+    try {
+      const result = await resolveLaunchContext({
+        flags: { config: 'staging.json' },
+        inputs: { org: {} },
+        launchHubUrl: 'https://launch-api.test',
+        analyticsInfo: 'cli/2.0.0',
+        ux: { print: () => undefined, inquire: async () => undefined as never },
+        isTTY: false,
+      });
+
+      expect(result.configNotice).toBe(`Using the organization UID from ${join(dir, 'staging.json')}.`);
+    } finally {
+      process.chdir(startedIn);
+    }
+  });
+
+  it('words no notice when the flags supplied every value the config file also holds', async () => {
+    const result = await contextInFolderHoldingAnOrg({ org: 'org-from-flag' });
+
+    expect(result.configNotice).toBeUndefined();
+  });
+});
+
+describe('projectConfigLoader', () => {
+  function store(config: object) {
+    const load = jest.fn(() => config);
+
+    return { store: { load } as unknown as ProjectConfigStore, load };
+  }
+
+  it('reads a default-location config only when a value is first needed, and only once', () => {
+    const { store: lazy, load } = store({ organizationUid: 'org1' });
+
+    const loader = projectConfigLoader(lazy, false);
+
+    expect(load).not.toHaveBeenCalled();
+    expect(typeof loader).toBe('function');
+    expect((loader as () => object)()).toEqual({ organizationUid: 'org1' });
+    expect((loader as () => object)()).toEqual({ organizationUid: 'org1' });
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads a config named by --config at once, so a wrong path fails before anything else happens', () => {
+    const { store: named, load } = store({ uid: 'p1' });
+
+    expect(projectConfigLoader(named, true)).toEqual({ uid: 'p1' });
+    expect(load).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets a load failure surface from the lazy read, not from building the loader', () => {
+    const failing = { load: jest.fn(() => { throw new Error('branches disagree'); }) } as unknown as ProjectConfigStore;
+
+    const loader = projectConfigLoader(failing, false);
+
+    expect(() => (loader as () => object)()).toThrow('branches disagree');
+  });
+});

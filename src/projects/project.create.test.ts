@@ -1,0 +1,2107 @@
+import AdmZip from 'adm-zip';
+import { randomBytes } from 'node:crypto';
+import { cliux } from '@contentstack/cli-utilities';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { basename, join } from 'node:path';
+
+import { CancelledError, MissingInputError, SessionExpiredError, UsageError } from '../core/errors';
+import type { UxLike } from '../core/prompt';
+import type { ServiceContext } from '../core/service-context';
+import { DeploymentUnsuccessfulError } from '../deployments/deployment.errors';
+import type { WatchTiming } from '../deployments/deployment.watcher';
+import type { ApiErrorEntry } from '../transport/errors';
+import { LaunchApiError } from '../transport/errors';
+import { GitConnectionMissingError, GitNamespaceNotConnectedError } from '../git/git.errors';
+import type { ApiSurface } from '../resources';
+import type { CreateRequest } from './types';
+import { ProjectCreator } from './project.create';
+import { SITE_OPEN_DELAY_MS } from '../deployments/deployment.follower';
+import { UploadFailedError } from '../uploads/upload.errors';
+import { UPLOAD_PROGRESS_LABEL } from '../uploads/upload.presenter';
+import {
+  DuplicateProjectNameError,
+  PROJECT_ERROR_MESSAGES,
+  ProjectCreateFailedError,
+} from './project.errors';
+
+jest.mock('../uploads/upload.transfer', () => ({
+  ...jest.requireActual('../uploads/upload.transfer'),
+  uploadArchive: jest.fn(async () => undefined),
+}));
+
+import * as archiveModule from '../uploads/upload.archive';
+import type { UploadOptions } from '../uploads/upload.transfer';
+import { MAX_UPLOAD_BYTES, uploadArchive } from '../uploads/upload.transfer';
+
+// Random, so it zips past the 1 KB Launch's storage providers accept as the smallest upload.
+const SITE_PAGE = `<h1>site</h1><!-- ${randomBytes(2048).toString('hex')} -->`;
+
+function fakeProgressBars() {
+  const built: Record<string, unknown>[] = [];
+  const calls: string[] = [];
+  const bar = {
+    started: [] as number[],
+    updated: [] as number[],
+    start: (total: number) => {
+      bar.started.push(total);
+      calls.push('start');
+    },
+    update: (value: number) => {
+      bar.updated.push(value);
+      calls.push('update');
+    },
+    stop: () => {
+      calls.push('stop');
+    },
+  };
+  const bars: unknown[] = [];
+  jest.spyOn(cliux, 'progress').mockImplementation(((options: Record<string, unknown>) => {
+    built.push(options);
+    bars.push(bar);
+    return bar;
+  }) as never);
+
+  return { built, bars, bar, calls };
+}
+
+const ORG = 'org1';
+const PROJECT_UID = 'p1';
+const ENVIRONMENT_UID = 'e1';
+const DEPLOYMENT_UID = 'd1';
+const SIGNED_UPLOAD = {
+  uploadUrl: 'https://uploads.example.test/x',
+  expiresIn: 600,
+  uploadUid: 'upload-uid',
+  method: 'POST',
+  fields: [{ formFieldKey: 'bucket', formFieldValue: 'launch-uploads' }],
+};
+
+function advancingTiming(timeline: string[] = []): WatchTiming {
+  let clock = 0;
+
+  return {
+    sleep: async (ms: number) => {
+      timeline.push(`sleep ${ms}`);
+      clock += ms;
+    },
+    now: () => clock,
+    pollDelayMs: 1,
+    maxBackoffSteps: 1,
+    timeoutMs: 5,
+  };
+}
+
+interface Scenario {
+  isTTY?: boolean;
+  outputIsTTY?: boolean;
+  answers?: unknown[];
+  statuses?: string[];
+  environments?: unknown[];
+  deployments?: unknown[];
+  repositories?: unknown[];
+  branches?: unknown[];
+  detected?: unknown;
+  createFails?: Error;
+  createFailures?: Error[];
+  repositoriesFails?: Error;
+  namespaces?: unknown[];
+  namespacesFails?: Error;
+  launchAppUrl?: string;
+  withoutOpenUrl?: boolean;
+  pollFails?: Error;
+  signedUrlFails?: Error;
+  environmentFails?: Error;
+  latestFails?: Error;
+  createdProject?: unknown;
+}
+
+const CONNECT_URL = 'https://dev11-app.csnonprod.com/#!/launch/settings/connected-accounts';
+const CONNECTION_IDENTIFIED = 'info: GitHub connection identified!';
+const PROJECT_CREATED = 'info: New project created successfully';
+
+let dataDir: string;
+
+function harness(scenario: Scenario = {}) {
+  const printed: string[] = [];
+  const timeline: string[] = [];
+  const asked: unknown[] = [];
+  const askedPayloads: Record<string, unknown>[] = [];
+  const created: unknown[] = [];
+  const gitCalls: unknown[] = [];
+  const calls: Record<'signedUploadUrl' | 'environments' | 'latest' | 'get' | 'branches' | 'namespaces', unknown[]> = {
+    namespaces: [],
+    signedUploadUrl: [],
+    environments: [],
+    latest: [],
+    get: [],
+    branches: [],
+  };
+  let answerIndex = 0;
+  let pollIndex = 0;
+  let latestIndex = 0;
+  let environmentIndex = 0;
+
+  const statuses = scenario.statuses ?? ['LIVE'];
+
+  const ux: UxLike = {
+    print: (message: string) => {
+      printed.push(message);
+      timeline.push(`print ${message}`);
+    },
+    inquire: async (payload: unknown) => {
+      asked.push((payload as { message: string }).message);
+      askedPayloads.push(payload as Record<string, unknown>);
+      const answer = (scenario.answers ?? [])[answerIndex];
+      answerIndex += 1;
+      return answer as never;
+    },
+  };
+
+  const api = {
+    uploads: {
+      signedUploadUrl: async (params: unknown) => {
+        calls.signedUploadUrl.push(params);
+
+        if (scenario.signedUrlFails) {
+          throw scenario.signedUrlFails;
+        }
+
+        return SIGNED_UPLOAD;
+      },
+    },
+    projects: {
+      create: async (params: unknown) => {
+        created.push(params);
+
+        if (scenario.createFails) {
+          throw scenario.createFails;
+        }
+
+        const failure = scenario.createFailures?.shift();
+
+        if (failure) {
+          throw failure;
+        }
+
+        return scenario.createdProject ?? { uid: PROJECT_UID, name: 'My Site', projectType: 'GITPROVIDER' };
+      },
+      gitFramework: async (params: unknown) => {
+        gitCalls.push(params);
+        return scenario.detected ?? { framework: 'NEXTJS', buildCommand: 'npm run build', outputDirectory: '.next' };
+      },
+      fileFramework: async (params: unknown) => {
+        gitCalls.push(params);
+        return scenario.detected ?? { framework: 'OTHER' };
+      },
+    },
+    environments: {
+      first: async (params: unknown) => {
+        calls.environments.push(params);
+
+        if (scenario.environmentFails) {
+          throw scenario.environmentFails;
+        }
+
+        const list = scenario.environments ?? [{ uid: ENVIRONMENT_UID, name: 'Default', domains: [] }];
+        const found = list[Math.min(environmentIndex, list.length - 1)];
+        environmentIndex += 1;
+        return found;
+      },
+    },
+    deployments: {
+      latest: async (params: unknown) => {
+        calls.latest.push(params);
+
+        if (scenario.latestFails) {
+          throw scenario.latestFails;
+        }
+
+        const list = scenario.deployments ?? [{ uid: DEPLOYMENT_UID, deploymentNumber: 1 }];
+        const found = list[Math.min(latestIndex, list.length - 1)];
+        latestIndex += 1;
+        return found;
+      },
+      get: async (params: unknown) => {
+        calls.get.push(params);
+
+        if (scenario.pollFails) {
+          pollIndex += 1;
+          throw scenario.pollFails;
+        }
+
+        const status = statuses[Math.min(pollIndex, statuses.length - 1)];
+        pollIndex += 1;
+        return { uid: DEPLOYMENT_UID, deploymentNumber: 1, status, deploymentUrl: 'my-site.example.test' };
+      },
+    },
+    deploymentLogs: {
+      after: async () => [],
+    },
+    git: {
+      namespaces: async (params: unknown) => {
+        calls.namespaces.push(params);
+
+        if (scenario.namespacesFails) {
+          throw scenario.namespacesFails;
+        }
+
+        return {
+          pagination: { count: 1, limit: 100 },
+          namespaces: scenario.namespaces ?? [{ name: 'my-org', type: 'User', provider: 'GitHub' }],
+        };
+      },
+      repositories: async (params: unknown) => {
+        gitCalls.push(params);
+
+        if (scenario.repositoriesFails) {
+          throw scenario.repositoriesFails;
+        }
+
+        return {
+          pagination: { count: 1, limit: 100 },
+          repositories: scenario.repositories ?? [
+            {
+              id: '24567',
+              name: 'my-repo',
+              fullName: 'my-org/my-repo',
+              url: 'https://github.com/my-org/my-repo',
+              defaultBranch: 'main',
+              isPrivate: false,
+            },
+          ],
+        };
+      },
+      branches: async (params: unknown) => {
+        calls.branches.push(params);
+        return {
+          pagination: { count: 1, limit: 100 },
+          branches: scenario.branches ?? [{ name: 'main' }],
+        };
+      },
+    },
+  } as unknown as ApiSurface;
+
+  const opened: string[] = [];
+  const services: ServiceContext = {
+    api,
+    ux,
+    isTTY: scenario.isTTY ?? false,
+    outputIsTTY: scenario.outputIsTTY,
+    launchAppUrl: scenario.launchAppUrl,
+    openUrl: scenario.withoutOpenUrl
+      ? undefined
+      : (url) => {
+        opened.push(url);
+        timeline.push(`open ${url}`);
+      },
+  };
+
+  return {
+    creator: new ProjectCreator(services, advancingTiming(timeline)),
+    opened,
+    timeline,
+    printed,
+    asked,
+    askedPayloads,
+    created,
+    gitCalls,
+    calls,
+  };
+}
+
+function cloneOf(repoName: string): void {
+  mkdirSync(join(dataDir, '.git'), { recursive: true });
+  writeFileSync(join(dataDir, '.git', 'HEAD'), 'ref: refs/heads/main\n');
+  writeFileSync(join(dataDir, '.git', 'config'), `[remote "origin"]\n\turl = https://github.com/${repoName}.git\n`);
+}
+
+function repositoryFound(colour = false): string {
+  const folder = colour ? `\u001b[36m${dataDir}\u001b[39m` : dataDir;
+
+  return `Using the GitHub repository my-org/my-repo from ${folder}.`;
+}
+
+function configPathIn(dir: string): string {
+  return join(dir, '.cs-launch.json');
+}
+
+function configFileIn(dir: string): unknown {
+  return JSON.parse(readFileSync(configPathIn(dir), 'utf8'));
+}
+
+function gitRequest(overrides: Partial<CreateRequest> = {}): CreateRequest {
+  return {
+    org: ORG,
+    dataDir,
+    configPath: configPathIn(dataDir),
+    type: 'GitHub',
+    name: 'My Site',
+    envName: 'Default',
+    branch: 'main',
+    framework: 'NEXTJS',
+    buildCmd: 'npm run build',
+    outputDir: '.next',
+    resMode: 'buffered',
+    csAuth: 'enable',
+    ...overrides,
+  };
+}
+
+function uploadRequest(overrides: Partial<CreateRequest> = {}): CreateRequest {
+  return {
+    org: ORG,
+    dataDir,
+    configPath: configPathIn(dataDir),
+    type: 'FileUpload',
+    name: 'My Site',
+    envName: 'Default',
+    framework: 'OTHER',
+    buildCmd: 'npm run build',
+    outputDir: './',
+    resMode: 'buffered',
+    csAuth: 'enable',
+    ...overrides,
+  };
+}
+
+function bodyOf(created: unknown[]): Record<string, unknown> {
+  return (created[0] as { input: Record<string, unknown> }).input;
+}
+
+describe('ProjectCreator on the GitHub path', () => {
+  beforeEach(() => {
+    dataDir = mkdtempSync(join(tmpdir(), 'launch-create-'));
+    writeFileSync(join(dataDir, 'index.html'), SITE_PAGE);
+    cloneOf('my-org/my-repo');
+  });
+
+  afterEach(() => {
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  it('sends the documented create body and reports the created project with its site url', async () => {
+    const { creator, created, printed, calls } = harness();
+
+    await creator.create(gitRequest());
+
+    expect((created[0] as { org: string }).org).toBe(ORG);
+    expect(calls.environments).toEqual([{ org: ORG, project: PROJECT_UID }]);
+    expect(calls.latest).toEqual([{ org: ORG, project: PROJECT_UID, environment: ENVIRONMENT_UID }]);
+    expect(calls.get).toEqual([
+      { org: ORG, project: PROJECT_UID, environment: ENVIRONMENT_UID, deployment: DEPLOYMENT_UID },
+    ]);
+    expect(calls.signedUploadUrl).toEqual([]);
+    expect(bodyOf(created)).toEqual({
+      name: 'My Site',
+      projectType: 'GITPROVIDER',
+      environment: {
+        name: 'Default',
+        gitBranch: 'main',
+        uploadUid: undefined,
+        buildCommand: 'npm run build',
+        outputDirectory: '.next',
+        serverCommand: undefined,
+        frameworkPreset: 'NEXTJS',
+        environmentVariables: [],
+        isStreamingEnabled: false,
+        isContentstackAuthenticationEnabled: true,
+      },
+      repository: {
+        repositoryName: 'my-org/my-repo',
+        username: 'my-org',
+        repositoryUrl: 'https://github.com/my-org/my-repo',
+        gitProviderMetadata: { gitProvider: 'GitHub' },
+      },
+    });
+    expect(printed).toEqual([CONNECTION_IDENTIFIED, repositoryFound(), PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
+  });
+
+  it('sends the project description and the two toggles only when they were supplied', async () => {
+    const { creator, created } = harness();
+
+    await creator.create(
+      gitRequest({ description: 'A site', autoDeploy: 'enable', csAuth: 'disable', resMode: 'streaming' }),
+    );
+    const body = bodyOf(created);
+
+    expect(body.description).toBe('A site');
+    expect(body.environment).toMatchObject({
+      autoDeployOnPush: true,
+      isContentstackAuthenticationEnabled: false,
+      isStreamingEnabled: true,
+    });
+  });
+
+  it('leaves the optional fields out of the body when they were not supplied', async () => {
+    const { creator, created } = harness();
+
+    await creator.create(gitRequest({ csAuth: undefined }));
+    const body = bodyOf(created);
+
+    expect(body).not.toHaveProperty('description');
+    expect(body).not.toHaveProperty('fileUpload');
+    expect(body.environment).not.toHaveProperty('autoDeployOnPush');
+    expect(body.environment).not.toHaveProperty('isContentstackAuthenticationEnabled');
+  });
+
+  it('always sends an empty environmentVariables array, whatever else it was handed', async () => {
+    const { creator, created } = harness();
+
+    await creator.create({
+      ...gitRequest(),
+      ...({ var: 'SECRET=hunter2', 'env-file': '.env', 'from-stack': 'blt1' } as object),
+    } as CreateRequest);
+    const environment = bodyOf(created).environment as Record<string, unknown>;
+
+    expect(environment.environmentVariables).toEqual([]);
+    expect(JSON.stringify(created)).not.toContain('hunter2');
+  });
+
+  it('detects the framework from the chosen repository and branch', async () => {
+    const { creator, gitCalls } = harness();
+
+    await creator.create(gitRequest());
+
+    expect(gitCalls).toContainEqual({
+      org: ORG,
+      provider: 'GitHub',
+      repoName: 'my-org/my-repo',
+      branchName: 'main',
+      namespace: 'my-org',
+    });
+  });
+
+  it('derives a repository url when the Git provider did not return one', async () => {
+    const { creator, created } = harness({ repositories: [{ fullName: 'my-org/my-repo' }] });
+
+    await creator.create(gitRequest());
+
+    expect((bodyOf(created).repository as Record<string, string>).repositoryUrl).toBe(
+      'https://github.com/my-org/my-repo',
+    );
+  });
+
+  it('takes the namespace and repository from the local clone instead of asking for them', async () => {
+    cloneOf('my-org/my-repo');
+    const { creator, asked, created } = harness({ isTTY: true, answers: ['main'] });
+
+    await creator.create(gitRequest({ branch: undefined }));
+
+    expect(asked).toEqual(['Choose a branch']);
+    expect(bodyOf(created).repository).toMatchObject({
+      repositoryName: 'my-org/my-repo',
+      username: 'my-org',
+    });
+  });
+
+  it('offers the detected repository default branch when it asks for a branch', async () => {
+    cloneOf('my-org/my-repo');
+    const { creator, asked, askedPayloads, calls } = harness({ isTTY: true, answers: ['main'] });
+
+    await creator.create(gitRequest({ branch: undefined }));
+
+    expect(asked).toEqual(['Choose a branch']);
+    expect(askedPayloads[0]).toMatchObject({ default: 'main' });
+    expect(calls.branches).toEqual([
+      { org: ORG, provider: 'GitHub', namespace: 'my-org', repoName: 'my-org/my-repo', limit: 100, skip: 0 },
+    ]);
+  });
+
+  it('creates from a local clone with no terminal to ask on', async () => {
+    cloneOf('my-org/my-repo');
+    const { creator, created } = harness();
+
+    await creator.create(gitRequest());
+
+    expect(bodyOf(created).repository).toMatchObject({
+      repositoryName: 'my-org/my-repo',
+      username: 'my-org',
+    });
+  });
+
+  it.each([[true], [false]])('refuses when the folder is not a GitHub working copy (terminal: %p)', async (isTTY) => {
+    const notAClone = mkdtempSync(join(tmpdir(), 'launch-not-a-clone-'));
+    const { creator, asked } = harness({ isTTY });
+
+    const failure = await creator
+      .create(gitRequest({ dataDir: notAClone, configPath: configPathIn(notAClone) }))
+      .catch((error: Error) => error);
+    rmSync(notAClone, { recursive: true, force: true });
+
+    expect(failure).toBeInstanceOf(UsageError);
+    expect((failure as Error).message).toBe(
+      `No GitHub repository was found in ${notAClone} or any folder above it. Run this command inside a ` +
+      'working copy of a GitHub repository, or pass --data-dir with one.',
+    );
+    expect(asked).toEqual([]);
+  });
+
+  it('names the detected repository when the API rejects the lookup outright', async () => {
+    const { creator } = harness({
+      repositoriesFails: new LaunchApiError(404, [{ message: 'Something went wrong' }]),
+    });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(UsageError);
+    expect((failure as Error).message).toBe(
+      `The GitHub repository "my-org/my-repo" checked out in ${dataDir} is not available to this ` +
+      'organization\'s connected GitHub account: Something went wrong. ' +
+      'Connect it in the Launch app, or pass --data-dir with a folder whose repository is connected.',
+    );
+  });
+
+  it.each<[string, ApiErrorEntry]>([
+    ['the code', { code: 'launch.USERCONNECTION.NOT_FOUND', message: 'No user connection found' }],
+    ['only the message', { message: 'No user connection found' }],
+  ])(
+    'points a missing GitHub connection at the connected-accounts page and opens it, by %s, as V1 did',
+    async (_by, entry) => {
+      const { creator, opened, printed } = harness({
+        launchAppUrl: 'https://dev11-app.csnonprod.com',
+        repositoriesFails: new LaunchApiError(404, [entry]),
+      });
+
+      const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+      expect(failure).toBeInstanceOf(GitConnectionMissingError);
+      expect(printed).toEqual([
+        CONNECTION_IDENTIFIED,
+        repositoryFound(),
+        'error: GitHub connection not found!',
+        'info: You can connect your GitHub account to the UI using the following URL:',
+        CONNECT_URL,
+      ]);
+      expect((failure as GitConnectionMissingError).exitCode).toBe(1);
+      expect(opened).toEqual([CONNECT_URL]);
+    },
+  );
+
+  it('names the owner the user is not connected to, rather than claiming no connection at all', async () => {
+    const { creator, opened, printed } = harness({
+      launchAppUrl: 'https://dev11-app.csnonprod.com',
+      namespaces: [{ name: 'harshi-xyz', type: 'User', provider: 'GitHub' }],
+      repositoriesFails: new LaunchApiError(404, [{ message: 'No user connection found' }]),
+    });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(GitNamespaceNotConnectedError);
+    expect(printed).toEqual([
+      CONNECTION_IDENTIFIED,
+      repositoryFound(),
+      'error: You are connected to GitHub as "harshi-xyz", which does not own this repository.',
+      `info: This repository belongs to "my-org". Manage your GitHub connections: ${CONNECT_URL}`,
+    ]);
+    expect(opened).toEqual([]);
+  });
+
+  it('refuses an owner it is not connected to before asking for a project name, as V1 refused a missing connection', async () => {
+    const { creator, asked, gitCalls } = harness({
+      isTTY: true,
+      namespaces: [{ name: 'harshi-xyz', type: 'User', provider: 'GitHub' }],
+    });
+
+    const failure = await creator
+      .create(gitRequest({ name: undefined, envName: undefined }))
+      .catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(GitNamespaceNotConnectedError);
+    expect(asked).toEqual([]);
+    expect(gitCalls).toEqual([]);
+  });
+
+  it('looks the repository up under the spelling the connection carries, not the one the clone url used', async () => {
+    cloneOf('MY-ORG/MY-REPO');
+    const { creator, gitCalls, created } = harness();
+
+    await creator.create(gitRequest());
+
+    expect(gitCalls[0]).toEqual(expect.objectContaining({ namespace: 'my-org', search: 'MY-REPO' }));
+    expect(created).toHaveLength(1);
+  });
+
+  it('reads the owner the same however either side spells it, since GitHub account names ignore case', async () => {
+    cloneOf('MY-ORG/my-repo');
+    const { creator, printed } = harness({
+      repositoriesFails: new LaunchApiError(404, [{ message: 'No user connection found' }]),
+    });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(GitConnectionMissingError);
+    expect(printed).toContain('error: GitHub connection not found!');
+  });
+
+  it('lists every account it is connected to when none of them owns the repository', async () => {
+    const { creator, printed } = harness({
+      namespaces: [
+        { name: 'harshi-xyz', type: 'User', provider: 'GitHub' },
+        { name: 'acme-org', type: 'User', provider: 'GitHub' },
+      ],
+      repositoriesFails: new LaunchApiError(404, [{ message: 'No user connection found' }]),
+    });
+
+    await creator.create(gitRequest()).catch(() => undefined);
+
+    expect(printed).toContain(
+      'error: You are connected to GitHub as "harshi-xyz" and "acme-org", which do not own this repository.',
+    );
+  });
+
+  it('keeps V1\'s message when the namespace list never arrived, since nothing then contradicts it', async () => {
+    const { creator, printed } = harness({
+      launchAppUrl: 'https://dev11-app.csnonprod.com',
+      namespacesFails: new LaunchApiError(502, [{ message: 'Bitbucket is unreachable' }]),
+      repositoriesFails: new LaunchApiError(404, [{ message: 'No user connection found' }]),
+    });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(GitConnectionMissingError);
+    expect(printed).toContain('error: GitHub connection not found!');
+  });
+
+  it('colours the missing-connection lines only when stdout is a terminal', async () => {
+    const { creator, printed } = harness({
+      outputIsTTY: true,
+      launchAppUrl: 'https://dev11-app.csnonprod.com',
+      repositoriesFails: new LaunchApiError(404, [{ message: 'No user connection found' }]),
+    });
+
+    await creator.create(gitRequest()).catch(() => undefined);
+
+    expect(printed).toEqual([
+      `\u001b[32m${CONNECTION_IDENTIFIED}\u001b[39m`,
+      repositoryFound(true),
+      '\u001b[31merror: GitHub connection not found!\u001b[39m',
+      '\u001b[32minfo: You can connect your GitHub account to the UI using the following URL:\u001b[39m',
+      `\u001b[32m${CONNECT_URL}\u001b[39m`,
+    ]);
+  });
+
+  it('says which GitHub repository it found and the top folder it found it in, from a folder below that one', async () => {
+    const app = join(dataDir, 'apps', 'web');
+    mkdirSync(app, { recursive: true });
+    const { creator, printed } = harness();
+
+    await creator.create(gitRequest({ dataDir: app, configPath: configPathIn(app) }));
+
+    expect(printed).toContain(`Using the GitHub repository my-org/my-repo from ${dataDir}.`);
+  });
+
+  it('colours only the folder in that line cyan, and only when stdout is a terminal', async () => {
+    const { creator, printed } = harness({ outputIsTTY: true });
+
+    await creator.create(gitRequest());
+
+    expect(printed).toContain(repositoryFound(true));
+  });
+
+  it('says the GitHub connection was identified, as V1 did, after asking which namespaces the user has connected', async () => {
+    const { creator, printed, calls } = harness({ outputIsTTY: true });
+
+    await creator.create(gitRequest());
+
+    expect(calls.namespaces).toEqual([{ org: ORG, limit: 100, skip: 0 }]);
+    expect(printed[0]).toBe(`\u001b[32m${CONNECTION_IDENTIFIED}\u001b[39m`);
+  });
+
+  it.each<[string, unknown[]]>([
+    ['no namespace at all', []],
+    ['only another provider', [{ name: 'acme', type: 'Organization', provider: 'ExternalGitProvider' }]],
+    ['a GitHub namespace with no name', [{ type: 'User', provider: 'GitHub' }]],
+  ])('sends the user to the connected-accounts page before asking anything when they have %s', async (_has, namespaces) => {
+    const { creator, opened, printed, asked, gitCalls, created } = harness({
+      isTTY: true,
+      launchAppUrl: 'https://dev11-app.csnonprod.com',
+      namespaces,
+    });
+
+    const failure = await creator.create(gitRequest({ name: undefined, envName: undefined })).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(GitConnectionMissingError);
+    expect((failure as GitConnectionMissingError).exitCode).toBe(1);
+    expect(printed).toEqual([
+      'error: GitHub connection not found!',
+      'info: You can connect your GitHub account to the UI using the following URL:',
+      CONNECT_URL,
+    ]);
+    expect(opened).toEqual([CONNECT_URL]);
+    expect(asked).toEqual([]);
+    expect(gitCalls).toEqual([]);
+    expect(created).toEqual([]);
+  });
+
+  it('reads a missing-connection rejection of the namespace lookup as a missing connection', async () => {
+    const { creator, printed, gitCalls } = harness({
+      launchAppUrl: 'https://dev11-app.csnonprod.com',
+      namespacesFails: new LaunchApiError(404, [{ code: 'launch.USERCONNECTION.NOT_FOUND', message: 'No user connection found' }]),
+    });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(GitConnectionMissingError);
+    expect(printed[0]).toBe('error: GitHub connection not found!');
+    expect(gitCalls).toEqual([]);
+  });
+
+  it.each<[string, LaunchApiError]>([
+    ['a broken external git provider', new LaunchApiError(502, [{ code: 'launch.PROVIDER.UNAVAILABLE', message: 'Bitbucket is unreachable' }])],
+    ['a server error', new LaunchApiError(500, [{ code: 'launch.INTERNAL', message: 'down' }])],
+  ])('carries on unannounced when the namespace lookup is refused for %s, and lets the repository lookup decide', async (_cause, refusal) => {
+    const { creator, printed, gitCalls, created } = harness({ namespacesFails: refusal });
+
+    await creator.create(gitRequest());
+
+    expect(printed).not.toContain(CONNECTION_IDENTIFIED);
+    expect(printed).toEqual([repositoryFound(), PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
+    expect(gitCalls[0]).toEqual({ org: ORG, provider: 'GitHub', namespace: 'my-org', search: 'my-repo', limit: 100, skip: 0 });
+    expect(created).toHaveLength(1);
+  });
+
+  it('still reports a missing connection the repository lookup finds after a refused namespace lookup', async () => {
+    const { creator, printed, created } = harness({
+      launchAppUrl: 'https://dev11-app.csnonprod.com',
+      namespacesFails: new LaunchApiError(502, [{ message: 'Bitbucket is unreachable' }]),
+      repositoriesFails: new LaunchApiError(404, [{ message: 'No user connection found' }]),
+    });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(GitConnectionMissingError);
+    expect(printed[1]).toBe('error: GitHub connection not found!');
+    expect(created).toEqual([]);
+  });
+
+  it('stops on a namespace lookup failure that is not an API answer, before anything is looked up or created', async () => {
+    const boom = new SessionExpiredError();
+    const { creator, printed, gitCalls, created } = harness({ namespacesFails: boom });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBe(boom);
+    expect(printed).toEqual([]);
+    expect(gitCalls).toEqual([]);
+    expect(created).toEqual([]);
+  });
+
+  it('is reported by its own lines, so the command exits on its code without printing it again', async () => {
+    const { creator } = harness({
+      launchAppUrl: 'https://dev11-app.csnonprod.com',
+      repositoriesFails: new LaunchApiError(404, [{ message: 'No user connection found' }]),
+    });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect((failure as GitConnectionMissingError).reported).toBe(true);
+    expect((failure as GitConnectionMissingError).connectUrl).toBe(CONNECT_URL);
+  });
+
+  it('still reports a missing GitHub connection, without a url to open, when no region names one', async () => {
+    const { creator, opened, printed } = harness({
+      repositoriesFails: new LaunchApiError(404, [{ message: 'No user connection found' }]),
+    });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(GitConnectionMissingError);
+    expect(printed).toEqual([CONNECTION_IDENTIFIED, repositoryFound(), 'error: GitHub connection not found!']);
+    expect(opened).toEqual([]);
+  });
+
+  it('still reports a missing GitHub connection when there is no way to open its url', async () => {
+    const { creator, printed } = harness({
+      launchAppUrl: 'https://dev11-app.csnonprod.com',
+      withoutOpenUrl: true,
+      repositoriesFails: new LaunchApiError(404, [{ message: 'No user connection found' }]),
+    });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(GitConnectionMissingError);
+    expect(printed).toContain(CONNECT_URL);
+  });
+
+  it('does not read a rejection whose entries carry no message as a missing connection', async () => {
+    const { creator, opened } = harness({
+      launchAppUrl: 'https://dev11-app.csnonprod.com',
+      repositoriesFails: new LaunchApiError(404, [{ code: 'launch.SOMETHING.WRONG' }]),
+    });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(UsageError);
+    expect(failure).not.toBeInstanceOf(GitConnectionMissingError);
+    expect(opened).toEqual([]);
+  });
+
+  it('lets a failure that is not an API error through the lookup untouched', async () => {
+    const boom = new SessionExpiredError();
+    const { creator } = harness({ repositoriesFails: boom });
+
+    await expect(creator.create(gitRequest())).rejects.toBe(boom);
+  });
+
+  it('names the local folder and the flags when the detected repository is not connected', async () => {
+    cloneOf('my-org/missing-repo');
+    const { creator } = harness({ isTTY: true });
+
+    const failure = await creator
+      .create(gitRequest({ branch: undefined }))
+      .catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(UsageError);
+    expect((failure as Error).message).toBe(
+      `The GitHub repository "my-org/missing-repo" checked out in ${dataDir} is not available to this ` +
+      'organization\'s connected GitHub account: no repository with that name was found. ' +
+      'Connect it in the Launch app, or pass --data-dir with a folder whose repository is connected.',
+    );
+  });
+
+});
+
+describe('ProjectCreator prompting order and refusals', () => {
+  beforeEach(() => {
+    dataDir = mkdtempSync(join(tmpdir(), 'launch-create-'));
+    writeFileSync(join(dataDir, 'index.html'), SITE_PAGE);
+    cloneOf('my-org/my-repo');
+  });
+
+  afterEach(() => {
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  it('asks in the order the doc pins: type, project name, environment name, framework, build, output, response, Contentstack Authentication', async () => {
+    const { creator, asked } = harness({
+      isTTY: true,
+      answers: ['GitHub', 'My Site', 'Default', 'main', 'NextJs', 'npm run build', '.next', 'buffered', 'enable'],
+    });
+
+    await creator.create({ org: ORG, dataDir, configPath: configPathIn(dataDir) });
+
+    expect(asked).toEqual([
+      'Choose a project type to proceed',
+      'Project name',
+      'Environment name',
+      'Choose a branch',
+      'Framework preset',
+      'Build command',
+      'Output directory',
+      'Response mode',
+      'Contentstack Authentication',
+    ]);
+  });
+
+  it('offers Default as the environment name, so pressing enter is enough, as V1 did', async () => {
+    const { creator, askedPayloads, created } = harness({
+      isTTY: true,
+      answers: ['GitHub', 'My Site', 'Default', 'main', 'NextJs', 'npm run build', '.next', 'buffered', 'enable'],
+    });
+
+    await creator.create({ org: ORG, dataDir, configPath: configPathIn(dataDir) });
+
+    expect(askedPayloads[2]).toMatchObject({ message: 'Environment name', default: 'Default' });
+    expect(bodyOf(created).environment).toMatchObject({ name: 'Default' });
+  });
+
+  it('asks for Contentstack Authentication on a terminal, defaulting to enable, and sends the answer', async () => {
+    const { creator, asked, askedPayloads, created } = harness({ isTTY: true, answers: ['disable'] });
+
+    await creator.create(gitRequest({ csAuth: undefined }));
+
+    expect(asked).toEqual(['Contentstack Authentication']);
+    expect(askedPayloads[0]).toMatchObject({ default: 'enable' });
+    expect(bodyOf(created).environment).toMatchObject({ isContentstackAuthenticationEnabled: false });
+  });
+
+  it('zips and uploads the files right after the project type, before asking for any name, as V1 did', async () => {
+    (uploadArchive as jest.Mock).mockClear();
+    const { creator, asked } = harness({
+      isTTY: true,
+      answers: ['FileUpload', 'My Site', 'Default', 'NextJs', 'npm run build', '.next', 'buffered', 'enable'],
+    });
+    let askedBeforeUpload: unknown[] = [];
+    (uploadArchive as jest.Mock).mockImplementation(async () => {
+      askedBeforeUpload = [...asked];
+    });
+
+    await creator.create({ org: ORG, dataDir, configPath: configPathIn(dataDir) });
+
+    expect(uploadArchive).toHaveBeenCalledTimes(1);
+    expect(askedBeforeUpload).toEqual(['Choose a project type to proceed']);
+    expect(asked.slice(1, 4)).toEqual(['Project name', 'Environment name', 'Framework preset']);
+  });
+
+  it.each<[string, Partial<CreateRequest>]>([
+    ['type', {}],
+    ['name', { type: 'GitHub' }],
+    ['env-name', { type: 'GitHub', name: 'My Site' }],
+  ])('exits 2 naming --%s when there is no terminal to ask on', async (flag, supplied) => {
+    const { creator } = harness();
+
+    const failure = await creator.create({ org: ORG, dataDir, configPath: configPathIn(dataDir), ...supplied }).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(MissingInputError);
+    expect((failure as MissingInputError).flag).toBe(flag);
+    expect((failure as MissingInputError).exitCode).toBe(2);
+  });
+
+  it('exits 2 naming --framework when nothing detected can be offered without a terminal', async () => {
+    const { creator } = harness({ detected: {} });
+
+    const failure = await creator
+      .create(gitRequest({ framework: undefined }))
+      .catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(MissingInputError);
+    expect((failure as MissingInputError).flag).toBe('framework');
+  });
+
+  it('offers the detected framework as the default rather than choosing it outright', async () => {
+    const { creator, asked, created } = harness({
+      isTTY: true,
+      answers: ['Astro', 'npm run build', 'dist', 'npm start', 'buffered'],
+      detected: { framework: 'NEXTJS', buildCommand: 'npm run build', outputDirectory: '.next' },
+    });
+
+    await creator.create(gitRequest({ framework: undefined, buildCmd: undefined, outputDir: undefined, resMode: undefined }));
+
+    expect(asked[0]).toBe('Framework preset');
+    expect((bodyOf(created).environment as Record<string, unknown>).frameworkPreset).toBe('ASTRO');
+  });
+
+  it('offers ./ as the output directory default when the service detected none', async () => {
+    const { creator, created } = harness({
+      isTTY: true,
+      answers: ['./'],
+      detected: { framework: 'OTHER', buildCommand: 'npm run build' },
+    });
+
+    await creator.create(uploadRequest({ outputDir: undefined, framework: 'GATSBY' }));
+
+    expect((bodyOf(created).environment as Record<string, unknown>).outputDirectory).toBe('./');
+  });
+
+  it('offers the detected framework as a default the picker can actually match', async () => {
+    const { creator, askedPayloads } = harness({
+      isTTY: true,
+      answers: ['Gatsby'],
+      detected: { framework: 'NEXTJS', buildCommand: 'npm run build', outputDirectory: '.next' },
+    });
+
+    await creator.create(gitRequest({ framework: undefined }));
+
+    const choices = askedPayloads[0].choices as { value: string }[];
+
+    expect(askedPayloads[0].default).toBe('NextJs');
+    expect(choices.map((choice) => choice.value)).toContain(askedPayloads[0].default);
+  });
+
+  it.each([['SvelteKit'], ['SolidStart'], ['Qwik'], ['']])(
+    'suggests nothing and still creates the project when the service detected the unknown framework %p',
+    async (framework) => {
+      const { creator, askedPayloads, created } = harness({
+        isTTY: true,
+        answers: ['Gatsby'],
+        detected: { framework, buildCommand: 'npm run build', outputDirectory: 'dist' },
+      });
+
+      await creator.create(gitRequest({ framework: undefined }));
+
+      expect(askedPayloads[0].default).toBeUndefined();
+      expect((bodyOf(created).environment as Record<string, unknown>).frameworkPreset).toBe('GATSBY');
+    },
+  );
+
+  it('suggests nothing when the service detected a framework that is not a string', async () => {
+    const { creator, askedPayloads } = harness({
+      isTTY: true,
+      answers: ['Gatsby'],
+      detected: { framework: 42, buildCommand: 'npm run build', outputDirectory: 'dist' },
+    });
+
+    await creator.create(gitRequest({ framework: undefined }));
+
+    expect(askedPayloads[0].default).toBeUndefined();
+  });
+
+  it('offers no framework default when the service detected nothing', async () => {
+    const { creator, created } = harness({ isTTY: true, answers: ['Other', 'npm start'], detected: {} });
+
+    await creator.create(gitRequest({ framework: undefined }));
+
+    expect((bodyOf(created).environment as Record<string, unknown>).frameworkPreset).toBe('OTHER');
+  });
+
+  it('cancels with exit 3 when nothing is picked at a prompt', async () => {
+    const { creator } = harness({ isTTY: true, answers: [undefined] });
+
+    const failure = await creator.create({ org: ORG, dataDir, configPath: configPathIn(dataDir) }).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(CancelledError);
+    expect((failure as CancelledError).exitCode).toBe(3);
+  });
+
+  it('asks for a server command only for a framework that supports one', async () => {
+    const supported = harness({ isTTY: true, answers: ['npm start'] });
+    await supported.creator.create(gitRequest({ framework: 'REMIX', serverCmd: undefined }));
+
+    expect(supported.asked).toEqual(['Server command']);
+    expect((bodyOf(supported.created).environment as Record<string, unknown>).serverCommand).toBe('npm start');
+
+    rmSync(configPathIn(dataDir), { force: true });
+    const unsupported = harness({ isTTY: true, answers: [] });
+    await unsupported.creator.create(gitRequest({ framework: 'NEXTJS', serverCmd: undefined }));
+
+    expect(unsupported.asked).toEqual([]);
+    expect((bodyOf(unsupported.created).environment as Record<string, unknown>).serverCommand).toBeUndefined();
+  });
+
+  it('sends a supplied server command for a supported framework without asking', async () => {
+    const { creator, asked, created } = harness({ isTTY: true });
+
+    await creator.create(gitRequest({ framework: 'NUXT', serverCmd: 'npm run start' }));
+
+    expect(asked).toEqual([]);
+    expect((bodyOf(created).environment as Record<string, unknown>).serverCommand).toBe('npm run start');
+  });
+
+  it('sends no server command for a supported framework when there is no terminal to ask on', async () => {
+    const { creator, created } = harness();
+
+    await creator.create(gitRequest({ framework: 'OTHER', serverCmd: undefined }));
+
+    expect((bodyOf(created).environment as Record<string, unknown>).serverCommand).toBeUndefined();
+  });
+});
+
+describe('ProjectCreator on the FileUpload path', () => {
+  beforeEach(() => {
+    dataDir = mkdtempSync(join(tmpdir(), 'launch-create-'));
+    writeFileSync(join(dataDir, 'index.html'), SITE_PAGE);
+    (uploadArchive as jest.Mock).mockClear();
+    (uploadArchive as jest.Mock).mockImplementation(async () => undefined);
+  });
+
+  afterEach(() => {
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  it('never reads the local clone, even when the data dir is one', async () => {
+    cloneOf('my-org/my-repo');
+    const { creator, created, gitCalls } = harness();
+
+    await creator.create(uploadRequest());
+
+    expect(gitCalls).toEqual([{ org: ORG, uploadUid: 'upload-uid' }]);
+    expect(bodyOf(created).repository).toBeUndefined();
+  });
+
+  it('never looks for a GitHub connection, which an upload does not need', async () => {
+    const { creator, calls, printed } = harness({ namespaces: [] });
+
+    await creator.create(uploadRequest());
+
+    expect(calls.namespaces).toEqual([]);
+    expect(printed).not.toContain(CONNECTION_IDENTIFIED);
+  });
+
+  it('zips the data dir, uploads it, and creates the project with the upload uid', async () => {
+    const { creator, created, printed, gitCalls, calls } = harness();
+
+    await creator.create(uploadRequest());
+
+    expect(calls.signedUploadUrl).toEqual([{ org: ORG }]);
+    expect(uploadArchive).toHaveBeenCalledTimes(1);
+    expect((uploadArchive as jest.Mock).mock.calls[0][0]).toBe(SIGNED_UPLOAD);
+    expect(bodyOf(created)).toMatchObject({
+      projectType: 'FILEUPLOAD',
+      fileUpload: { uploadUid: 'upload-uid' },
+      environment: { uploadUid: 'upload-uid', gitBranch: undefined },
+    });
+    expect(bodyOf(created)).not.toHaveProperty('repository');
+    expect(gitCalls).toContainEqual({ org: ORG, uploadUid: 'upload-uid' });
+    expect(printed.join('\n')).not.toContain('Uploading');
+  });
+
+  it('warns that --auto-deploy is not supported and creates the project without it, asking nothing', async () => {
+    const { creator, created, printed, asked } = harness({ isTTY: true });
+
+    await creator.create(uploadRequest({ autoDeploy: 'enable' }));
+
+    expect(printed).toContain('warn: --auto-deploy is not supported for FileUpload projects.');
+    expect(asked.filter((question) => String(question).includes('proceed'))).toEqual([]);
+    expect(bodyOf(created).environment).not.toHaveProperty('autoDeployOnPush');
+  });
+
+  it('warns that --branch is not supported and creates the project without one', async () => {
+    const { creator, created, printed } = harness();
+
+    await creator.create(uploadRequest({ branch: 'main' }));
+
+    expect(printed).toContain('warn: --branch is not supported for FileUpload projects.');
+    expect(bodyOf(created).environment).toMatchObject({ gitBranch: undefined });
+  });
+
+  it('warns once per unsupported flag, before zipping or uploading anything', async () => {
+    const { creator, printed } = harness();
+
+    await creator.create(uploadRequest({ branch: 'main', autoDeploy: 'disable' }));
+
+    expect(printed.slice(0, 3)).toEqual([
+      'warn: --branch is not supported for FileUpload projects.',
+      'warn: --auto-deploy is not supported for FileUpload projects.',
+      'Preparing zip file...',
+    ]);
+  });
+
+  it('warns and carries on without an interactive terminal too', async () => {
+    const { creator, created, printed } = harness({ isTTY: false });
+
+    await creator.create(uploadRequest({ autoDeploy: 'enable' }));
+
+    expect(printed).toContain('warn: --auto-deploy is not supported for FileUpload projects.');
+    expect(created).toHaveLength(1);
+  });
+
+  it('warns about --branch when FileUpload was chosen at the type prompt', async () => {
+    const { creator, printed } = harness({ isTTY: true, answers: ['FileUpload'] });
+
+    await creator.create(uploadRequest({ type: undefined, branch: 'main' }));
+
+    expect(printed).toContain('warn: --branch is not supported for FileUpload projects.');
+  });
+
+  it('colours the warning yellow only when stdout is a terminal', async () => {
+    const { creator, printed } = harness({ outputIsTTY: true });
+
+    await creator.create(uploadRequest({ autoDeploy: 'enable' }));
+
+    expect(printed).toContain('\u001b[33mwarn: --auto-deploy is not supported for FileUpload projects.\u001b[39m');
+  });
+
+  it.each([[true], [false], [undefined]])(
+    'never spins for the zip, whose step says so in a line of its own (output terminal: %s)',
+    async (outputIsTTY) => {
+      const spun: string[] = [];
+      jest.spyOn(cliux, 'loaderV2').mockImplementation(((message: string, running?: unknown) => {
+        spun.push(message);
+        return running === undefined ? {} : undefined;
+      }) as never);
+      const { creator, printed } = harness({ outputIsTTY });
+
+      await creator.create(uploadRequest());
+
+      expect(spun).not.toContain('Preparing zip file...');
+      expect(printed[0]).toBe('Preparing zip file...');
+    },
+  );
+
+  it.each([[true], [false], [undefined]])(
+    'draws the upload progress bar only when the output is a terminal (output terminal: %s)',
+    async (outputIsTTY) => {
+      const { bars, calls } = fakeProgressBars();
+      (uploadArchive as jest.Mock).mockImplementation(async (_target, body: Buffer, options: UploadOptions) => {
+        options.onProgress?.(body.length / 2, body.length);
+        options.onProgress?.(body.length, body.length);
+      });
+      const { creator } = harness({ outputIsTTY });
+
+      await creator.create(uploadRequest());
+
+      expect(bars).toHaveLength(outputIsTTY === true ? 1 : 0);
+      expect(calls).toEqual(outputIsTTY === true ? ['start', 'update', 'update', 'stop'] : []);
+    },
+  );
+
+  it('sizes the bar by the bytes going on the wire, not by the archive the multipart body wraps', async () => {
+    const { built, bar } = fakeProgressBars();
+    const WIRE_TOTAL = 53_335;
+    (uploadArchive as jest.Mock).mockImplementation(async (_target, body: Buffer, options: UploadOptions) => {
+      expect(body.length).toBeLessThan(WIRE_TOTAL);
+      options.onProgress?.(0, WIRE_TOTAL);
+      options.onProgress?.(WIRE_TOTAL, WIRE_TOTAL);
+    });
+    const { creator } = harness({ outputIsTTY: true });
+
+    await creator.create(uploadRequest());
+
+    expect(built[0].format).toContain(UPLOAD_PROGRESS_LABEL);
+    expect(bar.started).toEqual([WIRE_TOTAL]);
+    expect(bar.updated).toEqual([0, WIRE_TOTAL]);
+  });
+
+  it('stops the upload progress bar when the upload fails partway, rather than leaving it drawn', async () => {
+    const { calls } = fakeProgressBars();
+    (uploadArchive as jest.Mock).mockImplementation(async (_target, body: Buffer, options: UploadOptions) => {
+      options.onProgress?.(0, body.length);
+      throw new Error('upload refused');
+    });
+    const { creator } = harness({ outputIsTTY: true });
+
+    await expect(creator.create(uploadRequest())).rejects.toThrow('upload refused');
+
+    expect(calls).toEqual(['start', 'update', 'stop']);
+  });
+
+  it('draws no bar at all when the upload fails before a single byte reaches the wire', async () => {
+    const { bars, calls } = fakeProgressBars();
+    (uploadArchive as jest.Mock).mockImplementation(async () => {
+      throw new Error('upload refused');
+    });
+    const { creator } = harness({ outputIsTTY: true });
+
+    await expect(creator.create(uploadRequest())).rejects.toThrow('upload refused');
+
+    expect(bars).toEqual([]);
+    expect(calls).toEqual([]);
+  });
+
+  it('refuses a zip over the upload limit before asking for an upload url or any name', async () => {
+    jest.spyOn(archiveModule, 'archiveDirectory').mockReturnValue({
+      buffer: { length: MAX_UPLOAD_BYTES + 1 } as Buffer,
+      entries: ['index.html'],
+      skippedLinks: [],
+    });
+    const { creator, calls, asked } = harness({ isTTY: true, answers: ['FileUpload'] });
+
+    const failure = await creator.create({ org: ORG, dataDir, configPath: configPathIn(dataDir) }).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(UsageError);
+    expect((failure as Error).message).toContain('over the 100 MB Launch accepts for a file upload');
+    expect(calls.signedUploadUrl).toEqual([]);
+    expect(uploadArchive).not.toHaveBeenCalled();
+    expect(asked).toEqual(['Choose a project type to proceed']);
+  });
+
+  it('refuses a folder that zips under 1 KB before asking for an upload url, rather than being refused by storage', async () => {
+    writeFileSync(join(dataDir, 'index.html'), '<h1>site</h1>');
+    const { creator, calls, created } = harness();
+
+    const failure = await creator.create(uploadRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(UsageError);
+    expect((failure as Error).message).toContain('under the 1 KB Launch accepts for a file upload');
+    expect(calls.signedUploadUrl).toEqual([]);
+    expect(uploadArchive).not.toHaveBeenCalled();
+    expect(created).toEqual([]);
+  });
+
+  it('leaves a --config file that lives inside the data dir out of the upload', async () => {
+    const configPath = join(dataDir, 'launch.json');
+    writeFileSync(configPath, JSON.stringify({ project: { organizationUid: ORG } }));
+    const { creator } = harness({ createdProject: { uid: 'p0', name: 'My Site' } });
+
+    await creator.create(uploadRequest({ configPath }));
+
+    const uploaded = new AdmZip((uploadArchive as jest.Mock).mock.calls[0][1]);
+    expect(uploaded.getEntries().map((entry) => entry.entryName)).toEqual(['index.html']);
+  });
+
+  it.each([[true], [false]])(
+    'says it is preparing the zip in plain text, terminal or not (output terminal: %s)',
+    async (outputIsTTY) => {
+      let printedBeforeUpload: string[] = [];
+      const { creator, printed } = harness({ outputIsTTY });
+      (uploadArchive as jest.Mock).mockImplementation(async () => {
+        printedBeforeUpload = [...printed];
+      });
+
+      await creator.create(uploadRequest());
+
+      expect(printed[0]).toBe('Preparing zip file...');
+      expect(printedBeforeUpload[0]).toBe('Preparing zip file...');
+    },
+  );
+
+  it('never claims a zip it refused was ready, having only said it was preparing one', async () => {
+    jest.spyOn(archiveModule, 'archiveDirectory').mockReturnValue({
+      buffer: { length: MAX_UPLOAD_BYTES + 1 } as Buffer,
+      entries: ['index.html'],
+      skippedLinks: [],
+    });
+    const { creator, printed } = harness();
+
+    await expect(creator.create(uploadRequest())).rejects.toThrow('over the 100 MB Launch accepts');
+
+    expect(printed).toEqual(['Preparing zip file...']);
+  });
+
+  it('says which symbolic links it left out of the upload before uploading', async () => {
+    symlinkSync(join(dataDir, 'index.html'), join(dataDir, 'linked.html'));
+    const { creator, printed } = harness();
+
+    await creator.create(uploadRequest());
+
+    expect(printed[0]).toBe('Preparing zip file...');
+    expect(printed[1]).toBe('Skipping 1 symbolic link(s), which are never uploaded: linked.html');
+  });
+
+  it('creates the project with no server command when the optional prompt is left empty', async () => {
+    for (const answer of ['', '   ', undefined, null]) {
+      rmSync(configPathIn(dataDir), { force: true });
+      (uploadArchive as jest.Mock).mockClear();
+      const { creator, created, asked } = harness({ isTTY: true, answers: [answer] });
+
+      await creator.create(uploadRequest({ framework: 'OTHER', serverCmd: undefined }));
+
+      expect(asked).toEqual(['Server command']);
+      expect(uploadArchive).toHaveBeenCalledTimes(1);
+      expect(created).toHaveLength(1);
+      expect((bodyOf(created).environment as Record<string, unknown>).serverCommand).toBeUndefined();
+    }
+  });
+
+  it('creates the project with no build command when the optional prompt is left empty', async () => {
+    for (const answer of ['', '   ', undefined, null]) {
+      rmSync(configPathIn(dataDir), { force: true });
+      const { creator, created, asked, askedPayloads } = harness({ isTTY: true, answers: [answer] });
+
+      await creator.create(uploadRequest({ buildCmd: undefined, serverCmd: 'npm start' }));
+
+      expect(asked).toEqual(['Build command']);
+      expect(askedPayloads[0].default).toBeUndefined();
+      expect(created).toHaveLength(1);
+      expect((bodyOf(created).environment as Record<string, unknown>).buildCommand).toBeUndefined();
+    }
+  });
+
+  it('trims a build command and a server command typed at their optional prompts', async () => {
+    const { creator, created } = harness({ isTTY: true, answers: ['  npm run build  ', ' npm start '] });
+
+    await creator.create(uploadRequest({ buildCmd: undefined, serverCmd: undefined }));
+
+    expect(bodyOf(created).environment).toMatchObject({ buildCommand: 'npm run build', serverCommand: 'npm start' });
+  });
+
+  it('exits 2 naming --data-dir rather than uploading the wrong contents', async () => {
+    const { creator } = harness();
+
+    const failure = await creator
+      .create(uploadRequest({ dataDir: join(dataDir, 'no-such-folder') }))
+      .catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(UsageError);
+    expect((failure as UsageError).exitCode).toBe(2);
+    expect((failure as UsageError).message).toContain('--data-dir');
+    expect(uploadArchive).not.toHaveBeenCalled();
+  });
+
+  it('exits 2 without uploading when the directory holds nothing but excluded paths', async () => {
+    rmSync(join(dataDir, 'index.html'));
+    writeFileSync(join(dataDir, '.env'), 'SECRET=1');
+    const { creator } = harness();
+
+    await expect(creator.create(uploadRequest())).rejects.toThrow('Nothing to upload');
+    expect(uploadArchive).not.toHaveBeenCalled();
+  });
+
+  it('propagates an upload that fails midway rather than creating a project from it', async () => {
+    (uploadArchive as jest.Mock).mockImplementation(async () => {
+      throw new UploadFailedError('The upload of your project files failed: socket hang up');
+    });
+    const { creator, created } = harness();
+
+    const failure = await creator.create(uploadRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(UploadFailedError);
+    expect((failure as UploadFailedError).exitCode).toBe(1);
+    expect(created).toEqual([]);
+  });
+
+  it('propagates a failure to get a signed upload url without uploading or creating anything', async () => {
+    const refused = new LaunchApiError(403, [{ code: 'launch.FORBIDDEN', message: 'Not allowed here.' }]);
+    const { creator, created, calls } = harness({ signedUrlFails: refused });
+
+    const failure = await creator.create(uploadRequest()).catch((error: Error) => error);
+
+    expect(failure).toBe(refused);
+    expect((failure as LaunchApiError).exitCode).toBe(1);
+    expect(calls.signedUploadUrl).toEqual([{ org: ORG }]);
+    expect(uploadArchive).not.toHaveBeenCalled();
+    expect(created).toEqual([]);
+  });
+});
+
+describe('ProjectCreator waiting on the first deployment', () => {
+  beforeEach(() => {
+    dataDir = mkdtempSync(join(tmpdir(), 'launch-create-'));
+    writeFileSync(join(dataDir, 'index.html'), SITE_PAGE);
+    cloneOf('my-org/my-repo');
+  });
+
+  afterEach(() => {
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  it.each([
+    [true, ['Loading deployment logs...', 'done']],
+    [false, []],
+    [undefined, []],
+  ])('draws the loading spinner only when the output is a terminal (output terminal: %s)', async (outputIsTTY, drawn) => {
+    const spun: string[] = [];
+    jest.spyOn(cliux, 'loaderV2').mockImplementation(((message: string, running?: unknown) => {
+      spun.push(message);
+      return running === undefined ? {} : undefined;
+    }) as never);
+    const { creator } = harness({ isTTY: true, outputIsTTY, statuses: ['DEPLOYING', 'LIVE'] });
+
+    await creator.create(gitRequest());
+
+    expect(spun).toEqual(drawn);
+  });
+
+  it('waits through every in-flight status without printing it', async () => {
+    const { creator, printed } = harness({ statuses: ['QUEUED', 'QUEUED', 'DEPLOYING', 'LIVE'] });
+
+    await creator.create(gitRequest());
+
+    expect(printed).toEqual([CONNECTION_IDENTIFIED, repositoryFound(), PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
+  });
+
+  it.each([
+    [true, false, 'Deployment URL https://my-site.example.test'],
+    [false, true, '\u001b[1mDeployment URL\u001b[22m \u001b[36mhttps://my-site.example.test\u001b[39m'],
+    [false, undefined, 'Deployment URL https://my-site.example.test'],
+  ])(
+    'styles the deployment url by where the output goes, not by stdin (stdin terminal: %s, output terminal: %s)',
+    async (isTTY, outputIsTTY, line) => {
+      const { creator, printed } = harness({ isTTY, outputIsTTY });
+
+      await creator.create(gitRequest());
+
+      expect(printed.at(-1)).toBe(line);
+    },
+  );
+
+  it('treats DEPLOYED as a success as well as LIVE', async () => {
+    const { creator, printed } = harness({ statuses: ['DEPLOYED'] });
+
+    await creator.create(gitRequest());
+
+    expect(printed).toContain('Deployment URL https://my-site.example.test');
+  });
+
+  it('exits 1 on a failed deployment, saying what survived and how to retry and inspect it', async () => {
+    const { creator } = harness({ statuses: ['DEPLOYING', 'FAILED'] });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
+    expect((failure as DeploymentUnsuccessfulError).exitCode).toBe(1);
+    expect((failure as Error).message).toBe(
+      'The deployment did not succeed; its last status was FAILED. ' +
+      'The project "My Site" (p1) and its environment "Default" were created and have not been rolled back. ' +
+      'Run csdx launch:deployments:create --org org1 --project p1 --env e1 to try the deployment again, ' +
+      'or csdx launch:logs:get --org org1 --project p1 --env e1 --deployment d1 ' +
+      'to see why it did not succeed.',
+    );
+  });
+
+  it('exits 1 when the deployment never left DEPLOYING within the timeout', async () => {
+    const { creator } = harness({ statuses: ['DEPLOYING'] });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
+    expect((failure as Error).message).toContain('The deployment was still DEPLOYING when the CLI stopped waiting');
+    expect((failure as Error).message).toContain('Do not start another deployment yet');
+    expect((failure as Error).message).not.toContain('deployments:create');
+  });
+
+  it('exits 1 naming no deployment when the API reported none to wait on', async () => {
+    const { creator } = harness({ deployments: [undefined] });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
+    expect((failure as Error).message).toContain('its last status was NONE');
+    expect((failure as Error).message).not.toContain('--deployment');
+  });
+
+  it('waits for the first deployment to appear rather than calling an empty page a failure', async () => {
+    const { creator, printed } = harness({ deployments: [undefined, { uid: DEPLOYMENT_UID, deploymentNumber: 1 }] });
+
+    await creator.create(gitRequest());
+
+    expect(printed).toContain('Deployment URL https://my-site.example.test');
+  });
+
+  it('waits for the first environment to appear rather than calling an empty page a failure', async () => {
+    const { creator, printed } = harness({
+      environments: [undefined, { uid: ENVIRONMENT_UID, name: 'Default', domains: [] }],
+    });
+
+    await creator.create(gitRequest());
+
+    expect(printed).toContain('Deployment URL https://my-site.example.test');
+  });
+
+  it('exits 1 disclosing the project when looking up its first environment failed', async () => {
+    const { creator, calls } = harness({ environmentFails: new LaunchApiError(502, []) });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
+    expect((failure as DeploymentUnsuccessfulError).exitCode).toBe(1);
+    expect((failure as Error).message).toContain('Launch API request failed with status 502.');
+    expect((failure as Error).message).toContain('The project "My Site" (p1)');
+    expect((failure as Error).message).toContain('have not been rolled back');
+    expect((failure as Error).message).not.toContain('--environment');
+    expect(calls.latest).toEqual([]);
+  });
+
+  it('exits 1 disclosing the project and environment when looking up the first deployment failed', async () => {
+    const { creator, calls } = harness({ latestFails: new Error('socket hang up') });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
+    expect((failure as DeploymentUnsuccessfulError).exitCode).toBe(1);
+    expect((failure as Error).message).toContain('socket hang up.');
+    expect((failure as Error).message).toContain('--org org1 --project p1 --env e1');
+    expect((failure as Error).message).not.toContain('--deployment');
+    expect(calls.get).toEqual([]);
+  });
+
+  it('exits 1 disclosing what survived when the wait itself failed outright', async () => {
+    const { creator } = harness({ pollFails: new Error('The Launch API answered 502 Bad Gateway.') });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
+    expect((failure as DeploymentUnsuccessfulError).exitCode).toBe(1);
+    expect((failure as Error).message).toContain('The Launch API answered 502 Bad Gateway.');
+    expect((failure as Error).message).toContain('have not been rolled back');
+    expect((failure as Error).message).toContain('--org org1 --project p1');
+    expect((failure as Error).message).toContain('--env e1');
+    expect((failure as Error).message).toContain('--deployment d1');
+  });
+
+  it('exits 1 disclosing what survived when the wait failed with something that is not an Error', async () => {
+    const { creator } = harness({ pollFails: 'socket hang up' as unknown as Error });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
+    expect((failure as Error).message).toContain('socket hang up.');
+    expect((failure as Error).message).toContain('have not been rolled back');
+  });
+
+  it('exits 1 naming no environment when the API reported none either', async () => {
+    const { creator } = harness({ environments: [undefined] });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect((failure as Error).message).toContain('its environment "Default"');
+    expect((failure as Error).message).not.toContain('--environment');
+  });
+
+  it('falls back to the environment domain when the deployment carries no url', async () => {
+    const { creator, printed } = harness({
+      environments: [{ uid: ENVIRONMENT_UID, name: 'Default', domains: [{}, { url: 'domain.example.test' }] }],
+    });
+    const { creator: creator2 } = harness();
+    expect(creator2).toBeDefined();
+
+    jest
+      .spyOn(
+        (creator as unknown as { services: { api: { deployments: { get: () => unknown } } } }).services.api.deployments,
+        'get',
+      )
+      .mockResolvedValue({ uid: DEPLOYMENT_UID, deploymentNumber: 1, status: 'LIVE' } as never);
+
+    await creator.create(gitRequest());
+
+    expect(printed).toContain('Deployment URL https://domain.example.test');
+  });
+
+  it('reports no url at all when neither the deployment nor the environment has one', async () => {
+    const { creator, printed } = harness({ environments: [{ uid: ENVIRONMENT_UID, name: 'Default' }] });
+
+    jest
+      .spyOn(
+        (creator as unknown as { services: { api: { deployments: { get: () => unknown } } } }).services.api.deployments,
+        'get',
+      )
+      .mockResolvedValue({ uid: DEPLOYMENT_UID, deploymentNumber: 1, status: 'LIVE' } as never);
+
+    await creator.create(gitRequest());
+
+    expect(printed.join('\n')).not.toContain('Deployment URL');
+    expect(printed.join('\n')).not.toContain('undefined');
+  });
+
+  it('opens the site after printing its url and waiting six seconds, as V1 did, even when output is piped', async () => {
+    const { creator, opened, timeline } = harness();
+
+    await creator.create(gitRequest());
+
+    expect(SITE_OPEN_DELAY_MS).toBe(6000);
+    expect(opened).toEqual(['https://my-site.example.test']);
+    expect(timeline.slice(-3)).toEqual([
+      'print Deployment URL https://my-site.example.test',
+      'sleep 6000',
+      'open https://my-site.example.test',
+    ]);
+  });
+
+  it('says the project was created, as V1 did, between creating it and following its deployment', async () => {
+    const { creator, printed, timeline } = harness({ outputIsTTY: true });
+
+    await creator.create(gitRequest());
+
+    expect(printed[2]).toBe(`\u001b[32m${PROJECT_CREATED}\u001b[39m`);
+    expect(timeline.indexOf(`print \u001b[32m${PROJECT_CREATED}\u001b[39m`)).toBeLessThan(
+      timeline.findIndex((entry) => entry.includes('Deployment URL')),
+    );
+  });
+
+  it('opens the site on a terminal too', async () => {
+    const { creator, opened } = harness({ isTTY: true, outputIsTTY: true });
+
+    await creator.create(gitRequest());
+
+    expect(opened).toEqual(['https://my-site.example.test']);
+  });
+
+  it('neither waits nor opens anything when the deployment has no url to open', async () => {
+    const { creator, opened, timeline } = harness({ environments: [{ uid: ENVIRONMENT_UID, name: 'Default' }] });
+
+    jest
+      .spyOn(
+        (creator as unknown as { services: { api: { deployments: { get: () => unknown } } } }).services.api.deployments,
+        'get',
+      )
+      .mockResolvedValue({ uid: DEPLOYMENT_UID, deploymentNumber: 1, status: 'LIVE' } as never);
+
+    await creator.create(gitRequest());
+
+    expect(opened).toEqual([]);
+    expect(timeline).not.toContain(`sleep ${SITE_OPEN_DELAY_MS}`);
+  });
+
+  it('prints the url without waiting when there is no way to open it', async () => {
+    const { creator, printed, timeline } = harness({ withoutOpenUrl: true });
+
+    await creator.create(gitRequest());
+
+    expect(printed).toEqual([CONNECTION_IDENTIFIED, repositoryFound(), PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
+    expect(timeline).not.toContain(`sleep ${SITE_OPEN_DELAY_MS}`);
+  });
+
+  it('opens nothing when the deployment fails', async () => {
+    const { creator, opened, timeline } = harness({ statuses: ['DEPLOYING', 'FAILED'] });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
+    expect(opened).toEqual([]);
+    expect(timeline).not.toContain(`sleep ${SITE_OPEN_DELAY_MS}`);
+  });
+
+  it('names the project by its uid when the API returned one with no name', async () => {
+    const { creator } = harness({ statuses: ['FAILED'] });
+    jest
+      .spyOn(
+        (creator as unknown as { services: { api: { projects: { create: () => unknown } } } }).services.api.projects,
+        'create',
+      )
+      .mockResolvedValue({ uid: PROJECT_UID, projectType: 'GITPROVIDER' } as never);
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect((failure as Error).message).toContain(`The project "${PROJECT_UID}" (${PROJECT_UID})`);
+    expect((failure as Error).message).not.toContain('undefined');
+  });
+
+  it('names the environment by the name it asked for when the API returned one with no name', async () => {
+    const { creator } = harness({ statuses: ['FAILED'], environments: [{ uid: ENVIRONMENT_UID }] });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect((failure as Error).message).toContain('its environment "Default"');
+    expect((failure as Error).message).not.toContain('undefined');
+  });
+
+  it('reports a create failure under V1\'s header without waiting on anything', async () => {
+    const boom = new UsageError('Project name contains characters that are not allowed.');
+    const { creator, printed, calls } = harness({ createFails: boom });
+
+    const failure = await creator.create(gitRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(ProjectCreateFailedError);
+    expect((failure as ProjectCreateFailedError).exitCode).toBe(2);
+    expect(printed).toEqual([
+      CONNECTION_IDENTIFIED,
+      repositoryFound(),
+      'error: New project creation failed!',
+      'error: Project name contains characters that are not allowed.',
+    ]);
+    expect(calls.environments).toEqual([]);
+  });
+});
+
+describe('ProjectCreator writing the project config', () => {
+  beforeEach(() => {
+    (uploadArchive as jest.Mock).mockImplementation(async () => undefined);
+    dataDir = mkdtempSync(join(tmpdir(), 'launch-create-'));
+    writeFileSync(join(dataDir, 'index.html'), SITE_PAGE);
+    cloneOf('my-org/my-repo');
+  });
+
+  afterEach(() => {
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  it('writes the created project into .cs-launch.json on the GitHub path', async () => {
+    const { creator } = harness();
+
+    await creator.create(gitRequest({ configPath: configPathIn(dataDir) }));
+
+    expect(configFileIn(dataDir)).toEqual({
+      project: { uid: PROJECT_UID, organizationUid: ORG },
+    });
+  });
+
+  it('writes the created project into .cs-launch.json on the FileUpload path', async () => {
+    const { creator } = harness();
+
+    await creator.create(uploadRequest({ configPath: configPathIn(dataDir) }));
+
+    expect(configFileIn(dataDir)).toEqual({
+      project: { uid: PROJECT_UID, organizationUid: ORG },
+    });
+  });
+
+  it('keeps every other branch block in an existing multi-branch file', async () => {
+    writeFileSync(
+      configPathIn(dataDir),
+      JSON.stringify({
+        main: { organizationUid: ORG, environments: [{ uid: 'e1', name: 'Default' }] },
+        'feature/checkout': { organizationUid: ORG, environments: [{ uid: 'e2', name: 'Preview' }] },
+      }),
+    );
+    const { creator } = harness();
+
+    await creator.create(gitRequest({ configPath: configPathIn(dataDir) }));
+
+    expect(configFileIn(dataDir)).toEqual({
+      main: {
+        uid: PROJECT_UID,
+        organizationUid: ORG,
+        environments: [{ uid: 'e1', name: 'Default' }],
+      },
+      'feature/checkout': {
+        uid: PROJECT_UID,
+        organizationUid: ORG,
+        environments: [{ uid: 'e2', name: 'Preview' }],
+      },
+    });
+  });
+
+  it('refuses before creating anything, and leaves the file alone, when the folder already names a project', async () => {
+    const existing = { project: { uid: 'other-project', organizationUid: ORG } };
+    writeFileSync(configPathIn(dataDir), JSON.stringify(existing));
+    const { creator, created } = harness();
+
+    const failure = await creator.create(gitRequest({ configPath: configPathIn(dataDir) })).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(UsageError);
+    expect((failure as UsageError).message).toBe(
+      'This folder already belongs to project other-project.\n' +
+      `To create a new project, rename or delete ${configPathIn(dataDir)}.`,
+    );
+    expect(created).toEqual([]);
+    expect(configFileIn(dataDir)).toEqual(existing);
+  });
+
+  it('names the linked config file by its bare name when it sits in the working directory', async () => {
+    writeFileSync(configPathIn(dataDir), JSON.stringify({ project: { uid: 'other-project', organizationUid: ORG } }));
+    jest.spyOn(process, 'cwd').mockReturnValue(dataDir);
+    const { creator } = harness();
+
+    const failure = await creator.create(gitRequest({ configPath: configPathIn(dataDir) })).catch((error: Error) => error);
+
+    expect((failure as UsageError).message).toBe(
+      'This folder already belongs to project other-project.\n' +
+      'To create a new project, rename or delete .cs-launch.json.',
+    );
+  });
+
+  it('names the linked config file relative to the working directory when it sits in a folder below it', async () => {
+    const site = join(dataDir, 'site');
+    mkdirSync(site);
+    writeFileSync(configPathIn(site), JSON.stringify({ project: { uid: 'other-project', organizationUid: ORG } }));
+    jest.spyOn(process, 'cwd').mockReturnValue(dataDir);
+    const { creator } = harness();
+
+    const failure = await creator.create(gitRequest({ configPath: configPathIn(site) })).catch((error: Error) => error);
+
+    expect((failure as UsageError).message).toBe(
+      'This folder already belongs to project other-project.\n' +
+      `To create a new project, rename or delete ${join('site', '.cs-launch.json')}.`,
+    );
+  });
+
+  it('reports the miss and leaves an unparseable config file untouched, still completing the create', async () => {
+    writeFileSync(configPathIn(dataDir), '{ not json ');
+    const { creator, printed, created } = harness();
+
+    await expect(creator.create(gitRequest({ configPath: configPathIn(dataDir) }))).resolves.toBeUndefined();
+
+    expect(readFileSync(configPathIn(dataDir), 'utf8')).toBe('{ not json ');
+    expect(created).toHaveLength(1);
+    expect(printed).toContain(
+      `Could not record this project in ${configPathIn(dataDir)}: ` +
+      `The config file at '${configPathIn(dataDir)}' is not valid JSON. It was left unchanged. ` +
+      `Pass --org ${ORG} --project ${PROJECT_UID} explicitly when you run Launch commands in this folder.`,
+    );
+    expect(printed.some((line) => line.includes(PROJECT_UID))).toBe(true);
+  });
+
+  it('reports the miss and still reports the created project when the file cannot be written', async () => {
+    const unwritable = join(dataDir, 'no-such-folder', '.cs-launch.json');
+    const { creator, printed } = harness();
+
+    await expect(creator.create(gitRequest({ configPath: unwritable }))).resolves.toBeUndefined();
+
+    expect(printed.some((line) => line.startsWith(`Could not record this project in ${unwritable}:`))).toBe(true);
+    expect(printed.some((line) => line.includes(PROJECT_UID))).toBe(true);
+  });
+
+  it('omits the project name when the api returns a project without one', async () => {
+    const { creator } = harness({ createdProject: { uid: PROJECT_UID } });
+
+    await creator.create(gitRequest({ configPath: configPathIn(dataDir) }));
+
+    expect(configFileIn(dataDir)).toEqual({ project: { uid: PROJECT_UID, organizationUid: ORG } });
+  });
+
+});
+
+describe('ProjectCreator name prompts', () => {
+  beforeEach(() => {
+    dataDir = mkdtempSync(join(tmpdir(), 'launch-create-'));
+    writeFileSync(join(dataDir, 'index.html'), SITE_PAGE);
+    (uploadArchive as jest.Mock).mockClear();
+    (uploadArchive as jest.Mock).mockImplementation(async () => undefined);
+  });
+
+  afterEach(() => {
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  it.each([
+    ['Project name', 200],
+    ['Environment name', 200],
+  ])('checks a typed %s against its %i-character limit inside the prompt', async (message, max) => {
+    const { creator, asked, askedPayloads } = harness({ isTTY: true, answers: ['My Site', 'Default'] });
+
+    await creator.create(uploadRequest({ name: undefined, envName: undefined, serverCmd: 'npm start' }));
+
+    const validate = askedPayloads[asked.indexOf(message)].validate as (value: string) => true | string;
+    expect(validate('x'.repeat(max))).toBe(true);
+    expect(validate('x'.repeat(max + 1))).toBe(
+      `${message} must be ${max} characters or fewer; that value is ${max + 1} characters.`,
+    );
+  });
+});
+
+describe('ProjectCreator when the project name is already taken', () => {
+  const duplicate = (): LaunchApiError =>
+    new LaunchApiError(409, [{ code: 'launch.PROJECT.DUPLICATE_NAME' }], PROJECT_ERROR_MESSAGES);
+
+  beforeEach(() => {
+    dataDir = mkdtempSync(join(tmpdir(), 'launch-create-'));
+    writeFileSync(join(dataDir, 'index.html'), SITE_PAGE);
+    (uploadArchive as jest.Mock).mockClear();
+    (uploadArchive as jest.Mock).mockImplementation(async () => undefined);
+  });
+
+  afterEach(() => {
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  function terminalRequest(): CreateRequest {
+    return uploadRequest({ serverCmd: 'npm start' });
+  }
+
+  it('offers the cloned repository name, as V1 did, as the project name prompt\'s initial value', async () => {
+    cloneOf('my-org/my-repo');
+    const { creator, asked, askedPayloads, created } = harness({ isTTY: true, answers: ['My Site'] });
+
+    await creator.create(gitRequest({ name: undefined }));
+
+    expect(asked).toEqual(['Project name']);
+    expect(askedPayloads[0]).toMatchObject({ default: 'my-repo' });
+    expect(bodyOf(created)).toMatchObject({ name: 'My Site' });
+  });
+
+  it('offers the cloned repository name again when a taken name is renamed', async () => {
+    cloneOf('my-org/my-repo');
+    const { creator, asked, askedPayloads } = harness({
+      isTTY: true,
+      createFailures: [duplicate()],
+      answers: [true, 'My Site 2'],
+    });
+
+    await creator.create(gitRequest());
+
+    expect(asked).toEqual(['Would you like to change the project\'s name and try again?', 'Project name']);
+    expect(askedPayloads[1]).toMatchObject({ default: 'my-repo' });
+  });
+
+  it('offers the folder name, as V1 did, as the project name prompt\'s initial value for an upload', async () => {
+    const { creator, asked, askedPayloads } = harness({ isTTY: true, answers: ['My Site'] });
+
+    await creator.create(uploadRequest({ serverCmd: 'npm start', name: undefined }));
+
+    expect(asked).toEqual(['Project name']);
+    expect(askedPayloads[0]).toMatchObject({ default: basename(dataDir) });
+  });
+
+  it('offers a new name in a terminal and retries with it, reusing the upload rather than zipping again', async () => {
+    const { creator, created, printed, asked, askedPayloads } = harness({
+      isTTY: true,
+      createFailures: [duplicate()],
+      answers: [true, 'My Site 2'],
+    });
+
+    await creator.create(terminalRequest());
+
+    expect(printed).toEqual(expect.arrayContaining([
+      'error: New project creation failed!',
+      'error: Duplicate project name identified',
+    ]));
+    expect(asked).toEqual(['Would you like to change the project\'s name and try again?', 'Project name']);
+    expect(askedPayloads[1]).toMatchObject({ default: basename(dataDir) });
+    expect(created).toHaveLength(2);
+    expect(bodyOf(created.slice(1))).toMatchObject({ name: 'My Site 2', fileUpload: { uploadUid: 'upload-uid' } });
+    expect(uploadArchive).toHaveBeenCalledTimes(1);
+  });
+
+  it('prints the V1 lines and exits 1 with nothing more when the user does not want to rename', async () => {
+    const { creator, created, printed } = harness({ isTTY: true, createFailures: [duplicate()], answers: [false] });
+
+    const failure = await creator.create(terminalRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(DuplicateProjectNameError);
+    expect((failure as DuplicateProjectNameError).exitCode).toBe(1);
+    expect((failure as DuplicateProjectNameError).reported).toBe(true);
+    expect(printed.slice(-2)).toEqual([
+      'error: New project creation failed!',
+      'error: Duplicate project name identified',
+    ]);
+    expect(created).toHaveLength(1);
+  });
+
+  it('prints the V1 lines and says to rename without a terminal, never prompting', async () => {
+    const { creator, created, printed, asked } = harness({ isTTY: false, createFailures: [duplicate()] });
+
+    const failure = await creator.create(uploadRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(DuplicateProjectNameError);
+    expect((failure as DuplicateProjectNameError).exitCode).toBe(1);
+    expect(printed.slice(-3)).toEqual([
+      'error: New project creation failed!',
+      'error: Duplicate project name identified',
+      'info: Change the project name and re-run the command.',
+    ]);
+    expect(asked).toEqual([]);
+    expect(created).toHaveLength(1);
+  });
+
+  it('stops after three renames with the V1 retry-limit warning', async () => {
+    const { creator, created, printed } = harness({
+      isTTY: true,
+      createFailures: [duplicate(), duplicate(), duplicate(), duplicate()],
+      answers: [true, 'Two', true, 'Three', true, 'Four'],
+    });
+
+    const failure = await creator.create(terminalRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(DuplicateProjectNameError);
+    expect(printed.slice(-3)).toEqual([
+      'error: New project creation failed!',
+      'error: Duplicate project name identified',
+      'warn: Reached max project creation retry limit',
+    ]);
+    expect(created).toHaveLength(4);
+  });
+
+  it('checks a new name against the length limit inside the prompt, so the user can fix it there', async () => {
+    const { creator, askedPayloads } = harness({
+      isTTY: true,
+      createFailures: [duplicate()],
+      answers: [true, 'My Site 2'],
+    });
+
+    await creator.create(terminalRequest());
+
+    const validate = askedPayloads[1].validate as (value: string) => true | string;
+    expect(validate('x'.repeat(200))).toBe(true);
+    expect(validate('x'.repeat(201))).toBe('Project name must be 200 characters or fewer; that value is 201 characters.');
+  });
+
+  it('colours the error lines red and the rename hint green only when stdout is a terminal', async () => {
+    const { creator, printed } = harness({ outputIsTTY: true, createFailures: [duplicate()] });
+
+    await creator.create(uploadRequest()).catch(() => undefined);
+
+    expect(printed.slice(-3)).toEqual([
+      '\u001b[31merror: New project creation failed!\u001b[39m',
+      '\u001b[31merror: Duplicate project name identified\u001b[39m',
+      '\u001b[32minfo: Change the project name and re-run the command.\u001b[39m',
+    ]);
+  });
+
+  it.each([
+    ['launch.PROJECT.LIMIT_REACHED', 'error: Launch project limit reached!'],
+    ['launch.DEPLOYMENT.INVALID_FILE_SIZE', 'error: Please use a file over the size of 1KB and under the size of 100MB.'],
+    ['launch.DEPLOYMENT.FILE_UPLOAD_FAILED', 'error: Please use a file over the size of 1KB and under the size of 100MB.'],
+    ['launch.PROJECT.CREATE_FAILED', 'error: The Launch API could not create that project.'],
+  ])('reports %s under V1\'s header in V1\'s words, exiting 1 without prompting', async (code, cause) => {
+    const boom = new LaunchApiError(422, [{ code }], PROJECT_ERROR_MESSAGES);
+    const { creator, asked, printed } = harness({ isTTY: true, createFailures: [boom] });
+
+    const failure = await creator.create(terminalRequest()).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(ProjectCreateFailedError);
+    expect((failure as ProjectCreateFailedError).exitCode).toBe(1);
+    expect((failure as ProjectCreateFailedError).reported).toBe(true);
+    expect(printed.slice(-2)).toEqual(['error: New project creation failed!', cause]);
+    expect(asked.filter((question) => String(question).includes('change the project'))).toEqual([]);
+  });
+
+  it('reports a failure carrying only a message by that message', async () => {
+    const boom = new LaunchApiError(500, [{ message: 'Something went wrong.' }], PROJECT_ERROR_MESSAGES);
+    const { creator, printed } = harness({ createFailures: [boom] });
+
+    await creator.create(uploadRequest()).catch(() => undefined);
+
+    expect(printed.slice(-2)).toEqual(['error: New project creation failed!', 'error: Something went wrong.']);
+  });
+
+  it('colours a reported create failure red only when stdout is a terminal', async () => {
+    const boom = new LaunchApiError(422, [{ code: 'launch.PROJECT.LIMIT_REACHED' }], PROJECT_ERROR_MESSAGES);
+    const { creator, printed } = harness({ outputIsTTY: true, createFailures: [boom] });
+
+    await creator.create(uploadRequest()).catch(() => undefined);
+
+    expect(printed.slice(-2)).toEqual([
+      '\u001b[31merror: New project creation failed!\u001b[39m',
+      '\u001b[31merror: Launch project limit reached!\u001b[39m',
+    ]);
+  });
+
+  it('lets a failure that is not a Launch error through untouched, unreported', async () => {
+    const boom = new Error('a bug, not a Launch failure');
+    const { creator, printed } = harness({ createFailures: [boom] });
+
+    await expect(creator.create(uploadRequest())).rejects.toBe(boom);
+    expect(printed).not.toContain('error: New project creation failed!');
+  });
+});

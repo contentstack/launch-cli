@@ -1,17 +1,240 @@
 fileignoreconfig:
+- filename: test/integration/retired-commands.test.ts
+  checksum: 6eab66fd4393aa3e46e94bb7e21252775f4d809d0b3f2613d0146144589b12de
+- filename: test/integration/manage-base-path.test.ts
+  checksum: 79eb9ad420ea47d5bee8045d812c45b010bbeeafcaf5f85d11653140b0cd0db1
+- filename: src/transport/rest-client.ts
+  checksum: bf0b19bdce7796208e7a8f29f7fdc8aad36ed2ffc10e148439fa19fd166c63d3
+- filename: src/transport/rest-client.test.ts
+  checksum: 3b5751449c61f7a1d71b978ed03b9472f714e12dd1679f691bbd4dd8f84be923
+- filename: src/transport/cma-client.ts
+  checksum: 035f862697541696a989bf0fb71566ddc3d0663b243156333d1909d1f373d50b
+- filename: src/transport/auth-strategy.test.ts
+  checksum: a4f3e3ea7db10dbf82abbac0207d2231ee740916f476fcda836a2268505295ef
+- filename: src/projects/types.ts
+  checksum: 73826a3686cd0793e7813e80c54bfdc78cddb72b085d2861854f20064a23fdc8
+- filename: src/projects/projects.api.ts
+  checksum: 29fb58c181bab1c76b6827608a77f21b9e72ce0e34eff9fd06fe5d74419c5aad
+- filename: src/core/service-context.test.ts
+  checksum: 7bc4f6ca3ec8a960f84fb4c07453a287bb2bb0ccc7e06c5805a7f56df160024a
+- filename: src/core/rules.test.ts
+  checksum: 2dbc873f3e635a72b1b566311c04252d2a2c25142570006523415c81a91c7a6a
+- filename: src/core/inputs.test.ts
+  checksum: c5b4be7a0aa2f0878153f062e1500b2bdbd53bdd2d84bb7c13c731db3c3699c4
 - filename: .github/workflows/secrets-scan.yml
+  checksum: 84da8e208ace349bd6eb2b3eef1d6aa17a85cda0feaa127b0282de52814e37bb
+- filename: .husky/secrets-scan.sh
+  checksum: 5a44edca8d209ca4b7f6eefc4ce2caab838679f8916ef6136ad68584c0705cb6
+- filename: package-lock.json
   ignore_detectors:
     - filecontent
-- filename: src/commands/launch/index.test.ts
-  checksum: 9db6c02ad35a0367343cd753b916dd64db4a9efd24838201d2e1113ed19c9b62
-- filename: src/commands/launch/rollback.test.ts
-  checksum: a1010882456f315a918afe2777f90472985e9966bd308c5311ac0de318b14e8c
-- filename: test/unit/commands/rollback.test.ts
-  checksum: d1f931f2d9a397131409399ad6463653e28b5a2224e870b641d9ba57c4418f18
-- filename: package-lock.json
-  checksum: 36459c67c22b67c7255935e31ec8eda5c4483a702afbcbd0c1ff6f3d969cfbe4
-- filename: src/adapters/github.test.ts
-  checksum: b3d3d3a3c14adde103152d2ac4e1c4b7121a5f7533a87c3cc600f6d25fb59d1b
-- filename: src/adapters/file-upload.test.ts
-  checksum: 962fd8b45578914926d20857ddc3d1bc2fa19e8b192c6dfdc03d214ae1898b59
+- filename: test/integration/project-upload.test.ts
+  allowed_patterns:
+    - "key: 'Content-Type'"
+    - "formFieldKey: 'key', formFieldValue"
+    - "key: 'x-ms-blob-type', value: 'BlockBlob'"
+- filename: src/uploads/upload.transfer.ts
+  allowed_patterns:
+    - "formFieldKey"
+    - "\\[header\\.key, header\\.value\\]"
+    - "const \\[key, value\\] of"
+- filename: src/uploads/upload.transfer.test.ts
+  allowed_patterns:
+    - "formFieldKey"
+    - "key: name, value: contents"
+    - "formField\\('key', "
+    - "headers: \\[\\{ key: '"
+    - 'name="key"'
+    - "drops a field with no key"
+- filename: src/commands/launch/projects/update.test.ts
+  allowed_patterns:
+    - "a1b2c3d4e5f60718293a4b5c"
+    - "Pass at least one of --name, --description"
+    - "Object\\.keys\\(ProjectsUpdate\\.flags\\)"
+- filename: test/integration/projects-update.test.ts
+  allowed_patterns:
+    - "a1b2c3d4e5f60718293a4b5c"
+    - "mockImplementation\\(\\(key: string\\) => CONFIG\\[key\\]\\)"
+    - "Pass at least one of --name, --description"
+- filename: test/integration/organization-prompt.test.ts
+  allowed_patterns:
+    - "a1b2c3d4e5f60718293a4b5c"
+    - "mockImplementation\\(\\(key: string\\) => values\\[key\\]\\)"
+    - "Pass --org, set it in \\.cs-launch\\.json"
+    - "when --org is passed"
+- filename: src/projects/project.update.ts
+  allowed_patterns:
+    - "Pass at least one of --name, --description"
+- filename: src/projects/project.presenter.ts
+  allowed_patterns:
+    - "keyof ProjectUpdate"
+- filename: src/projects/project.presenter.test.ts
+  allowed_patterns:
+    - "a1b2c3d4e5f60718293a4b5c"
+    - "b2c3d4e5f60718293a4b5c6d"
+    - "c3d4e5f60718293a4b5c6d7e"
+- filename: src/projects/projects.api.test.ts
+  allowed_patterns:
+    - "the caller passes neither"
+    - "the caller must pass a uid instead"
+- filename: src/uploads/uploads.api.test.ts
+  allowed_patterns:
+    - "formFieldKey"
+- filename: src/projects/project.create.test.ts
+  allowed_patterns:
+    - "'SECRET=hunter2'"
+    - "formFieldKey"
+- filename: test/integration/projects-create.test.ts
+  allowed_patterns:
+    - "mockImplementation\\(\\(key: string\\) => CONFIG\\[key\\]\\)"
+    - "formFieldKey"
+    - "key: 'x-ms-blob-type', value: 'BlockBlob'"
+    - "key: 'Content-Type', value: 'application/zip'"
+- filename: test/fixtures/README.md
+  checksum: f0d6c28d269fb7c9e441c3b95fd89ba46584462a2309e1cce4035ff7e0d2a5a1
+  allowed_patterns:
+    - "formFieldKey"
+    - "\\{key, value\\}"
+- filename: src/environments/environments.api.ts
+  ignore_detectors:
+    - filename
+- filename: src/environments/environments.api.test.ts
+  ignore_detectors:
+    - filename
+- filename: src/transport/envelope.ts
+  ignore_detectors:
+    - filename
+- filename: src/transport/envelope.test.ts
+  ignore_detectors:
+    - filename
+- filename: src/git/git.api.ts
+  checksum: 80c8dceec63e1bb85f23004975f491e97cf2b6dfae15b7f3bafa294b3a0bba08
+  allowed_patterns:
+    - "assertArray\\(response, key, `\\$\\{key\\} response`\\)"
+- filename: src/environments/environment.inputs.ts
+  ignore_detectors:
+    - filename
+- filename: src/environments/environment.builder.ts
+  ignore_detectors:
+    - filename
+- filename: src/environments/environment.builder.test.ts
+  ignore_detectors:
+    - filename
+- filename: src/environments/environment.inputs.test.ts
+  checksum: ba38924cf2b2b0df4044e8aba4c4cd0bfa7edcb1f09654cf37a7edb06365de06
+  ignore_detectors:
+    - filename
+- filename: src/core/inputs.ts
+  checksum: 638c1093562cc19038395b498202d06aef53b8d2537ee80b715611f19f83c78b
+  allowed_patterns:
+    - "FlagKey"
+    - "InputKeys"
+- filename: src/core/resolution.ts
+  allowed_patterns:
+    - "FlagKey"
+- filename: test/fixtures/project-get.json
+  allowed_patterns:
+    - "a1b2c3d4e5f60718293a4b5c"
+    - "b2c3d4e5f60718293a4b5c6d"
+    - "c3d4e5f60718293a4b5c6d7e"
+- filename: test/fixtures/projects-list.json
+  allowed_patterns:
+    - "a1b2c3d4e5f60718293a4b5c"
+    - "b2c3d4e5f60718293a4b5c6d"
+    - "c3d4e5f60718293a4b5c6d7e"
+- filename: test/integration/projects-get.test.ts
+  allowed_patterns:
+    - "a1b2c3d4e5f60718293a4b5c"
+    - "b2c3d4e5f60718293a4b5c6d"
+    - "c3d4e5f60718293a4b5c6d7e"
+- filename: test/integration/projects-list.test.ts
+  allowed_patterns:
+    - "a1b2c3d4e5f60718293a4b5c"
+    - "b2c3d4e5f60718293a4b5c6d"
+    - "c3d4e5f60718293a4b5c6d7e"
+- filename: src/core/rules.ts
+  checksum: ac94c82b5ce3805f986b5aeecc4e53579dfdf1473d9617c20bc126597657fe37
+  allowed_patterns:
+    - "FlagKey"
+- filename: src/resources.ts
+  allowed_patterns:
+    - "FlagKey"
+- filename: src/resources.test.ts
+  allowed_patterns:
+    - "a project name passed on argv to the project resolver"
+- filename: AGENTS.md
+  allowed_patterns:
+    - "Do not add an exemption to a guard to make a new file pass"
+    - "passes its own error wording to `client.request\\(req, MESSAGES\\)`"
+    - "a key of `ProjectConfig`"
+    - "returns silently when `--yes` was passed"
+    - "path the user passed with `--config`"
+    - "what `limit` resolves to when nobody passed it"
+    - "a test passes `var`, `env-file` and `from-stack`"
+    - "an in-flight secret registry to redact against"
+- filename: src/core/search-list.test.ts
+  allowed_patterns:
+    - "passes a listed answer, and the answers beside it"
+- filename: src/core/project-config.ts
+  checksum: 1f19da706128ee78e1fe20d8624626038893d908a7061b3f2633e741a77c93b6
+- filename: src/core/project-config.test.ts
+  checksum: 65c0a613ec77d4dc6727224d4d097de4a02b300339286db692dbaea9379565ae
+- filename: src/core/resolve.ts
+  checksum: 5d150db11cb1c976911ecba61336118ddad051942da95f809695c0cf0346de42
+- filename: src/core/resolve.test.ts
+  checksum: 42dfd6c77b752f64f6a927845a2d98626934ba0952c911cf701b3df502cb0443
+- filename: src/git/local-repository.ts
+  checksum: b9091ed135dfebdf590a5412bbfba2b2f96d4a177cf944a20909b93405268e9f
+- filename: test/guards/layering.test.ts
+  checksum: d856282fd15bfc6fa7b5eb32ff419e66eb5fd20ff8dc79af9e82c0eb3afcd4f6
+- filename: src/commands/launch/projects/create.test.ts
+  checksum: 1d5063992d0a7cfb91871ab00f79123bf71806ddc9faac80952cf279d165aec5
+- filename: src/commands/launch/projects/delete.test.ts
+  checksum: d67d8a804d14f9b809153d10b0cf9d5e52b70f9e0b65678ebb1663a7d2da22c1
+- filename: test/integration/projects-delete.test.ts
+  checksum: 78baba5c3e3aa5fd054dec04cee0e72a99e85cb8451b2346f53761f099509191
+- filename: src/core/launch-command.ts
+  checksum: 85f86ea5f075bfdd78652dc05d20a2f6e89348466c6bd41ae903bcb1b7e8515d
+- filename: src/core/launch-command.test.ts
+  checksum: 930069aeddbf4348097f33713e4e57bd26cb3be1b7970eb60142bb53010e1674
+- filename: src/projects/project.inputs.test.ts
+  checksum: c20f69186e74bc5fe6deb73a9036fa2cb86aeff1bde48670f0c489d9e9121c62
+- filename: test/integration/projects-command-flows.test.ts
+  checksum: 786a470c71f3a7ce58463d0a08e9bf47e36f936c55a2ca7cd8ef2a058ac01e4a
+- filename: src/core/redact.test.ts
+  checksum: ae497ea8c3a4c3f12217d2c4c028a1da3d1324e18362d68c355ba8120902bcb3
+- filename: src/commands/launch/projects/list.test.ts
+  checksum: d01cbf70469a771425c8258fb1800b70a6ff0b807208fc76f3060b69a2cc05bc
+- filename: src/commands/launch/projects/get.test.ts
+  checksum: fec6ca189bc3d93aefa109ee6405f8ce74a42318aa18a99045d40c3cb5561b9e
+- filename: test/integration/projects-list-command.test.ts
+  checksum: d9617f9ae02a32a03d707be711f495350e4a442e61ac1a3514b8bc9190e9e6a2
+- filename: src/functions/cloud-functions.test.ts
+  checksum: 5faf7b0497efc9f620983220019736a0ec2e8c43f22316f888201912bbcb5d62
+- filename: src/transport/proxy.test.ts
+  checksum: 06db291bb40ec55774179b02e3e1a9644bbaa116ec511c163e8d6012aebb3868
+- filename: test/integration/project-upload-proxy.test.ts
+  checksum: 502adf95d5c1b41e58a8500929597741e8f8a178a3aaa69f517451cb7bedac4a
+- filename: src/environments/environment.errors.ts
+  checksum: ac2b4115715433965f87d017f8751db8ffb534ace02e2a4b6c5e5e1d2b0861e3
+- filename: test/fixtures/project-get-fileupload.json
+  checksum: 56488abc4785846b61953e3b32abd0537512ce1d4afea977c937d87b21c07623
+- filename: src/core/errors.test.ts
+  checksum: 03f4f47609435dd74d80409600e092850a95a5e571a6e93de60afa0ebf0e8236
+- filename: src/functions/contentfly.test.ts
+  checksum: 946ec05589897e37f2eee30acb9f8bc4934d77b8cdaa7b7b0846489b3f977c88
+- filename: src/functions/function.errors.test.ts
+  checksum: ac0a55e5bee974fefa9fb95541adba63e9a2c2c6e6c47b87c8ca1022542e75f0
+- filename: src/transport/errors.test.ts
+  checksum: b7e28a9062e29a87c8c8b882c6543d50e90e12509c5629ee362ffcac430d01f1
+- filename: src/transport/auth-strategy.ts
+  checksum: 6fe87def1b508cb67203d4445d9bd889570e512ed4194dfc4fdd3182bc8b87b2
+- filename: src/functions/function.logger.test.ts
+  checksum: 840b2b2b7f938e0862881871e8d568112631c58e12cf6c8a5be32e7552b8cf9e
+- filename: src/transport/cma-client.test.ts
+  checksum: 018e2c76b66485592c1660301a2c4c8c232c4efe082dee98e1baed5a2e6956f5
+- filename: src/core/catalog.test.ts
+  checksum: bf8c203a8efc40a75f5407ceb29a639ea9a6e1fa081d02260def2d7e0fab958a
+- filename: test/credential-guard.setup.ts
+  checksum: 519ccbeb0552fdb1d5f27308c56477c0258ee6cc0adec8f618e8e5bc047cbf6d
 version: "1.0"
