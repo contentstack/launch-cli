@@ -5,7 +5,7 @@ describe('input value helpers', () => {
   it.each([
     [{}, true],
     [{ a: 1 }, true],
-    [[], true],
+    [[], false],
     [null, false],
     [undefined, false],
     ['', false],

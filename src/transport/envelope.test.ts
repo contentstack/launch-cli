@@ -33,6 +33,7 @@ describe('response envelope', () => {
     [{}],
     [{ project: null }],
     [{ project: 'p1' }],
+    [{ project: [] }],
   ])('refuses %p as an envelope that carries no project', (response) => {
     const error = failureFrom(() => unwrap(response, 'project', 'project response'));
 

@@ -568,8 +568,8 @@ describe('ProjectsApi create and detection endpoints', () => {
     });
   });
 
-  it('raises a malformed-response error when a framework response is not an object', async () => {
-    const { client } = fakeRestClient(null);
+  it.each([[null], [[]]])('raises a malformed-response error when a framework response is %p, not an object', async (body) => {
+    const { client } = fakeRestClient(body);
 
     await expect(new ProjectsApi(client).fileFramework({ org: 'org1', uploadUid: 'u' })).rejects.toThrow(
       'The Launch API returned a framework response that was not an object.',
