@@ -66,6 +66,8 @@ describe('UploadsApi', () => {
       { uploadUrl: 'https://x' },
       { uploadUid: 'u' },
       { uploadUrl: 1, uploadUid: 'u' },
+      { uploadUrl: '', uploadUid: 'u' },
+      { uploadUrl: 'https://x', uploadUid: '  ' },
     ]) {
       const { client } = fakeRestClient(body);
 

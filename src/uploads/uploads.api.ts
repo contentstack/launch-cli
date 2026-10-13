@@ -1,4 +1,4 @@
-import { isRecord } from '../core/values';
+import { isAbsent, isRecord } from '../core/values';
 import { malformed } from '../transport/envelope';
 import type { RestApiClient } from '../transport/rest-client';
 import { UPLOAD_ERROR_MESSAGES } from './upload.errors';
@@ -23,7 +23,13 @@ function signedUploadPath(scope: UploadScope): string {
 }
 
 function isSignedUploadUrl(value: unknown): value is SignedUploadUrl {
-  return isRecord(value) && typeof value.uploadUrl === 'string' && typeof value.uploadUid === 'string';
+  return (
+    isRecord(value) &&
+    typeof value.uploadUrl === 'string' &&
+    typeof value.uploadUid === 'string' &&
+    !isAbsent(value.uploadUrl) &&
+    !isAbsent(value.uploadUid)
+  );
 }
 
 export class UploadsApi {
