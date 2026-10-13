@@ -1,6 +1,6 @@
 import { configHandler, managementSDKClient, managementSDKInitiator } from '@contentstack/cli-utilities';
 
-import { OAUTH_ORGANIZATION_KEY, cmaHostOf, createCmaSession } from './cma-client';
+import { OAUTH_ORG_UID_CONFIG_FIELD, cmaHostOf, createCmaSession } from './cma-client';
 
 jest.mock('@contentstack/cli-utilities', () => ({
   ...jest.requireActual('@contentstack/cli-utilities'),
@@ -110,7 +110,7 @@ describe('createCmaSession', () => {
 
   it('reads the organization an OAuth session is scoped to from the CLI config', () => {
     const spy = jest.spyOn(configHandler, 'get').mockImplementation((key: string) =>
-      key === OAUTH_ORGANIZATION_KEY ? 'org7' : undefined,
+      key === OAUTH_ORG_UID_CONFIG_FIELD ? 'org7' : undefined,
     );
 
     expect(createCmaSession({ analyticsInfo: 'cli/2.0.0' }).scopedOrganizationUid()).toBe('org7');
@@ -119,7 +119,7 @@ describe('createCmaSession', () => {
 
   it.each([[undefined], [null], [''], ['   '], [42]])('reports no scoped organization when the config holds %p', (value) => {
     jest.spyOn(configHandler, 'get').mockImplementation((key: string) =>
-      key === OAUTH_ORGANIZATION_KEY ? value : undefined,
+      key === OAUTH_ORG_UID_CONFIG_FIELD ? value : undefined,
     );
 
     expect(createCmaSession({ analyticsInfo: 'cli/2.0.0' }).scopedOrganizationUid()).toBeUndefined();

@@ -5,7 +5,7 @@ import {
   managementSDKInitiator,
 } from '@contentstack/cli-utilities';
 
-export const OAUTH_ORGANIZATION_KEY = 'oauthOrgUid';
+export const OAUTH_ORG_UID_CONFIG_FIELD = 'oauthOrgUid';
 
 export interface CmaCollection {
   items?: unknown[];
@@ -50,7 +50,7 @@ export function createCmaSession(options: CmaSessionOptions): CmaSession {
     fetchOrganizations: async (query) => (await open()).organization().fetchAll(query),
     fetchOrganization: async (uid) => (await open()).organization(uid).fetch(),
     scopedOrganizationUid: () => {
-      const uid: unknown = configHandler.get(OAUTH_ORGANIZATION_KEY);
+      const uid: unknown = configHandler.get(OAUTH_ORG_UID_CONFIG_FIELD);
 
       return typeof uid === 'string' && uid.trim() !== '' ? uid : undefined;
     },

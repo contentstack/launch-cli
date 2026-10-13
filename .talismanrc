@@ -8,7 +8,7 @@ fileignoreconfig:
 - filename: src/transport/rest-client.test.ts
   checksum: 3b5751449c61f7a1d71b978ed03b9472f714e12dd1679f691bbd4dd8f84be923
 - filename: src/transport/cma-client.ts
-  checksum: b1cc7c3348930846f1d27b9d025e3a76f807eaccd48db6464ef9c27ef83ec4ac
+  checksum: 035f862697541696a989bf0fb71566ddc3d0663b243156333d1909d1f373d50b
 - filename: src/transport/auth-strategy.test.ts
   checksum: a4f3e3ea7db10dbf82abbac0207d2231ee740916f476fcda836a2268505295ef
 - filename: src/projects/types.ts
@@ -232,7 +232,7 @@ fileignoreconfig:
 - filename: src/functions/function.logger.test.ts
   checksum: 840b2b2b7f938e0862881871e8d568112631c58e12cf6c8a5be32e7552b8cf9e
 - filename: src/transport/cma-client.test.ts
-  checksum: d227a540c9100c32a08af99efc8d53c9a05fecd73a67a0180fcccd490ddfde87
+  checksum: 018e2c76b66485592c1660301a2c4c8c232c4efe082dee98e1baed5a2e6956f5
 - filename: src/core/catalog.test.ts
   checksum: bf8c203a8efc40a75f5407ceb29a639ea9a6e1fa081d02260def2d7e0fab958a
 - filename: test/credential-guard.setup.ts
