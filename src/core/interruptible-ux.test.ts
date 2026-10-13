@@ -86,6 +86,24 @@ describe('cancelOnInterrupt', () => {
     expect(loop.events).toEqual(['held', 'released']);
   });
 
+  it('propagates a prompt that throws before returning a promise, then stops listening', async () => {
+    const signals = new EventEmitter();
+    const loop = recordingHold();
+    const failure = new Error('no terminal');
+    const throwing: UxLike = {
+      print: () => undefined,
+      inquire: () => {
+        throw failure;
+      },
+    };
+
+    const answer = cancelOnInterrupt(throwing, { signals, hold: loop.hold }).inquire<string>(QUESTION);
+
+    await expect(answer).rejects.toBe(failure);
+    expect(signals.listenerCount('SIGINT')).toBe(0);
+    expect(loop.events).toEqual(['held', 'released']);
+  });
+
   it('prints through the wrapped ux unchanged', () => {
     const inner = pendingUx();
 

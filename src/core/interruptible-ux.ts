@@ -38,17 +38,21 @@ export function cancelOnInterrupt(ux: UxLike, options: InterruptOptions = {}): U
           reject(new CancelledError());
         };
 
+        const fail = (error: unknown): void => {
+          release();
+          reject(error);
+        };
+
         signals.once('SIGINT', cancel);
-        ux.inquire<T>(payload).then(
-          (answer) => {
+
+        try {
+          ux.inquire<T>(payload).then((answer) => {
             release();
             resolve(answer);
-          },
-          (error: unknown) => {
-            release();
-            reject(error);
-          },
-        );
+          }, fail);
+        } catch (error) {
+          fail(error);
+        }
       }),
   };
 }
