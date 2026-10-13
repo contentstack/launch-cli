@@ -91,6 +91,7 @@ fileignoreconfig:
     - "key: 'x-ms-blob-type', value: 'BlockBlob'"
     - "key: 'Content-Type', value: 'application/zip'"
 - filename: test/fixtures/README.md
+  checksum: f0d6c28d269fb7c9e441c3b95fd89ba46584462a2309e1cce4035ff7e0d2a5a1
   allowed_patterns:
     - "formFieldKey"
     - "\\{key, value\\}"
@@ -214,4 +215,26 @@ fileignoreconfig:
   checksum: 06db291bb40ec55774179b02e3e1a9644bbaa116ec511c163e8d6012aebb3868
 - filename: test/integration/project-upload-proxy.test.ts
   checksum: 502adf95d5c1b41e58a8500929597741e8f8a178a3aaa69f517451cb7bedac4a
+- filename: src/environments/environment.errors.ts
+  checksum: ac2b4115715433965f87d017f8751db8ffb534ace02e2a4b6c5e5e1d2b0861e3
+- filename: test/fixtures/project-get-fileupload.json
+  checksum: 56488abc4785846b61953e3b32abd0537512ce1d4afea977c937d87b21c07623
+- filename: src/core/errors.test.ts
+  checksum: 03f4f47609435dd74d80409600e092850a95a5e571a6e93de60afa0ebf0e8236
+- filename: src/functions/contentfly.test.ts
+  checksum: 946ec05589897e37f2eee30acb9f8bc4934d77b8cdaa7b7b0846489b3f977c88
+- filename: src/functions/function.errors.test.ts
+  checksum: ac0a55e5bee974fefa9fb95541adba63e9a2c2c6e6c47b87c8ca1022542e75f0
+- filename: src/transport/errors.test.ts
+  checksum: b7e28a9062e29a87c8c8b882c6543d50e90e12509c5629ee362ffcac430d01f1
+- filename: src/transport/auth-strategy.ts
+  checksum: 6fe87def1b508cb67203d4445d9bd889570e512ed4194dfc4fdd3182bc8b87b2
+- filename: src/functions/function.logger.test.ts
+  checksum: 840b2b2b7f938e0862881871e8d568112631c58e12cf6c8a5be32e7552b8cf9e
+- filename: src/transport/cma-client.test.ts
+  checksum: d227a540c9100c32a08af99efc8d53c9a05fecd73a67a0180fcccd490ddfde87
+- filename: src/core/catalog.test.ts
+  checksum: bf8c203a8efc40a75f5407ceb29a639ea9a6e1fa081d02260def2d7e0fab958a
+- filename: test/credential-guard.setup.ts
+  checksum: 519ccbeb0552fdb1d5f27308c56477c0258ee6cc0adec8f618e8e5bc047cbf6d
 version: "1.0"
