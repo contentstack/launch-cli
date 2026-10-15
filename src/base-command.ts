@@ -1,5 +1,5 @@
 import keys from 'lodash/keys';
-import { existsSync, statSync } from 'fs';
+import { existsSync, readFileSync, statSync } from 'fs';
 import EventEmitter from 'events';
 import { resolve } from 'path';
 import includes from 'lodash/includes';
@@ -153,8 +153,7 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
    */
   async getConfig(): Promise<void> {
     if (this.sharedConfig.config && existsSync(this.sharedConfig.config)) {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const config: Record<string, any> = require(this.sharedConfig.config);
+      const config: Record<string, any> = JSON.parse(readFileSync(this.sharedConfig.config, 'utf-8'));
       const configKeys = keys(config);
 
       // If a specific branch is provided and exists in the config
