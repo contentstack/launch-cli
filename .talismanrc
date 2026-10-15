@@ -39,12 +39,7 @@ fileignoreconfig:
 - filename: test/integration/harness/fixtures.ts
   checksum: b3133a65f3f4b3f3a32caf0cc0bf65b0c71187f96e044a3331ddcce3adea88c1
 - filename: src/base-command.ts
-  allowed_patterns:
-    - "const configKeys = keys\\(config\\)"
-    - "includes\\(configKeys, this\\.flags\\.branch\\)"
-    - "handleBranchSelection\\(config: Record<string, any>, configKeys: string\\[\\]\\)"
-    - "configKeys\\.filter\\(\\(key\\) => key !== 'project'\\)"
-    - "If there are multiple keys \\(branches\\), excluding \"project\""
+  checksum: db8bc45f6d8aa3daebae621920c8618b6e23d1a20984dee0749d91bfa5c1530c
 - filename: test/unit/base-command.test.ts
   checksum: 4612c2a41c9d5a7af887f77842feee0a6f6a28ba95a094282b5e9aa20dba6c8c
 version: "1.0"
