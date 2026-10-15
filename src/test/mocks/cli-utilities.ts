@@ -85,7 +85,9 @@ export const baseClassAdapter = {
   },
 };
 
-export const functionsCommand = {};
+export const functionsCommand = {
+  loadChalk: jest.fn(async () => undefined),
+};
 
 export const logPolling = {
   cliux: {

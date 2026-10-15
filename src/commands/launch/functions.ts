@@ -1,4 +1,4 @@
-import { FlagInput } from '@contentstack/cli-utilities';
+import { FlagInput, loadChalk } from '@contentstack/cli-utilities';
 import Contentfly from '../../util/cloud-function';
 import { Flags, Command } from '@oclif/core';
 import { Logger } from '../../util';
@@ -32,6 +32,7 @@ export default class Functions extends Command {
   }
 
   async init(): Promise<void> {
+    await loadChalk();
     const { flags } = await this.parse(Functions);
     const currentWorkingDirectory = process.cwd();
     const projectBasePath = flags['data-dir'] || currentWorkingDirectory;

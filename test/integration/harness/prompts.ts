@@ -2,7 +2,8 @@ type InquirerModule = {
   prompt: (questions: any) => Promise<Record<string, any>>;
 };
 
-const inquirer: InquirerModule = require('inquirer');
+const inquirerModule = require('inquirer');
+const inquirer: InquirerModule = inquirerModule.default ?? inquirerModule;
 
 export type PromptQuestion = {
   name: string;

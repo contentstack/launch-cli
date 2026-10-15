@@ -2,7 +2,7 @@
 // TODO: Allow ts with any and remove ts-nocheck
 import { expect } from 'chai';
 import { stub, createSandbox } from 'sinon';
-import { cliux as ux, configHandler } from '@contentstack/cli-utilities';
+import { cliux as ux, configHandler, loadChalk } from '@contentstack/cli-utilities';
 import fs from 'fs';
 import path from 'path';
 import { BaseCommand } from '../../src/base-command';
@@ -13,6 +13,10 @@ describe('BaseCommand', () => {
   let sandbox;
   let baseCommandInstance;
   let flags;
+
+  before(async () => {
+    await loadChalk();
+  });
 
   describe('prepareConfig', () => {
     let statSyncResultObj;

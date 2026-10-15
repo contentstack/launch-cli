@@ -21,8 +21,8 @@
   ],
   "dependencies": {
     "@apollo/client": "^3.14.0",
-    "@contentstack/cli-command": "^1.8.7",
-    "@contentstack/cli-utilities": "^1.18.5",
+    "@contentstack/cli-command": "^2.0.2",
+    "@contentstack/cli-utilities": "^2.0.2",
     "@oclif/core": "^4.2.7",
     "@oclif/plugin-help": "^6.2.25",
     "@rollup/plugin-commonjs": "^28.0.2",
@@ -35,7 +35,7 @@
     "chalk": "^4.1.2",
     "cross-fetch": "^4.1.0",
     "dotenv": "^16.4.7",
-    "express": "^4.22.0",
+    "express": "^4.22.3",
     "form-data": "4.0.6",
     "graphql": "^16.9.0",
     "ini": "^3.0.1",
@@ -113,7 +113,11 @@
     "@eslint/eslintrc": {
       "ajv": "^6.12.6"
     },
-    "qs": "^6.16.0",
+    "qs": "^6.16.1",
+    "traverse": "^0.6.14",
+    "tty-table": {
+      "csv": "^6.6.4"
+    },
     "tmp": "^0.2.4",
     "minimatch@10.2.5": {
       "brace-expansion": "^5.0.12"

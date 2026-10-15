@@ -10,6 +10,8 @@ const config = {
     ],
   },
   transformIgnorePatterns: ['/node_modules/(?!uuid/)'],
+  // cli-utilities 2.x bundles ESM-only chalk 5, which Jest cannot require; chalk 4 has the same colour API.
+  moduleNameMapper: { '^chalk$': require.resolve('chalk') },
   globalSetup: '<rootDir>/test/integration/jest.global-setup.ts',
   globalTeardown: '<rootDir>/test/integration/jest.global-teardown.ts',
   setupFiles: ['<rootDir>/test/integration/jest.setup-env.ts'],
