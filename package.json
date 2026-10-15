@@ -107,26 +107,10 @@
     "prepare": "husky"
   },
   "overrides": {
-    "eslint": {
-      "ajv": "^6.12.6"
-    },
-    "@eslint/eslintrc": {
-      "ajv": "^6.12.6"
-    },
-    "qs": "^6.16.0",
+    "qs": "^6.16.1",
     "tmp": "^0.2.4",
-    "minimatch@10.2.5": {
-      "brace-expansion": "^5.0.12"
-    },
-    "minimatch@9.0.9": {
-      "brace-expansion": "^2.1.7"
-    },
-    "minimatch@5.1.9": {
-      "brace-expansion": "^2.1.7"
-    },
     "serialize-javascript": "^7.1.0",
-    "diff": "^8.0.3",
-    "brace-expansion@1": "^1.1.21"
+    "diff": "^8.0.3"
   },
   "engines": {
     "node": ">=22.0.0"
