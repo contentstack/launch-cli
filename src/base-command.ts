@@ -1,5 +1,5 @@
 import keys from 'lodash/keys';
-import { existsSync, statSync } from 'fs';
+import { existsSync, readFileSync, statSync } from 'fs';
 import EventEmitter from 'events';
 import { resolve } from 'path';
 import includes from 'lodash/includes';
@@ -12,6 +12,7 @@ import {
   cliux as ux,
   configHandler,
   isAuthenticated,
+  loadChalk,
   ContentstackClient,
   managementSDKClient,
   managementSDKInitiator,
@@ -50,6 +51,7 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
   };
 
   public async init(): Promise<void> {
+    await loadChalk();
     this.checkAuthenticated();
     await super.init();
     const { args, flags } = await this.parse({
@@ -76,8 +78,7 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
   }
 
   public checkAuthenticated() {
-    const self = this;
-    if ((self as this & { id: string }).id === 'launch:functions') {
+    if ((this as this & { id: string }).id === 'launch:functions') {
       return;
     }
     const _isAuthenticated = isAuthenticated();
@@ -121,7 +122,7 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
     }
 
     this.sharedConfig = {
-      ...require('./config').default,
+      ...config,
       currentConfig: {},
       ...this.flags,
       flags: this.flags,
@@ -152,7 +153,7 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
    */
   async getConfig(): Promise<void> {
     if (this.sharedConfig.config && existsSync(this.sharedConfig.config)) {
-      const config: Record<string, any> = require(this.sharedConfig.config);
+      const config: Record<string, any> = JSON.parse(readFileSync(this.sharedConfig.config, 'utf-8'));
       const configKeys = keys(config);
 
       // If a specific branch is provided and exists in the config
@@ -201,7 +202,7 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
    * @memberof BaseCommand
    */
   async prepareApiClients(): Promise<void> {
-    let headers: GraphqlHeaders = {
+    const headers: GraphqlHeaders = {
       'X-CS-CLI': getAnalyticsInfo(this.context, this.config),
     };
 
