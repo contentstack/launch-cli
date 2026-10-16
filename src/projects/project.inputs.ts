@@ -1,12 +1,9 @@
 import { Flags } from '@contentstack/cli-utilities';
 
-import { MissingInputError } from '../core/errors';
-import { CREATE_PROMPT_REMEDIES } from '../environments/environment.inputs';
 import type { UxLike } from '../core/prompt';
 import type { ResolutionSpec } from '../core/resolution';
-import type { ServiceContext } from '../core/service-context';
 import { oneOf, withinLength } from '../core/values';
-import { ProjectRef } from './project-ref';
+import { ResourceRef } from '../core/resource-ref';
 import type { ProjectType } from './types';
 import { PROJECT_DESCRIPTION_MAX_LENGTH, PROJECT_NAME_MAX_LENGTH } from './types';
 import { askOption } from '../core/prompt';
@@ -36,27 +33,6 @@ export function askProjectType(ux: UxLike): Promise<string> {
   );
 }
 
-export async function needInput<T extends string | undefined>(
-  services: ServiceContext,
-  flag: string,
-  supplied: string | undefined,
-  ask: () => Promise<T>,
-): Promise<string | T> {
-  if (supplied !== undefined) {
-    return supplied;
-  }
-
-  if (!services.isTTY) {
-    throw new MissingInputError(flag, CREATE_PROMPT_REMEDIES);
-  }
-
-  return ask();
-}
-
-export const GIT_ONLY_FLAGS = ['branch', 'auto-deploy'] as const;
-
-export type GitOnlyFlag = (typeof GIT_ONLY_FLAGS)[number];
-
 export const projectFlags = {
   project: Flags.string({ description: 'Project name or UID' }),
   name: Flags.string({ description: `Project name (${PROJECT_NAME_MAX_LENGTH} characters or fewer)` }),
@@ -77,7 +53,7 @@ export const projectResolution = {
     normalize: (value, { services, resolved, source }) =>
       new ProjectResolver(services.api.projects).toUid(
         resolved.org,
-        source === 'flag' ? ProjectRef.parse(value) : ProjectRef.uid(value),
+        source === 'flag' ? ResourceRef.parse(value) : ResourceRef.uid(value),
       ),
   } satisfies ResolutionSpec<string, 'org'>,
   name: {

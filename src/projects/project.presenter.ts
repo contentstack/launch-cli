@@ -1,8 +1,8 @@
 import type { LaunchError } from '../core/errors';
 import type { TableColumn } from '../core/render';
 import { styled } from '../core/style';
+import { firstDeploymentFailureMessage } from '../deployments/deployment.presenter';
 import { LaunchApiError } from '../transport/errors';
-import type { GitOnlyFlag } from './project.inputs';
 import type { Project } from './types';
 
 export const PROJECT_COLUMNS: TableColumn<Project>[] = [
@@ -84,10 +84,6 @@ export function renameAndRerunLine(outputIsTTY: boolean): string {
   return styled('info: Change the project name and re-run the command.', 'green', outputIsTTY);
 }
 
-export function gitOnlyFlagLine(flag: GitOnlyFlag, outputIsTTY: boolean): string {
-  return styled(`warn: --${flag} is not supported for FileUpload projects.`, 'yellow', outputIsTTY);
-}
-
 export interface PartialCreateFailure {
   projectName: string;
   projectUid: string;
@@ -101,32 +97,19 @@ export interface PartialCreateFailure {
 }
 
 export function deploymentFailureMessage(failure: PartialCreateFailure): string {
-  const scope = `--org ${failure.org} --project ${failure.projectUid}`;
-  const environment = failure.environmentUid === undefined ? '' : ` --env ${failure.environmentUid}`;
-  const deployment = failure.deploymentUid === undefined ? '' : ` --deployment ${failure.deploymentUid}`;
-
-  if (failure.timedOut === true) {
-    return (
-      `The deployment was still ${failure.status} when the CLI stopped waiting for it; it may still finish. ` +
-      `The project "${failure.projectName}" (${failure.projectUid}) and its environment ` +
-      `"${failure.environmentName}" were created. Do not start another deployment yet: ` +
-      `run csdx launch:deployments:get ${scope}${environment}${deployment} to see how it ends, ` +
-      `or csdx launch:logs:get ${scope}${environment}${deployment} to follow it.`
-    );
-  }
-
-  const opening =
-    failure.reason === undefined
-      ? `The deployment did not succeed; its last status was ${failure.status}. `
-      : `The deployment could not be followed to completion: ${failure.reason} `;
-
-  return (
-    opening +
-    `The project "${failure.projectName}" (${failure.projectUid}) and its environment ` +
-    `"${failure.environmentName}" were created and have not been rolled back. ` +
-    `Run csdx launch:deployments:create ${scope}${environment} to try the deployment again, ` +
-    `or csdx launch:logs:get ${scope}${environment}${deployment} to see why it did not succeed.`
-  );
+  return firstDeploymentFailureMessage({
+    created:
+      `The project "${failure.projectName}" (${failure.projectUid}) ` +
+      `and its environment "${failure.environmentName}"`,
+    plural: true,
+    org: failure.org,
+    project: failure.projectUid,
+    environmentUid: failure.environmentUid,
+    deploymentUid: failure.deploymentUid,
+    status: failure.status,
+    reason: failure.reason,
+    timedOut: failure.timedOut,
+  });
 }
 
 export const PROJECT_UPDATED = '\u2714 Project updated successfully.';

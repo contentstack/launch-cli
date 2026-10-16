@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 
 import { UsageError } from '../core/errors';
 import { LaunchApiError } from '../transport/errors';
-import { ProjectRef } from './project-ref';
+import { ResourceRef } from '../core/resource-ref';
 import type { ProjectPages } from './project.resolver';
 import { ProjectResolver } from './project.resolver';
 import type { ProjectsPage } from './types';
@@ -54,7 +54,7 @@ describe('ProjectResolver', () => {
   it('returns a uid reference without calling the API at all', async () => {
     const { projects, pageCalls } = fakePages([]);
 
-    await expect(new ProjectResolver(projects).toUid('org1', ProjectRef.parse(PRIMARY_UID))).resolves.toBe(PRIMARY_UID);
+    await expect(new ProjectResolver(projects).toUid('org1', ResourceRef.parse(PRIMARY_UID))).resolves.toBe(PRIMARY_UID);
     expect(pageCalls).toEqual([]);
   });
 
@@ -62,14 +62,14 @@ describe('ProjectResolver', () => {
     const { projects, pageCalls } = fakePages([]);
     const upper = PRIMARY_UID.toUpperCase();
 
-    await expect(new ProjectResolver(projects).toUid('org1', ProjectRef.parse(upper))).resolves.toBe(upper);
+    await expect(new ProjectResolver(projects).toUid('org1', ResourceRef.parse(upper))).resolves.toBe(upper);
     expect(pageCalls).toEqual([]);
   });
 
   it('looks a name up and returns its uid', async () => {
     const { projects, pageCalls, fetchedPages } = fakePages([[{ uid: PRIMARY_UID, name: 'marketing-site' }]]);
 
-    await expect(new ProjectResolver(projects).toUid('org1', ProjectRef.parse('marketing-site'))).resolves.toBe(
+    await expect(new ProjectResolver(projects).toUid('org1', ResourceRef.parse('marketing-site'))).resolves.toBe(
       PRIMARY_UID,
     );
     expect(pageCalls).toEqual([{ org: 'org1' }]);
@@ -80,8 +80,8 @@ describe('ProjectResolver', () => {
     const { projects, pageCalls } = fakePages([[{ uid: PRIMARY_UID, name: 'marketing-site' }]]);
     const resolver = new ProjectResolver(projects);
 
-    await expect(resolver.toUid('org1', ProjectRef.parse('ghost'))).rejects.toThrow(UsageError);
-    await expect(resolver.toUid('org1', ProjectRef.parse('ghost'))).rejects.toThrow(
+    await expect(resolver.toUid('org1', ResourceRef.parse('ghost'))).rejects.toThrow(UsageError);
+    await expect(resolver.toUid('org1', ResourceRef.parse('ghost'))).rejects.toThrow(
       'No project named "ghost" found in this organization.',
     );
     expect(pageCalls).toEqual([{ org: 'org1' }, { org: 'org1' }]);
@@ -94,7 +94,7 @@ describe('ProjectResolver', () => {
     }));
     const { projects, fetchedPages } = fakePages([firstPage, [{ uid: SECOND_UID, name: 'docs-site' }]], 101);
 
-    await expect(new ProjectResolver(projects).toUid('org1', ProjectRef.parse('docs-site'))).resolves.toBe(SECOND_UID);
+    await expect(new ProjectResolver(projects).toUid('org1', ResourceRef.parse('docs-site'))).resolves.toBe(SECOND_UID);
     expect(fetchedPages).toEqual([0, 1]);
   });
 
@@ -108,7 +108,7 @@ describe('ProjectResolver', () => {
       3,
     );
 
-    await expect(new ProjectResolver(projects).toUid('org1', ProjectRef.parse('ghost'))).rejects.toThrow(
+    await expect(new ProjectResolver(projects).toUid('org1', ResourceRef.parse('ghost'))).rejects.toThrow(
       'No project named "ghost" found in this organization.',
     );
     expect(fetchedPages).toEqual([0, 1, 2]);
@@ -124,7 +124,7 @@ describe('ProjectResolver', () => {
       3,
     );
 
-    await expect(new ProjectResolver(projects).toUid('org1', ProjectRef.parse('two'))).resolves.toBe('b'.repeat(24));
+    await expect(new ProjectResolver(projects).toUid('org1', ResourceRef.parse('two'))).resolves.toBe('b'.repeat(24));
     expect(fetchedPages).toEqual([0, 1]);
   });
 
@@ -132,8 +132,8 @@ describe('ProjectResolver', () => {
     const { projects, fetchedPages } = fakePages([], 150);
     const resolver = new ProjectResolver(projects);
 
-    await expect(resolver.toUid('org1', ProjectRef.parse('ghost'))).rejects.toThrow(UsageError);
-    await expect(resolver.toUid('org1', ProjectRef.parse('ghost'))).rejects.toThrow(
+    await expect(resolver.toUid('org1', ResourceRef.parse('ghost'))).rejects.toThrow(UsageError);
+    await expect(resolver.toUid('org1', ResourceRef.parse('ghost'))).rejects.toThrow(
       'No project named "ghost" found in this organization.',
     );
     expect(fetchedPages).toEqual([]);
@@ -142,14 +142,14 @@ describe('ProjectResolver', () => {
   it.each([['0'.repeat(23)], ['0'.repeat(25)]])('looks the %s-character hex string up as a name', async (value) => {
     const { projects, pageCalls } = fakePages([[{ uid: PRIMARY_UID, name: value }]]);
 
-    await expect(new ProjectResolver(projects).toUid('org1', ProjectRef.parse(value))).resolves.toBe(PRIMARY_UID);
+    await expect(new ProjectResolver(projects).toUid('org1', ResourceRef.parse(value))).resolves.toBe(PRIMARY_UID);
     expect(pageCalls).toEqual([{ org: 'org1' }]);
   });
 
   it('returns a 24-character hex project name unchanged rather than looking it up', async () => {
     const { projects, pageCalls } = fakePages([[{ uid: PRIMARY_UID, name: HEX_NAME }]]);
 
-    await expect(new ProjectResolver(projects).toUid('org1', ProjectRef.parse(HEX_NAME))).resolves.toBe(HEX_NAME);
+    await expect(new ProjectResolver(projects).toUid('org1', ResourceRef.parse(HEX_NAME))).resolves.toBe(HEX_NAME);
     expect(pageCalls).toEqual([]);
   });
 
@@ -157,8 +157,8 @@ describe('ProjectResolver', () => {
     const { projects } = fakePages([[{ uid: PRIMARY_UID, name: 'Marketing-Site' }]]);
     const resolver = new ProjectResolver(projects);
 
-    await expect(resolver.toUid('org1', ProjectRef.parse('Marketing-Site'))).resolves.toBe(PRIMARY_UID);
-    await expect(resolver.toUid('org1', ProjectRef.parse('marketing-site'))).rejects.toThrow(
+    await expect(resolver.toUid('org1', ResourceRef.parse('Marketing-Site'))).resolves.toBe(PRIMARY_UID);
+    await expect(resolver.toUid('org1', ResourceRef.parse('marketing-site'))).rejects.toThrow(
       'No project named "marketing-site" found in this organization.',
     );
   });
@@ -167,7 +167,7 @@ describe('ProjectResolver', () => {
     const failure = new LaunchApiError(403, [{ code: 'launch.FORBIDDEN', message: 'no access' }]);
 
     await expect(
-      new ProjectResolver(failingPages(failure)).toUid('org1', ProjectRef.parse('marketing-site')),
+      new ProjectResolver(failingPages(failure)).toUid('org1', ResourceRef.parse('marketing-site')),
     ).rejects.toBe(failure);
   });
 });

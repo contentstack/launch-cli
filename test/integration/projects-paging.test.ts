@@ -7,7 +7,7 @@ import { PROJECT_SCAN_PAGE_SIZE } from '../../src/projects/projects.api';
 import { UsageError } from '../../src/core/errors';
 import { RestApiClient } from '../../src/transport/rest-client';
 import type { UxLike } from '../../src/core/prompt';
-import { ProjectRef } from '../../src/projects/project-ref';
+import { ResourceRef } from '../../src/core/resource-ref';
 import { ProjectResolver } from '../../src/projects/project.resolver';
 import type { CmaSession } from '../../src/transport/cma-client';
 
@@ -70,7 +70,7 @@ describe('integration: paging GET /projects for name resolution', () => {
       .query({ limit: String(PROJECT_SCAN_PAGE_SIZE), skip: String(PROJECT_SCAN_PAGE_SIZE) })
       .reply(200, pageOf([{ uid: TARGET_UID, name: 'docs-site' }], 101));
 
-    await expect(new ProjectResolver(buildDeps().api.projects).toUid(ORG_UID, ProjectRef.parse('docs-site'))).resolves.toBe(TARGET_UID);
+    await expect(new ProjectResolver(buildDeps().api.projects).toUid(ORG_UID, ResourceRef.parse('docs-site'))).resolves.toBe(TARGET_UID);
 
     expect(first.isDone()).toBe(true);
     expect(second.isDone()).toBe(true);
@@ -87,7 +87,7 @@ describe('integration: paging GET /projects for name resolution', () => {
       .query({ limit: String(PROJECT_SCAN_PAGE_SIZE), skip: String(PROJECT_SCAN_PAGE_SIZE) })
       .reply(200, pageOf(projectsOfSize(PROJECT_SCAN_PAGE_SIZE, 'b'), 500));
 
-    await expect(new ProjectResolver(buildDeps().api.projects).toUid(ORG_UID, ProjectRef.parse('docs-site'))).resolves.toBe(TARGET_UID);
+    await expect(new ProjectResolver(buildDeps().api.projects).toUid(ORG_UID, ResourceRef.parse('docs-site'))).resolves.toBe(TARGET_UID);
 
     expect(first.isDone()).toBe(true);
     expect(second.isDone()).toBe(false);
@@ -107,7 +107,7 @@ describe('integration: paging GET /projects for name resolution', () => {
       .query({ limit: String(PROJECT_SCAN_PAGE_SIZE), skip: '150' })
       .reply(200, pageOf([], 150));
 
-    const rejection = await new ProjectResolver(buildDeps().api.projects).toUid(ORG_UID, ProjectRef.parse('ghost')).catch((error: unknown) => error);
+    const rejection = await new ProjectResolver(buildDeps().api.projects).toUid(ORG_UID, ResourceRef.parse('ghost')).catch((error: unknown) => error);
 
     expect(rejection).toBeInstanceOf(UsageError);
     expect((rejection as UsageError).message).toBe('No project named "ghost" found in this organization.');
@@ -126,7 +126,7 @@ describe('integration: paging GET /projects for name resolution', () => {
       .query({ limit: String(PROJECT_SCAN_PAGE_SIZE), skip: '0' })
       .reply(200, pageOf([], 900));
 
-    const rejection = await new ProjectResolver(buildDeps().api.projects).toUid(ORG_UID, ProjectRef.parse('ghost')).catch((error: unknown) => error);
+    const rejection = await new ProjectResolver(buildDeps().api.projects).toUid(ORG_UID, ResourceRef.parse('ghost')).catch((error: unknown) => error);
 
     expect(rejection).toBeInstanceOf(UsageError);
     expect(first.isDone()).toBe(true);

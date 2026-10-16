@@ -1,6 +1,6 @@
 import { UsageError } from '../core/errors';
-import type { ProjectRef } from './project-ref';
-import { hasUid } from '../transport/envelope';
+import { uidByName } from '../core/name-lookup';
+import type { ResourceRef } from '../core/resource-ref';
 import type { PageProjectsParams } from './projects.api';
 import type { ProjectsPage } from './types';
 
@@ -11,19 +11,12 @@ export interface ProjectPages {
 export class ProjectResolver {
   constructor(private readonly projects: ProjectPages) {}
 
-  async toUid(org: string, ref: ProjectRef): Promise<string> {
-    if (ref.kind === 'uid') {
-      return ref.uid;
-    }
-
-    for await (const page of this.projects.pages({ org })) {
-      const match = page.projects.filter(hasUid).find((project) => project.name === ref.name);
-
-      if (match) {
-        return match.uid;
-      }
-    }
-
-    throw new UsageError(`No project named "${ref.name}" found in this organization.`);
+  toUid(org: string, ref: ResourceRef): Promise<string> {
+    return uidByName(
+      () => this.projects.pages({ org }),
+      (page) => page.projects,
+      ref,
+      (name) => new UsageError(`No project named "${name}" found in this organization.`),
+    );
   }
 }

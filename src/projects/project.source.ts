@@ -3,6 +3,7 @@ import { UsageError } from '../core/errors';
 import { connectedAccountsUrl } from '../core/region';
 import type { ServiceContext } from '../core/service-context';
 import { asSentence, messageOf } from '../core/values';
+import { needInput } from '../core/prompt';
 import {
   GitConnectionMissingError,
   GitNamespaceNotConnectedError,
@@ -21,7 +22,6 @@ import { detectGitHubRepository } from '../git/local-repository';
 import type { GitNamespacesPage, GitRepository } from '../git/types';
 import { GIT_PROVIDER_GITHUB } from '../git/types';
 import { LaunchApiError } from '../transport/errors';
-import { needInput } from './project.inputs';
 import { FolderUploader } from '../uploads/upload.folder';
 import type { EnvironmentSource } from '../environments/types';
 import type { CreateRequest } from './types';
