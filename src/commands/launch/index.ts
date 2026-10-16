@@ -5,5 +5,5 @@ export default class LaunchRetired extends RetiredCommand {
 
   static retiredName = 'launch';
 
-  static replacements = ['launch:projects:create', 'launch:environments:create', 'launch:deployments:create'];
+  static replacements = ['launch:projects:create', 'launch:env:create', 'launch:deployments:create'];
 }

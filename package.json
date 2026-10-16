@@ -70,6 +70,9 @@
       "launch:projects": {
         "description": "Manage Launch projects"
       },
+      "launch:env": {
+        "description": "Manage the environments of a Launch project"
+      },
       "launch:functions": {
         "description": "Run Launch cloud functions locally"
       }
@@ -141,6 +144,11 @@
       "launch": "LNCH",
       "launch:deployments": "LNCH-DPLMNT",
       "launch:environments": "LNCH-ENV",
+      "launch:env:create": "LNCH-ENV-CRT",
+      "launch:env:delete": "LNCH-ENV-DEL",
+      "launch:env:get": "LNCH-ENV-GET",
+      "launch:env:list": "LNCH-ENV-LS",
+      "launch:env:update": "LNCH-ENV-UPD",
       "launch:functions": "LNCH-FN",
       "launch:functions:serve": "LNCH-FN-SRV",
       "launch:logs": "LNCH-LGS",
