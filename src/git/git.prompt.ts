@@ -2,6 +2,7 @@ import { PICKER_PAGE_SIZE } from '../core/constants';
 import { UsageError } from '../core/errors';
 import type { PromptDeps } from '../core/prompt';
 import { askOption, noteTruncation } from '../core/prompt';
+import { isAbsent } from '../core/values';
 import { repositoryLabel } from './git.presenter';
 import type { GitRepository } from './types';
 
@@ -32,10 +33,13 @@ export async function askBranch(
 
   noteTruncation(deps.ux, page.pagination.count, named.length, 'branches', '--branch');
 
+  const names = named.map((branch) => branch.name as string);
+  const listed = initial === undefined || isAbsent(initial) || names.includes(initial) ? names : [initial, ...names];
+
   return askOption(
     deps.ux,
     'Choose a branch',
-    named.map((branch) => ({ name: branch.name as string, value: branch.name as string })),
+    listed.map((name) => ({ name, value: name })),
     initial,
   );
 }

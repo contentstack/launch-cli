@@ -53,7 +53,32 @@ describe('askBranch', () => {
         { name: 'develop', value: 'develop' },
       ],
       default: 'main',
+      loop: false,
+      pageSize: 2,
     });
+  });
+
+  it('lists the pre-selected branch first when the first page does not include it, so Enter keeps it', async () => {
+    const { deps: d, asked } = deps(['release/x'], {
+      pagination: { count: 340, limit: 100 },
+      branches: [{ name: 'main' }, { name: 'develop' }],
+    });
+
+    await expect(askBranch(d, { ...GIT, repoName: 'my-org/my-repo' }, 'release/x')).resolves.toBe('release/x');
+    expect((asked[0] as { choices: unknown; default: unknown }).choices).toEqual([
+      { name: 'release/x', value: 'release/x' },
+      { name: 'main', value: 'main' },
+      { name: 'develop', value: 'develop' },
+    ]);
+    expect((asked[0] as { default: unknown }).default).toBe('release/x');
+  });
+
+  it.each([[''], ['  ']])('adds no blank choice when the pre-selected branch is %p', async (initial) => {
+    const { deps: d, asked } = deps(['main'], { pagination: { count: 1, limit: 100 }, branches: [{ name: 'main' }] });
+
+    await askBranch(d, { ...GIT, repoName: 'my-org/my-repo' }, initial);
+
+    expect((asked[0] as { choices: unknown }).choices).toEqual([{ name: 'main', value: 'main' }]);
   });
 
   it('refuses when the repository has no usable branch', async () => {

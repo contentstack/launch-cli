@@ -140,3 +140,43 @@ export function deploymentLogsUnavailableLine(error: unknown): string {
 
   return `  ! Could not read the deployment logs (${reason}). Still waiting on the deployment.`;
 }
+
+export interface FirstDeploymentFailure {
+  created: string;
+  plural: boolean;
+  org: string;
+  project: string;
+  status: string;
+  environmentUid?: string;
+  deploymentUid?: string;
+  reason?: string;
+  timedOut?: boolean;
+}
+
+export function firstDeploymentFailureMessage(failure: FirstDeploymentFailure): string {
+  const scope = `--org ${failure.org} --project ${failure.project}`;
+  const environment = failure.environmentUid === undefined ? '' : ` --env ${failure.environmentUid}`;
+  const deployment = failure.deploymentUid === undefined ? '' : ` --deployment ${failure.deploymentUid}`;
+  const were = failure.plural ? 'were' : 'was';
+
+  if (failure.timedOut === true) {
+    return (
+      `The deployment was still ${failure.status} when the CLI stopped waiting for it; it may still finish. ` +
+      `${failure.created} ${were} created. Do not start another deployment yet: ` +
+      `run csdx launch:deployments:get ${scope}${environment}${deployment} to see how it ends, ` +
+      `or csdx launch:logs:get ${scope}${environment}${deployment} to follow it.`
+    );
+  }
+
+  const opening =
+    failure.reason === undefined
+      ? `The deployment did not succeed; its last status was ${failure.status}. `
+      : `The deployment could not be followed to completion: ${failure.reason} `;
+
+  return (
+    opening +
+    `${failure.created} ${were} created and ${failure.plural ? 'have' : 'has'} not been rolled back. ` +
+    `Run csdx launch:deployments:create ${scope}${environment} to try the deployment again, ` +
+    `or csdx launch:logs:get ${scope}${environment}${deployment} to see why it did not succeed.`
+  );
+}

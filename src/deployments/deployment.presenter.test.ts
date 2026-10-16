@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 
 import {
   colouredLogMessage,
+  firstDeploymentFailureMessage,
   deploymentLogLine,
   deploymentLogsUnavailableLine,
   deploymentUrlLine,
@@ -142,6 +143,52 @@ describe('deployment presenter', () => {
   it('names what failed when a log fetch rejects with something other than an Error', () => {
     expect(deploymentLogsUnavailableLine('socket hang up')).toBe(
       '  ! Could not read the deployment logs (socket hang up). Still waiting on the deployment.',
+    );
+  });
+});
+
+describe('firstDeploymentFailureMessage', () => {
+  const ENVIRONMENT = { created: 'The environment "staging" (env9)', plural: false };
+  const SCOPE = { org: 'org1', project: 'proj1', environmentUid: 'env9' };
+
+  it('names the status, what survived and both follow-up commands for a failed deployment', () => {
+    expect(firstDeploymentFailureMessage({ ...ENVIRONMENT, ...SCOPE, deploymentUid: 'dep1', status: 'FAILED' })).toBe(
+      'The deployment did not succeed; its last status was FAILED. ' +
+        'The environment "staging" (env9) was created and has not been rolled back. ' +
+        'Run csdx launch:deployments:create --org org1 --project proj1 --env env9 to try the deployment again, ' +
+        'or csdx launch:logs:get --org org1 --project proj1 --env env9 --deployment dep1 to see why it did not succeed.',
+    );
+  });
+
+  it('agrees the verbs with a plural survivor and leaves out the scope it does not know', () => {
+    expect(
+      firstDeploymentFailureMessage({
+        created: 'The project "site" (p1) and its environment "Default"',
+        plural: true,
+        org: 'org1',
+        project: 'p1',
+        status: 'NONE',
+        reason: 'Lookup refused.',
+      }),
+    ).toBe(
+      'The deployment could not be followed to completion: Lookup refused. ' +
+        'The project "site" (p1) and its environment "Default" were created and have not been rolled back. ' +
+        'Run csdx launch:deployments:create --org org1 --project p1 to try the deployment again, ' +
+        'or csdx launch:logs:get --org org1 --project p1 to see why it did not succeed.',
+    );
+  });
+
+  it.each([
+    [false, 'The environment "staging" (env9) was created.'],
+    [true, 'The environment "staging" (env9) were created.'],
+  ])('words a wait that ran out as possibly still finishing (plural %p)', (plural, created) => {
+    expect(
+      firstDeploymentFailureMessage({ ...ENVIRONMENT, plural, ...SCOPE, deploymentUid: 'dep1', status: 'DEPLOYING', timedOut: true }),
+    ).toBe(
+      'The deployment was still DEPLOYING when the CLI stopped waiting for it; it may still finish. ' +
+        `${created} Do not start another deployment yet: ` +
+        'run csdx launch:deployments:get --org org1 --project proj1 --env env9 --deployment dep1 to see how it ends, ' +
+        'or csdx launch:logs:get --org org1 --project proj1 --env env9 --deployment dep1 to follow it.',
     );
   });
 });
