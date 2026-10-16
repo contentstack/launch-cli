@@ -1,9 +1,9 @@
 import { MissingInputError } from '../core/errors';
-import { askOption, askOptionalText, askText } from '../core/prompt';
+import { CREATE_PROMPT_REMEDIES, askOption, askOptionalText, askText } from '../core/prompt';
 import { requireValueOf } from '../core/rules';
 import type { ServiceContext } from '../core/service-context';
 import type { ResponseMode, ToggleValue } from './environment.inputs';
-import { CREATE_PROMPT_REMEDIES, RESPONSE_MODES, TOGGLE_VALUES, frameworkPresetOf } from './environment.inputs';
+import { RESPONSE_MODES, TOGGLE_VALUES, frameworkPresetOf } from './environment.inputs';
 import type { FrameworkPreset } from './frameworks';
 import {
   FRAMEWORK_CHOICES,
@@ -17,7 +17,7 @@ function emptyEnvironmentVariables(): [] {
   return [];
 }
 
-function frameworkLabelOf(detected: unknown): string | undefined {
+export function frameworkLabelOf(detected: unknown): string | undefined {
   if (typeof detected !== 'string') {
     return undefined;
   }

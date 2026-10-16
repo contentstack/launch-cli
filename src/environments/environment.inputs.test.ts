@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 import { UsageError } from '../core/errors';
 import type { ResolveServices } from '../core/resolution';
 import type { ApiSurface } from '../resources';
@@ -30,6 +32,7 @@ const FROM_FLAGS = { 'server-cmd': 'flag', framework: 'flag' } as const;
 describe('environment inputs', () => {
   it('names each flag as the Commands Details "All flags" tables name it', () => {
     expect(Object.keys(environmentFlags)).toEqual([
+      'env',
       'env-name',
       'branch',
       'framework',
@@ -39,6 +42,10 @@ describe('environment inputs', () => {
       'res-mode',
       'auto-deploy',
       'cs-auth',
+      'cache-priming',
+      'password-protection',
+      'username',
+      'password',
     ]);
   });
 
@@ -134,5 +141,122 @@ describe('environment inputs', () => {
       '--server-cmd is only supported when --framework is one of ANALOG, ANGULAR, NUXT, ASTRO, REMIX, OTHER; ' +
         '--framework is GATSBY.',
     );
+  });
+});
+
+const ENV_UID = randomBytes(12).toString('hex');
+
+function envServices(pages: { uid?: string; name?: string }[][]) {
+  const scanned: unknown[] = [];
+  const listed: unknown[] = [];
+  const asked: unknown[] = [];
+  const ux: UxLike = {
+    print: () => undefined,
+    inquire: async (payload: unknown) => {
+      asked.push(payload);
+      return 'e9' as never;
+    },
+  };
+  const api = {
+    environments: {
+      pages: async function* (params: unknown) {
+        scanned.push(params);
+        for (const environments of pages) {
+          yield { pagination: { count: 0, limit: 100 }, environments };
+        }
+      },
+      list: async (params: unknown) => {
+        listed.push(params);
+        return { pagination: { count: 1, limit: 100 }, environments: [{ uid: 'e9', name: 'production' }] };
+      },
+    },
+  } as unknown as ApiSurface;
+
+  return { services: { api, ux, isTTY: true }, scanned, listed, asked };
+}
+
+const RESOLVED_SCOPE = { org: 'org1', project: 'proj1' };
+
+describe('the --env input', () => {
+  it('describes the flag as taking a name or a uid, with no short form', () => {
+    expect(environmentFlags.env.description).toBe('Environment name or UID');
+    expect((environmentFlags.env as { char?: string }).char).toBeUndefined();
+  });
+
+  it('resolves after the organization and the project and is never read from the config file', () => {
+    expect(environmentResolution.env.dependsOn).toEqual(['org', 'project']);
+    expect((environmentResolution.env as { configPath?: string }).configPath).toBeUndefined();
+  });
+
+  it('resolves a name given on the command line to the uid of the environment with exactly that name', async () => {
+    const { services: s, scanned } = envServices([[{ uid: 'e1', name: 'Production' }, { uid: 'e2', name: 'production' }]]);
+
+    await expect(
+      environmentResolution.env.normalize('production', { services: s, resolved: RESOLVED_SCOPE, source: 'flag' }),
+    ).resolves.toBe('e2');
+    expect(scanned).toEqual([RESOLVED_SCOPE]);
+  });
+
+  it('takes a 24-character hex value on the command line as a uid without scanning', async () => {
+    const { services: s, scanned } = envServices([]);
+
+    await expect(
+      environmentResolution.env.normalize(ENV_UID, { services: s, resolved: RESOLVED_SCOPE, source: 'flag' }),
+    ).resolves.toBe(ENV_UID);
+    expect(scanned).toEqual([]);
+  });
+
+  it('takes the picker answer as a uid without scanning, whatever it looks like', async () => {
+    const { services: s, scanned } = envServices([[{ uid: 'e2', name: 'e9' }]]);
+
+    await expect(
+      environmentResolution.env.normalize('e9', { services: s, resolved: RESOLVED_SCOPE, source: 'prompt' }),
+    ).resolves.toBe('e9');
+    expect(scanned).toEqual([]);
+  });
+
+  it('refuses a name on the command line that no environment in the project carries', async () => {
+    const { services: s } = envServices([[{ uid: 'e1', name: 'Production' }]]);
+
+    await expect(
+      environmentResolution.env.normalize('production', { services: s, resolved: RESOLVED_SCOPE, source: 'flag' }),
+    ).rejects.toThrow(new UsageError('No environment named "production" found in this project.'));
+  });
+
+  it('prompts with the environment picker scoped to the resolved organization and project', async () => {
+    const { services: s, listed, asked } = envServices([]);
+
+    await expect(environmentResolution.env.prompt({ services: s, resolved: RESOLVED_SCOPE })).resolves.toBe('e9');
+    expect(listed).toEqual([{ ...RESOLVED_SCOPE, limit: 100, skip: 0 }]);
+    expect((asked[0] as { message: string }).message).toBe('Choose an environment');
+  });
+});
+
+describe('the update-only toggles and credentials', () => {
+  it.each([['cache-priming'], ['password-protection']] as const)(
+    'takes --%s as enable or disable however it is cased, and refuses anything else',
+    async (flag) => {
+      await expect(normalize(flag, ' Disable ')).resolves.toBe('disable');
+      await expect(normalize(flag, 'enable')).resolves.toBe('enable');
+      await expect(normalize(flag, 'yes')).rejects.toThrow(UsageError);
+    },
+  );
+
+  it('gives --username the short form -u and --password the short form -p', () => {
+    expect(environmentFlags.username.char).toBe('u');
+    expect(environmentFlags.password.char).toBe('p');
+  });
+
+  it('takes --password as presence only, so a password can never be passed on argv', () => {
+    expect(environmentFlags.password.type).toBe('boolean');
+    expect(environmentResolution.password.default).toBe(false);
+  });
+
+  it('trims a --username', async () => {
+    await expect(normalize('username', '  admin  ')).resolves.toBe('admin');
+  });
+
+  it('refuses a --username containing a colon, which basic authentication cannot carry', async () => {
+    await expect(normalize('username', 'ad:min')).rejects.toThrow(new UsageError('--username must not contain ":".'));
   });
 });

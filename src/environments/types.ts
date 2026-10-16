@@ -13,15 +13,55 @@ export interface EnvironmentDomain {
   url?: string;
 }
 
+export interface EnvironmentPasswordProtection {
+  isEnabled?: boolean;
+}
+
+export interface EnvironmentVariable {
+  key?: string;
+  value?: string;
+}
+
 export interface Environment {
   uid?: string;
   name?: string;
+  description?: string;
   gitBranch?: string;
   frameworkPreset?: string;
   buildCommand?: string;
   outputDirectory?: string;
   serverCommand?: string;
   domains?: EnvironmentDomain[];
+  autoDeployOnPush?: boolean;
+  isContentstackAuthenticationEnabled?: boolean;
+  isCachePrimingEnabled?: boolean;
+  passwordProtection?: EnvironmentPasswordProtection;
+  environmentVariables?: EnvironmentVariable[];
+  organizationUid?: string;
+  project?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PasswordProtectionUpdate {
+  isEnabled: boolean;
+  username?: string;
+  password?: string;
+}
+
+export interface EnvironmentUpdate {
+  name?: string;
+  description?: string;
+  gitBranch?: string;
+  frameworkPreset?: string;
+  buildCommand?: string;
+  serverCommand?: string;
+  outputDirectory?: string;
+  isStreamingEnabled?: boolean;
+  autoDeployOnPush?: boolean;
+  isContentstackAuthenticationEnabled?: boolean;
+  isCachePrimingEnabled?: boolean;
+  passwordProtection?: PasswordProtectionUpdate;
 }
 
 export type IdentifiedEnvironment = Environment & { uid: string };

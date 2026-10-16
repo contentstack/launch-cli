@@ -1,0 +1,37 @@
+{
+  "environment": {
+    "uid": "d4e5f60718293a4b5c6d7e8f",
+    "name": "production",
+    "description": "It is a test environment.",
+    "project": "a1b2c3d4e5f60718293a4b5c",
+    "gitBranch": "main",
+    "buildCommand": "npx @11ty/eleventy",
+    "outputDirectory": "./_site",
+    "frameworkPreset": "OTHER",
+    "environmentVariables": [
+      {
+        "key": "key1",
+        "value": "value1"
+      }
+    ],
+    "autoDeployOnPush": true,
+    "nodeVersion": "22",
+    "organizationUid": "blt4d9e2a7c1f6b3085",
+    "createdAt": "2025-11-06T07:39:19.230Z",
+    "updatedAt": "2025-11-06T07:39:53.582Z",
+    "createdBy": "blt8c3f1b6d4a9e2075",
+    "updatedBy": "blt8c3f1b6d4a9e2075",
+    "isCachePrimingEnabled": false,
+    "isContentstackAuthenticationEnabled": true,
+    "passwordProtection": {
+      "isEnabled": false
+    },
+    "domains": [
+      {
+        "url": "https://production-sample-project.contentstackapps.com",
+        "createdAt": "2025-11-06T07:39:19.512Z",
+        "updatedAt": "2025-11-06T07:39:19.512Z"
+      }
+    ]
+  }
+}

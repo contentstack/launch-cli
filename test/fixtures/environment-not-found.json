@@ -1,0 +1,9 @@
+{
+  "errors": [
+    {
+      "code": "launch.ENVIRONMENT.NOT_FOUND",
+      "message": "Environment not found."
+    }
+  ],
+  "status": 404
+}
