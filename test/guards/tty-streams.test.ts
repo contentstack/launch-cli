@@ -12,7 +12,7 @@ function stdinReads(source: SourceFile): Occurrence[] {
 
   return lines.flatMap((raw, index) => {
     const text = raw.trim();
-    const stdinSide = text.replace(/\bstdout\.isTTY\b/g, '');
+    const stdinSide = text.replace(/\bstdout\.isTTY\b/g, '').replace(/\bprocess\.stdin\b(?!\.)/g, '');
 
     if (!/\bisTTY\b|\bstdin\b/.test(stdinSide)) {
       return [];
@@ -122,6 +122,23 @@ describe('guard: output decisions read stdout; only the decision to prompt reads
     };
 
     expect(outputDecisionsOnStdin(source)).toEqual([]);
+  });
+
+  it('allows reading piped data from process.stdin as a stream, while its terminal flag is still a read', () => {
+    const source: SourceFile = {
+      path: 'core/piped-input.ts',
+      text: [
+        'export async function readPipedInput(stream: AsyncIterable<unknown> = process.stdin): Promise<string> {',
+        '  for await (const chunk of process.stdin) {',
+        '  }',
+        '}',
+        'const draw = process.stdin.isTTY ? spinner() : undefined;',
+      ].join('\n'),
+    };
+
+    expect(outputDecisionsOnStdin(source).map((violation) => violation.split('  <-')[0])).toEqual([
+      'src/core/piped-input.ts:5  const draw = process.stdin.isTTY ? spinner() : undefined;',
+    ]);
   });
 
   it('treats a plumbing line as plumbing only inside the plumbing files', () => {

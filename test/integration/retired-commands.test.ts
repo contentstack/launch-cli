@@ -29,8 +29,6 @@ const CONFIG: Record<string, unknown> = {
 let config: Interfaces.Config;
 
 const PLANNED_COMMANDS: Record<string, string> = {
-  'launch:environments:create': 'CL-7168',
-  'launch:environments:list': 'CL-7168',
   'launch:deployments:create': 'CL-7170',
   'launch:deployments:get': 'CL-7170',
   'launch:deployments:list': 'CL-7170',
@@ -68,7 +66,7 @@ describe('integration: retired V1 command names', () => {
     expect(error?.oclif?.exit).toBe(2);
     expect(error?.message).toBe(
       'csdx launch was removed in Launch CLI v2. Use csdx launch:projects:create, ' +
-        'csdx launch:environments:create or csdx launch:deployments:create instead.',
+        'csdx launch:env:create or csdx launch:deployments:create instead.',
     );
   });
 
@@ -79,7 +77,7 @@ describe('integration: retired V1 command names', () => {
     ],
     [
       'launch:environments',
-      'csdx launch:environments was removed in Launch CLI v2. Use csdx launch:environments:list instead.',
+      'csdx launch:environments was removed in Launch CLI v2. Use csdx launch:env:list instead.',
     ],
     ['launch:open', 'csdx launch:open was removed in Launch CLI v2. Use csdx launch:site:open instead.'],
     ['launch:logs', 'csdx launch:logs was removed in Launch CLI v2. Use csdx launch:logs:get instead.'],

@@ -40,6 +40,10 @@ describe('integration: the oclif manifest in package.json', () => {
     expect(manifest.oclif.topics?.['launch:functions']?.description).toBe('Run Launch cloud functions locally');
   });
 
+  it('describes the launch:env subtopic', () => {
+    expect(manifest.oclif.topics?.['launch:env']?.description).toBe('Manage the environments of a Launch project');
+  });
+
   it('declares a description for every topic it declares', () => {
     const topics = manifest.oclif.topics ?? {};
 

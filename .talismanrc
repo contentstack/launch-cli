@@ -1,6 +1,6 @@
 fileignoreconfig:
 - filename: test/integration/retired-commands.test.ts
-  checksum: 6eab66fd4393aa3e46e94bb7e21252775f4d809d0b3f2613d0146144589b12de
+  checksum: 15a04dda74e97d9d1d89340b7a90744fb239d9de1fbada08e7d42cfe12cc649e
 - filename: test/integration/manage-base-path.test.ts
   checksum: 79eb9ad420ea47d5bee8045d812c45b010bbeeafcaf5f85d11653140b0cd0db1
 - filename: src/transport/rest-client.ts
@@ -14,7 +14,7 @@ fileignoreconfig:
 - filename: src/projects/types.ts
   checksum: 73826a3686cd0793e7813e80c54bfdc78cddb72b085d2861854f20064a23fdc8
 - filename: src/projects/projects.api.ts
-  checksum: 29fb58c181bab1c76b6827608a77f21b9e72ce0e34eff9fd06fe5d74419c5aad
+  checksum: 59818dd541577d99c12c50c0c6ef4846ef2db614ab6183cb6dd7b71710931eb1
 - filename: src/core/service-context.test.ts
   checksum: 7bc4f6ca3ec8a960f84fb4c07453a287bb2bb0ccc7e06c5805a7f56df160024a
 - filename: src/core/rules.test.ts
@@ -91,7 +91,7 @@ fileignoreconfig:
     - "key: 'x-ms-blob-type', value: 'BlockBlob'"
     - "key: 'Content-Type', value: 'application/zip'"
 - filename: test/fixtures/README.md
-  checksum: f0d6c28d269fb7c9e441c3b95fd89ba46584462a2309e1cce4035ff7e0d2a5a1
+  checksum: 84200663e97129b03a28240a2cb722d4e45c61fff9b0b19cbcef676582cfc1dd
   allowed_patterns:
     - "formFieldKey"
     - "\\{key, value\\}"
@@ -112,6 +112,7 @@ fileignoreconfig:
   allowed_patterns:
     - "assertArray\\(response, key, `\\$\\{key\\} response`\\)"
 - filename: src/environments/environment.inputs.ts
+  checksum: 3fc2802c79457f7c7e93cd5f32c00a7986dc6f686fe3c346de4b8436a66cc0b9
   ignore_detectors:
     - filename
 - filename: src/environments/environment.builder.ts
@@ -120,8 +121,54 @@ fileignoreconfig:
 - filename: src/environments/environment.builder.test.ts
   ignore_detectors:
     - filename
+- filename: src/environments/environment.update.ts
+  checksum: b1e15e174f98a875f97e0683182638f93966ef4c498135d36df620a28338aacb
+  ignore_detectors:
+    - filename
+- filename: src/environments/environment.update.test.ts
+  checksum: 5e90c3dd231ede1b890f7c750c7063412116a2e4be536d2f290d56d28205ceae
+  ignore_detectors:
+    - filename
+- filename: src/environments/environment.create.ts
+  ignore_detectors:
+    - filename
+- filename: src/environments/environment.create.test.ts
+  ignore_detectors:
+    - filename
+- filename: src/environments/environment.rules.ts
+  checksum: 3440409b7104f49a0f05bd816acdab2d1c5139b8a9170a9aded9e396dbd52de0
+  ignore_detectors:
+    - filename
+- filename: src/environments/environment.update.prompt.ts
+  checksum: 12b8bfafabc5f5174559179b2e926131fb04793685c9bba63cf0620d1cb089a2
+  ignore_detectors:
+    - filename
+- filename: src/environments/environment.update.prompt.test.ts
+  checksum: 5b77e234c5c331d52268157241802345006d59b3af4c0476faa9b28825a61d71
+  ignore_detectors:
+    - filename
+- filename: src/environments/environment.presenter.ts
+  checksum: e980e4fc6dcbe721a2a6d4c826273a3a4ddaa9a4e52a6661ee1b599a9ea9c783
+  ignore_detectors:
+    - filename
+- filename: src/environments/environment.presenter.test.ts
+  checksum: 3f497b982f33c721c988c8245f91534fd50b42317c84cc8f1de784da2d13c942
+  ignore_detectors:
+    - filename
+- filename: src/environments/environment.resolver.ts
+  ignore_detectors:
+    - filename
+- filename: src/environments/environment.resolver.test.ts
+  ignore_detectors:
+    - filename
+- filename: src/environments/environment.prompt.ts
+  ignore_detectors:
+    - filename
+- filename: src/environments/environment.prompt.test.ts
+  ignore_detectors:
+    - filename
 - filename: src/environments/environment.inputs.test.ts
-  checksum: ba38924cf2b2b0df4044e8aba4c4cd0bfa7edcb1f09654cf37a7edb06365de06
+  checksum: 499a4601152dded32b766abd8e43aa2ddd88e4e62fc5389b00a268d730178565
   ignore_detectors:
     - filename
 - filename: src/core/inputs.ts
@@ -137,6 +184,24 @@ fileignoreconfig:
     - "a1b2c3d4e5f60718293a4b5c"
     - "b2c3d4e5f60718293a4b5c6d"
     - "c3d4e5f60718293a4b5c6d7e"
+- filename: test/fixtures/environments-list.json
+  ignore_detectors:
+    - filename
+  allowed_patterns:
+    - "a1b2c3d4e5f60718293a4b5c"
+    - "d4e5f60718293a4b5c6d7e8f"
+    - "e5f60718293a4b5c6d7e8f90"
+- filename: test/fixtures/environment-get.json
+  ignore_detectors:
+    - filename
+  allowed_patterns:
+    - "a1b2c3d4e5f60718293a4b5c"
+    - "d4e5f60718293a4b5c6d7e8f"
+- filename: test/fixtures/environment-not-found.json
+  ignore_detectors:
+    - filename
+- filename: test/integration/environments-list-command.test.ts
+  checksum: 87bf2ec14656f2bcf1bf97dd1ea248c8be087e0f15bf1b7e212c8308d8f13cfe
 - filename: test/fixtures/projects-list.json
   allowed_patterns:
     - "a1b2c3d4e5f60718293a4b5c"
@@ -162,7 +227,9 @@ fileignoreconfig:
 - filename: src/resources.test.ts
   allowed_patterns:
     - "a project name passed on argv to the project resolver"
+    - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
 - filename: AGENTS.md
+  checksum: 7a582c03c5326b0d1c2465a0060da0763944dc295d6f6d7ab1ee4bf5ce047181
   allowed_patterns:
     - "Do not add an exemption to a guard to make a new file pass"
     - "passes its own error wording to `client.request\\(req, MESSAGES\\)`"
@@ -186,7 +253,7 @@ fileignoreconfig:
 - filename: src/git/local-repository.ts
   checksum: b9091ed135dfebdf590a5412bbfba2b2f96d4a177cf944a20909b93405268e9f
 - filename: test/guards/layering.test.ts
-  checksum: d856282fd15bfc6fa7b5eb32ff419e66eb5fd20ff8dc79af9e82c0eb3afcd4f6
+  checksum: 58f43e0ed643b9317538d12e44ba449d046e762dee219ff84f3907bd9dea3531
 - filename: src/commands/launch/projects/create.test.ts
   checksum: 1d5063992d0a7cfb91871ab00f79123bf71806ddc9faac80952cf279d165aec5
 - filename: src/commands/launch/projects/delete.test.ts
@@ -198,13 +265,15 @@ fileignoreconfig:
 - filename: src/core/launch-command.test.ts
   checksum: 930069aeddbf4348097f33713e4e57bd26cb3be1b7970eb60142bb53010e1674
 - filename: src/projects/project.inputs.test.ts
-  checksum: c20f69186e74bc5fe6deb73a9036fa2cb86aeff1bde48670f0c489d9e9121c62
+  checksum: eaecaba9eddec128186871550fc5802166fa56a2e89741d72ac955fcfe2f952f
 - filename: test/integration/projects-command-flows.test.ts
   checksum: 786a470c71f3a7ce58463d0a08e9bf47e36f936c55a2ca7cd8ef2a058ac01e4a
 - filename: src/core/redact.test.ts
   checksum: ae497ea8c3a4c3f12217d2c4c028a1da3d1324e18362d68c355ba8120902bcb3
 - filename: src/commands/launch/projects/list.test.ts
   checksum: d01cbf70469a771425c8258fb1800b70a6ff0b807208fc76f3060b69a2cc05bc
+- filename: src/commands/launch/env/list.test.ts
+  checksum: 36040ec3ae8230a0b9ae28e1609fd9edf5965b9d472bd2f9a1808c060ea897bf
 - filename: src/commands/launch/projects/get.test.ts
   checksum: fec6ca189bc3d93aefa109ee6405f8ce74a42318aa18a99045d40c3cb5561b9e
 - filename: test/integration/projects-list-command.test.ts
@@ -215,8 +284,6 @@ fileignoreconfig:
   checksum: 06db291bb40ec55774179b02e3e1a9644bbaa116ec511c163e8d6012aebb3868
 - filename: test/integration/project-upload-proxy.test.ts
   checksum: 502adf95d5c1b41e58a8500929597741e8f8a178a3aaa69f517451cb7bedac4a
-- filename: src/environments/environment.errors.ts
-  checksum: ac2b4115715433965f87d017f8751db8ffb534ace02e2a4b6c5e5e1d2b0861e3
 - filename: test/fixtures/project-get-fileupload.json
   checksum: 56488abc4785846b61953e3b32abd0537512ce1d4afea977c937d87b21c07623
 - filename: src/core/errors.test.ts
@@ -237,4 +304,32 @@ fileignoreconfig:
   checksum: bf8c203a8efc40a75f5407ceb29a639ea9a6e1fa081d02260def2d7e0fab958a
 - filename: test/credential-guard.setup.ts
   checksum: 519ccbeb0552fdb1d5f27308c56477c0258ee6cc0adec8f618e8e5bc047cbf6d
+- filename: src/environments/types.ts
+  checksum: a637325f841e8491a4c058998e6a523461abc7b3b150b9eee0c2f7190a80205e
+- filename: src/commands/launch/env/get.test.ts
+  checksum: 26863ca165d20df9a9ea8afac1eda71c9f96be15fe23bddb4fd7ddfcefab2256
+- filename: test/integration/environments-delete.test.ts
+  checksum: 7df1b364699953cad40b7aea3beeaaae6e2b781c72b7ae8f36ea78ebf50887e1
+- filename: src/commands/launch/env/delete.test.ts
+  checksum: 14116789eb5f9000f2a7d6f569cd15aabf2a1ec3b127ed4427afe13fd515f0c2
+- filename: src/environments/environment.errors.ts
+  checksum: 6696c36c85b5b36d6ade7897b196ad554ef52d615f7f5e61faaf825e4f3b3a31
+- filename: src/core/prompt.ts
+  checksum: 54a94bca9c39545606d51db0966e040ac03b43539315606c61c1cc64d11ec062
+- filename: src/core/prompt.test.ts
+  checksum: 783aa03b20d8b2b2e7259fc11c2c35dc8318f1b5e0fdd566b0f61693a47bfb14
+- filename: test/integration/environments-update.test.ts
+  checksum: 650627ec2cc6fed82f000b0e0a368a3725238dbb64ec18a5866c2fa3abb3a27f
+- filename: src/commands/launch/env/update.ts
+  checksum: 06add97108d878eaf415e32160439b8963683e63a0e37ce77a56f66b88383c7a
+- filename: src/commands/launch/env/update.test.ts
+  checksum: 2da219594e7bdd589adc0eff9ff035252a75aaa51dfa20514b18fd3266d7b752
+- filename: README.md
+  checksum: 88e66114eb9049a642a7469458b45b182b19890efe91ef2f6220e9b24ee8814a
+  allowed_patterns:
+    - "password-protection"
+    - "-p, --password"
+    - "-u, --username"
+- filename: test/integration/environments-create.test.ts
+  checksum: 9ffcc5cc8034fff34a19b6f04c737ff02aedbd3d3d919246d51c800aafb17693
 version: "1.0"

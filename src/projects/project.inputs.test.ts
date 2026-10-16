@@ -122,6 +122,8 @@ describe('the --type flag', () => {
           { name: 'Continue with FileUpload', value: 'FileUpload' },
         ],
         default: undefined,
+        loop: false,
+        pageSize: 2,
       },
     ]);
   });

@@ -75,3 +75,23 @@ now follow `contentfly-management-service` and a live dev11 response:
   (`src/projects/controllers/projects.controller.ts:484-485`), and the Fastify server
   (`src/app/main.ts:67`) refuses a bodyless request declared `application/json` with `400`. The
   delete interceptors therefore refuse a request that carries a `content-type`.
+
+## Environment fixtures (2026-10-12, from the service source)
+
+`environments-list.json`, `environment-get.json` and `environment-not-found.json` were written from
+`contentfly-management-service` `origin/main`, **not yet corroborated against a live environment**:
+
+| File | Source |
+|---|---|
+| `environments-list.json` | `src/environments/api-responses/environment.example.response.ts` `getEnvironmentsSummaryResponse`, with the bare `{pagination, environments}` envelope of `environment.controller.ts` `environmentsV1` |
+| `environment-get.json` | the same example environment, wrapped as `{environment}` by `environmentV1` |
+| `environment-not-found.json` | `getEnvironmentNotFoundResponse` in the same file |
+
+Two fields the published example omits are added because the controller and DTO return them:
+`domains` (`[{url, createdAt, updatedAt}]`, attached to every environment by both `environmentsV1`
+and `environmentV1`) and `isContentstackAuthenticationEnabled` (flattened from
+`contentstackAuthentication.isEnabled` in `models/rest/environments.rest.dto.ts`). Identifiers are
+substituted as above; environment uids are 24-character lowercase hex, and the environment names are
+the placeholders `production` and `staging`. The list's `pagination.skip` is the `0` the controller
+echoes from the query; replace it with whatever a live response shows once one is taken.
+

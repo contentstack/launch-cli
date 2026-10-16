@@ -72,6 +72,22 @@ describe('cancelOnInterrupt', () => {
     expect(loop.events.slice(0, 2)).toEqual(['held', 'released']);
   });
 
+  it('is still listening while a later SIGINT listener runs, so signal-exit does not re-raise it and exit 130', async () => {
+    const signals = new EventEmitter();
+    const inner = pendingUx();
+    const counted: number[] = [];
+
+    const answer = cancelOnInterrupt(inner.ux, { signals, hold: recordingHold().hold }).inquire<string>(QUESTION);
+    signals.on('SIGINT', () => counted.push(signals.listenerCount('SIGINT')));
+    signals.emit('SIGINT');
+    const error = await answer.catch((e: unknown) => e);
+    await new Promise((done) => setImmediate(done));
+
+    expect(error).toBeInstanceOf(CancelledError);
+    expect(counted).toEqual([2]);
+    expect(signals.listenerCount('SIGINT')).toBe(1);
+  });
+
   it('propagates the prompt failure unchanged rather than calling it a cancellation, then stops listening', async () => {
     const signals = new EventEmitter();
     const inner = pendingUx();

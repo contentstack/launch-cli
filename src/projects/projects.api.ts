@@ -1,4 +1,5 @@
 import { MAX_PAGES } from '../core/constants';
+import { scanPages } from '../core/paging';
 import { UsageError } from '../core/errors';
 import { isRecord } from '../core/values';
 import { assertPage, hasUid, malformed, unwrap } from '../transport/envelope';
@@ -105,32 +106,13 @@ export class ProjectsApi {
     return response;
   }
 
-  async *pages(params: PageProjectsParams): AsyncGenerator<ProjectsPage> {
-    const limit = params.pageSize ?? PROJECT_SCAN_PAGE_SIZE;
-    let skip = 0;
-
-    for (let fetched = 0; fetched < MAX_PAGES; fetched += 1) {
-      const page = await this.list({ org: params.org, limit, skip });
-
-      if (page.projects.length === 0) {
-        return;
-      }
-
-      yield page;
-
-      if (page.projects.length < limit) {
-        return;
-      }
-
-      skip += page.projects.length;
-      const total = page.pagination.count;
-
-      if (typeof total === 'number' && skip >= total) {
-        return;
-      }
-    }
-
-    throw new ProjectScanLimitError();
+  pages(params: PageProjectsParams): AsyncGenerator<ProjectsPage> {
+    return scanPages(
+      (window) => this.list({ org: params.org, ...window }),
+      (page) => page.projects,
+      params.pageSize ?? PROJECT_SCAN_PAGE_SIZE,
+      () => new ProjectScanLimitError(),
+    );
   }
 
   async get(params: GetProjectParams): Promise<Project> {

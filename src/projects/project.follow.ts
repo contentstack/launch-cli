@@ -1,6 +1,7 @@
 import type { ServiceContext } from '../core/service-context';
 import { asSentence, messageOf } from '../core/values';
 import { DeploymentFollower } from '../deployments/deployment.follower';
+import { untilFound } from '../deployments/deployment.lookup';
 import { DeploymentUnsuccessfulError } from '../deployments/deployment.errors';
 import type { WatchTiming } from '../deployments/deployment.watcher';
 import type { Deployment } from '../deployments/types';
@@ -9,7 +10,6 @@ import { deploymentFailureMessage } from './project.presenter';
 import type { IdentifiedProject } from './types';
 
 const NO_DEPLOYMENT_STATUS = 'NONE';
-const FIRST_LOOKUP_ATTEMPTS = 3;
 
 interface Survivors {
   org: string;
@@ -31,7 +31,7 @@ export class FirstDeploymentFollower {
 
   async follow(org: string, project: IdentifiedProject, envName: string): Promise<void> {
     const environment = await this.explaining({ org, project, envName }, () =>
-      this.appearing(() => this.services.api.environments.first({ org, project: project.uid })),
+      untilFound(() => this.services.api.environments.first({ org, project: project.uid }), this.timing),
     );
 
     if (environment === undefined) {
@@ -39,8 +39,9 @@ export class FirstDeploymentFollower {
     }
 
     const deployment = await this.explaining({ org, project, envName, environment }, () =>
-      this.appearing(() =>
-        this.services.api.deployments.latest({ org, project: project.uid, environment: environment.uid }),
+      untilFound(
+        () => this.services.api.deployments.latest({ org, project: project.uid, environment: environment.uid }),
+        this.timing,
       ),
     );
 
@@ -67,20 +68,6 @@ export class FirstDeploymentFollower {
       status: outcome.status,
       timedOut: outcome.kind === 'timed-out',
     });
-  }
-
-  private async appearing<T>(lookup: () => Promise<T | undefined>): Promise<T | undefined> {
-    for (let attempt = 1; attempt < FIRST_LOOKUP_ATTEMPTS; attempt += 1) {
-      const found = await lookup();
-
-      if (found !== undefined) {
-        return found;
-      }
-
-      await this.timing.sleep(this.timing.pollDelayMs);
-    }
-
-    return lookup();
   }
 
   private async explaining<T>(survivors: Survivors, step: () => Promise<T>): Promise<T> {

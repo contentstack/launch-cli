@@ -12,7 +12,7 @@ const RESOURCES = readdirSync(SRC, { withFileTypes: true })
 const RESOURCE_EDGES: Record<string, string[]> = {
   projects: ['environments', 'deployments', 'git', 'uploads'],
   functions: [],
-  environments: [],
+  environments: ['deployments', 'git', 'uploads'],
   deployments: [],
   git: [],
   organizations: [],
@@ -51,8 +51,11 @@ function crossResourceEdges(relativePath: string): string[] {
     .filter((target): target is string => target !== undefined && target !== owner);
 }
 
+const RESOURCE_OF_TOPIC: Record<string, string> = { env: 'environments' };
+
 function commandEdgesOf(relativePath: string, specifiers: string[]): string[] {
-  const owner = relativePath.split('/')[2];
+  const topic = relativePath.split('/')[2];
+  const owner = RESOURCE_OF_TOPIC[topic] ?? topic;
   const directory = directoryOf(relativePath);
   const allowed = RESOURCE_EDGES[owner] ?? [];
 
@@ -174,6 +177,14 @@ describe('layering of the command files', () => {
       'organizations',
     ]);
     expect(commandEdgesOf('commands/launch/functions/serve.ts', ['../../../projects/project.create'])).toEqual([
+      'projects',
+    ]);
+
+  });
+
+  it('treats a command under the env topic as owned by the environments resource', () => {
+    expect(commandEdgesOf('commands/launch/env/list.ts', ['../../../environments/environment.presenter'])).toEqual([]);
+    expect(commandEdgesOf('commands/launch/env/list.ts', ['../../../projects/project.presenter'])).toEqual([
       'projects',
     ]);
   });

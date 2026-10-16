@@ -46,7 +46,7 @@ the gate as a floor, never as evidence of correctness.
    it was handed, and nothing read the documented `now() + delay >= deadline` boundary.
 
 **A defect the live harness finds is closed only with two tests.** When the live harness
-(`docs/launch-cli-manual-tests`) finds a defect, it gets (1) a regression test that fails on the old
+(`scripts/launch-cli-manual-tests` in the developer workspace, not this repository) finds a defect, it gets (1) a regression test that fails on the old
 code and (2) a class-level test where one is feasible, before it is closed. The regression test pins
 that bug; the class test fails on the *next* bug of the same kind, in code that does not exist yet.
 Before writing a new class test, check the guards below: if the defect belongs to one of their
@@ -59,7 +59,7 @@ file and line that broke its rule, and each was proven red by reintroducing its 
 | `test/integration/transport-content-type.test.ts` | For every method in `HTTP_METHODS`, a bodyless request carries no content type and a request with a body carries `application/json`, asserted on the wire. `withoutDefaultContentType` suppresses the utility client's default, so a bodyless POST, PUT or PATCH (for example `deployments:cancel`) no longer goes out as `application/x-www-form-urlencoded`. Only `utility-http-client.ts` builds an `HttpClient` and only `rest-client.ts` sets the JSON type. | D5: every DELETE sent `Content-Type: application/json` |
 | `test/guards/tty-streams.test.ts` | `stdin.isTTY`, and the `isTTY` it becomes on the service context, are read only to decide whether the CLI may prompt (a read next to a prompt or a refusal to prompt) or on the plumbing lines that carry it there. Anything deciding what to draw reads `outputIsTTY` / `process.stdout.isTTY`. | D6: heartbeat drawn into a redirected file |
 | `test/integration/retired-commands.test.ts` (named commands) | Every `launch:…` command named anywhere in `src` - a retirement message, a failure hint, an example - is either a registered command or on `PLANNED_COMMANDS` with the ticket that builds it, and a command drops off that list once it ships. | Review: retirement messages and hints pointed at commands the beta does not have |
-| `test/guards/prompt-funnel.test.ts` | Every prompt goes through `LaunchCommand`'s `ux`, built once as `cancelOnInterrupt(cliux)`, so Ctrl-C at any prompt exits 3. No source calls `cliux.inquire` / `prompt` / `confirm` under any name, hands `cliux` on as a value, or imports a prompt library; `search-list.ts` may register a type but never prompt. | D2: Ctrl-C exited 130 |
+| `test/guards/prompt-funnel.test.ts` | Every prompt goes through `LaunchCommand`'s `ux`, built once as `cancelOnInterrupt(cliux)`, so Ctrl-C at any prompt exits 3. The wrapper stays attached to `SIGINT` until the signal has reached every listener (it detaches in a microtask): inquirer's `cli-cursor` loads `signal-exit`, which re-raises `SIGINT` - exit 130 - when it finds itself the only listener, so a `once` listener made every list and checkbox prompt exit 130 (`src/core/interruptible-ux.test.ts` pins it). No source calls `cliux.inquire` / `prompt` / `confirm` under any name, hands `cliux` on as a value, or imports a prompt library; `search-list.ts` may register a type but never prompt. | D2: Ctrl-C exited 130 |
 
 A new prompt, request, render path or command is covered by these guards without being listed in
 them. Do not add an exemption to a guard to make a new file pass: if a guard is wrong about a file,
@@ -136,9 +136,11 @@ src/
                 and LaunchApiError / LaunchNetworkError - no CLI wording lives here
   projects/     one resource: repository, value object, domain service, presenter,
                 error wording, prompt adapter, and the flags it contributes
-  environments/ the environment DTOs, the framework preset table, the environment
-                flags every create command contributes, and the EnvironmentBuilder that
-                turns them into a CreateEnvironmentInput
+  environments/ the environment repository, DTOs, the framework preset table, the
+                environment flags (including --env and its resolver and picker), the
+                EnvironmentBuilder that turns them into a CreateEnvironmentInput, and the
+                EnvironmentCreator / EnvironmentUpdater behind launch:env:create / :update.
+                It reaches deployments, git and uploads, for create
   deployments/  the deployment repository, the status classification, the
                 wait/stream loop and LogTail that projects:create, deployments:create
                 and logs:get all drive, and the DeploymentFollower that watches one
@@ -176,7 +178,11 @@ That is why `Pagination` lives in `src/core/render.ts` beside `renderPagination`
 lives under `src/projects/`.
 
 `src/commands/` mirrors the oclif topic path and nothing else: `launch:projects:list`
-is `src/commands/launch/projects/list.ts`, and that path is the public contract. Topic
+is `src/commands/launch/projects/list.ts`, and that path is the public contract. One topic is
+named differently from its resource folder: the environment commands are `launch:env:*`
+(`src/commands/launch/env/`), owned by `src/environments/`, and `RESOURCE_OF_TOPIC` in
+`test/guards/layering.test.ts` maps the one to the other. The V1 name `launch:environments` stays a
+retired command pointing at `launch:env:list`. Topic
 descriptions are declared in `package.json` under `oclif.topics`; without them oclif shows
 a leaf command's description for the whole topic on every `csdx --help`.
 
@@ -231,10 +237,14 @@ A new resource - environments, variables, deployments, logs, cache - is a folder
    `extends` clause.
 
 Anything with domain behaviour - "is this a uid or a name?", "which uid does this name
-have?" - is a value object and a domain service in the resource folder, not something
-inlined into a prompt module or a resolution spec. `projects/project-ref.ts` and
-`projects/project.resolver.ts` are the worked example: the prompt module is a UI adapter
-that renders choices and nothing more.
+have?" - is a value object and a domain service, not something inlined into a prompt module or a
+resolution spec. The generic parts live once in `core`: `ResourceRef` (`core/resource-ref.ts`, a
+24-hex value is a uid, anything else a name), `scanPages` (`core/paging.ts`, the page-at-a-time
+walk with its stop rules and the `MAX_PAGES` ceiling) and `uidByName` (`core/name-lookup.ts`, an
+exact, case-sensitive name match that skips entries without a uid). A resource contributes only its
+wording and its page shape: `projects/project.resolver.ts` and `environments/environment.resolver.ts`
+are the worked examples, and a new resource (variables, deployments) follows them rather than copying
+the loop. The prompt module is a UI adapter that renders choices and nothing more.
 
 **Typed resolved values.** `this.resolved.<flag>` carries the flag's own type, derived
 from the catalog entry: `Flags.string` gives `string`, `Flags.integer` gives `number`,
@@ -311,7 +321,10 @@ payload inline.
 
 *Almost every prompt takes no typed text at all.* `askOption` asks `type: 'list'`, which moves only
 on an arrow or a digit and ignores every letter, so text can never become the answer and nothing
-needs validating. Project type, branch, Framework preset, Response mode and Contentstack
+needs validating. Every choice prompt (`askOption`, and the checkbox `askChoices`) passes `loop: false`, so the
+arrow stops at the last entry instead of wrapping to the first, and a `pageSize` of the choice count
+capped at `PROMPT_PAGE_SIZE` (15), so a short list shows whole and a 100-entry picker scrolls in a
+fixed window. `askChoices` refuses an empty selection at the prompt, naming <space>. Project type, branch, Framework preset, Response mode and Contentstack
 Authentication are all asked this way. Prefer it: the `❯` always shows what Enter will take, where a
 search box hides the list the moment the filter matches nothing. The branch picker is on this side
 despite fetching `PICKER_PAGE_SIZE` branches, because `noteTruncation` already prints the escape
@@ -525,8 +538,9 @@ there is **no server-side maximum at all**.
 | `PICKER_PAGE_SIZE` | 100 | the page the interactive project picker fetches. It is separate from `CLIENT_MAX_LIMIT` on purpose: raising the client cap must never dump 1000 choices into a prompt |
 | `MAX_PAGES` | 100 | how many pages a name-to-uid scan will walk before raising `ProjectScanLimitError` |
 
-`PROJECT_SCAN_PAGE_SIZE` (100) lives in `src/projects/projects.api.ts` beside the `pages()`
-generator it sizes, because it is that repository's paging decision and not a CLI-wide one.
+`PROJECT_SCAN_PAGE_SIZE` and `ENVIRONMENT_SCAN_PAGE_SIZE` (100 each) live beside the `pages()`
+each repository builds on `scanPages`, because the page size is that repository's decision and not a
+CLI-wide one; the scan-limit error each raises carries its own wording.
 
 **The deployment wait/stream loop.** `src/deployments/deployment.watcher.ts` polls a deployment to a
 terminal state and is the single place any command waits on one. `POST /projects` creates the
@@ -625,8 +639,9 @@ at either means none, and the field is left out of the body. What the specs do o
 exactly like one from argv.
 
 The framework gate is the declarative rule `onlyWithValueOf('server-cmd', 'framework', ...)`,
-exported as `serverCommandFrameworkGate` and declared in `static rules` with `gitOnlyFlagRules`
-(`--branch`, `--namespace`, `--repo` only with `--type GitHub`). A rule judges its gate only when the
+exported as `serverCommandFrameworkGate` and declared in `static rules`. (`--branch` and `--auto-deploy`
+on a FileUpload create are not a rule: create warns about each one with `repositoryOnlyFlagLine` and ignores
+it; `--namespace` and `--repo` no longer exist, the repository comes from the local clone.) A rule judges its gate only when the
 user supplied the gate: with `--framework` on argv, a bad pairing costs exit 2 and nothing on the
 wire. When the framework is prompted or detected later, `EnvironmentBuilder` in
 `src/environments/environment.builder.ts` applies the same check
@@ -747,13 +762,12 @@ gate value `onlyWithValueOf` reads is a value, not a "was it supplied?" question
 wherever it came from. Write the next rule when a command needs it; a rule
 kept alive only by its own test proves nothing.
 
-**Built ahead of use.** Five pieces of production code have no caller yet, on purpose, each held
+**Built ahead of use.** Four pieces of production code have no caller yet, on purpose, each held
 for a named ticket whose shape it already fits. Nothing else in `src` is uncalled; add to this list
 rather than leave an orphan unexplained.
 
 | Code | Held for | Why its API fits |
 |---|---|---|
-| `EnvironmentsApi.list` | CL-7168 (`environments:*`) | `{org, project, limit, skip}` -> `EnvironmentsPage`, the paging every list command renders |
 | `DeploymentsApi.list` | CL-7170 (`deployments:*`) | a `DeploymentScope` plus paging -> `DeploymentsPage` |
 | `src/core/redact.ts` | CL-7169 (variables) | see below |
 | `exactlyOneOf` | CL-7172 (`cache:purge`) | "purge these paths, or everything, not both" - and it judges what the user supplied, not defaults |
@@ -768,15 +782,59 @@ debug logger and an in-flight secret registry to redact against, neither of whic
 one does, a command handling variable values must redact them itself before they reach `confirm()`
 or an error message.
 
+**The environment commands (CL-7168).** `launch:env:list`, `:get`, `:create`, `:update` and
+`:delete` - `launch:env:*` by product decision, not the `launch:environments:*` the Commands Details
+page shows; `launch:environments` stays a retired V1 name pointing at `launch:env:list`.
+
+- `--env <name-or-uid>` depends on `--org` and `--project` and is never read from `.cs-launch.json`.
+  From argv a 24-hex value is a uid and anything else is matched exactly and case-sensitively by
+  `EnvironmentResolver` over `EnvironmentsApi.pages` (exit 2 on no match, `EnvironmentScanLimitError`
+  past `MAX_PAGES`); a picker answer is already a uid. The picker is a plain `list`, not a search list.
+  CL-7169 to CL-7172 reuse it; do not build a second one.
+- `env:get`'s PROJECT row shows the project the command resolved, never the response's `project`
+  field: the service declares it `project: Types.ObjectId` with `@Expose()` and no transform
+  (`environments.rest.dto.ts:96`), and class-transformer answers with a freshly generated ObjectId on
+  every call. Found by the live harness on dev11.
+- `env:get` shows a FIELD | VALUE table; `VARIABLES` is a **count**, never a key or a value, and
+  password protection shows only enabled/disabled. The response mode cannot be shown: the API does
+  not return `isStreamingEnabled`.
+- `env:delete` mirrors `projects:delete`: GET first, then the confirm gate, then a bodyless DELETE.
+- `env:update` with no updatable flag asks on a terminal: a checklist of the settings
+  (`askChoices`, a checkbox prompt in `src/core/prompt.ts`; Branch and Auto deploy are left off for
+  FileUpload), then only the ticked ones, each offering the current value, keeping only what changed
+  (`promptForEnvironmentUpdate` in `environment.update.prompt.ts`). The response mode is always sent
+  when ticked, because the API never reports it. Nothing changed prints the yellow "Environment not
+  updated. No changes were entered." and exits 0. Without a terminal it is exit 2 naming every flag -
+  the API would answer `{}` with 200 and change nothing. Disabling cache priming or password protection is confirm-gated.
+  `--password` (`-p`) takes no value, so a password never reaches argv: on a terminal the password is
+  asked through `askSecret` (a masked prompt in `src/core/prompt.ts`); without one, `-p` reads it from
+  standard input (`readPipedInput`, `src/core/piped-input.ts`; one trailing newline dropped, an empty one
+  refused): `printf '%s' "$PASSWORD" | csdx launch:env:update ... --password-protection enable -u admin -p`.
+  Without a terminal, enabling needs both `-u` and `-p`, checked before any request. `--username` and
+  `--password` are refused without `--password-protection enable`. A taken name comes back from the
+  update endpoint as a 409 whose body carries the code as its *message* and no `code` field
+  (`environment.controller.ts:801`), so `EnvironmentsApi.update` rewords a 409 whose code *or message*
+  is `launch.ENVIRONMENT.DUPLICATE_NAME`; any other 409 keeps the API's wording.
+- `--branch` and `--auto-deploy` on a FileUpload project are warned about and dropped, never refused,
+  in `projects:create`, `env:create` and `env:update` alike: one warning line and one flag list
+  (`repositoryOnlyFlagLine`, `REPOSITORY_ONLY_FLAGS`, `withoutRepositoryFlags` in
+  `environments/environment.rules.ts`). An `env:update` left with nothing else says nothing changed.
+- `env:create` follows `projects:create`: the FileUpload warnings come before any upload or prompt,
+  the order is (upload) -> name -> (branch) -> framework -> build -> output -> server -> response mode
+  -> Contentstack Authentication, the green "Environment created successfully." prints as soon as the
+  POST succeeds, and every later failure is a partial success (exit 1) naming the environment. A 404
+  from framework detection means nothing was detected: both endpoints throw a bare
+  `NotFoundException` whenever detection fails.
+
 **Value helpers.** `src/core/values.ts` holds `withinLength` and `oneOf`, the two checks a
 resolution spec's `normalize` reaches for. `oneOf` is case- and whitespace-insensitive and returns
 the **canonical** option, which is what makes a doc label map cleanly onto a service enum. Both
 resources use it rather than each writing their own.
 
 **One copy of a shared helper.** A predicate or a wording rule that two resources need lives in the
-layer they both import, never copied beside each one. `isRecord` is in `src/transport/envelope.ts`
-beside `hasUid`; `sentence` - trim a reason and give it a full stop, so a reason can be sewn into a
-longer message - is in `src/core/errors.ts` beside `advice`. Both had two identical copies, which is
+layer they both import, never copied beside each one. `isRecord` and `asSentence` - trim a
+reason and give it a full stop, so a reason can be sewn into a longer message - are in
+`src/core/values.ts`, beside `isAbsent` and `messageOf`. Both had two identical copies, which is
 the state just before they drift: one gets a fix and the other keeps punctuating a reason its own
 way, so the same failure reads differently from one command to the next.
 

@@ -2,7 +2,11 @@ import { coreFlags } from './core/catalog';
 import { coreResolution, type AnyResolutionSpec } from './core/resolution';
 import { organizationFlags, organizationResolution } from './organizations/organization.inputs';
 import { PROJECT_DEPENDENCIES, projectFlags, projectResolution } from './projects/project.inputs';
-import { environmentFlags, environmentResolution } from './environments/environment.inputs';
+import {
+  ENVIRONMENT_DEPENDENCIES,
+  environmentFlags,
+  environmentResolution,
+} from './environments/environment.inputs';
 import { ProjectsApi } from './projects/projects.api';
 import { EnvironmentsApi } from './environments/environments.api';
 import { DeploymentsApi } from './deployments/deployments.api';
@@ -29,7 +33,9 @@ export type Resolution = typeof resolution;
 
 export const resolutionTable: Record<FlagKey, AnyResolutionSpec> = resolution;
 
-export const DEPENDENCIES = { ...PROJECT_DEPENDENCIES } satisfies Partial<Record<FlagKey, readonly FlagKey[]>>;
+export const DEPENDENCIES = { ...PROJECT_DEPENDENCIES, ...ENVIRONMENT_DEPENDENCIES } satisfies Partial<
+  Record<FlagKey, readonly FlagKey[]>
+>;
 
 export type DependenciesOf<K extends FlagKey> = K extends keyof typeof DEPENDENCIES
   ? (typeof DEPENDENCIES)[K][number]

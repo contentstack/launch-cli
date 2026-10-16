@@ -139,13 +139,15 @@ describe('resolution', () => {
     expect(table.project.dependsOn).toBe(DEPENDENCIES.project);
   });
 
-  it('declares no dependency for any flag other than project', () => {
+  it('declares no dependency for any flag other than project and env', () => {
     const withDependencies = Object.entries(table)
       .filter(([, spec]) => spec.dependsOn !== undefined)
       .map(([key]) => key);
 
-    expect(withDependencies).toEqual(['project']);
-    expect(Object.keys(DEPENDENCIES)).toEqual(['project']);
+    expect(withDependencies).toEqual(['project', 'env']);
+    expect(Object.keys(DEPENDENCIES)).toEqual(['project', 'env']);
+    expect(table.env.dependsOn).toBe(DEPENDENCIES.env);
+    expect(DEPENDENCIES.env).toEqual(['org', 'project']);
   });
 
   it('delegates the org prompt to the organization picker and normalises nothing', async () => {

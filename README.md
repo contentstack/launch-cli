@@ -45,6 +45,11 @@ with exit code 2 and name their V2 replacements. `launch:functions:serve` is liv
 * [`csdx help [COMMAND]`](#csdx-help-command)
 * [`csdx launch`](#csdx-launch)
 * [`csdx launch:deployments`](#csdx-launchdeployments)
+* [`csdx launch:env:create`](#csdx-launchenvcreate)
+* [`csdx launch:env:delete`](#csdx-launchenvdelete)
+* [`csdx launch:env:get`](#csdx-launchenvget)
+* [`csdx launch:env:list`](#csdx-launchenvlist)
+* [`csdx launch:env:update`](#csdx-launchenvupdate)
 * [`csdx launch:environments`](#csdx-launchenvironments)
 * [`csdx launch:functions`](#csdx-launchfunctions)
 * [`csdx launch:functions:serve`](#csdx-launchfunctionsserve)
@@ -105,16 +110,181 @@ DESCRIPTION
 
 _See code: [src/commands/launch/deployments/index.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/deployments/index.ts)_
 
+## `csdx launch:env:create`
+
+Create an environment in a Launch project and follow its first deployment
+
+```
+USAGE
+  $ csdx launch:env:create [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--name <value>]
+    [--description <value>] [--branch <value>] [--framework <value>] [--build-cmd <value>] [--server-cmd <value>]
+    [--output-dir <value>] [--res-mode <value>] [--auto-deploy <value>] [--cs-auth <value>]
+
+FLAGS
+  -c, --config=<value>       Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>     Current working directory
+      --auto-deploy=<value>  Deploy on every push, GitHub projects only (enable | disable)
+      --branch=<value>       Git branch name, GitHub projects only
+      --build-cmd=<value>    Build command
+      --cs-auth=<value>      Contentstack Authentication (enable | disable)
+      --description=<value>  Environment description (255 characters or fewer)
+      --framework=<value>    Framework preset (Gatsby | NextJs | CRA | CSR | Analog | Angular | Nuxt | Astro | VueJs |
+                             Remix | Other)
+      --name=<value>         Environment name (200 characters or fewer)
+      --org=<value>          Organization UID
+      --output-dir=<value>   Output directory
+      --project=<value>      Project name or UID
+      --res-mode=<value>     Response mode (buffered | streaming)
+      --server-cmd=<value>   Server command
+
+DESCRIPTION
+  Create an environment in a Launch project and follow its first deployment
+
+EXAMPLES
+  $ csdx launch:env:create --org <org-uid> --project <name-or-uid> --name staging --branch develop --framework NextJs --build-cmd "npm run build" --output-dir .next --res-mode buffered
+
+  $ csdx launch:env:create --org <org-uid> --project <name-or-uid> --name staging --data-dir ./site # a FileUpload project uploads the folder
+```
+
+_See code: [src/commands/launch/env/create.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/env/create.ts)_
+
+## `csdx launch:env:delete`
+
+Delete an environment of a Launch project
+
+```
+USAGE
+  $ csdx launch:env:delete [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [-y]
+
+FLAGS
+  -c, --config=<value>    Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>  Current working directory
+  -y, --yes               Skip the confirmation prompt
+      --env=<value>       Environment name or UID
+      --org=<value>       Organization UID
+      --project=<value>   Project name or UID
+
+DESCRIPTION
+  Delete an environment of a Launch project
+
+EXAMPLES
+  $ csdx launch:env:delete --org <org-uid> --project <name-or-uid> --env <name-or-uid>
+
+  $ csdx launch:env:delete --org <org-uid> --project <name-or-uid> --env <name-or-uid> --yes
+```
+
+_See code: [src/commands/launch/env/delete.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/env/delete.ts)_
+
+## `csdx launch:env:get`
+
+Show a single environment of a Launch project
+
+```
+USAGE
+  $ csdx launch:env:get [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>]
+
+FLAGS
+  -c, --config=<value>    Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>  Current working directory
+      --env=<value>       Environment name or UID
+      --org=<value>       Organization UID
+      --project=<value>   Project name or UID
+
+DESCRIPTION
+  Show a single environment of a Launch project
+
+EXAMPLES
+  $ csdx launch:env:get --org <org-uid> --project <name-or-uid> --env <name-or-uid>
+```
+
+_See code: [src/commands/launch/env/get.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/env/get.ts)_
+
+## `csdx launch:env:list`
+
+List the environments of a Launch project
+
+```
+USAGE
+  $ csdx launch:env:list [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--limit <value>] [--skip
+    <value>]
+
+FLAGS
+  -c, --config=<value>    Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>  Current working directory
+      --limit=<value>     Number of records to fetch (1-1000)
+      --org=<value>       Organization UID
+      --project=<value>   Project name or UID
+      --skip=<value>      Number of records to skip
+
+DESCRIPTION
+  List the environments of a Launch project
+
+EXAMPLES
+  $ csdx launch:env:list --org <org-uid> --project <name-or-uid>
+```
+
+_See code: [src/commands/launch/env/list.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/env/list.ts)_
+
+## `csdx launch:env:update`
+
+Update an environment of a Launch project
+
+```
+USAGE
+  $ csdx launch:env:update [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--name
+    <value>] [--description <value>] [--branch <value>] [--framework <value>] [--build-cmd <value>] [--server-cmd
+    <value>] [--output-dir <value>] [--res-mode <value>] [--auto-deploy <value>] [--cs-auth <value>] [--cache-priming
+    <value>] [--password-protection <value>] [-u <value>] [-p] [-y]
+
+FLAGS
+  -c, --config=<value>               Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>             Current working directory
+  -p, --password                     With --password-protection enable: read the password from standard input when there
+                                     is no terminal (on a terminal it is asked at a hidden prompt)
+  -u, --username=<value>             Password protection username, with --password-protection enable
+  -y, --yes                          Skip the confirmation prompt
+      --auto-deploy=<value>          Deploy on every push, GitHub projects only (enable | disable)
+      --branch=<value>               Git branch name, GitHub projects only
+      --build-cmd=<value>            Build command
+      --cache-priming=<value>        Cache priming (enable | disable)
+      --cs-auth=<value>              Contentstack Authentication (enable | disable)
+      --description=<value>          Environment description (255 characters or fewer)
+      --env=<value>                  Environment name or UID
+      --framework=<value>            Framework preset (Gatsby | NextJs | CRA | CSR | Analog | Angular | Nuxt | Astro |
+                                     VueJs | Remix | Other)
+      --name=<value>                 Environment name (200 characters or fewer)
+      --org=<value>                  Organization UID
+      --output-dir=<value>           Output directory
+      --password-protection=<value>  Password protection (enable | disable)
+      --project=<value>              Project name or UID
+      --res-mode=<value>             Response mode (buffered | streaming)
+      --server-cmd=<value>           Server command
+
+DESCRIPTION
+  Update an environment of a Launch project
+
+EXAMPLES
+  $ csdx launch:env:update --org <org-uid> --project <name-or-uid> --env <name-or-uid> --build-cmd "npm run build"
+
+  $ csdx launch:env:update --org <org-uid> --project <name-or-uid> --env <name-or-uid> --cache-priming disable --yes
+
+  $ csdx launch:env:update --org <org-uid> --project <name-or-uid> --env <name-or-uid> --password-protection enable -u <username> -p
+
+  $ printf '%s' "$PASSWORD" | csdx launch:env:update --org <org-uid> --project <name-or-uid> --env <name-or-uid> --password-protection enable -u <username> -p
+```
+
+_See code: [src/commands/launch/env/update.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/env/update.ts)_
+
 ## `csdx launch:environments`
 
-Removed in v2 - list environments with launch:environments:list
+Removed in v2 - list environments with launch:env:list
 
 ```
 USAGE
   $ csdx launch:environments
 
 DESCRIPTION
-  Removed in v2 - list environments with launch:environments:list
+  Removed in v2 - list environments with launch:env:list
 ```
 
 _See code: [src/commands/launch/environments/index.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/environments/index.ts)_

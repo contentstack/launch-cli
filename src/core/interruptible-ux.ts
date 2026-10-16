@@ -2,7 +2,7 @@ import { CancelledError } from './errors';
 import type { UxLike } from './prompt';
 
 export interface InterruptSource {
-  once(signal: 'SIGINT', listener: () => void): unknown;
+  on(signal: 'SIGINT', listener: () => void): unknown;
   removeListener(signal: 'SIGINT', listener: () => void): unknown;
 }
 
@@ -34,7 +34,7 @@ export function cancelOnInterrupt(ux: UxLike, options: InterruptOptions = {}): U
           signals.removeListener('SIGINT', cancel);
         };
         const cancel = (): void => {
-          release();
+          queueMicrotask(release);
           reject(new CancelledError());
         };
 
@@ -43,7 +43,7 @@ export function cancelOnInterrupt(ux: UxLike, options: InterruptOptions = {}): U
           reject(error);
         };
 
-        signals.once('SIGINT', cancel);
+        signals.on('SIGINT', cancel);
 
         try {
           ux.inquire<T>(payload).then((answer) => {

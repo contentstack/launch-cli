@@ -3,12 +3,13 @@ import { basename, relative, resolve, sep } from 'node:path';
 import { LaunchError, UsageError } from '../core/errors';
 import type { ProjectConfig } from '../core/project-config';
 import { ProjectConfigStore } from '../core/project-config';
-import { askText } from '../core/prompt';
+import { askText, needInput } from '../core/prompt';
 import type { ServiceContext } from '../core/service-context';
 import { messageOf } from '../core/values';
 import type { WatchTiming } from '../deployments/deployment.watcher';
 import { EnvironmentBuilder } from '../environments/environment.builder';
 import { ENVIRONMENT_NAME_MAX_LENGTH } from '../environments/environment.inputs';
+import { withoutRepositoryFlags } from '../environments/environment.rules';
 import { repositoryLabel } from '../git/git.presenter';
 import { repositorySearchTerm } from '../git/git.prompt';
 import type { LocalGitHubRepository } from '../git/local-repository';
@@ -16,19 +17,16 @@ import { GIT_PROVIDER_GITHUB } from '../git/types';
 import { LaunchApiError } from '../transport/errors';
 import { DuplicateProjectNameError, ProjectCreateFailedError } from './project.errors';
 import { FirstDeploymentFollower } from './project.follow';
-import type { GitOnlyFlag, ProjectTypeChoice } from './project.inputs';
+import type { ProjectTypeChoice } from './project.inputs';
 import {
-  GIT_ONLY_FLAGS,
   PROJECT_TYPE_BY_CHOICE,
   askProjectType,
-  needInput,
   projectTypeChoiceOf,
 } from './project.inputs';
 import {
   RENAME_PROJECT_QUESTION,
   createFailureCauseLine,
   duplicateProjectNameLine,
-  gitOnlyFlagLine,
   projectCreatedLine,
   projectCreationFailedLine,
   renameAndRerunLine,
@@ -242,15 +240,6 @@ export class ProjectCreator {
       return;
     }
 
-    const supplied: Record<GitOnlyFlag, string | undefined> = {
-      branch: request.branch,
-      'auto-deploy': request.autoDeploy,
-    };
-
-    for (const flag of GIT_ONLY_FLAGS) {
-      if (supplied[flag] !== undefined) {
-        this.services.ux.print(gitOnlyFlagLine(flag, this.services.outputIsTTY === true));
-      }
-    }
+    withoutRepositoryFlags(request, 'FILEUPLOAD', this.services.ux, this.services.outputIsTTY === true);
   }
 }
