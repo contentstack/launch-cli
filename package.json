@@ -106,22 +106,22 @@
     "@eslint/eslintrc": {
       "ajv": "^6.12.6"
     },
-    "qs": "^6.16.0",
+    "qs": "^6.16.1",
     "tmp": "^0.2.4",
-    "fast-uri": "^3.1.8",
+    "fast-uri": "^3.1.9",
     "proxy-addr": "^2.0.8",
     "minimatch@10.2.5": {
-      "brace-expansion": "^5.0.9"
+      "brace-expansion": "^5.0.12"
     },
     "minimatch@9.0.9": {
-      "brace-expansion": "^2.1.4"
+      "brace-expansion": "^2.1.7"
     },
     "minimatch@5.1.9": {
-      "brace-expansion": "^2.1.4"
+      "brace-expansion": "^2.1.7"
     },
     "serialize-javascript": "^7.1.0",
     "diff": "^8.0.3",
-    "brace-expansion@1": "^1.1.18",
+    "brace-expansion@1": "^1.1.21",
     "istanbul-lib-processinfo": {
       "uuid": "^11.1.1"
     }
