@@ -94,8 +94,8 @@
     "postpack": "shx rm -f oclif.manifest.json",
     "prepack": "npm run build && oclif manifest && oclif readme",
     "prepare": "husky",
-    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand",
-    "test:coverage": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand --coverage",
+    "test": "node --max-old-space-size=8192 --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand",
+    "test:coverage": "node --max-old-space-size=8192 --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand --coverage",
     "version": "oclif readme && git add README.md"
   },
   "overrides": {
