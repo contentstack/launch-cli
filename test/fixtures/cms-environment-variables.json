@@ -1,0 +1,24 @@
+[
+  {
+    "keyName": "CONTENTSTACK_API_HOST",
+    "key": "CONTENTSTACK_API_HOST",
+    "value": "api.integration.test"
+  },
+  {
+    "keyName": "CONTENTSTACK_CDN",
+    "key": "CONTENTSTACK_CDN",
+    "value": "cdn.integration.test"
+  },
+  {
+    "keyName": "CONTENTSTACK_API_KEY",
+    "key": "CONTENTSTACK_API_KEY"
+  },
+  {
+    "keyName": "CONTENTSTACK_DELIVERY_TOKEN",
+    "key": "CONTENTSTACK_DELIVERY_TOKEN"
+  },
+  {
+    "keyName": "CONTENTSTACK_ENVIRONMENT",
+    "key": "CONTENTSTACK_ENVIRONMENT"
+  }
+]

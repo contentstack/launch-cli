@@ -1,4 +1,7 @@
+import { randomBytes } from 'node:crypto';
+import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { authHandler, configHandler } from '@contentstack/cli-utilities';
 import type { Interfaces } from '@oclif/core';
@@ -7,6 +10,7 @@ import nock from 'nock';
 
 import * as watcher from '../../src/deployments/deployment.watcher';
 import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
+import { answerPrompts, onTerminal } from '../support/terminal';
 
 import projectFixture from '../fixtures/project-get.json';
 
@@ -148,6 +152,138 @@ describe('integration: launch:env:create on the wire', () => {
     expect(stdout).toContain('production.example.test');
     expect(stdout).not.toContain('│');
     expect(onWire).toEqual([]);
+  });
+
+  describe('picking variable sources at the prompt', () => {
+    const STACK_TOKEN = randomBytes(16).toString('hex');
+    const WITH_AUTH = [...GITHUB_ARGS, '--cs-auth', 'enable', '--server-cmd', 'serve'];
+
+    function stubStackPickers(): nock.Scope[] {
+      const cma = nock('https://cma.integration.test');
+
+      return [
+        cma
+          .get('/v3/stacks')
+          .query({ organization_uid: ORG_UID, limit: '100', skip: '0' })
+          .reply(200, { stacks: [{ name: 'Shop', api_key: 'blt9stackkey' }] }),
+        cma.get('/v3/stacks').query({ organization_uid: ORG_UID, limit: '100', skip: '1' }).reply(200, { stacks: [] }),
+        cma
+          .get('/v3/stacks/delivery_tokens')
+          .query({ limit: '100', skip: '0' })
+          .matchHeader('api_key', 'blt9stackkey')
+          .reply(200, {
+            tokens: [{ name: 'prod-token', token: STACK_TOKEN, scope: [{ environments: [{ name: 'staging' }] }] }],
+          }),
+        cma
+          .get('/v3/stacks/delivery_tokens')
+          .query({ limit: '100', skip: '1' })
+          .matchHeader('api_key', 'blt9stackkey')
+          .reply(200, { tokens: [] }),
+        nock(LAUNCH_HUB_URL)
+          .matchHeader('x-organization-uid', ORG_UID)
+          .get('/manage/cms/environment-variables')
+          .reply(200, [
+            { keyName: 'CONTENTSTACK_API_HOST', key: 'CONTENTSTACK_API_HOST', value: 'api.integration.test' },
+            { keyName: 'CONTENTSTACK_API_KEY', key: 'CONTENTSTACK_API_KEY' },
+          ]),
+      ];
+    }
+
+    it('merges a dotenv file and typed pairs in that order, the typed pair winning', async () => {
+      const file = join(DATA_DIR, `env-create-${randomBytes(4).toString('hex')}.env`);
+      writeFileSync(file, 'API_URL=from-file\nFROM_FILE=1\n');
+      const prompts = answerPrompts({
+        'Add environment variables': ['Import variables from a dotenv file', 'Type KEY=VALUE pairs'],
+        'Path to the dotenv file': file,
+        'KEY=VALUE pairs separated by spaces': 'API_URL=typed DEBUG=true',
+      });
+      const sent: { environmentVariables?: unknown }[] = [];
+      stubCreate(sent);
+      stubFollowUp('LIVE');
+
+      const { error, stdout } = await onTerminal(() => runCommand(WITH_AUTH, config));
+
+      expect(error).toBeUndefined();
+      expect(prompts.messages).toEqual([
+        'Add environment variables',
+        'Path to the dotenv file',
+        'KEY=VALUE pairs separated by spaces',
+      ]);
+      expect(sent[0].environmentVariables).toEqual([
+        { key: 'API_URL', value: 'typed' },
+        { key: 'FROM_FILE', value: '1' },
+        { key: 'DEBUG', value: 'true' },
+      ]);
+      expect(stdout).toContain('3 variables ready to set');
+      expect(stdout).not.toContain('from-file');
+      expect(onWire).toEqual([]);
+    });
+
+    it('merges all three sources, stack first, then the file, then the typed pairs, without printing the token', async () => {
+      const file = join(DATA_DIR, `env-create-${randomBytes(4).toString('hex')}.env`);
+      writeFileSync(file, 'CONTENTSTACK_ENVIRONMENT=from-file\nFROM_FILE=1\n');
+      const prompts = answerPrompts({
+        'Add environment variables': [
+          'Import variables from a stack',
+          'Import variables from a dotenv file',
+          'Type KEY=VALUE pairs',
+        ],
+        Stack: '0',
+        'Delivery token': '0',
+        'Path to the dotenv file': file,
+        'KEY=VALUE pairs separated by spaces': 'FROM_FILE=typed EXTRA=1',
+      });
+      const sent: { environmentVariables?: unknown }[] = [];
+      stubCreate(sent);
+      const lookups = stubStackPickers();
+      stubFollowUp('LIVE');
+
+      const { error, stdout } = await onTerminal(() => runCommand(WITH_AUTH, config));
+
+      expect(error).toBeUndefined();
+      expect(prompts.messages).toEqual([
+        'Add environment variables',
+        'Stack',
+        'Delivery token',
+        'Path to the dotenv file',
+        'KEY=VALUE pairs separated by spaces',
+      ]);
+      expect(lookups.every((scope) => scope.isDone())).toBe(true);
+      expect(sent[0].environmentVariables).toEqual([
+        { key: 'CONTENTSTACK_API_HOST', value: 'api.integration.test' },
+        { key: 'CONTENTSTACK_API_KEY', value: 'blt9stackkey' },
+        { key: 'CONTENTSTACK_DELIVERY_TOKEN', value: STACK_TOKEN },
+        { key: 'CONTENTSTACK_ENVIRONMENT', value: 'from-file' },
+        { key: 'FROM_FILE', value: 'typed' },
+        { key: 'EXTRA', value: '1' },
+      ]);
+      expect(stdout).toContain('6 variables ready to set');
+      expect(stdout).not.toContain(STACK_TOKEN);
+      expect(onWire).toEqual([]);
+    });
+
+    it('creates with no variables when Skip is chosen', async () => {
+      answerPrompts({ 'Add environment variables': ['Skip adding environment variables'] });
+      const sent: { environmentVariables?: unknown }[] = [];
+      stubCreate(sent);
+      stubFollowUp('LIVE');
+
+      const { error } = await onTerminal(() => runCommand(WITH_AUTH, config));
+
+      expect(error).toBeUndefined();
+      expect(sent[0].environmentVariables).toEqual([]);
+    });
+
+    it('refuses Skip combined with another source before creating anything', async () => {
+      answerPrompts({ 'Add environment variables': ['Skip adding environment variables', 'Type KEY=VALUE pairs'] });
+      const sent: unknown[] = [];
+      stubCreate(sent);
+
+      const { error } = await onTerminal(() => runCommand(WITH_AUTH, config));
+
+      expect(error?.message).toContain("'Skip adding environment variables' cannot be combined with the other options.");
+      expect(sent).toEqual([]);
+    });
   });
 
   it('exits 1 naming the surviving environment when the first deployment fails', async () => {

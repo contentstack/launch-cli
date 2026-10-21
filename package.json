@@ -73,6 +73,9 @@
       "launch:env": {
         "description": "Manage the environments of a Launch project"
       },
+      "launch:variables": {
+        "description": "List, set and remove the environment variables of a Launch environment"
+      },
       "launch:functions": {
         "description": "Run Launch cloud functions locally"
       }
@@ -158,7 +161,10 @@
       "launch:projects:get": "LNCH-PRJ-GET",
       "launch:projects:list": "LNCH-PRJ-LS",
       "launch:projects:update": "LNCH-PRJ-UPD",
-      "launch:rollback": "LNCH-RLBK"
+      "launch:rollback": "LNCH-RLBK",
+      "launch:variables:list": "LNCH-VAR-LS",
+      "launch:variables:set": "LNCH-VAR-SET",
+      "launch:variables:unset": "LNCH-VAR-UNSET"
     }
   }
 }

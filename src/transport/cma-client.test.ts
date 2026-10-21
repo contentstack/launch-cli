@@ -124,4 +124,132 @@ describe('createCmaSession', () => {
 
     expect(createCmaSession({ analyticsInfo: 'cli/2.0.0' }).scopedOrganizationUid()).toBeUndefined();
   });
+
+  it('lists the stacks of one organization through the SDK', async () => {
+    const recorded: { stack: unknown[][]; query: unknown[] } = { stack: [], query: [] };
+    const client = {
+      stack: (...args: unknown[]) => {
+        recorded.stack.push(args);
+        return {
+          query: (query: unknown) => {
+            recorded.query.push(query);
+            return { find: async () => (recorded.query.length === 1 ? { items: [{ name: 'Shop', api_key: 'blt1' }] } : { items: [] }) };
+          },
+        };
+      },
+    };
+    sdkClient.mockReset();
+    sdkClient.mockResolvedValue(client);
+    const session = createCmaSession({ cma: 'https://api.contentstack.io', analyticsInfo: 'cli/2.0.0' });
+
+    await expect(session.fetchStacks('org7')).resolves.toEqual({ items: [{ name: 'Shop', api_key: 'blt1' }] });
+
+    expect(recorded.stack).toEqual([[], []]);
+    expect(recorded.query).toEqual([
+      { organization_uid: 'org7', limit: 100, skip: 0 },
+      { organization_uid: 'org7', limit: 100, skip: 1 },
+    ]);
+  });
+
+  it('lists the delivery tokens of one stack through the SDK, addressed by its api key', async () => {
+    const recorded: { stack: unknown[][]; queries: number; asked: unknown[] } = { stack: [], queries: 0, asked: [] };
+    const client = {
+      stack: (...args: unknown[]) => {
+        recorded.stack.push(args);
+        return {
+          deliveryToken: () => ({
+            query: (query: unknown) => {
+              recorded.queries += 1;
+              recorded.asked.push(query);
+              return { find: async () => (recorded.queries === 1 ? { items: [{ name: 'prod-token' }] } : { items: [] }) };
+            },
+          }),
+        };
+      },
+    };
+    sdkClient.mockReset();
+    sdkClient.mockResolvedValue(client);
+    const session = createCmaSession({ cma: 'https://api.contentstack.io', analyticsInfo: 'cli/2.0.0' });
+
+    await expect(session.fetchDeliveryTokens('blt1')).resolves.toEqual({ items: [{ name: 'prod-token' }] });
+
+    expect(recorded.stack).toEqual([[{ api_key: 'blt1' }], [{ api_key: 'blt1' }]]);
+    expect(recorded.queries).toBe(2);
+    expect(recorded.asked).toEqual([
+      { limit: 100, skip: 0 },
+      { limit: 100, skip: 1 },
+    ]);
+  });
+
+  it('keeps asking for the next page until one comes back empty, whatever size the server returns', async () => {
+    const asked: unknown[] = [];
+    const pages = [
+      { items: Array.from({ length: 50 }, (_, index) => ({ api_key: `blt${index}` })) },
+      { items: [{ api_key: 'last' }] },
+      { items: [] },
+    ];
+    sdkClient.mockReset();
+    sdkClient.mockResolvedValue({
+      stack: () => ({
+        query: (query: unknown) => {
+          asked.push(query);
+          return { find: async () => pages[asked.length - 1] };
+        },
+      }),
+    });
+    const session = createCmaSession({ cma: 'https://api.contentstack.io', analyticsInfo: 'cli/2.0.0' });
+
+    const { items } = await session.fetchStacks('org7');
+
+    expect(items).toHaveLength(51);
+    expect(asked).toEqual([
+      { organization_uid: 'org7', limit: 100, skip: 0 },
+      { organization_uid: 'org7', limit: 100, skip: 50 },
+      { organization_uid: 'org7', limit: 100, skip: 51 },
+    ]);
+  });
+
+  it('gives up after a bounded number of pages when the server keeps answering', async () => {
+    let calls = 0;
+    sdkClient.mockReset();
+    sdkClient.mockResolvedValue({
+      stack: () => ({
+        query: () => ({
+          find: async () => {
+            calls += 1;
+            return { items: [{ api_key: 'same' }] };
+          },
+        }),
+      }),
+    });
+    const session = createCmaSession({ cma: 'https://api.contentstack.io', analyticsInfo: 'cli/2.0.0' });
+
+    const { items } = await session.fetchStacks('org7');
+
+    expect(calls).toBe(100);
+    expect(items).toHaveLength(100);
+  });
+
+  it('treats a reply with no items as an empty list', async () => {
+    sdkClient.mockReset();
+    sdkClient.mockResolvedValue({ stack: () => ({ query: () => ({ find: async () => ({}) }) }) });
+    const session = createCmaSession({ cma: 'https://api.contentstack.io', analyticsInfo: 'cli/2.0.0' });
+
+    await expect(session.fetchStacks('org7')).resolves.toEqual({ items: [] });
+  });
+
+  it('propagates a failed stack or delivery token lookup', async () => {
+    const failure = new Error('stack lookup failed');
+    sdkClient.mockReset();
+    sdkClient.mockResolvedValue({
+      stack: () => ({
+        query: () => ({ find: async () => Promise.reject(failure) }),
+        deliveryToken: () => ({ query: () => ({ find: async () => Promise.reject(failure) }) }),
+      }),
+    });
+    const session = createCmaSession({ cma: 'https://api.contentstack.io', analyticsInfo: 'cli/2.0.0' });
+
+    await expect(session.fetchStacks('org7')).rejects.toBe(failure);
+    await expect(session.fetchDeliveryTokens('blt1')).rejects.toBe(failure);
+  });
 });

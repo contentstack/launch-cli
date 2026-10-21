@@ -1,6 +1,7 @@
 import type { defaultWatchTiming } from '../../../deployments/deployment.watcher';
 import { DEPLOYMENT_WAIT_TIMEOUT_MS } from '../../../deployments/deployment.watcher';
 import { serverCommandFrameworkGate } from '../../../environments/environment.inputs';
+import { aliasRequiresFromStack } from '../../../variables/variable.rules';
 import { ProjectCreator } from '../../../projects/project.create';
 
 type WatchTiming = ReturnType<typeof defaultWatchTiming>;
@@ -39,6 +40,10 @@ describe('launch:projects:create', () => {
       'res-mode': 'buffered',
       'auto-deploy': 'enable',
       'cs-auth': 'disable',
+      var: ['A=1', 'B'],
+      dotenv: ['a.env', '-'],
+      'from-stack': true,
+      alias: 'my-prod',
     }).run();
 
     expect(requests).toEqual([
@@ -58,6 +63,10 @@ describe('launch:projects:create', () => {
         resMode: 'buffered',
         autoDeploy: 'enable',
         csAuth: 'disable',
+        vars: ['A=1', 'B'],
+        envFiles: ['a.env', '-'],
+        fromStack: true,
+        alias: 'my-prod',
       },
     ]);
   });
@@ -92,7 +101,7 @@ describe('launch:projects:create', () => {
   });
 
   it('declares only the framework gate as a rule, leaving GitHub-only flags on FileUpload to a confirmation', () => {
-    expect(ProjectsCreate.rules).toEqual([serverCommandFrameworkGate]);
+    expect(ProjectsCreate.rules).toEqual([serverCommandFrameworkGate, aliasRequiresFromStack]);
   });
 
   it('declares every flag it reads and requires only the organization', () => {
@@ -110,6 +119,10 @@ describe('launch:projects:create', () => {
       'res-mode',
       'auto-deploy',
       'cs-auth',
+      'var',
+      'dotenv',
+      'from-stack',
+      'alias',
     ]);
     expect(Object.keys(ProjectsCreate.flags).sort()).toEqual(Object.keys(ProjectsCreate.inputs).sort());
     expect(

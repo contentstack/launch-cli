@@ -11,11 +11,8 @@ import {
   OUTPUT_DIRECTORY_BY_FRAMEWORK,
   SERVER_COMMAND_FRAMEWORKS,
 } from './frameworks';
+import { variablesForCreate } from '../variables/variable.create';
 import type { CreateEnvironmentInput, DetectedFramework, EnvironmentRequest, EnvironmentSource } from './types';
-
-function emptyEnvironmentVariables(): [] {
-  return [];
-}
 
 export function frameworkLabelOf(detected: unknown): string | undefined {
   if (typeof detected !== 'string') {
@@ -46,7 +43,7 @@ export class EnvironmentBuilder {
       outputDirectory: await this.outputDirectory(request, framework, source.detected),
       serverCommand: await this.serverCommand(request, framework, source.detected),
       frameworkPreset: framework,
-      environmentVariables: emptyEnvironmentVariables(),
+      environmentVariables: [],
       isStreamingEnabled: await this.streaming(request),
     };
 
@@ -59,6 +56,18 @@ export class EnvironmentBuilder {
     if (csAuth !== undefined) {
       environment.isContentstackAuthenticationEnabled = csAuth === 'enable';
     }
+
+    environment.environmentVariables = await variablesForCreate(
+      {
+        org: request.org,
+        vars: request.vars,
+        envFiles: request.envFiles,
+        fromStack: request.fromStack,
+        alias: request.alias,
+        dataDir: request.dataDir ?? '.',
+      },
+      this.services,
+    );
 
     return environment;
   }

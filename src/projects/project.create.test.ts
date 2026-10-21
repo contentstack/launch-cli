@@ -116,6 +116,8 @@ interface Scenario {
   createdProject?: unknown;
 }
 
+const VARIABLES_PROMPT = 'Add environment variables';
+const SKIP_VARIABLES = 'Skip adding environment variables';
 const CONNECT_URL = 'https://dev11-app.csnonprod.com/#!/launch/settings/connected-accounts';
 const CONNECTION_IDENTIFIED = 'info: GitHub connection identified!';
 const PROJECT_CREATED = 'info: New project created successfully';
@@ -126,6 +128,7 @@ function harness(scenario: Scenario = {}) {
   const printed: string[] = [];
   const timeline: string[] = [];
   const asked: unknown[] = [];
+  const everyPrompt: unknown[] = [];
   const askedPayloads: Record<string, unknown>[] = [];
   const created: unknown[] = [];
   const gitCalls: unknown[] = [];
@@ -150,7 +153,14 @@ function harness(scenario: Scenario = {}) {
       timeline.push(`print ${message}`);
     },
     inquire: async (payload: unknown) => {
-      asked.push((payload as { message: string }).message);
+      const { message } = payload as { message: string };
+      everyPrompt.push(message);
+
+      if (message === VARIABLES_PROMPT) {
+        return [SKIP_VARIABLES] as never;
+      }
+
+      asked.push(message);
       askedPayloads.push(payload as Record<string, unknown>);
       const answer = (scenario.answers ?? [])[answerIndex];
       answerIndex += 1;
@@ -304,6 +314,7 @@ function harness(scenario: Scenario = {}) {
     printed,
     asked,
     askedPayloads,
+    everyPrompt,
     created,
     gitCalls,
     calls,
@@ -450,7 +461,7 @@ describe('ProjectCreator on the GitHub path', () => {
 
     await creator.create({
       ...gitRequest(),
-      ...({ var: 'SECRET=hunter2', 'env-file': '.env', 'from-stack': 'blt1' } as object),
+      ...({ var: 'SECRET=hunter2', dotenv: '.env', 'from-stack': 'blt1' } as object),
     } as CreateRequest);
     const environment = bodyOf(created).environment as Record<string, unknown>;
 
@@ -874,7 +885,7 @@ describe('ProjectCreator prompting order and refusals', () => {
   });
 
   it('asks in the order the doc pins: type, project name, environment name, framework, build, output, response, Contentstack Authentication', async () => {
-    const { creator, asked } = harness({
+    const { creator, asked, everyPrompt } = harness({
       isTTY: true,
       answers: ['GitHub', 'My Site', 'Default', 'main', 'NextJs', 'npm run build', '.next', 'buffered', 'enable'],
     });
@@ -892,6 +903,7 @@ describe('ProjectCreator prompting order and refusals', () => {
       'Response mode',
       'Contentstack Authentication',
     ]);
+    expect(everyPrompt).toEqual([...(asked as string[]), VARIABLES_PROMPT]);
   });
 
   it('offers Default as the environment name, so pressing enter is enough, as V1 did', async () => {

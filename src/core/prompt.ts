@@ -95,9 +95,16 @@ export async function askOption(ux: UxLike, message: string, choices: Choice[], 
   );
 }
 
-export async function askChoices(ux: UxLike, message: string, choices: Choice[]): Promise<string[]> {
+export async function askChoices(
+  ux: UxLike,
+  message: string,
+  choices: Choice[],
+  options: { requireOne?: boolean } = {},
+): Promise<string[]> {
   const validate = (picked: unknown): true | string =>
-    Array.isArray(picked) && picked.length > 0 ? true : 'Select at least one with <space>, then press <enter>.';
+    options.requireOne === false || (Array.isArray(picked) && picked.length > 0)
+      ? true
+      : 'Select at least one with <space>, then press <enter>.';
   const answer = await ux.inquire<unknown>({
     type: 'checkbox',
     name: 'value',

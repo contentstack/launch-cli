@@ -252,6 +252,7 @@ describe('EnvironmentCreator', () => {
         'Output directory': './.next',
         'Response mode': 'streaming',
         'Contentstack Authentication': 'enable',
+        'Add environment variables': ['Skip adding environment variables'],
       },
     });
 
@@ -265,6 +266,7 @@ describe('EnvironmentCreator', () => {
       'Output directory',
       'Response mode',
       'Contentstack Authentication',
+      'Add environment variables',
     ]);
     expect(calls[1]).toBe(
       'branches {"org":"org1","provider":"GitHub","namespace":"octo-user","repoName":"octo-user/site","limit":100,"skip":0}',
@@ -280,13 +282,17 @@ describe('EnvironmentCreator', () => {
     const { creator, calls, asked } = creatorUnderTest({
       project: UPLOAD_PROJECT,
       isTTY: true,
-      answers: { 'Environment name': 'staging', 'Contentstack Authentication': 'enable' },
+      answers: {
+        'Environment name': 'staging',
+        'Contentstack Authentication': 'enable',
+        'Add environment variables': ['Skip adding environment variables'],
+      },
     });
 
     await creator.create(request({ name: undefined, branch: undefined, framework: 'GATSBY', buildCmd: 'b', outputDir: 'o' }));
 
     expect(calls[1]).toMatch(/^upload /);
-    expect(asked).toEqual(['Environment name', 'Contentstack Authentication']);
+    expect(asked).toEqual(['Environment name', 'Contentstack Authentication', 'Add environment variables']);
   });
 
   it.each([

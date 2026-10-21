@@ -522,6 +522,7 @@ describe('integration: launch:projects:create on the wire', () => {
       'Output directory': './public',
       'Response mode': 'buffered',
       'Contentstack Authentication': 'enable',
+      'Add environment variables': ['Skip adding environment variables'],
     });
     const organizations = nock('https://cma.integration.test')
       .get('/v3/organizations')
@@ -558,6 +559,7 @@ describe('integration: launch:projects:create on the wire', () => {
       'Output directory',
       'Response mode',
       'Contentstack Authentication',
+      'Add environment variables',
     ]);
     expect(prompts.payloads[2].default).toBe(basename(dataDir));
     expect(onWire).toEqual([]);
@@ -600,7 +602,7 @@ describe('integration: launch:projects:create on the wire', () => {
     expect(process.listenerCount('SIGINT')).toBe(0);
   });
 
-  it('asks all ten GitHub prompts in the pinned order and submits exactly what was answered', async () => {
+  it('asks all eleven GitHub prompts in the pinned order and submits exactly what was answered', async () => {
     let body: unknown;
     const prompts = answerPrompts({
       'Choose a project type to proceed': 'GitHub',
@@ -613,6 +615,7 @@ describe('integration: launch:projects:create on the wire', () => {
       'Output directory': '.next',
       'Response mode': 'streaming',
       'Contentstack Authentication': 'disable',
+      'Add environment variables': ['Skip adding environment variables'],
     });
     nock('https://cma.integration.test')
       .get('/v3/organizations')
@@ -651,6 +654,7 @@ describe('integration: launch:projects:create on the wire', () => {
       'Output directory',
       'Response mode',
       'Contentstack Authentication',
+      'Add environment variables',
     ]);
     expect(prompts.payloads.map((payload) => payload.default)).toEqual([
       undefined,
@@ -663,6 +667,7 @@ describe('integration: launch:projects:create on the wire', () => {
       '.next',
       'buffered',
       'enable',
+      undefined,
     ]);
     expect(body).toEqual({
       name: 'My Site',
@@ -700,6 +705,7 @@ describe('integration: launch:projects:create on the wire', () => {
       'Output directory': '.next',
       'Response mode': 'buffered',
       'Contentstack Authentication': 'enable',
+      'Add environment variables': ['Skip adding environment variables'],
     });
     stubRepositoryLookup();
     const branches = hub()
@@ -731,6 +737,7 @@ describe('integration: launch:projects:create on the wire', () => {
       'Output directory',
       'Response mode',
       'Contentstack Authentication',
+      'Add environment variables',
     ]);
     expect([branches.isDone(), create.isDone()]).toEqual([true, true]);
     expect((body as { repository: unknown }).repository).toEqual({
@@ -743,7 +750,10 @@ describe('integration: launch:projects:create on the wire', () => {
   });
 
   it('asks on a terminal only for what argv left out, and nothing that a flag supplied', async () => {
-    const prompts = answerPrompts({ 'Framework preset': 'NextJs' });
+    const prompts = answerPrompts({
+      'Framework preset': 'NextJs',
+      'Add environment variables': ['Skip adding environment variables'],
+    });
     stubGitLookups();
     const create = hub().post('/manage/projects').query({}).reply(201, { project: CREATED_PROJECT });
     stubFollowUp('LIVE');
@@ -752,9 +762,236 @@ describe('integration: launch:projects:create on the wire', () => {
     const { error } = await onTerminal(() => runCommand(args, config));
 
     expect(error).toBeUndefined();
-    expect(prompts.messages).toEqual(['Framework preset']);
+    expect(prompts.messages).toEqual(['Framework preset', 'Add environment variables']);
     expect(create.isDone()).toBe(true);
     expect(onWire).toEqual([]);
+  });
+
+  it('sends the variables from --var and --dotenv in the create body and prints no value', async () => {
+    let body: { environment?: { environmentVariables?: unknown } } | undefined;
+    stubGitLookups();
+    const file = join(dataDir, 'staging.env');
+    writeFileSync(file, 'API_URL=from-file\nFROM_FILE=1\n');
+    const create = hub()
+      .post('/manage/projects', (sent: typeof body) => {
+        body = sent;
+        return true;
+      })
+      .query({})
+      .reply(201, { project: CREATED_PROJECT });
+    stubFollowUp('LIVE');
+
+    const { error, stdout } = await runCommand(
+      [...gitFlags(), '--dotenv', file, '--var', 'API_URL=never-printed-typed', 'DEBUG=true'],
+      config,
+    );
+
+    expect(error).toBeUndefined();
+    expect(create.isDone()).toBe(true);
+    expect(body?.environment?.environmentVariables).toEqual([
+      { key: 'API_URL', value: 'never-printed-typed' },
+      { key: 'FROM_FILE', value: '1' },
+      { key: 'DEBUG', value: 'true' },
+    ]);
+    expect(stdout).toContain('3 variables ready to set');
+    expect(stdout).not.toContain('never-printed-typed');
+    expect(onWire).toEqual([]);
+  });
+
+  it('imports a stack through --from-stack and --alias into the create body without printing the token', async () => {
+    const savedToken = randomBytes(16).toString('hex');
+    CONFIG.tokens = { 'my-prod': { token: savedToken, apiKey: 'blt9stackkey', environment: 'staging', type: 'delivery' } };
+    let body: { environment?: { environmentVariables?: unknown } } | undefined;
+    stubGitLookups();
+    const cms = hub()
+      .get('/manage/cms/environment-variables')
+      .reply(200, [
+        { keyName: 'CONTENTSTACK_API_HOST', key: 'CONTENTSTACK_API_HOST', value: 'api.integration.test' },
+        { keyName: 'CONTENTSTACK_API_KEY', key: 'CONTENTSTACK_API_KEY' },
+      ]);
+    const create = hub()
+      .post('/manage/projects', (sent: typeof body) => {
+        body = sent;
+        return true;
+      })
+      .query({})
+      .reply(201, { project: CREATED_PROJECT });
+    stubFollowUp('LIVE');
+
+    try {
+      const { error, stdout } = await runCommand([...gitFlags(), '--from-stack', '--alias', 'my-prod'], config);
+
+      expect(error).toBeUndefined();
+      expect(cms.isDone()).toBe(true);
+      expect(create.isDone()).toBe(true);
+      expect(body?.environment?.environmentVariables).toEqual([
+        { key: 'CONTENTSTACK_API_HOST', value: 'api.integration.test' },
+        { key: 'CONTENTSTACK_API_KEY', value: 'blt9stackkey' },
+        { key: 'CONTENTSTACK_DELIVERY_TOKEN', value: savedToken },
+        { key: 'CONTENTSTACK_ENVIRONMENT', value: 'staging' },
+      ]);
+      expect(stdout).toContain('4 variables ready to set');
+      expect(stdout).not.toContain(savedToken);
+    } finally {
+      delete CONFIG.tokens;
+    }
+  });
+
+  describe('picking variable sources at the prompt', () => {
+    const STACK_TOKEN = randomBytes(16).toString('hex');
+    interface CreateBody {
+      environment?: { environmentVariables?: unknown };
+    }
+
+    function stubStackPickers(): nock.Scope[] {
+      const cma = nock('https://cma.integration.test');
+
+      return [
+        cma
+          .get('/v3/stacks')
+          .query({ organization_uid: ORG_UID, limit: '100', skip: '0' })
+          .reply(200, { stacks: [{ name: 'Shop', api_key: 'blt9stackkey' }] }),
+        cma.get('/v3/stacks').query({ organization_uid: ORG_UID, limit: '100', skip: '1' }).reply(200, { stacks: [] }),
+        cma
+          .get('/v3/stacks/delivery_tokens')
+          .query({ limit: '100', skip: '0' })
+          .matchHeader('api_key', 'blt9stackkey')
+          .reply(200, {
+            tokens: [{ name: 'prod-token', token: STACK_TOKEN, scope: [{ environments: [{ name: 'staging' }] }] }],
+          }),
+        cma
+          .get('/v3/stacks/delivery_tokens')
+          .query({ limit: '100', skip: '1' })
+          .matchHeader('api_key', 'blt9stackkey')
+          .reply(200, { tokens: [] }),
+        hub()
+          .get('/manage/cms/environment-variables')
+          .reply(200, [
+            { keyName: 'CONTENTSTACK_API_HOST', key: 'CONTENTSTACK_API_HOST', value: 'api.integration.test' },
+            { keyName: 'CONTENTSTACK_API_KEY', key: 'CONTENTSTACK_API_KEY' },
+          ]),
+      ];
+    }
+
+    function captureBody(): { scope: nock.Scope; body: () => CreateBody | undefined } {
+      let sent: CreateBody | undefined;
+      const scope = hub()
+        .post('/manage/projects', (body: CreateBody) => {
+          sent = body;
+          return true;
+        })
+        .query({})
+        .reply(201, { project: CREATED_PROJECT });
+
+      return { scope, body: () => sent };
+    }
+
+    it('merges a dotenv file and typed pairs in that order, the typed pair winning, and asks the sub-prompts in order', async () => {
+      const file = join(dataDir, 'picked.env');
+      writeFileSync(file, 'API_URL=from-file\nFROM_FILE=1\n');
+      const prompts = answerPrompts({
+        'Add environment variables': ['Import variables from a dotenv file', 'Type KEY=VALUE pairs'],
+        'Path to the dotenv file': file,
+        'KEY=VALUE pairs separated by spaces': 'API_URL=typed DEBUG=true',
+      });
+      stubGitLookups();
+      const create = captureBody();
+      stubFollowUp('LIVE');
+
+      const { error, stdout } = await onTerminal(() => runCommand(gitFlags(), config));
+
+      expect(error).toBeUndefined();
+      expect(prompts.messages).toEqual([
+        'Add environment variables',
+        'Path to the dotenv file',
+        'KEY=VALUE pairs separated by spaces',
+      ]);
+      expect(create.scope.isDone()).toBe(true);
+      expect(create.body()?.environment?.environmentVariables).toEqual([
+        { key: 'API_URL', value: 'typed' },
+        { key: 'FROM_FILE', value: '1' },
+        { key: 'DEBUG', value: 'true' },
+      ]);
+      expect(stdout).toContain('3 variables ready to set');
+      expect(stdout).not.toContain('from-file');
+      expect(onWire).toEqual([]);
+    });
+
+    it('merges all three sources, stack first, then the file, then the typed pairs, without printing the token', async () => {
+      const file = join(dataDir, 'picked.env');
+      writeFileSync(file, 'CONTENTSTACK_ENVIRONMENT=from-file\nFROM_FILE=1\n');
+      const prompts = answerPrompts({
+        'Add environment variables': [
+          'Import variables from a stack',
+          'Import variables from a dotenv file',
+          'Type KEY=VALUE pairs',
+        ],
+        Stack: '0',
+        'Delivery token': '0',
+        'Path to the dotenv file': file,
+        'KEY=VALUE pairs separated by spaces': 'FROM_FILE=typed EXTRA=1',
+      });
+      stubGitLookups();
+      const lookups = stubStackPickers();
+      const create = captureBody();
+      stubFollowUp('LIVE');
+
+      const { error, stdout } = await onTerminal(() => runCommand(gitFlags(), config));
+
+      expect(error).toBeUndefined();
+      expect(prompts.messages).toEqual([
+        'Add environment variables',
+        'Stack',
+        'Delivery token',
+        'Path to the dotenv file',
+        'KEY=VALUE pairs separated by spaces',
+      ]);
+      expect(lookups.every((scope) => scope.isDone())).toBe(true);
+      expect(create.body()?.environment?.environmentVariables).toEqual([
+        { key: 'CONTENTSTACK_API_HOST', value: 'api.integration.test' },
+        { key: 'CONTENTSTACK_API_KEY', value: 'blt9stackkey' },
+        { key: 'CONTENTSTACK_DELIVERY_TOKEN', value: STACK_TOKEN },
+        { key: 'CONTENTSTACK_ENVIRONMENT', value: 'from-file' },
+        { key: 'FROM_FILE', value: 'typed' },
+        { key: 'EXTRA', value: '1' },
+      ]);
+      expect(stdout).toContain('6 variables ready to set');
+      expect(stdout).not.toContain(STACK_TOKEN);
+      expect(onWire).toEqual([]);
+    });
+
+    it('refuses Skip combined with another source before creating anything', async () => {
+      answerPrompts({
+        'Add environment variables': ['Skip adding environment variables', 'Type KEY=VALUE pairs'],
+      });
+      stubGitLookups();
+      const create = captureBody();
+
+      const { error } = await onTerminal(() => runCommand(gitFlags(), config));
+
+      expect(error?.message).toContain("'Skip adding environment variables' cannot be combined with the other options.");
+      expect(create.scope.isDone()).toBe(false);
+    });
+  });
+
+  it('sends an empty variable list and asks nothing about variables without a terminal and without flags', async () => {
+    let body: { environment?: { environmentVariables?: unknown } } | undefined;
+    stubGitLookups();
+    const create = hub()
+      .post('/manage/projects', (sent: typeof body) => {
+        body = sent;
+        return true;
+      })
+      .query({})
+      .reply(201, { project: CREATED_PROJECT });
+    stubFollowUp('LIVE');
+
+    const { error, stdout } = await runCommand(gitFlags(), config);
+
+    expect(error).toBeUndefined();
+    expect(create.isDone()).toBe(true);
+    expect(body?.environment?.environmentVariables).toEqual([]);
+    expect(stdout).not.toContain('variables ready to set');
   });
 
   it('reports a GitHub authorisation failure as a GitHub problem, never as an expired Contentstack login, and posts once', async () => {

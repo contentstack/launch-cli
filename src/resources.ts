@@ -7,6 +7,7 @@ import {
   environmentFlags,
   environmentResolution,
 } from './environments/environment.inputs';
+import { variableFlags, variableResolution } from './variables/variable.inputs';
 import { ProjectsApi } from './projects/projects.api';
 import { EnvironmentsApi } from './environments/environments.api';
 import { DeploymentsApi } from './deployments/deployments.api';
@@ -14,10 +15,12 @@ import { DeploymentLogsApi } from './deployments/deployment-logs.api';
 import { GitApi } from './git/git.api';
 import { OrganizationsApi } from './organizations/organizations.api';
 import { UploadsApi } from './uploads/uploads.api';
+import { StacksApi } from './stacks/stacks.api';
+import { VariablesApi } from './variables/variables.api';
 import type { CmaSession } from './transport/cma-client';
 import type { RestApiClient } from './transport/rest-client';
 
-export const catalog = { ...organizationFlags, ...coreFlags, ...projectFlags, ...environmentFlags };
+export const catalog = { ...organizationFlags, ...coreFlags, ...projectFlags, ...environmentFlags, ...variableFlags };
 
 export type Catalog = typeof catalog;
 export type FlagKey = keyof Catalog;
@@ -27,6 +30,7 @@ export const resolution = {
   ...organizationResolution,
   ...coreResolution,
   ...environmentResolution,
+  ...variableResolution,
 };
 
 export type Resolution = typeof resolution;
@@ -49,6 +53,8 @@ export interface ApiSurface {
   deploymentLogs: DeploymentLogsApi;
   git: GitApi;
   uploads: UploadsApi;
+  stacks: StacksApi;
+  variables: VariablesApi;
 }
 
 export function buildApi(client: RestApiClient, cma: CmaSession, logsClient: RestApiClient): ApiSurface {
@@ -60,5 +66,7 @@ export function buildApi(client: RestApiClient, cma: CmaSession, logsClient: Res
     deploymentLogs: new DeploymentLogsApi(logsClient),
     git: new GitApi(client),
     uploads: new UploadsApi(client),
+    stacks: new StacksApi(cma),
+    variables: new VariablesApi(client),
   };
 }

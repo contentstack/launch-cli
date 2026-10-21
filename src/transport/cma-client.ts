@@ -12,9 +12,30 @@ export interface CmaCollection {
   count?: number;
 }
 
+const PAGE_SIZE = 100;
+const MAX_PAGES = 100;
+
+async function allPages(fetchPage: (skip: number) => Promise<CmaCollection>): Promise<CmaCollection> {
+  const items: unknown[] = [];
+
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const batch = (await fetchPage(items.length)).items ?? [];
+
+    if (batch.length === 0) {
+      break;
+    }
+
+    items.push(...batch);
+  }
+
+  return { items };
+}
+
 export interface CmaSession {
   fetchOrganizations(query: Record<string, unknown>): Promise<CmaCollection>;
   fetchOrganization(uid: string): Promise<unknown>;
+  fetchStacks(organizationUid: string): Promise<CmaCollection>;
+  fetchDeliveryTokens(apiKey: string): Promise<CmaCollection>;
   scopedOrganizationUid(): string | undefined;
 }
 
@@ -49,6 +70,14 @@ export function createCmaSession(options: CmaSessionOptions): CmaSession {
   return {
     fetchOrganizations: async (query) => (await open()).organization().fetchAll(query),
     fetchOrganization: async (uid) => (await open()).organization(uid).fetch(),
+    fetchStacks: (organizationUid) =>
+      allPages(async (skip) =>
+        (await open()).stack().query({ organization_uid: organizationUid, limit: PAGE_SIZE, skip }).find(),
+      ),
+    fetchDeliveryTokens: (apiKey) =>
+      allPages(async (skip) =>
+        (await open()).stack({ api_key: apiKey }).deliveryToken().query({ limit: PAGE_SIZE, skip }).find(),
+      ),
     scopedOrganizationUid: () => {
       const uid: unknown = configHandler.get(OAUTH_ORG_UID_CONFIG_FIELD);
 

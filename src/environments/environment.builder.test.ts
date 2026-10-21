@@ -32,6 +32,7 @@ function builder(options: { isTTY?: boolean; answers?: unknown[] } = {}) {
 }
 
 const EVERY_FLAG: EnvironmentRequest = {
+  org: 'org1',
   framework: 'OTHER',
   buildCmd: 'npm run build',
   outputDir: './dist',
@@ -41,8 +42,8 @@ const EVERY_FLAG: EnvironmentRequest = {
 };
 
 describe('EnvironmentBuilder', () => {
-  it('builds the environment from the flags alone, asking and printing nothing', async () => {
-    const { environments, printed, asked } = builder({ isTTY: true });
+  it('builds the environment from the flags alone, asking only whether to add variables', async () => {
+    const { environments, printed, asked } = builder({ isTTY: true, answers: [['Skip adding environment variables']] });
 
     const environment = await environments.build(EVERY_FLAG, ENV_NAME, GIT_SOURCE, 'enable');
 
@@ -59,8 +60,41 @@ describe('EnvironmentBuilder', () => {
       autoDeployOnPush: true,
       isContentstackAuthenticationEnabled: false,
     });
+    expect(asked).toEqual([{ message: 'Add environment variables', default: undefined }]);
+    expect(printed).toEqual(['Skipped adding environment variables.']);
+  });
+
+  it('carries the variables from --var and --dotenv into the environment and asks nothing about them', async () => {
+    const { environments, asked, printed } = builder({ isTTY: true });
+
+    const environment = await environments.build(
+      { ...EVERY_FLAG, vars: ['API_URL=https://example.test'], envFiles: [] },
+      ENV_NAME,
+      GIT_SOURCE,
+      undefined,
+    );
+
+    expect(environment.environmentVariables).toEqual([{ key: 'API_URL', value: 'https://example.test' }]);
+    expect(asked).toEqual([]);
+    expect(printed).toEqual(['\u2714 1 variable ready to set \u2014 1 from --var']);
+  });
+
+  it('sends no variables and asks nothing about them without a terminal and without flags', async () => {
+    const { environments, asked, printed } = builder({ isTTY: false });
+
+    const environment = await environments.build(EVERY_FLAG, ENV_NAME, GIT_SOURCE, undefined);
+
+    expect(environment.environmentVariables).toEqual([]);
     expect(asked).toEqual([]);
     expect(printed).toEqual([]);
+  });
+
+  it('asks about variables last, after Contentstack Authentication', async () => {
+    const { environments, asked } = builder({ isTTY: true, answers: ['enable', ['Skip adding environment variables']] });
+
+    await environments.build({ ...EVERY_FLAG, csAuth: undefined }, ENV_NAME, GIT_SOURCE, undefined);
+
+    expect(asked.map((entry) => entry.message)).toEqual(['Contentstack Authentication', 'Add environment variables']);
   });
 
   it('carries an upload uid and leaves auto-deploy unset when none was given', async () => {
@@ -88,7 +122,7 @@ describe('EnvironmentBuilder', () => {
       branch: 'main',
     };
 
-    const environment = await environments.build({}, ENV_NAME, source, undefined);
+    const environment = await environments.build({ org: 'org1' }, ENV_NAME, source, undefined);
 
     expect(environment).toEqual(
       expect.objectContaining({
@@ -111,7 +145,7 @@ describe('EnvironmentBuilder', () => {
   it("falls back to the framework's default output directory without a terminal or a detected one", async () => {
     const { environments, printed } = builder();
 
-    const environment = await environments.build({ framework: 'NEXTJS' }, ENV_NAME, GIT_SOURCE, undefined);
+    const environment = await environments.build({ org: 'org1', framework: 'NEXTJS' }, ENV_NAME, GIT_SOURCE, undefined);
 
     expect(environment.outputDirectory).toBe('./.next');
     expect(printed).toContain('Using the default output directory "./.next" for NEXTJS. Pass --output-dir to change it.');
@@ -120,7 +154,7 @@ describe('EnvironmentBuilder', () => {
   it('refuses to guess a framework it could not detect without a terminal', async () => {
     const { environments } = builder();
 
-    const building = environments.build({}, ENV_NAME, { detected: { framework: 'not-a-framework' } }, undefined);
+    const building = environments.build({ org: 'org1' }, ENV_NAME, { detected: { framework: 'not-a-framework' } }, undefined);
 
     await expect(building).rejects.toThrow(MissingInputError);
     await expect(building).rejects.toThrow('--framework');
@@ -130,7 +164,7 @@ describe('EnvironmentBuilder', () => {
     const { environments } = builder();
 
     const building = environments.build(
-      { framework: 'NEXTJS', serverCmd: 'node server.js' },
+      { org: 'org1', framework: 'NEXTJS', serverCmd: 'node server.js' },
       ENV_NAME,
       GIT_SOURCE,
       undefined,
@@ -143,13 +177,13 @@ describe('EnvironmentBuilder', () => {
   it('asks for every unset value in a terminal, offering what was detected', async () => {
     const { environments, asked } = builder({
       isTTY: true,
-      answers: ['Other', 'npm run build', './out', 'node server.js', 'streaming', 'enable'],
+      answers: ['Other', 'npm run build', './out', 'node server.js', 'streaming', 'enable', ['Skip adding environment variables']],
     });
     const source: EnvironmentSource = {
       detected: { framework: 'other', buildCommand: 'make', outputDirectory: './public', serverCommand: 'node .' },
     };
 
-    const environment = await environments.build({}, ENV_NAME, source, undefined);
+    const environment = await environments.build({ org: 'org1' }, ENV_NAME, source, undefined);
 
     expect(asked).toEqual([
       { message: 'Framework preset', default: 'Other' },
@@ -158,6 +192,7 @@ describe('EnvironmentBuilder', () => {
       { message: 'Server command', default: 'node .' },
       { message: 'Response mode', default: 'buffered' },
       { message: 'Contentstack Authentication', default: 'enable' },
+      { message: 'Add environment variables', default: undefined },
     ]);
     expect(environment).toEqual(
       expect.objectContaining({
@@ -174,7 +209,7 @@ describe('EnvironmentBuilder', () => {
   it('does not ask for a server command when the framework takes none', async () => {
     const { environments, asked } = builder({ isTTY: true, answers: ['', './.next', 'buffered', 'disable'] });
 
-    const environment = await environments.build({ framework: 'NEXTJS' }, ENV_NAME, GIT_SOURCE, undefined);
+    const environment = await environments.build({ org: 'org1', framework: 'NEXTJS' }, ENV_NAME, GIT_SOURCE, undefined);
 
     expect(asked.map((question) => question.message)).not.toContain('Server command');
     expect(environment.serverCommand).toBeUndefined();

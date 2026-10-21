@@ -21,6 +21,12 @@ const UNUSED_CMA: CmaSession = {
   fetchOrganization: async () => {
     throw new Error('this test fetches no organization');
   },
+  fetchStacks: async () => {
+    throw new Error('this test lists no stacks');
+  },
+  fetchDeliveryTokens: async () => {
+    throw new Error('this test lists no delivery tokens');
+  },
   scopedOrganizationUid: () => undefined,
 };
 
@@ -173,7 +179,9 @@ describe('the api surface', () => {
       'git',
       'organizations',
       'projects',
+      'stacks',
       'uploads',
+      'variables',
     ]);
     expect(api.deploymentLogs).toBeInstanceOf(DeploymentLogsApi);
     expect(api.organizations).toBeInstanceOf(OrganizationsApi);
@@ -214,6 +222,12 @@ describe('the api surface', () => {
       fetchOrganization: async (uid) => {
         fetched.push(uid);
         return { uid, name: 'Scoped Org' };
+      },
+      fetchStacks: async () => {
+        throw new Error('this test lists no stacks');
+      },
+      fetchDeliveryTokens: async () => {
+        throw new Error('this test lists no delivery tokens');
       },
       scopedOrganizationUid: () => 'org7',
     };

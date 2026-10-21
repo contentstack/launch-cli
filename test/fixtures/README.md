@@ -22,6 +22,7 @@ These fixtures have two sources, and every file now satisfies both:
 | `project-get.json` | `paths./projects/{project_uid}.get.responses.200.content.application/json.example` (schema `ProjectResponse`) |
 | `project-get-fileupload.json` | same path and schema, shaped from the live FileUpload project observed on 2026-09-23 |
 | `project-not-found.json` | `paths./projects/{project_uid}.get.responses.404.content.application/json.example` |
+| `cms-environment-variables.json` | `GET /cms/environment-variables`, which the OpenAPI spec does not publish (the route is `@ApiExcludeEndpoint()`); shaped from the controller source and corroborated by a live call on 2026-10-21: a bare array of `{keyName, key, value?}`, with `value` set only on the two host entries. The hosts are synthetic. |
 
 ## What the live run corroborated
 
