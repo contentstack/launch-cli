@@ -141,6 +141,13 @@ src/
                 EnvironmentBuilder that turns them into a CreateEnvironmentInput, and the
                 EnvironmentCreator / EnvironmentUpdater behind launch:env:create / :update.
                 It reaches deployments, git and uploads, for create
+  stacks/       the Contentstack stack and delivery-token lookups behind --from-stack, through the
+                CmaSession (no Launch endpoint)
+  variables/    the shared variable-source resolver (--var, --dotenv, --from-stack, a detected .env file), the
+                read-modify-write writer behind launch:variables:set / :unset, and the masked
+                presenter behind :list. It has no repository of its own: it reads and writes through
+                environments, and reads the stack template through its own VariablesApi. EnvironmentBuilder calls back into it for the create commands, so the
+                two folders each name the other in the layering allow-list
   deployments/  the deployment repository, the status classification, the
                 wait/stream loop and LogTail that projects:create, deployments:create
                 and logs:get all drive, and the DeploymentFollower that watches one
@@ -313,6 +320,48 @@ does not exist is reported before the user is asked, not after they have said ye
 the yellow `Project not deleted.` and exits 3 (`EXIT_CANCELLED`) without the `Error:` line a
 `CancelledError` would print; Ctrl-C at the question is still a `CancelledError`. The success line is
 the green `✔ Project deleted successfully.`, matching `projects:update`.
+
+**Environment variables (`launch:variables:*`).** There is no per-variable endpoint, so `set` and `unset`
+are `GET .../environments/:uid`, merge locally, then `PUT` the complete `environmentVariables` array and
+nothing else: the update body is partial on the server, so no other environment field can be dropped by it.
+Every source is resolved and every value prompted for before the `GET`, so no user interaction sits between
+the read and the write; `unset` reads once to validate the keys and name the environment, confirms, then
+reads again immediately before the `PUT`. Two writers racing lose one change - the API offers no ETag and no
+partial update (CL-7179 is the proposed `PATCH`) - and FR34 asks that this be documented rather than treated
+as a defect.
+
+`collectVariables` in `src/variables/variable.sources.ts` is the one resolver: stack (`--from-stack`), then
+`--dotenv`, then `--var`, later wins, and the summary line names every source's new keys and every override.
+With no source flag, `set` on a terminal shows the `Add variables from` checklist (`chooseSources` in
+`src/variables/variable.chooser.ts`, shared with the create commands, which add a `Skip` choice); ticking nothing
+prints a yellow `Skipped adding variables.` and sends nothing (sources that supply no variable print a yellow
+`No changes made.`). Without a terminal, `set` auto-detects `.env.local` then `.env`
+under `--data-dir`, always printing the file it chose, and fails with exit 2 when there is none. A bare `--var KEY` is a hidden prompt on a terminal, a stdin read for exactly one bare key without one, and
+exit 2 naming `--dotenv -` for two or more. The API refuses an empty value, so `KEY=` is a usage error naming
+the key, and an empty value inside a dotenv file is skipped with its key reported. No value reaches stdout, a
+prompt message, a confirmation or an error: `list` masks through `redactedColumn`, and a failed `PUT` is worded from
+`ENVIRONMENT_ERROR_MESSAGES`, never from the API's own text.
+
+`projects:create` and `env:create` take `--var` and `--dotenv` and reach the same resolver through
+`EnvironmentBuilder`, which asks last - after Contentstack Authentication, where V1 asked - with no auto-detection.
+With neither flag it offers a checkbox over the sources plus `Skip adding environment variables`, which cannot be
+combined with the others; without a terminal it sends an empty list.
+
+**`--from-stack` and `--alias`.** `--from-stack` is a bare flag on `variables:set`, `projects:create` and
+`env:create`; `--alias <name>` (`-a`) names a delivery token saved with `csdx auth:tokens:add`, and is a usage error
+without `--from-stack` (`aliasRequiresFromStack`). With an alias the token is read from the `tokens` config object
+(indexed by alias, so a dot in the alias is safe) and must be a delivery token with an environment. Without an alias
+a terminal gets a stack picker then a delivery-token picker (names only); without a terminal it is a usage error
+naming `--alias`. The five variables come from `GET /cms/environment-variables` (API host and CDN, scheme stripped)
+plus the stack's API key, the token and its environment. `src/stacks/` owns the Contentstack stack lookups through
+`CmaSession.fetchStacks` / `fetchDeliveryTokens`, which page 100 at a time; `variables` may import `stacks` and
+`environments` and nothing else (`RESOURCE_EDGES`). A delivery token value is never printed or logged.
+
+Two harness traps. `@oclif/test`'s `runCommand` joins argv with spaces and splits it again, so a value containing a
+space must be passed pre-quoted there (`'"MSG=hello world"'`); the real parser keeps it whole, which
+`src/variables/variable.inputs.test.ts` proves against `Parser.parse`. And a test that lets a bare key reach the
+non-terminal path reads the real `process.stdin` and hangs the run, so such a test must answer on a terminal or
+fake `readStdin`.
 
 **A prompt never answers with something that is not on its list.** Two mechanisms, chosen by
 whether the choices need searching. `askOption` in `src/core/prompt.ts` is the
@@ -740,10 +789,9 @@ not a total one, so a large archive that is still moving is never cut off.
 It uses `node:http`/`node:https` rather than `fetch` so `nock` can intercept it - nock 13 does not see
 undici's `fetch`.
 
-**Environment variables and argv.** `environmentVariables` is always `[]` on create: the variable
-sources are CL-7169. The shape is built by a function that takes no input at all, so there is no
-argv path into it to grow by accident, and a test passes `var`, `env-file` and `from-stack` into the
-request to prove the body is unchanged. **No secret may reach argv** (FR30, G16).
+**Environment variables and argv.** On create, `environmentVariables` comes only from `variablesForCreate`, called last by
+`EnvironmentBuilder`, so the sources are the explicit `--var`, `--dotenv` and `--from-stack` inputs and the prompt
+checklist and nothing else; the create summary says `ready to set` because the environment does not exist yet. **No secret may reach argv** (FR30, G16).
 
 **Cross-flag rules.** A rule that is pure flag-versus-flag and evaluable from argv alone belongs in
 oclif's native `exclusive` / `relationships` on the flag definition, where it also shows in `--help` -
