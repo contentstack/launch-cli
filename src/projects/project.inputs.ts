@@ -50,11 +50,13 @@ export const projectResolution = {
     configLabel: 'project',
     dependsOn: PROJECT_DEPENDENCIES.project,
     prompt: ({ services, resolved }) => promptForProject(services, resolved.org),
-    normalize: (value, { services, resolved, source }) =>
-      new ProjectResolver(services.api.projects).toUid(
-        resolved.org,
-        source === 'flag' ? ResourceRef.parse(value) : ResourceRef.uid(value),
-      ),
+    normalize: async (value, { services, resolved, source }) =>
+      source === 'prompt'
+        ? value
+        : new ProjectResolver(services.api.projects).toUid(
+          resolved.org,
+          source === 'flag' ? ResourceRef.parse(value) : ResourceRef.uid(value),
+        ),
   } satisfies ResolutionSpec<string, 'org'>,
   name: {
     normalize: (value) => withinLength('name', value, PROJECT_NAME_MAX_LENGTH),

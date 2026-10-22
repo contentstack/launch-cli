@@ -19,16 +19,16 @@ export default class EnvironmentsGet extends LaunchCommand<typeof getInputs> {
   static flags = flagsFor(getInputs);
 
   async run(): Promise<void> {
-    const environment = await this.services.api.environments.get({
-      org: this.resolved.org,
-      project: this.resolved.project,
-      environment: this.resolved.env,
-    });
+    const scope = { org: this.resolved.org, project: this.resolved.project };
+    const [environment, project] = await Promise.all([
+      this.services.api.environments.get({ ...scope, environment: this.resolved.env }),
+      this.services.api.projects.get(scope),
+    ]);
 
     renderTable(
       this.ux,
       ENVIRONMENT_DETAIL_COLUMNS,
-      environmentDetailRows({ ...environment, project: this.resolved.project }),
+      environmentDetailRows({ ...environment, project: this.resolved.project }, project.projectType !== 'FILEUPLOAD'),
       process.stdout.columns,
       ENVIRONMENT_VALUE_COLUMN,
       this.services.outputIsTTY,

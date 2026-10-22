@@ -10,6 +10,7 @@ import nock from 'nock';
 
 import * as watcher from '../../src/deployments/deployment.watcher';
 import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
+import { projectOwnership } from '../support/project-ownership';
 import { answerPrompts, onTerminal } from '../support/terminal';
 
 import projectFixture from '../fixtures/project-get.json';
@@ -69,6 +70,7 @@ function hub(): nock.Scope {
 }
 
 function stubCreate(sent: unknown[]): void {
+  projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
   hub().get(`/manage/projects/${PROJECT_UID}`).reply(200, projectFixture);
   nock(LAUNCH_HUB_URL)
     .matchHeader('x-organization-uid', ORG_UID)

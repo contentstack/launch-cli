@@ -17,6 +17,8 @@ import type { Rule } from './rules';
 import { cancelOnInterrupt } from './interruptible-ux';
 import type { UxLike } from './prompt';
 import { registerSearchList } from './search-list';
+import type { FailureOutput } from './failure';
+import { failWith, failureOutputOf, reportFailure } from './failure';
 import type { ServiceContext } from './service-context';
 import { buildServiceContext } from './service-context';
 
@@ -190,10 +192,18 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
   }
 
   protected async catch(err: Error & { exitCode?: number }): Promise<unknown> {
-    if (err instanceof LaunchError) {
-      return err.reported ? this.exit(err.exitCode) : this.error(err.message, { exit: err.exitCode });
+    if (err instanceof LaunchError && err.reported) {
+      return this.exit(err.exitCode);
     }
 
-    return super.catch(err);
+    if (err instanceof LaunchError) {
+      return failWith(err.message, err.exitCode, this.failureOutput());
+    }
+
+    return reportFailure(err, this.failureOutput());
+  }
+
+  protected failureOutput(): FailureOutput {
+    return failureOutputOf((original) => super.catch(original));
   }
 }

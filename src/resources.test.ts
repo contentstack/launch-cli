@@ -127,7 +127,7 @@ describe('resolution', () => {
     spy.mockRestore();
   });
 
-  it.each(['config', 'prompt', 'default'] as const)(
+  it.each(['config', 'default'] as const)(
     'hands the resolver a uid reference for a value that came from %s, whatever its shape',
     async (source) => {
       const spy = jest.spyOn(ProjectResolver.prototype, 'toUid').mockResolvedValue(PROJECT_UID);
@@ -139,6 +139,18 @@ describe('resolution', () => {
       spy.mockRestore();
     },
   );
+
+  it('keeps a project the picker returned as it is, without the resolver', async () => {
+    const spy = jest.spyOn(ProjectResolver.prototype, 'toUid');
+    const { services, resolved } = args();
+
+    await expect(table.project.normalize?.(PROJECT_UID, { services, resolved, source: 'prompt' })).resolves.toBe(
+      PROJECT_UID,
+    );
+
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
 
   it('declares project as depending on org so the order of the literal cannot matter', () => {
     expect(table.project.dependsOn).toEqual(['org']);

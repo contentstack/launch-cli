@@ -8,6 +8,7 @@ import nock from 'nock';
 import listFixture from '../fixtures/projects-list.json';
 import notFoundFixture from '../fixtures/project-not-found.json';
 import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
+import { projectOwnership } from '../support/project-ownership';
 
 const LAUNCH_HUB_URL = 'https://launch-api.integration.test';
 const ORG_UID = 'blt4d9e2a7c1f6b3085';
@@ -63,6 +64,7 @@ describe('integration: launch:projects:update on the wire', () => {
   });
 
   it('puts only the supplied field in the PUT body and reports success', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
     const scope = nock(LAUNCH_HUB_URL)
       .put(`/manage/projects/${PROJECT_UID}`, { name: 'Renamed Site' })
       .query({})
@@ -90,6 +92,7 @@ describe('integration: launch:projects:update on the wire', () => {
   });
 
   it('puts both fields when both were supplied and reports success once', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
     const scope = nock(LAUNCH_HUB_URL)
       .put(`/manage/projects/${PROJECT_UID}`, { name: 'Renamed Site', description: 'A new blurb' })
       .query({})
@@ -148,7 +151,8 @@ describe('integration: launch:projects:update on the wire', () => {
     expect(stdout).toBe('✔ Project updated successfully.\n');
   });
 
-  it('exits 2 without sending anything when neither --name nor --description was supplied', async () => {
+  it('exits 2 without sending the update when neither --name nor --description was supplied', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
     const scope = nock(LAUNCH_HUB_URL).put(`/manage/projects/${PROJECT_UID}`).query({}).reply(200, {});
 
     const { error } = await runCommand(
@@ -163,7 +167,8 @@ describe('integration: launch:projects:update on the wire', () => {
     expect(nock.pendingMocks()).toHaveLength(1);
   });
 
-  it('exits 2 without sending anything when --name is longer than the server allows', async () => {
+  it('exits 2 without sending the update when --name is longer than the server allows', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
     const scope = nock(LAUNCH_HUB_URL).put(`/manage/projects/${PROJECT_UID}`).query({}).reply(200, {});
 
     const { error } = await runCommand(
@@ -187,7 +192,8 @@ describe('integration: launch:projects:update on the wire', () => {
     expect(scope.isDone()).toBe(false);
   });
 
-  it('exits 2 without sending anything when --description is longer than the server allows', async () => {
+  it('exits 2 without sending the update when --description is longer than the server allows', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
     const scope = nock(LAUNCH_HUB_URL).put(`/manage/projects/${PROJECT_UID}`).query({}).reply(200, {});
 
     const { error } = await runCommand(
@@ -213,6 +219,7 @@ describe('integration: launch:projects:update on the wire', () => {
 
   it('sends a name of exactly the server limit rather than refusing it', async () => {
     const atLimit = 'n'.repeat(200);
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
     const scope = nock(LAUNCH_HUB_URL)
       .put(`/manage/projects/${PROJECT_UID}`, { name: atLimit })
       .query({})
@@ -228,6 +235,7 @@ describe('integration: launch:projects:update on the wire', () => {
   });
 
   it('exits 1 with the project wording when the API rejects a duplicate name', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
     nock(LAUNCH_HUB_URL)
       .put(`/manage/projects/${PROJECT_UID}`)
       .query({})
@@ -243,6 +251,7 @@ describe('integration: launch:projects:update on the wire', () => {
   });
 
   it('exits 1 when the API does not know the project uid', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
     nock(LAUNCH_HUB_URL).put(`/manage/projects/${PROJECT_UID}`).query({}).reply(404, notFoundFixture);
 
     const { error } = await runCommand(

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { resolve as resolvePath, join } from 'node:path';
 
 import { HttpClient, authHandler, configHandler } from '@contentstack/cli-utilities';
+import { Errors } from '@oclif/core';
 
 import { EXIT_RUNTIME, PROJECT_CONFIG_FILE } from './constants';
 import { ProjectConfigStore } from './project-config';
@@ -60,6 +61,10 @@ function probe(): Probe & { error: jest.Mock } {
   return instance;
 }
 
+function stdoutIsTTY(value: boolean): void {
+  Object.defineProperty(process.stdout, 'isTTY', { value, configurable: true });
+}
+
 interface Wire {
   queries: unknown[];
   bodies: unknown[];
@@ -103,65 +108,80 @@ function fakeHttpClient(
 }
 
 describe('LaunchCommand.catch', () => {
-  it('reports a missing input as a usage error', async () => {
+  const original = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY');
+
+  beforeEach(() => stdoutIsTTY(false));
+
+  afterEach(() => {
+    if (original) {
+      Object.defineProperty(process.stdout, 'isTTY', original);
+    } else {
+      delete (process.stdout as { isTTY?: boolean }).isTTY;
+    }
+  });
+
+  async function caught(err: Error) {
     const instance = probe();
-
-    await instance['catch'](new MissingInputError('org', { config: true, prompt: true }));
-
-    expect(instance.error).toHaveBeenCalledWith(expect.stringContaining('Missing required value for --org'), {
-      exit: 2,
+    const lines: string[] = [];
+    const spy = jest.spyOn(process.stderr, 'write').mockImplementation((chunk: string | Uint8Array) => {
+      lines.push(String(chunk).replace(/\n$/, ''));
+      return true;
     });
-  });
+    const thrown = (await instance['catch'](err)
+      .catch((failure: unknown) => failure)
+      .finally(() => spy.mockRestore())) as Errors.CLIError & { skipOclifErrorHandling?: boolean };
 
-  it('reports a usage error as a usage error', async () => {
-    const instance = probe();
+    return { instance, lines, thrown };
+  }
 
-    await instance['catch'](new UsageError('No project named "ghost" found in this organization.'));
+  it.each([
+    [new MissingInputError('org', { config: true, prompt: true }), 2],
+    [new UsageError('No project named "ghost" found in this organization.'), 2],
+    [new CancelledError(), 3],
+    [new LaunchApiError(404, [{ code: 'launch.SOMETHING.ELSE', message: 'the api said no' }]), 1],
+    [new LaunchApiError(500, []), 1],
+  ])('prints %p once as a lowercase error line and exits %i without oclif printing it again', async (err, exit) => {
+    const { instance, lines, thrown } = await caught(err);
 
-    expect(instance.error).toHaveBeenCalledWith('No project named "ghost" found in this organization.', {
-      exit: 2,
-    });
-  });
-
-  it('reports a declined confirmation with the dedicated cancellation exit code', async () => {
-    const instance = probe();
-
-    await instance['catch'](new CancelledError());
-
-    expect(instance.error).toHaveBeenCalledWith('Cancelled. Nothing was changed.', { exit: 3 });
-  });
-
-  it('reports an API failure as a runtime error', async () => {
-    const instance = probe();
-
-    await instance['catch'](new LaunchApiError(404, [{ code: 'launch.SOMETHING.ELSE', message: 'the api said no' }]));
-
-    expect(instance.error).toHaveBeenCalledWith('the api said no', { exit: 1 });
-  });
-
-  it('maps a cancelled confirmation, a usage failure and an api failure through one LaunchError branch', async () => {
-    const instance = probe();
-
-    await instance['catch'](new CancelledError());
-    await instance['catch'](new UsageError('Pass --org.'));
-    await instance['catch'](new LaunchApiError(500, []));
-
-    expect(instance.error).toHaveBeenNthCalledWith(1, 'Cancelled. Nothing was changed.', { exit: 3 });
-    expect(instance.error).toHaveBeenNthCalledWith(2, 'Pass --org.', { exit: 2 });
-    expect(instance.error).toHaveBeenNthCalledWith(3, 'Launch API request failed with status 500.', { exit: 1 });
-  });
-
-  it('delegates anything else to oclif, which sets process.exitCode before rethrowing', async () => {
-    const instance = probe();
-    const other = new Error('boom');
-    const previousExitCode = process.exitCode;
-    process.exitCode = undefined;
-
-    await expect(instance['catch'](other)).rejects.toThrow('boom');
-
+    expect(lines).toEqual([`error: ${err.message}`]);
+    expect(thrown).toBeInstanceOf(Errors.CLIError);
+    expect(thrown.message).toBe(err.message);
+    expect(thrown.oclif.exit).toBe(exit);
+    expect(thrown.skipOclifErrorHandling).toBe(true);
     expect(instance.error).not.toHaveBeenCalled();
-    expect(process.exitCode).toBe(1);
-    process.exitCode = previousExitCode;
+  });
+
+  it('prints the whole error line in red when the output is a terminal', async () => {
+    stdoutIsTTY(true);
+
+    const { lines } = await caught(new UsageError('No project named "ghost" found in this organization.'));
+
+    expect(lines).toEqual(['\u001b[31merror: No project named "ghost" found in this organization.\u001b[39m']);
+  });
+
+  it('prints an oclif error, such as an unknown flag, the same way and keeps its exit code', async () => {
+    const { lines, thrown } = await caught(new Errors.CLIError('Nonexistent flag: --json', { exit: 2 }));
+
+    expect(lines).toEqual(['error: Nonexistent flag: --json']);
+    expect(thrown.oclif.exit).toBe(2);
+    expect(thrown.skipOclifErrorHandling).toBe(true);
+  });
+
+  it('lets an exit request pass through untouched and prints nothing', async () => {
+    const exit = new Errors.ExitError(3);
+
+    const { lines, thrown } = await caught(exit);
+
+    expect(lines).toEqual([]);
+    expect(thrown).toBe(exit);
+  });
+
+  it('prints an unexpected failure as an error line and exits 1, keeping the stack for DEBUG runs', async () => {
+    const { lines, thrown } = await caught(new Error('boom'));
+
+    expect(lines).toEqual(['error: boom']);
+    expect(thrown.oclif.exit).toBe(1);
+    expect(thrown.skipOclifErrorHandling).toBe(true);
   });
 });
 
@@ -231,15 +251,18 @@ describe('LaunchCommand.confirm', () => {
   it('fails as a usage error without prompting when there is no TTY and no --yes', async () => {
     const { instance, inquired } = gated(false, false);
 
+    const spy = jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+
     const rejection = await instance['confirm']('Delete project "marketing-site"?').catch((err: Error) => err);
-    await instance['catch'](rejection as Error);
+    const reported = (await instance['catch'](rejection as Error).catch((err: unknown) => err)) as Errors.CLIError;
 
     expect(rejection).toBeInstanceOf(UsageError);
     expect(inquired).toEqual([]);
-    expect(instance.error).toHaveBeenCalledWith(
+    expect(reported.message).toBe(
       'Delete project "marketing-site"? Pass --yes to confirm without an interactive terminal.',
-      { exit: 2 },
     );
+    expect(reported.oclif.exit).toBe(2);
+    spy.mockRestore();
   });
 
   it('does not accept a truthy non-boolean yes value as a confirmation', async () => {

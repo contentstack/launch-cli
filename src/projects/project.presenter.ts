@@ -8,7 +8,7 @@ import type { Project } from './types';
 export const PROJECT_COLUMNS: TableColumn<Project>[] = [
   { header: 'NAME', value: (project) => project.name ?? '-' },
   { header: 'TYPE', value: (project) => project.projectType ?? '-' },
-  { header: 'UID', value: (project) => project.uid ?? '-' },
+  { header: 'PROJECT UID', value: (project) => project.uid ?? '-' },
 ];
 
 export const PROJECT_DETAIL_COLUMNS: TableColumn<Project>[] = [

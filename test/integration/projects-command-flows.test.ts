@@ -82,6 +82,7 @@ describe('integration: end-to-end command flows', () => {
       .matchHeader('x-project-uid', PROJECT_UID)
       .get(`/manage/projects/${PROJECT_UID}`)
       .query({})
+      .times(2)
       .reply(200, getFixture);
 
     const { error, stdout } = await runLaunch(['launch:projects:get', '--data-dir', dir]);
@@ -92,7 +93,7 @@ describe('integration: end-to-end command flows', () => {
       [
         `Using the organization and project UIDs from ${join(dir, PROJECT_CONFIG_FILE)}.`,
         '\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510',
-        '\u2502  NAME            \u2502  TYPE         \u2502  UID                       \u2502  DESCRIPTION  \u2502',
+        '\u2502  NAME            \u2502  TYPE         \u2502  PROJECT UID               \u2502  DESCRIPTION  \u2502',
         '\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524',
         '\u2502  sample-project  \u2502  GITPROVIDER  \u2502  a1b2c3d4e5f60718293a4b5c  \u2502  -            \u2502',
         '\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518',
@@ -109,6 +110,7 @@ describe('integration: end-to-end command flows', () => {
       .matchHeader('x-organization-uid', ORG_UID)
       .get(`/manage/projects/${PROJECT_UID}`)
       .query({})
+      .times(2)
       .reply(200, getFixture);
 
     const { error, stdout } = await runLaunch(['launch:projects:get']);
@@ -125,13 +127,14 @@ describe('integration: end-to-end command flows', () => {
       .matchHeader('x-organization-uid', ORG_UID)
       .get(`/manage/projects/${PROJECT_UID}`)
       .query({})
+      .times(2)
       .reply(200, getFixture);
 
     const { error, stdout } = await runLaunch(['launch:projects:get', '--config', path]);
 
     expect(error).toBeUndefined();
     expect(scope.isDone()).toBe(true);
-    expect(stdout).toContain('\u2502  NAME            \u2502  TYPE         \u2502  UID                       \u2502  DESCRIPTION  \u2502');
+    expect(stdout).toContain('\u2502  NAME            \u2502  TYPE         \u2502  PROJECT UID               \u2502  DESCRIPTION  \u2502');
   });
 
   it('prefers an org passed on argv over the one the project folder config holds', async () => {
@@ -142,7 +145,8 @@ describe('integration: end-to-end command flows', () => {
       .matchHeader('x-organization-uid', otherOrg)
       .get(`/manage/projects/${PROJECT_UID}`)
       .query({})
-      .reply(200, getFixture);
+      .times(2)
+      .reply(200, { project: { ...getFixture.project, organizationUid: otherOrg } });
 
     const { error } = await runLaunch(['launch:projects:get', '--data-dir', dir, '--org', otherOrg]);
 
@@ -157,6 +161,7 @@ describe('integration: end-to-end command flows', () => {
       .matchHeader('authorization', `Bearer ${accessToken}`)
       .get(`/manage/projects/${PROJECT_UID}`)
       .query({})
+      .times(2)
       .reply(200, getFixture);
 
     const { error, stdout } = await runLaunch([
@@ -181,6 +186,7 @@ describe('integration: end-to-end command flows', () => {
       .matchHeader('authtoken', (value) => value === undefined)
       .get(`/manage/projects/${PROJECT_UID}`)
       .query({})
+      .times(2)
       .reply(200, getFixture);
 
     const { error } = await runLaunch([
@@ -226,6 +232,7 @@ describe('integration: end-to-end command flows', () => {
       .matchHeader('authorization', `Bearer ${freshToken}`)
       .get(`/manage/projects/${PROJECT_UID}`)
       .query({})
+      .times(2)
       .reply(200, getFixture);
 
     const { error, stdout } = await runLaunch([

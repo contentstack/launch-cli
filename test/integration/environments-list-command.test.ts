@@ -11,11 +11,13 @@ import notFoundFixture from '../fixtures/environment-not-found.json';
 import projectsFixture from '../fixtures/projects-list.json';
 import { stdoutOfWidth } from '../support/terminal';
 import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
+import { projectOwnership } from '../support/project-ownership';
 
 const LAUNCH_HUB_URL = 'https://launch-api.integration.test';
 const ORG_UID = 'blt4d9e2a7c1f6b3085';
 const PROJECT_UID = 'a1b2c3d4e5f60718293a4b5c';
 const ENV_UID = 'd4e5f60718293a4b5c6d7e8f';
+const OTHER_ORG_UID = 'blt0000000000000000';
 const DATA_DIR = tmpdir();
 
 const CONFIG: Record<string, unknown> = {
@@ -75,6 +77,8 @@ describe('integration: launch:env commands driven through oclif runCommand', () 
     const restoreWidth = stdoutOfWidth(200);
 
     try {
+      projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
+      projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
       const scope = environmentsOfProject();
 
       const { error, stdout } = await runCommand(
@@ -100,6 +104,7 @@ describe('integration: launch:env commands driven through oclif runCommand', () 
       .get('/manage/projects')
       .query({ limit: '100', skip: '0' })
       .reply(200, projectsFixture);
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
     const scope = environmentsOfProject();
 
     const { error } = await runCommand(
@@ -110,6 +115,21 @@ describe('integration: launch:env commands driven through oclif runCommand', () 
     expect(error).toBeUndefined();
     expect(lookup.isDone()).toBe(true);
     expect(scope.isDone()).toBe(true);
+  });
+
+  it('exits 2 with a generic not-found, and lists nothing, when the project belongs to another org', async () => {
+    const ownership = projectOwnership(LAUNCH_HUB_URL, OTHER_ORG_UID, PROJECT_UID);
+    const listing = nock(LAUNCH_HUB_URL).get(`/manage/projects/${PROJECT_UID}/environments`).query(true).reply(200, listFixture);
+
+    const { error } = await runCommand(
+      ['launch:env:list', '--org', OTHER_ORG_UID, '--project', PROJECT_UID, '--data-dir', DATA_DIR],
+      config,
+    );
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe(`No project with UID "${PROJECT_UID}" found in this organization.`);
+    expect(ownership.isDone()).toBe(true);
+    expect(listing.isDone()).toBe(false);
   });
 
   it('exits 2 naming --project when it is missing and there is no terminal to prompt on', async () => {
@@ -123,6 +143,8 @@ describe('integration: launch:env commands driven through oclif runCommand', () 
     const restoreWidth = stdoutOfWidth(200);
 
     try {
+      projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
+      projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
       const scan = environmentsOfProject();
       const fetch = nock(LAUNCH_HUB_URL)
         .matchHeader('x-organization-uid', ORG_UID)
@@ -152,6 +174,8 @@ describe('integration: launch:env commands driven through oclif runCommand', () 
   });
 
   it('exits 1 with the CLI wording when the environment does not exist', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
     nock(LAUNCH_HUB_URL)
       .get(`/manage/projects/${PROJECT_UID}/environments/${ENV_UID}`)
       .reply(404, notFoundFixture);
@@ -166,6 +190,7 @@ describe('integration: launch:env commands driven through oclif runCommand', () 
   });
 
   it('exits 2 when no environment of the project carries the --env name, sending no environment GET', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
     const scan = environmentsOfProject();
     const fetch = nock(LAUNCH_HUB_URL).get(new RegExp(`/environments/[0-9a-f]{24}$`)).reply(200, getFixture);
 
@@ -181,6 +206,7 @@ describe('integration: launch:env commands driven through oclif runCommand', () 
   });
 
   it('exits 2 naming --env when it is missing and there is no terminal to prompt on', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
     const { error } = await runCommand(
       ['launch:env:get', '--org', ORG_UID, '--project', PROJECT_UID, '--data-dir', DATA_DIR],
       config,

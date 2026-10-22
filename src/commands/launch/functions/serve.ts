@@ -1,6 +1,7 @@
 import { Command } from '@oclif/core';
 
 import { EXIT_RUNTIME, EXIT_USAGE } from '../../../core/constants';
+import { failureOutputOf, reportFailure } from '../../../core/failure';
 import Contentfly from '../../../functions';
 import { PortInUseError } from '../../../functions/function.errors';
 import { isValidPort, serveFlags } from '../../../functions/function.inputs';
@@ -49,5 +50,9 @@ export default class Functions extends Command {
 
       throw error;
     }
+  }
+
+  protected async catch(err: Error): Promise<unknown> {
+    return reportFailure(err, failureOutputOf((original) => super.catch(original)));
   }
 }

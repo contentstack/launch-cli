@@ -68,7 +68,8 @@ function commandUnderTest(
 
 function fakeServices() {
   const ux: UxLike = { print: () => undefined, inquire: async () => undefined as never };
-  return { api: {} as ApiSurface, ux, isTTY: false };
+  const projects = { get: async () => ({ uid: PROJECT_UID, organizationUid: 'org1' }) };
+  return { api: { projects } as unknown as ApiSurface, ux, isTTY: false };
 }
 
 describe('launch:projects:update', () => {

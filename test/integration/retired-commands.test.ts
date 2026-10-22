@@ -60,6 +60,12 @@ describe('integration: retired V1 command names', () => {
     nock.cleanAll();
   });
 
+  it('prints a retired name once as a lowercase error line, the same shape as every other error', async () => {
+    const { stderr } = await runCommand(['launch:environments'], config);
+
+    expect(stderr).toBe('error: csdx launch:environments was removed in Launch CLI v2. Use csdx launch:env:list instead.\n');
+  });
+
   it('exits 2 naming the three V2 create commands for the bare launch name', async () => {
     const { error } = await runCommand(['launch'], config);
 

@@ -127,7 +127,7 @@ export function renderTable<T>(
   outputIsTTY = false,
 ): void {
   if (rows.length === 0) {
-    ux.print('No records found.');
+    ux.print(styled('No records found.', 'yellow', outputIsTTY));
     return;
   }
 

@@ -7,6 +7,7 @@ import nock from 'nock';
 
 import { CTRL_C, answerPrompts, onTerminal, pretendTerminal } from '../support/terminal';
 import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
+import { projectOwnership } from '../support/project-ownership';
 
 import getFixture from '../fixtures/project-get.json';
 import listFixture from '../fixtures/projects-list.json';
@@ -67,6 +68,7 @@ describe('integration: launch:projects:delete on the wire', () => {
   });
 
   it('deletes the project and reports it when --yes is given', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
     const lookup = nock(LAUNCH_HUB_URL).get(`/manage/projects/${PROJECT_UID}`).query({}).reply(200, getFixture);
     const removal = nock(LAUNCH_HUB_URL, BODYLESS).delete(`/manage/projects/${PROJECT_UID}`).query({}).reply(204);
 
@@ -103,6 +105,7 @@ describe('integration: launch:projects:delete on the wire', () => {
   });
 
   it('exits 2 naming --yes, and never sends the delete, without a terminal and without --yes', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
     const lookup = nock(LAUNCH_HUB_URL).get(`/manage/projects/${PROJECT_UID}`).query({}).reply(200, getFixture);
     const removal = nock(LAUNCH_HUB_URL, BODYLESS).delete(`/manage/projects/${PROJECT_UID}`).query({}).reply(204);
 
@@ -143,6 +146,7 @@ describe('integration: launch:projects:delete on the wire', () => {
   });
 
   it('says the project was not deleted, exits 3 and never sends the delete when the user declines the prompt', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
     const lookup = nock(LAUNCH_HUB_URL).get(`/manage/projects/${PROJECT_UID}`).query({}).reply(200, getFixture);
     const removal = nock(LAUNCH_HUB_URL, BODYLESS).delete(`/manage/projects/${PROJECT_UID}`).query({}).reply(204);
     const restore = pretendTerminal();
@@ -178,6 +182,7 @@ describe('integration: launch:projects:delete on the wire', () => {
   });
 
   it('exits 3 as cancelled, not 130, and never sends the delete when Ctrl-C is pressed at the confirmation', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
     const lookup = nock(LAUNCH_HUB_URL).get(`/manage/projects/${PROJECT_UID}`).query({}).reply(200, getFixture);
     const removal = nock(LAUNCH_HUB_URL, BODYLESS).delete(`/manage/projects/${PROJECT_UID}`).query({}).reply(204);
     const question = 'Are you sure you want to delete this project?';
@@ -212,6 +217,7 @@ describe('integration: launch:projects:delete on the wire', () => {
   });
 
   it('exits 1 when the API refuses the delete for want of permission', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
     nock(LAUNCH_HUB_URL).get(`/manage/projects/${PROJECT_UID}`).query({}).reply(200, getFixture);
     nock(LAUNCH_HUB_URL, BODYLESS)
       .delete(`/manage/projects/${PROJECT_UID}`)

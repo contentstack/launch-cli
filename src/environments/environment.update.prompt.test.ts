@@ -57,7 +57,7 @@ describe('promptForEnvironmentUpdate', () => {
 
     await promptForEnvironmentUpdate(services, githubContext());
 
-    expect(SETTINGS_QUESTION).toBe('Which settings do you want to change?');
+    expect(SETTINGS_QUESTION).toBe('Select the fields to update:');
     expect(asked[0]).toEqual({
       type: 'checkbox',
       name: 'value',

@@ -13,9 +13,14 @@ const PRIMARY_UID = randomBytes(12).toString('hex');
 const SECOND_UID = randomBytes(12).toString('hex');
 const HEX_NAME = randomBytes(12).toString('hex');
 
-function fakePages(pages: FakeProject[][], totalCount = pages.reduce((total, page) => total + page.length, 0)) {
+function fakePages(
+  pages: FakeProject[][],
+  totalCount = pages.reduce((total, page) => total + page.length, 0),
+  owningOrg = 'org1',
+) {
   const pageCalls: unknown[] = [];
   const fetchedPages: number[] = [];
+  const getCalls: unknown[] = [];
   const projects: ProjectPages = {
     pages: async function* (params: unknown) {
       pageCalls.push(params);
@@ -24,15 +29,24 @@ function fakePages(pages: FakeProject[][], totalCount = pages.reduce((total, pag
         yield { pagination: { count: totalCount, limit: 100, skip: null }, projects: pages[index] } as ProjectsPage;
       }
     },
+    get: async (params) => {
+      getCalls.push(params);
+      return { uid: params.project, organizationUid: owningOrg };
+    },
   };
 
-  return { projects, pageCalls, fetchedPages };
+  return { projects, pageCalls, fetchedPages, getCalls };
+}
+
+function projectIn(organizationUid: string): ProjectPages {
+  return fakePages([], 0, organizationUid).projects;
 }
 
 function failingPages(failure: Error): ProjectPages {
   return {
     pages: () =>
       ({ [Symbol.asyncIterator]: () => ({ next: () => Promise.reject(failure) }) }) as unknown as AsyncGenerator<ProjectsPage>,
+    get: () => Promise.reject(failure),
   };
 }
 
@@ -51,14 +65,23 @@ describe('ProjectResolver', () => {
     );
   });
 
-  it('returns a uid reference without calling the API at all', async () => {
-    const { projects, pageCalls } = fakePages([]);
+  it('rejects a uid reference whose project belongs to another organization without naming the owner', async () => {
+    const projects = projectIn('org-owner');
+
+    await expect(new ProjectResolver(projects).toUid('org-other', ResourceRef.parse(PRIMARY_UID))).rejects.toThrow(
+      new UsageError(`No project with UID "${PRIMARY_UID}" found in this organization.`),
+    );
+  });
+
+  it('returns a uid reference once the project is confirmed to belong to the organization, without paging', async () => {
+    const { projects, pageCalls, getCalls } = fakePages([]);
 
     await expect(new ProjectResolver(projects).toUid('org1', ResourceRef.parse(PRIMARY_UID))).resolves.toBe(PRIMARY_UID);
+    expect(getCalls).toEqual([{ org: 'org1', project: PRIMARY_UID }]);
     expect(pageCalls).toEqual([]);
   });
 
-  it('returns an uppercase uid reference unchanged and without calling the API', async () => {
+  it('returns an uppercase uid reference unchanged and without paging', async () => {
     const { projects, pageCalls } = fakePages([]);
     const upper = PRIMARY_UID.toUpperCase();
 
@@ -161,6 +184,20 @@ describe('ProjectResolver', () => {
     await expect(resolver.toUid('org1', ResourceRef.parse('marketing-site'))).rejects.toThrow(
       'No project named "marketing-site" found in this organization.',
     );
+  });
+
+  it('propagates an api failure raised while fetching a project by uid', async () => {
+    const failure = new LaunchApiError(404, [{ code: 'launch.PROJECTS.NOT_FOUND' }]);
+
+    await expect(new ProjectResolver(failingPages(failure)).toUid('org1', ResourceRef.parse(PRIMARY_UID))).rejects.toBe(
+      failure,
+    );
+  });
+
+  it('accepts a uid reference when the API does not report the project organization', async () => {
+    const projects = { ...fakePages([]).projects, get: async () => ({ uid: PRIMARY_UID }) };
+
+    await expect(new ProjectResolver(projects).toUid('org1', ResourceRef.parse(PRIMARY_UID))).resolves.toBe(PRIMARY_UID);
   });
 
   it('propagates an api failure raised while paging the organization projects', async () => {

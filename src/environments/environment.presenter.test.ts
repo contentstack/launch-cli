@@ -3,6 +3,7 @@ import {
   ENVIRONMENT_DELETE_QUESTION,
   ENVIRONMENT_DETAIL_COLUMNS,
   ENVIRONMENT_VALUE_COLUMN,
+  environmentColumns,
   environmentDeletedLine,
   environmentDetailRows,
   environmentNoChangesLine,
@@ -34,6 +35,10 @@ const FULL = {
 };
 
 describe('ENVIRONMENT_COLUMNS', () => {
+  it('labels the uid column as the environment uid', () => {
+    expect(ENVIRONMENT_COLUMNS.map((column) => column.header)).toEqual(['NAME', 'BRANCH', 'URL', 'UPDATED', 'ENVIRONMENT UID']);
+  });
+
   it('renders every list column of a full environment', () => {
     expect(ENVIRONMENT_COLUMNS.map((column) => column.value(FULL))).toEqual([
       'production',
@@ -52,10 +57,25 @@ describe('ENVIRONMENT_COLUMNS', () => {
   });
 });
 
+describe('environmentColumns', () => {
+  it('keeps every list column when the branch is shown', () => {
+    expect(environmentColumns(true)).toEqual(ENVIRONMENT_COLUMNS);
+  });
+
+  it('drops the branch column when the branch is not shown', () => {
+    expect(environmentColumns(false).map((column) => column.header)).toEqual([
+      'NAME',
+      'URL',
+      'UPDATED',
+      'ENVIRONMENT UID',
+    ]);
+  });
+});
+
 describe('environmentDetailRows', () => {
   it('lists every field in the agreed order, booleans as enabled or disabled and variables as a bare count', () => {
     expect(environmentDetailRows(FULL)).toEqual([
-      { field: 'UID', value: 'e1' },
+      { field: 'ENVIRONMENT UID', value: 'e1' },
       { field: 'NAME', value: 'production' },
       { field: 'DESCRIPTION', value: 'the live site' },
       { field: 'BRANCH', value: 'main' },
@@ -69,8 +89,8 @@ describe('environmentDetailRows', () => {
       { field: 'CONTENTSTACK AUTHENTICATION', value: 'disabled' },
       { field: 'PASSWORD PROTECTION', value: 'disabled' },
       { field: 'URL', value: 'https://a.io, https://b.io' },
-      { field: 'ORGANIZATION', value: 'blt0rg' },
-      { field: 'PROJECT', value: 'p1' },
+      { field: 'ORGANIZATION UID', value: 'blt0rg' },
+      { field: 'PROJECT UID', value: 'p1' },
       { field: 'CREATED AT', value: '2026-08-01T00:00:00.000Z' },
       { field: 'UPDATED AT', value: '2026-09-01T00:00:00.000Z' },
     ]);
@@ -108,6 +128,13 @@ describe('environmentDetailRows', () => {
     [{ name: '  ' }, 'NAME', '-'],
   ])('renders %p as %s = %p', (environment, field, value) => {
     expect(environmentDetailRows(environment).find((row) => row.field === field)?.value).toBe(value);
+  });
+
+  it('leaves the branch out when asked not to show it', () => {
+    const fields = environmentDetailRows(FULL, false).map((row) => row.field);
+
+    expect(fields).not.toContain('BRANCH');
+    expect(fields).toContain('ENVIRONMENT UID');
   });
 
   it('never renders a variable key or value', () => {

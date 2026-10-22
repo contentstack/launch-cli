@@ -1,7 +1,7 @@
 import { LaunchCommand } from '../../../core/launch-command';
 import { flagsFor, inputs } from '../../../core/inputs';
 import { renderPagination, renderTable } from '../../../core/render';
-import { ENVIRONMENT_COLUMNS } from '../../../environments/environment.presenter';
+import { environmentColumns } from '../../../environments/environment.presenter';
 
 const listInputs = inputs({ org: { required: true }, project: { required: true }, limit: {}, skip: {} });
 
@@ -15,16 +15,15 @@ export default class EnvironmentsList extends LaunchCommand<typeof listInputs> {
   static flags = flagsFor(listInputs);
 
   async run(): Promise<void> {
-    const page = await this.services.api.environments.list({
-      org: this.resolved.org,
-      project: this.resolved.project,
-      limit: this.resolved.limit,
-      skip: this.resolved.skip,
-    });
+    const scope = { org: this.resolved.org, project: this.resolved.project };
+    const [page, project] = await Promise.all([
+      this.services.api.environments.list({ ...scope, limit: this.resolved.limit, skip: this.resolved.skip }),
+      this.services.api.projects.get(scope),
+    ]);
 
     renderTable(
       this.ux,
-      ENVIRONMENT_COLUMNS,
+      environmentColumns(project.projectType !== 'FILEUPLOAD'),
       page.environments,
       process.stdout.columns,
       undefined,

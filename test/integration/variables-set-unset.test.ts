@@ -12,6 +12,7 @@ import cmsFixture from '../fixtures/cms-environment-variables.json';
 import getFixture from '../fixtures/environment-get.json';
 import { answerPrompts, onTerminal } from '../support/terminal';
 import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
+import { projectOwnership } from '../support/project-ownership';
 
 const LAUNCH_HUB_URL = 'https://launch-api.integration.test';
 const ORG_UID = 'blt4d9e2a7c1f6b3085';
@@ -110,6 +111,7 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
     routeConsoleLogToStdout();
     jest.spyOn(configHandler, 'get').mockImplementation((key: string) => CONFIG[key]);
     jest.spyOn(authHandler, 'compareOAuthExpiry').mockResolvedValue(undefined);
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID).persist();
   });
 
   afterEach(() => {
