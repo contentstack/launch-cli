@@ -144,10 +144,11 @@ src/
   stacks/       the Contentstack stack and delivery-token lookups behind --from-stack, through the
                 CmaSession (no Launch endpoint)
   variables/    the shared variable-source resolver (--var, --dotenv, --from-stack, a detected .env file), the
-                read-modify-write writer behind launch:variables:set / :unset, and the masked
-                presenter behind :list. It has no repository of its own: it reads and writes through
-                environments, and reads the stack template through its own VariablesApi. EnvironmentBuilder calls back into it for the create commands, so the
-                two folders each name the other in the layering allow-list
+                writer behind launch:variables:set / :unset, and the masked presenter behind :list. Its
+                VariablesApi owns the per-variable PATCH and the stack template read; the
+                pre-confirmation read for unset and the list read go through environments.
+                EnvironmentBuilder calls back into it for the create commands, so the two folders
+                each name the other in the layering allow-list
   deployments/  the deployment repository, the status classification, the
                 wait/stream loop and LogTail that projects:create, deployments:create
                 and logs:get all drive, and the DeploymentFollower that watches one
@@ -321,14 +322,16 @@ the yellow `Project not deleted.` and exits 3 (`EXIT_CANCELLED`) without the `Er
 `CancelledError` would print; Ctrl-C at the question is still a `CancelledError`. The success line is
 the green `✔ Project deleted successfully.`, matching `projects:update`.
 
-**Environment variables (`launch:variables:*`).** There is no per-variable endpoint, so `set` and `unset`
-are `GET .../environments/:uid`, merge locally, then `PUT` the complete `environmentVariables` array and
-nothing else: the update body is partial on the server, so no other environment field can be dropped by it.
-Every source is resolved and every value prompted for before the `GET`, so no user interaction sits between
-the read and the write; `unset` reads once to validate the keys and name the environment, confirms, then
-reads again immediately before the `PUT`. Two writers racing lose one change - the API offers no ETag and no
-partial update (CL-7179 is the proposed `PATCH`) - and FR34 asks that this be documented rather than treated
-as a defect.
+**Environment variables (`launch:variables:*`).** `set` and `unset` call the per-variable
+`PATCH .../environments/:uid/variables` (`VariablesApi.patch`, CL-7179) with a body of `{set: [{key, value}]}`
+or `{unset: [key]}`, never both, so the CLI no longer reads the environment to merge and cannot overwrite a
+concurrent change to another key. The server merges under a compare-and-swap and its response carries keys
+only, which the CLI ignores. `unset` still reads the environment once, before it asks, to name it in the
+question and to refuse a key that is not set with exit 2 before any prompt; a key that disappears after that
+read comes back as 404 `KEY.NOT_FOUND`, which `VariablesApi.patch` rewords to the same not-set usage error
+(`variable.errors.ts`). A 409 `CONCURRENT_UPDATE` (the server gave up after its retries) exits 1 with advice to run the
+command again; `PATCH_EMPTY` and `CONFLICTING_KEYS` cannot be sent by this CLI and read as a CLI bug. A PUT or
+a UI save racing a PATCH is still last-writer-wins on the whole array, by design on the server.
 
 `collectVariables` in `src/variables/variable.sources.ts` is the one resolver: stack (`--from-stack`), then
 `--dotenv`, then `--var`, later wins, and the summary line names every source's new keys and every override.
@@ -339,7 +342,7 @@ prints a yellow `Skipped adding variables.` and sends nothing (sources that supp
 under `--data-dir`, always printing the file it chose, and fails with exit 2 when there is none. A bare `--var KEY` is a hidden prompt on a terminal, a stdin read for exactly one bare key without one, and
 exit 2 naming `--dotenv -` for two or more. The API refuses an empty value, so `KEY=` is a usage error naming
 the key, and an empty value inside a dotenv file is skipped with its key reported. No value reaches stdout, a
-prompt message, a confirmation or an error: `list` masks through `redactedColumn`, and a failed `PUT` is worded from
+prompt message, a confirmation or an error: `list` masks through `redactedColumn`, and a failed `PATCH` is worded from
 `ENVIRONMENT_ERROR_MESSAGES`, never from the API's own text.
 
 `projects:create` and `env:create` take `--var` and `--dotenv` and reach the same resolver through

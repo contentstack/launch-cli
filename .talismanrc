@@ -231,7 +231,7 @@ fileignoreconfig:
     - "a project name passed on argv to the project resolver"
     - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
 - filename: AGENTS.md
-  checksum: ace82b5dc26aa4b681378ef313ed3e5eeb2a5d7f3ab47d6305dc9c97e885f244
+  checksum: 66b94ec2bcb34947bcda15e6364dceee7edb50bfe851e26e6c737425315e81da
   allowed_patterns:
     - "Do not add an exemption to a guard to make a new file pass"
     - "passes its own error wording to `client.request\\(req, MESSAGES\\)`"
@@ -315,7 +315,7 @@ fileignoreconfig:
 - filename: src/commands/launch/env/delete.test.ts
   checksum: 14116789eb5f9000f2a7d6f569cd15aabf2a1ec3b127ed4427afe13fd515f0c2
 - filename: src/environments/environment.errors.ts
-  checksum: 37256331379dfda26ae10a3bc46399a716fb2740151d47b34f0f8eaeeeef48da
+  checksum: 3e17db3577ba944633f97063d208bdec57c833d4b6c38e203796a9fea43baacc
 - filename: src/core/prompt.ts
   checksum: 3285bdbccc31cba5b50eafe8ed8be4750af6339078a3eaee6df1e0630979aa2c
 - filename: src/core/prompt.test.ts
@@ -337,9 +337,9 @@ fileignoreconfig:
 - filename: src/commands/launch/variables/list.test.ts
   checksum: 87ccb762f4931326fc50bca1c01aeb4a16d552e4dfa141d00370fdfafa4363be
 - filename: src/commands/launch/variables/set.test.ts
-  checksum: 5f8029b2d49410dd59576b6bda5a2ad5cb452703fa1bf6fd4690f2ac356abea5
+  checksum: a6fc222527e946aee1c0015e3961bc3dff13aabec40c2162e7d2d3f2bb2d2cde
 - filename: src/commands/launch/variables/unset.test.ts
-  checksum: 857da0c6e10243477aa78cd112a126770f679b75b7b67eab929eeb2f76a41c9d
+  checksum: 709e849b1ef834bdc433936438110ff3f79b8cc0e7bec0f505c56ffd4f67bd8b
 - filename: src/commands/launch/variables/unset.ts
   checksum: b25c2b1547a1ed5b216c57b26bc18744ad04746e01efcc40e9469d1a5e472537
 - filename: src/environments/environment.errors.test.ts
@@ -356,6 +356,8 @@ fileignoreconfig:
   checksum: c3d5e33189736bb42b7c4fac7375cf0307681b34feca4830b49331f55a130f78
 - filename: src/variables/variable.dotenv.ts
   checksum: 337273d2ce8d987a6e7cf6a0f743df5031c24ac719cbe31e99fff16d7ffefa79
+- filename: src/variables/variable.errors.ts
+  checksum: f66b960365b83561f70b5fcef521bcc8a00d99b4415fb6a5df5bcf752a91d480
 - filename: src/variables/variable.files.test.ts
   checksum: d8b0efd6bb448c4d501ba52c47119b352ef29d6b5b66cec0e7d373a0ce91a36c
 - filename: src/variables/variable.inputs.test.ts
@@ -377,7 +379,7 @@ fileignoreconfig:
 - filename: src/variables/variable.presenter.ts
   checksum: ee8e4dcf75ad7e849d1e8e64ce6a6549d13fc62dc9aa322d96eb2e725d629db5
 - filename: src/variables/variable.set.test.ts
-  checksum: 68bd428a7f0a26e495cd9f79779cbc9fb5017cdee684594e90a983ea14303a62
+  checksum: df7d36ff83d1489301afad5418ebe76338adb7bcad51d1e738f989362be46903
 - filename: src/variables/variable.sources.test.ts
   checksum: 63ad95e998cbc6d33fabe4ce76797e8788b17abec3833b4fed2360eab01a6f79
 - filename: src/variables/variable.sources.ts
@@ -391,25 +393,25 @@ fileignoreconfig:
 - filename: src/variables/variable.summary.ts
   checksum: 0da287557a5c4280074d1a26aeff4f7d95b205e4266ff47c18b62665134f5bdc
 - filename: src/variables/variable.unset.test.ts
-  checksum: ef31b77f66913a10f1b865b7a6568bef71ff02803c6636971605b840b489671f
+  checksum: d449ba8483eeb932c155b2b210ce2088785d0961680eaa3efd036553c46579e2
 - filename: src/variables/variable.unset.ts
-  checksum: 250ce39c694d745370717771dc16d20e2f6b9516f43043900d4a40bde7fc04db
+  checksum: 0d21f5878aa1f05dcafc864dd7dcb23e3155d3d24b97e248e62ad9bf5bcd7745
 - filename: src/variables/variable.values.test.ts
   checksum: 56725066fdabce3afea373c70bee10a6db4c1409e3a8f6f1e7f191ea6e602419
 - filename: src/variables/variable.values.ts
   checksum: 70f23d8c993b0f0baf6522a918b2f011485a5d9c038548f06dea6ea1d0e83e0e
 - filename: src/variables/variable.writer.test.ts
-  checksum: 7dcd68d3c1b0df258fa86455b1d02547255be8fe77b656b3a7188824225220ab
+  checksum: 7991a4ba0c58f187dfebf01092642459ce89b297f453159ca8e0953a2ee7e2b8
 - filename: src/variables/variable.writer.ts
-  checksum: a6fc266af2bae734ff1bb716c854a154b5c3e858a0ba2798fc17d5bdbdfde1b9
+  checksum: 11acfccfad30b66a44954e97127d2a7bcebdb80f92299da6d645ac847c97192a
 - filename: src/variables/variables.api.test.ts
-  checksum: 33d41fb8383e0908260ca3df1d126227e614330acde0c6f195b877245e51cfd6
+  checksum: e716f85c2d97aadf95088cf7cf49cb46354d2581f8ed6e194cb0af876c65fb01
 - filename: src/variables/variables.api.ts
-  checksum: 2fca1f8fc784d5f859b13a24bd3cd09bda7aa92e7b3d65c0ecc92d4c0de954fa
+  checksum: 1b5a93e17fc1cc338afd5a3fc24a6ee444f551037c54797453481855e3300807
 - filename: test/fixtures/cms-environment-variables.json
   checksum: cb2cbb2d1d858b1cf2115c218a0ecca04ce04baf054fe11fe6123589c1afce27
 - filename: test/integration/variables-list.test.ts
   checksum: c0ccb0bc394c9013f75b69c4354cc5d52b2f6916a35af902de36bef1cda1648c
 - filename: test/integration/variables-set-unset.test.ts
-  checksum: f211ebcf35f39b26e5a55d81f468287670ade819899c6635a579b4eae68b1c50
+  checksum: 25ae86d9a50f02c5209823a91ae0ff1433e5a0bff3cfa27f84e48274d0e9c571
 version: "1.0"
