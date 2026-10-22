@@ -5,6 +5,7 @@ function commandUnderTest(
   page: unknown,
   resolved: Record<string, unknown> = { org: 'org1', project: 'proj1', limit: 50, skip: 0 },
   answer: () => Promise<unknown> = async () => page,
+  projectType = 'GITPROVIDER',
 ) {
   const lines: string[] = [];
   const ux: UxLike = {
@@ -23,6 +24,7 @@ function commandUnderTest(
       ux,
       isTTY: false,
       api: {
+        projects: { get: async () => ({ uid: 'proj1', projectType }) },
         environments: {
           list: async (params: unknown) => {
             listed.push(params);
@@ -54,9 +56,21 @@ describe('launch:env:list', () => {
     await command.run();
 
     expect(listed).toEqual([{ org: 'org1', project: 'proj1', limit: 50, skip: 0 }]);
-    expect(lines[1]).toBe('│  NAME        │  BRANCH  │  URL           │  UPDATED     │  UID  │');
-    expect(lines[3]).toBe('│  production  │  main    │  https://a.io  │  2026-09-01  │  e1   │');
+    expect(lines[1]).toBe('│  NAME        │  BRANCH  │  URL           │  UPDATED     │  ENVIRONMENT UID  │');
+    expect(lines[3]).toBe('│  production  │  main    │  https://a.io  │  2026-09-01  │  e1               │');
     expect(lines[5]).toBe('Showing 1-1 of 1');
+  });
+
+  it('leaves the branch column out for a file-upload project', async () => {
+    const page = {
+      pagination: { count: 1, limit: 50, skip: 0 },
+      environments: [{ uid: 'e1', name: 'production', domains: [{ url: 'https://a.io' }], updatedAt: '2026-09-01' }],
+    };
+    const { command, lines } = commandUnderTest(page, undefined, undefined, 'FILEUPLOAD');
+
+    await command.run();
+
+    expect(lines[1]).toBe('│  NAME        │  URL           │  UPDATED     │  ENVIRONMENT UID  │');
   });
 
   it('shows the first domain that carries a url, skipping domains without one', async () => {
@@ -75,7 +89,7 @@ describe('launch:env:list', () => {
 
     await command.run();
 
-    expect(lines[3]).toBe('│  production  │  main    │  https://a.io  │  2026-09-01  │  e1   │');
+    expect(lines[3]).toBe('│  production  │  main    │  https://a.io  │  2026-09-01  │  e1               │');
   });
 
   it.each([[{}], [{ domains: [] }], [{ domains: [{ url: '  ' }] }]])(
@@ -85,8 +99,8 @@ describe('launch:env:list', () => {
 
       await command.run();
 
-      expect(lines[1]).toBe('│  NAME  │  BRANCH  │  URL  │  UPDATED  │  UID  │');
-      expect(lines[3]).toBe('│  -     │  -       │  -    │  -        │  -    │');
+      expect(lines[1]).toBe('│  NAME  │  BRANCH  │  URL  │  UPDATED  │  ENVIRONMENT UID  │');
+      expect(lines[3]).toBe('│  -     │  -       │  -    │  -        │  -                │');
     },
   );
 

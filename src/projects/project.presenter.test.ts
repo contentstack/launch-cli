@@ -1,4 +1,5 @@
 import {
+  PROJECT_COLUMNS,
   PROJECT_DELETE_QUESTION,
   deploymentFailureMessage,
   projectDeletedLine,
@@ -6,6 +7,12 @@ import {
   projectNotUpdatedLine,
   projectUpdatedLine,
 } from './project.presenter';
+
+describe('PROJECT_COLUMNS', () => {
+  it('labels the uid column as the project uid', () => {
+    expect(PROJECT_COLUMNS.map((column) => column.header)).toEqual(['NAME', 'TYPE', 'PROJECT UID']);
+  });
+});
 
 describe('PROJECT_DELETE_QUESTION', () => {
   it('asks for confirmation without naming the project', () => {

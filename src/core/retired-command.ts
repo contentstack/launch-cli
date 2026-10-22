@@ -1,6 +1,7 @@
 import { Command } from '@oclif/core';
 
 import { EXIT_USAGE } from './constants';
+import { failureOutputOf, reportFailure } from './failure';
 
 export function retirementMessage(name: string, replacements: readonly string[]): string {
   const named = replacements.map((replacement) => `csdx ${replacement}`);
@@ -19,5 +20,9 @@ export abstract class RetiredCommand extends Command {
     const contract = this.constructor as typeof RetiredCommand;
 
     this.error(retirementMessage(contract.retiredName, contract.replacements), { exit: EXIT_USAGE });
+  }
+
+  protected async catch(err: Error): Promise<unknown> {
+    return reportFailure(err, failureOutputOf((original) => super.catch(original)));
   }
 }

@@ -47,6 +47,14 @@ describe('renderTable', () => {
     expect(lines).toEqual(['No records found.']);
   });
 
+  it('prints the no-rows placeholder in yellow when the output is a terminal', () => {
+    const { ux, lines } = fakeUx();
+
+    renderTable(ux, [{ header: 'UID', value: (row: { uid: string }) => row.uid }], [], undefined, undefined, true);
+
+    expect(lines).toEqual(['\u001b[33mNo records found.\u001b[39m']);
+  });
+
   it('boxes a single column', () => {
     const { ux, lines } = fakeUx();
 

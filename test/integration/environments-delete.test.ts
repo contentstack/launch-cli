@@ -7,6 +7,7 @@ import nock from 'nock';
 
 import { answerPrompts, onTerminal } from '../support/terminal';
 import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
+import { projectOwnership } from '../support/project-ownership';
 
 import getFixture from '../fixtures/environment-get.json';
 import listFixture from '../fixtures/environments-list.json';
@@ -42,6 +43,7 @@ function deleteArgs(...extra: string[]): string[] {
 }
 
 function lookupAndRemoval(status = 200, body: unknown = getFixture) {
+  projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
   const lookup = nock(LAUNCH_HUB_URL)
     .matchHeader('x-project-uid', PROJECT_UID)
     .get(ENV_PATH)

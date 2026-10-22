@@ -8,6 +8,7 @@ import nock from 'nock';
 
 import { pretendTerminal } from '../support/terminal';
 import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
+import { projectOwnership } from '../support/project-ownership';
 
 import getFixture from '../fixtures/project-get.json';
 import listFixture from '../fixtures/projects-list.json';
@@ -144,6 +145,7 @@ describe('integration: the organization prompt', () => {
       .matchHeader('x-organization-uid', ORG_UID)
       .get(`/manage/projects/${PROJECT_UID}`)
       .query({})
+      .times(2)
       .reply(200, getFixture);
 
     const { error, stdout } = await onTerminal([
@@ -165,6 +167,7 @@ describe('integration: the organization prompt', () => {
     useSession(session());
     const inquired = answering([ORG_UID]);
     nock(CMA_URL).get('/v3/organizations').query(ORGANIZATION_QUERY).reply(200, ORGANIZATIONS);
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
     const update = nock(LAUNCH_HUB_URL)
       .matchHeader('x-organization-uid', ORG_UID)
       .put(`/manage/projects/${PROJECT_UID}`, { name: 'Renamed Site' })
@@ -195,6 +198,7 @@ describe('integration: the organization prompt', () => {
       .matchHeader('x-organization-uid', ORG_UID)
       .get(`/manage/projects/${PROJECT_UID}`)
       .query({})
+      .times(2)
       .reply(200, getFixture);
     const remove = nock(LAUNCH_HUB_URL, { badheaders: ['content-type'] })
       .matchHeader('x-organization-uid', ORG_UID)

@@ -8,6 +8,7 @@ import nock from 'nock';
 
 import { answerPrompts, onTerminal } from '../support/terminal';
 import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
+import { projectOwnership } from '../support/project-ownership';
 
 import getFixture from '../fixtures/environment-get.json';
 import projectFixture from '../fixtures/project-get.json';
@@ -41,6 +42,8 @@ function updateArgs(...extra: string[]): string[] {
 }
 
 function reads(project: unknown = projectFixture) {
+  projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
+
   return [
     nock(LAUNCH_HUB_URL).get(`/manage/projects/${PROJECT_UID}`).reply(200, project as nock.Body),
     nock(LAUNCH_HUB_URL).get(ENV_PATH).reply(200, getFixture),
@@ -111,7 +114,8 @@ describe('integration: launch:env:update on the wire', () => {
     expect(onWire).toEqual([]);
   });
 
-  it('exits 2 naming the updatable flags and sends nothing when none was supplied', async () => {
+  it('exits 2 naming the updatable flags and sends no update when none was supplied', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
     const { error } = await runCommand(updateArgs(), config);
 
     expect(error?.oclif?.exit).toBe(2);
@@ -184,12 +188,12 @@ describe('integration: launch:env:update on the wire', () => {
     const sent: unknown[] = [];
     reads();
     const put = update(sent);
-    const prompts = answerPrompts({ 'Which settings do you want to change?': ['name'], Name: 'renamed' });
+    const prompts = answerPrompts({ 'Select the fields to update:': ['name'], Name: 'renamed' });
 
     const { error, stdout } = await onTerminal(() => runCommand(updateArgs(), config));
 
     expect(error).toBeUndefined();
-    expect(prompts.messages).toEqual(['Which settings do you want to change?', 'Name']);
+    expect(prompts.messages).toEqual(['Select the fields to update:', 'Name']);
     expect(prompts.payloads[0].type).toBe('checkbox');
     expect(put.isDone()).toBe(true);
     expect(sent).toEqual([{ name: 'renamed' }]);
@@ -199,7 +203,7 @@ describe('integration: launch:env:update on the wire', () => {
   it('says nothing changed, exits 0 and sends no PUT when every ticked setting keeps its value', async () => {
     reads();
     const put = update([]);
-    answerPrompts({ 'Which settings do you want to change?': ['name'], Name: 'production' });
+    answerPrompts({ 'Select the fields to update:': ['name'], Name: 'production' });
 
     const { error, stdout } = await onTerminal(() => runCommand(updateArgs(), config));
 

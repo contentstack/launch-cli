@@ -32,8 +32,12 @@ export const ENVIRONMENT_COLUMNS: TableColumn<Environment>[] = [
   { header: 'BRANCH', value: (environment) => text(environment.gitBranch) },
   { header: 'URL', value: (environment) => text(urlsOf(environment)[0]) },
   { header: 'UPDATED', value: (environment) => text(environment.updatedAt) },
-  { header: 'UID', value: (environment) => text(environment.uid) },
+  { header: 'ENVIRONMENT UID', value: (environment) => text(environment.uid) },
 ];
+
+export function environmentColumns(showBranch: boolean): TableColumn<Environment>[] {
+  return showBranch ? ENVIRONMENT_COLUMNS : ENVIRONMENT_COLUMNS.filter((column) => column.header !== 'BRANCH');
+}
 
 export const ENVIRONMENT_DETAIL_COLUMNS: TableColumn<DetailRow>[] = [
   { header: 'FIELD', value: (row) => row.field },
@@ -42,9 +46,9 @@ export const ENVIRONMENT_DETAIL_COLUMNS: TableColumn<DetailRow>[] = [
 
 export const ENVIRONMENT_VALUE_COLUMN = 1;
 
-export function environmentDetailRows(environment: Environment): DetailRow[] {
-  return [
-    { field: 'UID', value: text(environment.uid) },
+export function environmentDetailRows(environment: Environment, showBranch = true): DetailRow[] {
+  const rows: DetailRow[] = [
+    { field: 'ENVIRONMENT UID', value: text(environment.uid) },
     { field: 'NAME', value: text(environment.name) },
     { field: 'DESCRIPTION', value: text(environment.description) },
     { field: 'BRANCH', value: text(environment.gitBranch) },
@@ -58,11 +62,13 @@ export function environmentDetailRows(environment: Environment): DetailRow[] {
     { field: 'CONTENTSTACK AUTHENTICATION', value: toggle(environment.isContentstackAuthenticationEnabled) },
     { field: 'PASSWORD PROTECTION', value: toggle(environment.passwordProtection?.isEnabled) },
     { field: 'URL', value: text(urlsOf(environment).join(', ')) },
-    { field: 'ORGANIZATION', value: text(environment.organizationUid) },
-    { field: 'PROJECT', value: text(environment.project) },
+    { field: 'ORGANIZATION UID', value: text(environment.organizationUid) },
+    { field: 'PROJECT UID', value: text(environment.project) },
     { field: 'CREATED AT', value: text(environment.createdAt) },
     { field: 'UPDATED AT', value: text(environment.updatedAt) },
   ];
+
+  return showBranch ? rows : rows.filter((row) => row.field !== 'BRANCH');
 }
 
 export const ENVIRONMENT_DELETE_QUESTION = 'Are you sure you want to delete this environment?';

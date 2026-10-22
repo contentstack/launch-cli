@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 
-// eslint-disable-next-line unicorn/prefer-top-level-await
 (async () => {
   const oclif = await import('@oclif/core');
-  await oclif.execute({ development: false, dir: __dirname });
+  const { handleStandaloneFailure } = require('../dist/core/failure');
+
+  await oclif
+    .run(process.argv.slice(2), __dirname)
+    .then(() => oclif.flush())
+    .catch(handleStandaloneFailure);
 })();

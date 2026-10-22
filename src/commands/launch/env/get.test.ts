@@ -1,7 +1,7 @@
 import type { UxLike } from '../../../core/prompt';
 import EnvironmentsGet from './get';
 
-function commandUnderTest(answer: () => Promise<unknown>) {
+function commandUnderTest(answer: () => Promise<unknown>, projectType = 'GITPROVIDER') {
   const lines: string[] = [];
   const ux: UxLike = {
     print: (message: string) => {
@@ -20,6 +20,7 @@ function commandUnderTest(answer: () => Promise<unknown>) {
       isTTY: false,
       outputIsTTY: false,
       api: {
+        projects: { get: async () => ({ uid: 'proj1', projectType }) },
         environments: {
           get: async (params: unknown) => {
             fetched.push(params);
@@ -41,9 +42,18 @@ describe('launch:env:get', () => {
 
     expect(fetched).toEqual([{ org: 'org1', project: 'proj1', environment: 'env1' }]);
     expect(lines[1]).toBe('│  FIELD                        │  VALUE       │');
-    expect(lines[3]).toBe('│  UID                          │  env1        │');
+    expect(lines[3]).toBe('│  ENVIRONMENT UID              │  env1        │');
     expect(lines[5]).toBe('│  NAME                         │  production  │');
     expect(lines).toHaveLength(39);
+  });
+
+  it('leaves the branch row out for an environment of a file-upload project', async () => {
+    const { command, lines } = commandUnderTest(async () => ({ uid: 'env1', gitBranch: 'main' }), 'FILEUPLOAD');
+
+    await command.run();
+
+    expect(lines.some((line) => line.includes('BRANCH'))).toBe(false);
+    expect(lines).toHaveLength(37);
   });
 
   it('propagates a failed lookup', async () => {

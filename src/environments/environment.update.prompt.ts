@@ -16,7 +16,7 @@ import type { EnvironmentUpdateRequest } from './environment.update';
 import { FRAMEWORK_CHOICES, SERVER_COMMAND_FRAMEWORKS } from './frameworks';
 import type { Environment } from './types';
 
-export const SETTINGS_QUESTION = 'Which settings do you want to change?';
+export const SETTINGS_QUESTION = 'Select the fields to update:';
 
 export type EnvironmentChanges = Partial<
   Pick<

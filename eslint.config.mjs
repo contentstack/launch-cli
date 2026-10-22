@@ -16,6 +16,19 @@ export default tseslint.config(
     },
   },
   {
+    files: ['bin/**/*.js'],
+    languageOptions: {
+      globals: {
+        require: 'readonly',
+        process: 'readonly',
+        __dirname: 'readonly',
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+  {
     files: ['src/**/*.{js,ts}', 'test/**/*.{js,ts}'],
     rules: {
       '@typescript-eslint/interface-name-prefix': 'off',

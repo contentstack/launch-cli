@@ -35,6 +35,7 @@ function recordingServices(seen: unknown[]) {
         seen.push(params.org);
         yield { pagination: { count: 1, limit: 1, skip: null }, projects: [{ uid: PROJECT_UID, name: 'Project One' }] };
       },
+      get: async (params: { org: string; project: string }) => ({ uid: params.project, organizationUid: params.org }),
     },
   } as unknown as ApiSurface;
 
@@ -61,6 +62,7 @@ function services(overrides: Partial<{ isTTY: boolean; answer: unknown }> = {}) 
             projects: [{ uid: PROJECT_UID, name: 'Project One' }],
           };
         },
+        get: async (params: { org: string; project: string }) => ({ uid: params.project, organizationUid: params.org }),
       },
     } as unknown as ApiSurface,
     ux,
@@ -341,6 +343,7 @@ describe('resolveInputs', () => {
             projects: [{ uid: PROJECT_UID, name: 'Project One' }],
           };
         },
+        get: async (params: { org: string; project: string }) => ({ uid: params.project, organizationUid: params.org }),
       },
     } as unknown as ApiSurface;
 
@@ -375,6 +378,7 @@ describe('resolveInputs', () => {
             projects: [{ uid: PROJECT_UID, name: 'Project One' }],
           };
         },
+        get: async (params: { org: string; project: string }) => ({ uid: params.project, organizationUid: params.org }),
       },
     } as unknown as ApiSurface;
 
@@ -474,6 +478,7 @@ describe('resolveInputs', () => {
             projects: [{ uid: PROJECT_UID, name: 'Project One' }],
           };
         },
+        get: async (params: { org: string; project: string }) => ({ uid: params.project, organizationUid: params.org }),
       },
     } as unknown as ApiSurface;
 
