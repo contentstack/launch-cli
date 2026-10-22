@@ -1,7 +1,12 @@
+import { randomUUID } from 'node:crypto';
 import { EXIT_RUNTIME } from '../core/constants';
 import type { CmaCollection, CmaSession } from '../transport/cma-client';
 import { StackLookupError } from './stack.errors';
 import { StacksApi } from './stacks.api';
+
+const TOKEN_A = `cs-${randomUUID()}`;
+const TOKEN_B = `cs-${randomUUID()}`;
+const TOKEN_C = `cs-${randomUUID()}`;
 
 function session(stacks: CmaCollection | Error, tokens: CmaCollection | Error) {
   const asked: { stacks: string[]; tokens: string[] } = { stacks: [], tokens: [] };
@@ -63,15 +68,15 @@ describe('stacks api', () => {
       {},
       {
         items: [
-          { name: 'prod-token', token: 'cs-aaa', scope: [{ module: 'environment', environments: [{ name: 'production' }, { name: 'staging' }] }] },
-          { name: 'dev-token', token: 'cs-bbb', scope: [{ module: 'environment', environments: [{ name: 'development' }] }] },
+          { name: 'prod-token', token: TOKEN_A, scope: [{ module: 'environment', environments: [{ name: 'production' }, { name: 'staging' }] }] },
+          { name: 'dev-token', token: TOKEN_B, scope: [{ module: 'environment', environments: [{ name: 'development' }] }] },
         ],
       },
     );
 
     await expect(api.deliveryTokens('blt1')).resolves.toEqual([
-      { name: 'prod-token', token: 'cs-aaa', environment: 'production' },
-      { name: 'dev-token', token: 'cs-bbb', environment: 'development' },
+      { name: 'prod-token', token: TOKEN_A, environment: 'production' },
+      { name: 'dev-token', token: TOKEN_B, environment: 'development' },
     ]);
     expect(asked.tokens).toEqual(['blt1']);
   });
@@ -85,20 +90,20 @@ describe('stacks api', () => {
     [[{ module: 'environment', environments: [{}] }]],
     [[null, 'text']],
   ])('leaves the environment unset when the token scope names none (%p)', async (scope) => {
-    const { api } = session({}, { items: [{ name: 'prod-token', token: 'cs-aaa', scope }] });
+    const { api } = session({}, { items: [{ name: 'prod-token', token: TOKEN_A, scope }] });
 
-    await expect(api.deliveryTokens('blt1')).resolves.toEqual([{ name: 'prod-token', token: 'cs-aaa', environment: undefined }]);
+    await expect(api.deliveryTokens('blt1')).resolves.toEqual([{ name: 'prod-token', token: TOKEN_A, environment: undefined }]);
   });
 
   it('skips a token with no value and names one by its position when it has no name', async () => {
     const { api } = session(
       {},
-      { items: [{ name: 'no-value' }, { token: 'cs-bbb' }, { name: 'blank', token: ' ' }, null, { name: 'ok', token: 'cs-ccc' }] },
+      { items: [{ name: 'no-value' }, { token: TOKEN_B }, { name: 'blank', token: ' ' }, null, { name: 'ok', token: TOKEN_C }] },
     );
 
     await expect(api.deliveryTokens('blt1')).resolves.toEqual([
-      { name: 'Delivery token 2', token: 'cs-bbb', environment: undefined },
-      { name: 'ok', token: 'cs-ccc', environment: undefined },
+      { name: 'Delivery token 2', token: TOKEN_B, environment: undefined },
+      { name: 'ok', token: TOKEN_C, environment: undefined },
     ]);
   });
 

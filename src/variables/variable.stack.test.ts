@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { configHandler } from '@contentstack/cli-utilities';
 
 import { CancelledError, UsageError } from '../core/errors';
@@ -8,6 +9,12 @@ import { StackLookupError } from '../stacks/stack.errors';
 import type { StackTemplateEntry } from './variables.api';
 import { importFromStack, readSavedToken } from './variable.stack';
 import type { SavedToken } from './variable.stack';
+
+const PROD_TOKEN = `cs-${randomUUID()}`;
+const DEV_TOKEN = `cs-${randomUUID()}`;
+const SAVED_TOKEN = `cs-${randomUUID()}`;
+const LOOSE_TOKEN = `cs-${randomUUID()}`;
+const OTHER_TOKEN = `cs-${randomUUID()}`;
 
 const TEMPLATE: StackTemplateEntry[] = [
   { key: 'CONTENTSTACK_API_HOST', value: 'https://api.example.test' },
@@ -23,8 +30,8 @@ const STACKS: Stack[] = [
 ];
 
 const TOKENS: DeliveryToken[] = [
-  { name: 'prod-token', token: 'cs-prod-value', environment: 'production' },
-  { name: 'dev-token', token: 'cs-dev-value', environment: 'development' },
+  { name: 'prod-token', token: PROD_TOKEN, environment: 'production' },
+  { name: 'dev-token', token: DEV_TOKEN, environment: 'development' },
 ];
 
 interface Scenario {
@@ -88,7 +95,7 @@ function fakes(scenario: Scenario = {}) {
   return { services, calls, printed, prompts };
 }
 
-const SAVED: SavedToken = { token: 'cs-saved-value', apiKey: 'blt9', environment: 'staging' };
+const SAVED: SavedToken = { token: SAVED_TOKEN, apiKey: 'blt9', environment: 'staging' };
 
 function saved(entries: Record<string, SavedToken | undefined>) {
   const asked: string[] = [];
@@ -115,13 +122,13 @@ describe('variable stack import with --alias', () => {
       { key: 'CONTENTSTACK_API_HOST', value: 'api.example.test' },
       { key: 'CONTENTSTACK_CDN', value: 'cdn.example.test' },
       { key: 'CONTENTSTACK_API_KEY', value: 'blt9' },
-      { key: 'CONTENTSTACK_DELIVERY_TOKEN', value: 'cs-saved-value' },
+      { key: 'CONTENTSTACK_DELIVERY_TOKEN', value: SAVED_TOKEN },
       { key: 'CONTENTSTACK_ENVIRONMENT', value: 'staging' },
     ]);
     expect(asked).toEqual(['my-prod']);
     expect(calls).toEqual(['template:org1']);
     expect(printed).toEqual(['Using the saved delivery token "my-prod" (environment staging).']);
-    expect(printed.join('\n')).not.toContain('cs-saved-value');
+    expect(printed.join('\n')).not.toContain(SAVED_TOKEN);
   });
 
   it('omits the host and CDN when the template carries no value for them', async () => {
@@ -144,7 +151,7 @@ describe('variable stack import with --alias', () => {
     await importFromStack({ org: 'org1', alias: 'a' }, { services, savedToken });
 
     expect(printed).toContain('No value was available for CONTENTSTACK_CDN, so it was not imported.');
-    expect(printed.join('\n')).not.toContain('cs-saved-value');
+    expect(printed.join('\n')).not.toContain(SAVED_TOKEN);
   });
 
   it('keeps a host that is not a url as it is and reduces a url to its host and port', async () => {
@@ -245,7 +252,7 @@ describe('variable stack import without --alias', () => {
       { key: 'CONTENTSTACK_API_HOST', value: 'api.example.test' },
       { key: 'CONTENTSTACK_CDN', value: 'cdn.example.test' },
       { key: 'CONTENTSTACK_API_KEY', value: 'blt2' },
-      { key: 'CONTENTSTACK_DELIVERY_TOKEN', value: 'cs-prod-value' },
+      { key: 'CONTENTSTACK_DELIVERY_TOKEN', value: PROD_TOKEN },
       { key: 'CONTENTSTACK_ENVIRONMENT', value: 'production' },
     ]);
     expect(prompts[0].payload).toMatchObject({
@@ -262,13 +269,13 @@ describe('variable stack import without --alias', () => {
       ],
     });
     expect(printed).toEqual(['Using delivery token "prod-token" of stack "Blog" (environment production).']);
-    expect(JSON.stringify({ printed, prompts })).not.toContain('cs-prod-value');
+    expect(JSON.stringify({ printed, prompts })).not.toContain(PROD_TOKEN);
   });
 
   it('offers a token with no environment without the parenthesis and then refuses it', async () => {
     const { services, prompts } = fakes({
       answers: { Stack: '0', 'Delivery token': '0' },
-      tokens: [{ name: 'loose', token: 'cs-loose', environment: undefined }],
+      tokens: [{ name: 'loose', token: LOOSE_TOKEN, environment: undefined }],
     });
 
     await expect(importFromStack({ org: 'org1' }, { services, savedToken: NOTHING_SAVED })).rejects.toThrow(
@@ -341,16 +348,16 @@ describe('readSavedToken', () => {
   }
 
   it('reads the token csdx auth:tokens:add saved under the alias', () => {
-    const asked = configHolding({ 'my-prod': { token: 'cs-x', apiKey: 'blt1', environment: 'production', type: 'delivery' } });
+    const asked = configHolding({ 'my-prod': { token: OTHER_TOKEN, apiKey: 'blt1', environment: 'production', type: 'delivery' } });
 
-    expect(readSavedToken('my-prod')).toEqual({ token: 'cs-x', apiKey: 'blt1', environment: 'production', type: 'delivery' });
+    expect(readSavedToken('my-prod')).toEqual({ token: OTHER_TOKEN, apiKey: 'blt1', environment: 'production', type: 'delivery' });
     expect(asked).toEqual(['tokens']);
   });
 
   it('leaves the environment and type unset when the entry has none', () => {
-    configHolding({ a: { token: 'cs-x', apiKey: 'blt1' } });
+    configHolding({ a: { token: OTHER_TOKEN, apiKey: 'blt1' } });
 
-    expect(readSavedToken('a')).toEqual({ token: 'cs-x', apiKey: 'blt1', environment: undefined, type: undefined });
+    expect(readSavedToken('a')).toEqual({ token: OTHER_TOKEN, apiKey: 'blt1', environment: undefined, type: undefined });
   });
 
   it.each([
@@ -358,10 +365,10 @@ describe('readSavedToken', () => {
     [null],
     ['text'],
     [{}],
-    [{ token: 'cs-x' }],
+    [{ token: OTHER_TOKEN }],
     [{ apiKey: 'blt1' }],
     [{ token: '', apiKey: 'blt1' }],
-    [{ token: 'cs-x', apiKey: '  ' }],
+    [{ token: OTHER_TOKEN, apiKey: '  ' }],
   ])('reports no saved token for an entry of %p', (entry) => {
     configHolding({ a: entry });
 
@@ -369,12 +376,12 @@ describe('readSavedToken', () => {
   });
 
   it('finds an alias that contains a dot', () => {
-    configHolding({ 'prod.eu': { token: 'cs-x', apiKey: 'blt1' } });
+    configHolding({ 'prod.eu': { token: OTHER_TOKEN, apiKey: 'blt1' } });
 
-    expect(readSavedToken('prod.eu')).toEqual({ token: 'cs-x', apiKey: 'blt1', environment: undefined, type: undefined });
+    expect(readSavedToken('prod.eu')).toEqual({ token: OTHER_TOKEN, apiKey: 'blt1', environment: undefined, type: undefined });
   });
 
-  it.each([[undefined], [null], ['text'], [{}], [{ other: { token: 'cs-x', apiKey: 'blt1' } }]])(
+  it.each([[undefined], [null], ['text'], [{}], [{ other: { token: OTHER_TOKEN, apiKey: 'blt1' } }]])(
     'reports no saved token when the tokens config holds %p',
     (tokens) => {
       configHolding(tokens);

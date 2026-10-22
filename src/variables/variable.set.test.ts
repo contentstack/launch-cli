@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,6 +10,8 @@ import type { Environment, EnvironmentUpdate } from '../environments/types';
 import { DEFAULT_VARIABLE_IO } from './variable.io';
 import { VariableSetter } from './variable.set';
 import type { SavedToken } from './variable.stack';
+
+const SECRET_TOKEN = `cs-${randomUUID()}`;
 
 const SCOPE = { org: 'org1', project: 'proj1', environment: 'env1' };
 
@@ -195,7 +198,7 @@ describe('variable setter with --from-stack', () => {
 
   it('imports through the saved token under the alias for the same organization, merges it in and names the stack', async () => {
     const { setter, printed, templateAsked, aliasAsked, updates } = stackSetter({
-      token: 'cs-secret-token',
+      token: SECRET_TOKEN,
       apiKey: 'blt9',
       environment: 'staging',
     });
@@ -208,7 +211,7 @@ describe('variable setter with --from-stack', () => {
       { key: 'KEEP', value: 'k' },
       { key: 'CONTENTSTACK_API_HOST', value: 'api.example.test' },
       { key: 'CONTENTSTACK_API_KEY', value: 'blt9' },
-      { key: 'CONTENTSTACK_DELIVERY_TOKEN', value: 'cs-secret-token' },
+      { key: 'CONTENTSTACK_DELIVERY_TOKEN', value: SECRET_TOKEN },
       { key: 'CONTENTSTACK_ENVIRONMENT', value: 'staging' },
     ]);
     expect(printed).toEqual([
@@ -216,7 +219,7 @@ describe('variable setter with --from-stack', () => {
       'No value was available for CONTENTSTACK_CDN, so it was not imported.',
       '\u2714 4 variables set \u2014 4 from stack',
     ]);
-    expect(printed.join('\n')).not.toContain('cs-secret-token');
+    expect(printed.join('\n')).not.toContain(SECRET_TOKEN);
   });
 
   it('writes nothing when the alias has no saved token', async () => {

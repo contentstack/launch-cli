@@ -345,13 +345,13 @@ fileignoreconfig:
 - filename: src/environments/environment.errors.test.ts
   checksum: 33ae71db0a46173c903659438a77d1d441797a8296e0591dbaa48512f32a4cab
 - filename: src/stacks/stacks.api.test.ts
-  checksum: db0c613f10361fa6aafa71cc09d217a3c5a7f924523901469b174807b7b9b237
+  checksum: 67e00bd82b3c3a96c05585f36a3c3ace7f06eff535bc347fe9937033775cf5cc
 - filename: src/stacks/stacks.api.ts
   checksum: 7241b9c2c6e946c11849bb5fb21842c03eca09f9ed6c901be198fd544ce8f769
 - filename: src/variables/variable.chooser.ts
   checksum: 15a6b8a1a974c8d0396ac18d8c9d39c8bc9f70efbf41ce0eef79180ce16b2f04
 - filename: src/variables/variable.create.test.ts
-  checksum: 48b9864639a01e05b8c6de9ce5ef1abad7ba990ecfbe7f47d0df3d3e759344b8
+  checksum: 71dbed4ca09e86e761026955c7865f12e4f168e3afcf4c4ef664d3de319a2697
 - filename: src/variables/variable.dotenv.test.ts
   checksum: c3d5e33189736bb42b7c4fac7375cf0307681b34feca4830b49331f55a130f78
 - filename: src/variables/variable.dotenv.ts
@@ -377,13 +377,13 @@ fileignoreconfig:
 - filename: src/variables/variable.presenter.ts
   checksum: ee8e4dcf75ad7e849d1e8e64ce6a6549d13fc62dc9aa322d96eb2e725d629db5
 - filename: src/variables/variable.set.test.ts
-  checksum: f6a59e15775ea4247ec3860d4d3fad495b1624ed8a9d834c79a3fcc3033df58e
+  checksum: 68bd428a7f0a26e495cd9f79779cbc9fb5017cdee684594e90a983ea14303a62
 - filename: src/variables/variable.sources.test.ts
   checksum: 63ad95e998cbc6d33fabe4ce76797e8788b17abec3833b4fed2360eab01a6f79
 - filename: src/variables/variable.sources.ts
   checksum: c2c7e442c6fed29b11843850ad86c8603540fcc174e1fac79993c8e26d95e8dc
 - filename: src/variables/variable.stack.test.ts
-  checksum: 75db498059c80145ed72ef4ec4c3e787cca31ab1e7e41ad563ec90fa6dfc035d
+  checksum: d221484c0709aeb6de9359f533ee79d73513a878cace0a6247439917d658ce4f
 - filename: src/variables/variable.stack.ts
   checksum: 0c5116d39bacccdb6e813357dd091e90274383761832f19d3a9b5433a21d99ae
 - filename: src/variables/variable.summary.test.ts
