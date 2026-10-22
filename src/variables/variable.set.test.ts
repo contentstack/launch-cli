@@ -6,7 +6,7 @@ import { Readable } from 'node:stream';
 
 import type { UxLike } from '../core/prompt';
 import type { ServiceContext } from '../core/service-context';
-import type { Environment, EnvironmentUpdate } from '../environments/types';
+import type { PatchVariablesParams } from './variables.api';
 import { DEFAULT_VARIABLE_IO } from './variable.io';
 import { VariableSetter } from './variable.set';
 import type { SavedToken } from './variable.stack';
@@ -16,14 +16,13 @@ const SECRET_TOKEN = `cs-${randomUUID()}`;
 const SCOPE = { org: 'org1', project: 'proj1', environment: 'env1' };
 
 function fakes(
-  held: Environment = { environmentVariables: [{ key: 'KEEP', value: 'k' }] },
   files: Record<string, string> = {},
   answers?: Record<string, unknown>,
 ) {
   const asked: { message: string; payload: Record<string, unknown> }[] = [];
   const printed: string[] = [];
   const order: string[] = [];
-  const updates: unknown[] = [];
+  const patches: PatchVariablesParams[] = [];
   const ux: UxLike = {
     print: (message: string) => {
       printed.push(message);
@@ -38,16 +37,10 @@ function fakes(
     isTTY: answers !== undefined,
     outputIsTTY: false,
     api: {
-      environments: {
-        get: async (params: unknown) => {
-          order.push('get');
-          updates.push(params);
-          return held;
-        },
-        update: async (params: { update: EnvironmentUpdate }) => {
-          order.push('update');
-          updates.push(params);
-          return { ...held, environmentVariables: params.update.environmentVariables };
+      variables: {
+        patch: async (params: PatchVariablesParams) => {
+          order.push('patch');
+          patches.push(params);
         },
       },
     },
@@ -66,43 +59,31 @@ function fakes(
     readStdin: async () => '',
   };
 
-  return { printed, order, updates, asked, setter: new VariableSetter(services, io) };
+  return { printed, order, patches, asked, setter: new VariableSetter(services, io) };
 }
 
 describe('variable setter', () => {
-  it('gathers every source before it reads the environment, then reads, writes and prints the provenance', async () => {
-    const { setter, order, printed, updates } = fakes(undefined, { 'a.env': 'FROM_FILE=1' });
+  it('gathers every source first, then patches only the variables it gathered and prints the provenance', async () => {
+    const { setter, order, printed, patches } = fakes({ 'a.env': 'FROM_FILE=1' });
 
     await setter.set({ ...SCOPE, vars: ['TYPED=2'], envFiles: ['a.env'], dataDir: '/work' });
 
-    expect(order).toEqual(['read:a.env', 'get', 'update']);
-    expect(updates[1]).toEqual({
-      ...SCOPE,
-      update: {
-        environmentVariables: [
-          { key: 'KEEP', value: 'k' },
-          { key: 'FROM_FILE', value: '1' },
-          { key: 'TYPED', value: '2' },
-        ],
-      },
-    });
+    expect(order).toEqual(['read:a.env', 'patch']);
+    expect(patches).toEqual([{ ...SCOPE, set: [{ key: 'FROM_FILE', value: '1' }, { key: 'TYPED', value: '2' }] }]);
     expect(printed).toEqual(['✔ 2 variables set — 1 from a.env, 1 from --var']);
   });
 
   it('auto-detects a file under the data directory when no source is given and names it', async () => {
-    const { setter, printed, updates } = fakes(undefined, { '/work/.env.local': 'A=1' });
+    const { setter, printed, patches } = fakes({ '/work/.env.local': 'A=1' });
 
     await setter.set({ ...SCOPE, vars: undefined, envFiles: undefined, dataDir: '/work' });
 
     expect(printed).toEqual(['Using variables from /work/.env.local.', '✔ 1 variable set — 1 from /work/.env.local']);
-    expect((updates[1] as { update: EnvironmentUpdate }).update.environmentVariables).toEqual([
-      { key: 'KEEP', value: 'k' },
-      { key: 'A', value: '1' },
-    ]);
+    expect(patches).toEqual([{ ...SCOPE, set: [{ key: 'A', value: '1' }] }]);
   });
 
   it('prints no changes made and never reads the environment when the sources hold nothing', async () => {
-    const { setter, printed, order } = fakes(undefined, { 'empty.env': '# nothing' });
+    const { setter, printed, order } = fakes({ 'empty.env': '# nothing' });
 
     await setter.set({ ...SCOPE, vars: undefined, envFiles: ['empty.env'], dataDir: '/work' });
 
@@ -111,7 +92,7 @@ describe('variable setter', () => {
   });
 
   it('names an override in the summary', async () => {
-    const { setter, printed } = fakes(undefined, { 'a.env': 'API_URL=file' });
+    const { setter, printed } = fakes({ 'a.env': 'API_URL=file' });
 
     await setter.set({ ...SCOPE, vars: ['API_URL=typed'], envFiles: ['a.env'], dataDir: '/work' });
 
@@ -136,23 +117,20 @@ describe('variable setter', () => {
         isTTY: false,
         outputIsTTY: false,
         api: {
-          environments: {
-            get: async () => ({}),
-            update: async () => Promise.reject(new Error('update failed')),
-          },
+          variables: { patch: async () => Promise.reject(new Error('patch failed')) },
         },
       } as unknown as ServiceContext,
       { readFile: async () => '', exists: () => false, readStdin: async () => '' },
     );
 
     await expect(failing.set({ ...SCOPE, vars: ['A=1'], envFiles: undefined, dataDir: '/work' })).rejects.toThrow(
-      'update failed',
+      'patch failed',
     );
     expect(printed).toEqual([]);
   });
 
   it('never prints a value', async () => {
-    const { setter, printed } = fakes(undefined, { 'a.env': 'A=never-printed-value' });
+    const { setter, printed } = fakes({ 'a.env': 'A=never-printed-value' });
 
     await setter.set({ ...SCOPE, vars: ['B=another_secret'], envFiles: ['a.env'], dataDir: '/work' });
 
@@ -166,7 +144,7 @@ describe('variable setter with --from-stack', () => {
     const printed: string[] = [];
     const templateAsked: string[] = [];
     const aliasAsked: string[] = [];
-    const updates: unknown[] = [];
+    const patches: PatchVariablesParams[] = [];
     const services = {
       ux: { print: (message: string) => printed.push(message), inquire: async () => undefined as never },
       isTTY: false,
@@ -177,12 +155,8 @@ describe('variable setter with --from-stack', () => {
             templateAsked.push(org);
             return [{ key: 'CONTENTSTACK_API_HOST', value: 'api.example.test' }];
           },
-        },
-        environments: {
-          get: async () => ({ environmentVariables: [{ key: 'KEEP', value: 'k' }] }),
-          update: async (params: unknown) => {
-            updates.push(params);
-            return {};
+          patch: async (params: PatchVariablesParams) => {
+            patches.push(params);
           },
         },
       },
@@ -193,11 +167,11 @@ describe('variable setter with --from-stack', () => {
       return saved;
     });
 
-    return { setter, printed, templateAsked, aliasAsked, updates };
+    return { setter, printed, templateAsked, aliasAsked, patches };
   }
 
   it('imports through the saved token under the alias for the same organization, merges it in and names the stack', async () => {
-    const { setter, printed, templateAsked, aliasAsked, updates } = stackSetter({
+    const { setter, printed, templateAsked, aliasAsked, patches } = stackSetter({
       token: SECRET_TOKEN,
       apiKey: 'blt9',
       environment: 'staging',
@@ -207,8 +181,7 @@ describe('variable setter with --from-stack', () => {
 
     expect(aliasAsked).toEqual(['my-prod']);
     expect(templateAsked).toEqual(['org1']);
-    expect((updates[0] as { update: { environmentVariables: unknown } }).update.environmentVariables).toEqual([
-      { key: 'KEEP', value: 'k' },
+    expect(patches[0].set).toEqual([
       { key: 'CONTENTSTACK_API_HOST', value: 'api.example.test' },
       { key: 'CONTENTSTACK_API_KEY', value: 'blt9' },
       { key: 'CONTENTSTACK_DELIVERY_TOKEN', value: SECRET_TOKEN },
@@ -223,22 +196,22 @@ describe('variable setter with --from-stack', () => {
   });
 
   it('writes nothing when the alias has no saved token', async () => {
-    const { setter, printed, updates } = stackSetter(undefined);
+    const { setter, printed, patches } = stackSetter(undefined);
 
     await expect(
       setter.set({ ...SCOPE, vars: undefined, envFiles: undefined, dataDir: '/work', fromStack: true, alias: 'gone' }),
     ).rejects.toThrow('No delivery token is saved as "gone".');
-    expect(updates).toEqual([]);
+    expect(patches).toEqual([]);
     expect(printed).toEqual([]);
   });
 
   it('refuses --from-stack without --alias when there is no terminal, writing nothing', async () => {
-    const { setter, updates } = stackSetter(undefined);
+    const { setter, patches } = stackSetter(undefined);
 
     await expect(
       setter.set({ ...SCOPE, vars: undefined, envFiles: undefined, dataDir: '/work', fromStack: true }),
     ).rejects.toThrow("--from-stack requires --alias when there's no TTY.");
-    expect(updates).toEqual([]);
+    expect(patches).toEqual([]);
   });
 });
 
@@ -289,7 +262,7 @@ describe('default variable io', () => {
     const TYPED = 'Type KEY=VALUE pairs';
 
     it('offers the three sources, with no Skip, on a terminal when no source flag was given', async () => {
-      const { setter, asked } = fakes(undefined, {}, { 'Add variables from': [] });
+      const { setter, asked } = fakes({}, { 'Add variables from': [] });
 
       await setter.set({ ...SCOPE, vars: undefined, envFiles: undefined, dataDir: '/work' });
 
@@ -306,7 +279,7 @@ describe('default variable io', () => {
     });
 
     it('names the detected dotenv file in its choice', async () => {
-      const { setter, asked } = fakes(undefined, { '/work/.env.local': 'A=1' }, { 'Add variables from': [] });
+      const { setter, asked } = fakes({ '/work/.env.local': 'A=1' }, { 'Add variables from': [] });
 
       await setter.set({ ...SCOPE, vars: undefined, envFiles: undefined, dataDir: '/work' });
 
@@ -316,7 +289,7 @@ describe('default variable io', () => {
     });
 
     it('says it skipped adding variables, and never reads the environment, when nothing is ticked', async () => {
-      const { setter, printed, order } = fakes(undefined, {}, { 'Add variables from': [] });
+      const { setter, printed, order } = fakes({}, { 'Add variables from': [] });
 
       await setter.set({ ...SCOPE, vars: undefined, envFiles: undefined, dataDir: '/work' });
 
@@ -325,8 +298,7 @@ describe('default variable io', () => {
     });
 
     it('sets what the ticked sources supply and prints the provenance', async () => {
-      const { setter, printed, updates, order } = fakes(
-        undefined,
+      const { setter, printed, patches, order } = fakes(
         { '/work/.env.local': 'FROM_FILE=1' },
         {
           'Add variables from': [FILE, TYPED],
@@ -337,9 +309,8 @@ describe('default variable io', () => {
 
       await setter.set({ ...SCOPE, vars: undefined, envFiles: undefined, dataDir: '/work' });
 
-      expect(order).toEqual(['read:/work/.env.local', 'get', 'update']);
-      expect((updates[1] as { update: EnvironmentUpdate }).update.environmentVariables).toEqual([
-        { key: 'KEEP', value: 'k' },
+      expect(order).toEqual(['read:/work/.env.local', 'patch']);
+      expect(patches[0].set).toEqual([
         { key: 'FROM_FILE', value: '1' },
         { key: 'TYPED', value: '2' },
       ]);
@@ -351,7 +322,7 @@ describe('default variable io', () => {
       [{ envFiles: ['a.env'] }],
       [{ fromStack: true, alias: 'prod' }],
     ])('does not ask when a source flag was given (%p)', async (flags) => {
-      const { setter, asked } = fakes(undefined, { 'a.env': 'FROM_FILE=1' }, {});
+      const { setter, asked } = fakes({ 'a.env': 'FROM_FILE=1' }, {});
 
       await setter
         .set({ ...SCOPE, vars: undefined, envFiles: undefined, dataDir: '/work', ...flags })

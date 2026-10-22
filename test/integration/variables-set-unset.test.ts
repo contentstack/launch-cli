@@ -38,7 +38,7 @@ const SCOPE = ['--org', ORG_UID, '--project', PROJECT_UID, '--env', ENV_UID];
 
 interface Wire {
   order: string[];
-  put: unknown[];
+  patch: unknown[];
 }
 
 function scopedHub() {
@@ -48,31 +48,39 @@ function scopedHub() {
     .matchHeader('x-cs-api-version', '1.0');
 }
 
-function environmentEndpoints(wire: Wire, putStatus = 200, putBody: unknown = undefined, reads = 1) {
+function patchEndpoint(wire: Wire, status = 200, body: unknown = undefined) {
+  return scopedHub()
+    .patch(`${ENV_PATH}/variables`, (sent) => {
+      wire.order.push('patch');
+      wire.patch.push(sent);
+      return true;
+    })
+    .reply(status, () => {
+      if (body !== undefined) {
+        return body;
+      }
+
+      const sent = wire.patch[wire.patch.length - 1] as { set?: { key: string }[] };
+
+      return {
+        environment: {
+          uid: ENV_UID,
+          updatedAt: getFixture.environment.updatedAt,
+          environmentVariables: (sent.set ?? []).map(({ key }) => ({ key })),
+        },
+      };
+    });
+}
+
+function unsetEndpoints(wire: Wire, status = 200, body: unknown = undefined) {
   scopedHub()
     .get(ENV_PATH)
-    .times(reads)
     .reply(200, () => {
       wire.order.push('get');
       return getFixture;
     });
 
-  return scopedHub()
-    .put(ENV_PATH, (body) => {
-      wire.order.push('put');
-      wire.put.push(body);
-      return true;
-    })
-    .reply(putStatus, () => {
-      if (putBody !== undefined) {
-        return putBody;
-      }
-
-      const [stored] = [getFixture.environment];
-      const sent = wire.put[wire.put.length - 1] as { environmentVariables: unknown[] };
-
-      return { environment: { ...stored, environmentVariables: sent.environmentVariables } };
-    });
+  return patchEndpoint(wire, status, body);
 }
 
 function cmsEndpoint(sent: Wire) {
@@ -86,7 +94,7 @@ function cmsEndpoint(sent: Wire) {
 }
 
 function wire(): Wire {
-  return { order: [], put: [] };
+  return { order: [], patch: [] };
 }
 
 describe('integration: launch:variables:set and :unset driven through oclif runCommand', () => {
@@ -115,9 +123,9 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
     nock.restore();
   });
 
-  it('puts the complete merged array built from a real GET and carries nothing else, so no other field can be dropped', async () => {
+  it('patches only the variables it was given, without reading the environment first', async () => {
     const sent = wire();
-    const scope = environmentEndpoints(sent);
+    const scope = patchEndpoint(sent);
 
     const { error, stdout } = await runCommand(
       ['launch:variables:set', ...SCOPE, '--var', 'API_URL=https://example.test', 'DEBUG=true', '--data-dir', workDir],
@@ -126,14 +134,11 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
 
     expect(error).toBeUndefined();
     expect(scope.isDone()).toBe(true);
-    expect(sent.order).toEqual(['get', 'put']);
-    expect(sent.put).toEqual([
-      {
-        environmentVariables: [
-          ...getFixture.environment.environmentVariables,
-          { key: 'API_URL', value: 'https://example.test' },
-          { key: 'DEBUG', value: 'true' },
-        ],
+    expect(sent.order).toEqual(['patch']);
+    expect(sent.patch).toEqual([
+      { set: [{ key: 'API_URL', value: 'https://example.test' },
+        { key: 'DEBUG', value: 'true' },
+      ],
       },
     ]);
     expect(stdout).toContain('\u2714 2 variables set \u2014 2 from --var');
@@ -143,17 +148,17 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
 
   it('keeps every other variable when a single key is set and replaces a key that already exists', async () => {
     const sent = wire();
-    environmentEndpoints(sent);
+    patchEndpoint(sent);
 
     const { error } = await runCommand(['launch:variables:set', ...SCOPE, '--var', 'key1=changed', '--data-dir', workDir], config);
 
     expect(error).toBeUndefined();
-    expect(sent.put).toEqual([{ environmentVariables: [{ key: 'key1', value: 'changed' }] }]);
+    expect(sent.patch).toEqual([{ set: [{ key: 'key1', value: 'changed' }] }]);
   });
 
   it('stops --var at the next flag so --project is not swallowed as a value', async () => {
     const sent = wire();
-    environmentEndpoints(sent);
+    patchEndpoint(sent);
 
     const { error } = await runCommand(
       ['launch:variables:set', '--org', ORG_UID, '--var', 'A=1', 'B=2', '--project', PROJECT_UID, '--env', ENV_UID, '--data-dir', workDir],
@@ -161,32 +166,29 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
     );
 
     expect(error).toBeUndefined();
-    expect(sent.put).toEqual([
-      { environmentVariables: [...getFixture.environment.environmentVariables, { key: 'A', value: '1' }, { key: 'B', value: '2' }] },
+    expect(sent.patch).toEqual([
+      { set: [{ key: 'A', value: '1' }, { key: 'B', value: '2' }] },
     ]);
   });
 
   it('splits on the first equals sign and keeps a quoted value with a space whole', async () => {
     const sent = wire();
-    environmentEndpoints(sent);
+    patchEndpoint(sent);
 
     const { error } = await runCommand(['launch:variables:set', ...SCOPE, '--var', 'TOKEN=a=b', '"MSG=hello world"', '--data-dir', workDir], config);
 
     expect(error).toBeUndefined();
-    expect(sent.put).toEqual([
-      {
-        environmentVariables: [
-          ...getFixture.environment.environmentVariables,
-          { key: 'TOKEN', value: 'a=b' },
-          { key: 'MSG', value: 'hello world' },
-        ],
+    expect(sent.patch).toEqual([
+      { set: [{ key: 'TOKEN', value: 'a=b' },
+        { key: 'MSG', value: 'hello world' },
+      ],
       },
     ]);
   });
 
   it('reads a named dotenv file, lets --var win a collision and names the override', async () => {
     const sent = wire();
-    environmentEndpoints(sent);
+    patchEndpoint(sent);
     const file = join(workDir, 'staging.env');
     writeFileSync(file, 'API_URL=from-file\nFROM_FILE=1\n');
 
@@ -196,13 +198,10 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
     );
 
     expect(error).toBeUndefined();
-    expect(sent.put).toEqual([
-      {
-        environmentVariables: [
-          ...getFixture.environment.environmentVariables,
-          { key: 'API_URL', value: 'typed' },
-          { key: 'FROM_FILE', value: '1' },
-        ],
+    expect(sent.patch).toEqual([
+      { set: [{ key: 'API_URL', value: 'typed' },
+        { key: 'FROM_FILE', value: '1' },
+      ],
       },
     ]);
     expect(stdout).toContain(`2 variables set \u2014 2 from ${file}, API_URL overridden by --var`);
@@ -210,7 +209,7 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
 
   it('auto-detects .env.local under --data-dir with no source flag and names the file it chose', async () => {
     const sent = wire();
-    environmentEndpoints(sent);
+    patchEndpoint(sent);
     writeFileSync(join(workDir, '.env.local'), 'LOCAL=1\n');
     writeFileSync(join(workDir, '.env'), 'OTHER=2\n');
 
@@ -218,12 +217,12 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
 
     expect(error).toBeUndefined();
     expect(stdout).toContain(`Using variables from ${join(workDir, '.env.local')}.`);
-    expect(sent.put).toEqual([{ environmentVariables: [...getFixture.environment.environmentVariables, { key: 'LOCAL', value: '1' }] }]);
+    expect(sent.patch).toEqual([{ set: [{ key: 'LOCAL', value: '1' }] }]);
   });
 
   it('exits 2 naming --dotenv and --data-dir when nothing is given and nothing is detected, sending no request', async () => {
     const sent = wire();
-    const scope = environmentEndpoints(sent);
+    const scope = patchEndpoint(sent);
 
     const { error } = await runCommand(['launch:variables:set', ...SCOPE, '--data-dir', workDir], config);
 
@@ -235,7 +234,7 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
 
   it('exits 0 with no changes made and sends no request when the file holds nothing', async () => {
     const sent = wire();
-    environmentEndpoints(sent);
+    patchEndpoint(sent);
     const file = join(workDir, 'empty.env');
     writeFileSync(file, '# nothing\n');
 
@@ -248,7 +247,7 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
 
   it('asks which sources to use on a terminal when none was given, then sets what was typed', async () => {
     const sent = wire();
-    const scope = environmentEndpoints(sent);
+    const scope = patchEndpoint(sent);
     const prompts = answerPrompts({
       'Add variables from': ['Type KEY=VALUE pairs'],
       'KEY=VALUE pairs separated by spaces': 'API_URL=typed-value DEBUG=true',
@@ -267,13 +266,10 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
       'Type KEY=VALUE pairs',
     ]);
     expect(scope.isDone()).toBe(true);
-    expect(sent.put).toEqual([
-      {
-        environmentVariables: [
-          ...getFixture.environment.environmentVariables,
-          { key: 'API_URL', value: 'typed-value' },
-          { key: 'DEBUG', value: 'true' },
-        ],
+    expect(sent.patch).toEqual([
+      { set: [{ key: 'API_URL', value: 'typed-value' },
+        { key: 'DEBUG', value: 'true' },
+      ],
       },
     ]);
     expect(stdout).toContain('2 variables set \u2014 2 from --var');
@@ -282,7 +278,7 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
 
   it('names the detected dotenv file in the checklist and reads the path it is given', async () => {
     const sent = wire();
-    environmentEndpoints(sent);
+    patchEndpoint(sent);
     writeFileSync(join(workDir, '.env.local'), 'FROM_FILE=1\n');
     const prompts = answerPrompts({
       'Add variables from': ['Import variables from a dotenv file'],
@@ -297,14 +293,14 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
     expect((prompts.payloads[0].choices as { name: string }[])[1].name).toBe(
       'Import variables from a dotenv file (.env.local found)',
     );
-    expect(sent.put).toEqual([
-      { environmentVariables: [...getFixture.environment.environmentVariables, { key: 'FROM_FILE', value: '1' }] },
+    expect(sent.patch).toEqual([
+      { set: [{ key: 'FROM_FILE', value: '1' }] },
     ]);
   });
 
   it('exits 0 saying it skipped adding variables, and sends no request, when nothing is ticked on a terminal', async () => {
     const sent = wire();
-    const scope = environmentEndpoints(sent);
+    const scope = patchEndpoint(sent);
     answerPrompts({ 'Add variables from': [] });
 
     const { error, stdout } = await onTerminal(() =>
@@ -319,7 +315,7 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
 
   it('does not ask on a terminal when a source flag was given', async () => {
     const sent = wire();
-    environmentEndpoints(sent);
+    patchEndpoint(sent);
     const prompts = answerPrompts({});
 
     const { error } = await onTerminal(() =>
@@ -332,7 +328,7 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
 
   it('exits 2 for two bare keys without a terminal, naming --dotenv -, and sends no request', async () => {
     const sent = wire();
-    environmentEndpoints(sent);
+    patchEndpoint(sent);
 
     const { error } = await runCommand(['launch:variables:set', ...SCOPE, '--var', 'A', 'B', '--data-dir', workDir], config);
 
@@ -343,7 +339,7 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
 
   it('asks a hidden prompt for a bare key on a terminal and never prints what was typed', async () => {
     const sent = wire();
-    environmentEndpoints(sent);
+    patchEndpoint(sent);
     const prompts = answerPrompts({ 'Value for API_KEY': 'never-printed-typed-value' });
 
     const { error, stdout } = await onTerminal(() =>
@@ -353,15 +349,15 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
     expect(error).toBeUndefined();
     expect(prompts.messages).toEqual(['Value for API_KEY']);
     expect(prompts.payloads[0]).toMatchObject({ type: 'password', mask: '*' });
-    expect(sent.put).toEqual([
-      { environmentVariables: [...getFixture.environment.environmentVariables, { key: 'API_KEY', value: 'never-printed-typed-value' }] },
+    expect(sent.patch).toEqual([
+      { set: [{ key: 'API_KEY', value: 'never-printed-typed-value' }] },
     ]);
     expect(stdout).not.toContain('never-printed-typed-value');
   });
 
   it('exits 2 for an empty value before any request is sent', async () => {
     const sent = wire();
-    environmentEndpoints(sent);
+    patchEndpoint(sent);
 
     const { error } = await runCommand(['launch:variables:set', ...SCOPE, '--var', 'KEY=', '--data-dir', workDir], config);
 
@@ -370,9 +366,9 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
     expect(sent.order).toEqual([]);
   });
 
-  it('exits 1 with the CLI wording and echoes neither the request body nor any value when the PUT is refused', async () => {
+  it('exits 1 with the CLI wording and echoes neither the request body nor any value when the PATCH is refused', async () => {
     const sent = wire();
-    environmentEndpoints(sent, 400, {
+    patchEndpoint(sent, 400, {
       errors: [
         {
           code: 'launch.ENVIRONMENT.ENVIRONMENT_VARIABLES.BYTE_SIZE_LIMIT_REACHED',
@@ -395,22 +391,66 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
     expect(stdout).not.toContain('variables set');
   });
 
-  it('removes only the named key with --yes, sending the rest as the complete array', async () => {
+  it('exits 1 telling the user to run set again when another writer changed the variables first', async () => {
     const sent = wire();
-    environmentEndpoints(sent, 200, undefined, 2);
+    patchEndpoint(sent, 409, {
+      errors: [{ code: 'launch.ENVIRONMENT.ENVIRONMENT_VARIABLES.CONCURRENT_UPDATE' }],
+      status: 409,
+    });
+
+    const { error, stdout } = await runCommand(['launch:variables:set', ...SCOPE, '--var', 'A=1', '--data-dir', workDir], config);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.message).toBe(
+      "Another change to this environment's variables landed at the same moment, so nothing was changed. Run the command again.",
+    );
+    expect(stdout).not.toContain('variables set');
+  });
+
+  it('exits 1 with the same advice when unset loses the race, and does not report the key as removed', async () => {
+    const sent = wire();
+    unsetEndpoints(sent, 409, {
+      errors: [{ code: 'launch.ENVIRONMENT.ENVIRONMENT_VARIABLES.CONCURRENT_UPDATE' }],
+      status: 409,
+    });
+
+    const { error, stdout } = await runCommand(['launch:variables:unset', ...SCOPE, '--key', 'key1', '--yes'], config);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.message).toContain('Run the command again.');
+    expect(stdout).not.toContain('removed');
+  });
+
+  it('exits 2 with the not-set wording when the key is gone by the time the PATCH lands', async () => {
+    const sent = wire();
+    unsetEndpoints(sent, 404, {
+      errors: [{ code: 'launch.ENVIRONMENT.ENVIRONMENT_VARIABLES.KEY.NOT_FOUND' }],
+      status: 404,
+    });
+
+    const { error, stdout } = await runCommand(['launch:variables:unset', ...SCOPE, '--key', 'key1', '--yes'], config);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe('key1 is not set in this environment.');
+    expect(stdout).not.toContain('removed');
+  });
+
+  it('removes only the named key with --yes, patching out only that key', async () => {
+    const sent = wire();
+    unsetEndpoints(sent);
 
     const { error, stdout } = await runCommand(['launch:variables:unset', ...SCOPE, '--key', 'key1', '--yes'], config);
 
     expect(error).toBeUndefined();
-    expect(sent.order).toEqual(['get', 'get', 'put']);
-    expect(sent.put).toEqual([{ environmentVariables: [] }]);
+    expect(sent.order).toEqual(['get', 'patch']);
+    expect(sent.patch).toEqual([{ unset: ['key1'] }]);
     expect(stdout).toContain('\u2714 key1 removed from production.');
     expect(stdout).not.toContain('value1');
   });
 
-  it('exits 2 for a key that is not set and sends no PUT', async () => {
+  it('exits 2 for a key that is not set and sends no PATCH', async () => {
     const sent = wire();
-    environmentEndpoints(sent);
+    unsetEndpoints(sent);
 
     const { error } = await runCommand(['launch:variables:unset', ...SCOPE, '--key', 'NOPE', '--yes'], config);
 
@@ -419,9 +459,9 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
     expect(sent.order).toEqual(['get']);
   });
 
-  it('exits 2 naming --yes without a terminal and sends no PUT', async () => {
+  it('exits 2 naming --yes without a terminal and sends no PATCH', async () => {
     const sent = wire();
-    environmentEndpoints(sent);
+    unsetEndpoints(sent);
 
     const { error } = await runCommand(['launch:variables:unset', ...SCOPE, '--key', 'key1'], config);
 
@@ -430,9 +470,9 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
     expect(sent.order).toEqual(['get']);
   });
 
-  it('exits 3 and sends no PUT when the user declines', async () => {
+  it('exits 3 and sends no PATCH when the user declines', async () => {
     const sent = wire();
-    environmentEndpoints(sent);
+    unsetEndpoints(sent);
     answerPrompts({ 'Are you sure you want to remove key1 from "production"?': false });
 
     const { error, stdout } = await onTerminal(() =>
@@ -455,10 +495,10 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
       delete CONFIG.tokens;
     });
 
-    it('imports through the saved alias before it reads the environment, then puts the complete merged array', async () => {
+    it('imports through the saved alias, then patches the stack variables in', async () => {
       const sent = wire();
       cmsEndpoint(sent);
-      environmentEndpoints(sent);
+      patchEndpoint(sent);
 
       const { error, stdout } = await runCommand(
         ['launch:variables:set', ...SCOPE, '--from-stack', '-a', 'my-prod', '--data-dir', workDir],
@@ -466,17 +506,14 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
       );
 
       expect(error).toBeUndefined();
-      expect(sent.order).toEqual(['cms', 'get', 'put']);
-      expect(sent.put).toEqual([
-        {
-          environmentVariables: [
-            ...getFixture.environment.environmentVariables,
-            { key: 'CONTENTSTACK_API_HOST', value: 'api.integration.test' },
-            { key: 'CONTENTSTACK_CDN', value: 'cdn.integration.test' },
-            { key: 'CONTENTSTACK_API_KEY', value: 'blt9stackkey' },
-            { key: 'CONTENTSTACK_DELIVERY_TOKEN', value: SAVED_TOKEN },
-            { key: 'CONTENTSTACK_ENVIRONMENT', value: 'staging' },
-          ],
+      expect(sent.order).toEqual(['cms', 'patch']);
+      expect(sent.patch).toEqual([
+        { set: [{ key: 'CONTENTSTACK_API_HOST', value: 'api.integration.test' },
+          { key: 'CONTENTSTACK_CDN', value: 'cdn.integration.test' },
+          { key: 'CONTENTSTACK_API_KEY', value: 'blt9stackkey' },
+          { key: 'CONTENTSTACK_DELIVERY_TOKEN', value: SAVED_TOKEN },
+          { key: 'CONTENTSTACK_ENVIRONMENT', value: 'staging' },
+        ],
         },
       ]);
       expect(stdout).toContain('Using the saved delivery token "my-prod" (environment staging).');
@@ -487,7 +524,7 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
     it('lets a typed --var override a stack value and names the override', async () => {
       const sent = wire();
       cmsEndpoint(sent);
-      environmentEndpoints(sent);
+      patchEndpoint(sent);
 
       const { error, stdout } = await runCommand(
         ['launch:variables:set', ...SCOPE, '--from-stack', '--alias', 'my-prod', '--var', 'CONTENTSTACK_ENVIRONMENT=production', '--data-dir', workDir],
@@ -495,7 +532,7 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
       );
 
       expect(error).toBeUndefined();
-      expect((sent.put[0] as { environmentVariables: { key: string; value: string }[] }).environmentVariables.at(-1)).toEqual({
+      expect((sent.patch[0] as { set: { key: string; value: string }[] }).set.at(-1)).toEqual({
         key: 'CONTENTSTACK_ENVIRONMENT',
         value: 'production',
       });
@@ -505,7 +542,7 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
     it('exits 2 naming --alias when there is no terminal and no alias, sending no request', async () => {
       const sent = wire();
       cmsEndpoint(sent);
-      environmentEndpoints(sent);
+      patchEndpoint(sent);
 
       const { error } = await runCommand(['launch:variables:set', ...SCOPE, '--from-stack', '--data-dir', workDir], config);
 
@@ -517,7 +554,7 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
     it('exits 2 for an alias nothing is saved under, sending no request', async () => {
       const sent = wire();
       cmsEndpoint(sent);
-      environmentEndpoints(sent);
+      patchEndpoint(sent);
 
       const { error } = await runCommand(
         ['launch:variables:set', ...SCOPE, '--from-stack', '--alias', 'gone', '--data-dir', workDir],
@@ -532,7 +569,7 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
     it('exits 2 when --alias is given without --from-stack, sending no request', async () => {
       const sent = wire();
       cmsEndpoint(sent);
-      environmentEndpoints(sent);
+      patchEndpoint(sent);
 
       const { error } = await runCommand(
         ['launch:variables:set', ...SCOPE, '--alias', 'my-prod', '--var', 'A=1', '--data-dir', workDir],

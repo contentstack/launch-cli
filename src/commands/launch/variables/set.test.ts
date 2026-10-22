@@ -23,11 +23,9 @@ function commandUnderTest(resolved: Record<string, unknown>, files: Record<strin
       isTTY: false,
       outputIsTTY: false,
       api: {
-        environments: {
-          get: async () => ({ environmentVariables: [] }),
-          update: async (params: unknown) => {
+        variables: {
+          patch: async (params: unknown) => {
             updates.push(params);
-            return {};
           },
         },
       },
@@ -38,13 +36,13 @@ function commandUnderTest(resolved: Record<string, unknown>, files: Record<strin
 }
 
 describe('launch:variables:set', () => {
-  it('sets the --var pairs through the environment endpoints and prints the provenance', async () => {
+  it('sets the --var pairs through the variables patch and prints the provenance', async () => {
     const { command, lines, updates } = commandUnderTest({ org: 'o', project: 'p', env: 'e', var: ['A=1', 'B=2'] });
 
     await command.run();
 
     expect(updates).toEqual([
-      { org: 'o', project: 'p', environment: 'e', update: { environmentVariables: [{ key: 'A', value: '1' }, { key: 'B', value: '2' }] } },
+      { org: 'o', project: 'p', environment: 'e', set: [{ key: 'A', value: '1' }, { key: 'B', value: '2' }] },
     ]);
     expect(lines).toEqual(['✔ 2 variables set — 2 from --var']);
   });

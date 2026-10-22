@@ -60,7 +60,7 @@ export class VariableSetter {
     }
 
     await setVariables(
-      this.services.api.environments,
+      this.services.api.variables,
       { org: request.org, project: request.project, environment: request.environment },
       merged.variables,
     );

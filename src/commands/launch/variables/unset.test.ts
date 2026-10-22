@@ -47,15 +47,15 @@ function commandUnderTest(harness: Harness) {
             calls.push('get');
             return { name: 'staging', environmentVariables: [{ key: 'API_KEY', value: 'never-printed-value' }, { key: 'DEBUG', value: 'x' }] };
           },
-          update: async (params: unknown) => {
-            calls.push('update');
+        },
+        variables: {
+          patch: async (params: unknown) => {
+            calls.push('patch');
             updates.push(params);
 
             if (harness.updateFails) {
               throw harness.updateFails;
             }
-
-            return {};
           },
         },
       },
@@ -74,8 +74,8 @@ describe('launch:variables:unset', () => {
     expect(inquired).toEqual([
       { type: 'confirm', name: 'confirm', message: 'Are you sure you want to remove API_KEY from "staging"?', default: false },
     ]);
-    expect(calls).toEqual(['get', 'get', 'update']);
-    expect(updates).toEqual([{ ...SCOPE, update: { environmentVariables: [{ key: 'DEBUG', value: 'x' }] } }]);
+    expect(calls).toEqual(['get', 'patch']);
+    expect(updates).toEqual([{ ...SCOPE, unset: ['API_KEY'] }]);
     expect(lines).toEqual(['✔ API_KEY removed from staging.']);
     expect(lines.join('')).not.toContain('never-printed-value');
   });
@@ -86,7 +86,7 @@ describe('launch:variables:unset', () => {
     await command.run();
 
     expect(inquired).toEqual([]);
-    expect(calls).toEqual(['get', 'get', 'update']);
+    expect(calls).toEqual(['get', 'patch']);
     expect(lines).toEqual(['✔ API_KEY removed from staging.']);
   });
 
