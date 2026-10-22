@@ -1,4 +1,6 @@
 import type { ContentstackClient } from '@contentstack/cli-utilities';
+
+import { UsageError } from '../core/errors';
 import {
   configHandler,
   managementSDKClient,
@@ -15,20 +17,30 @@ export interface CmaCollection {
 const PAGE_SIZE = 100;
 const MAX_PAGES = 100;
 
-async function allPages(fetchPage: (skip: number) => Promise<CmaCollection>): Promise<CmaCollection> {
+export class CmaScanLimitError extends UsageError {
+  constructor(subject: string) {
+    super(`Stopped after fetching ${MAX_PAGES} pages of ${subject} without reaching the end of the list.`);
+    this.name = 'CmaScanLimitError';
+  }
+}
+
+async function allPages(
+  fetchPage: (skip: number) => Promise<CmaCollection>,
+  subject: string,
+): Promise<CmaCollection> {
   const items: unknown[] = [];
 
   for (let page = 0; page < MAX_PAGES; page += 1) {
     const batch = (await fetchPage(items.length)).items ?? [];
 
     if (batch.length === 0) {
-      break;
+      return { items };
     }
 
     items.push(...batch);
   }
 
-  return { items };
+  throw new CmaScanLimitError(subject);
 }
 
 export interface CmaSession {
@@ -71,12 +83,16 @@ export function createCmaSession(options: CmaSessionOptions): CmaSession {
     fetchOrganizations: async (query) => (await open()).organization().fetchAll(query),
     fetchOrganization: async (uid) => (await open()).organization(uid).fetch(),
     fetchStacks: (organizationUid) =>
-      allPages(async (skip) =>
-        (await open()).stack().query({ organization_uid: organizationUid, limit: PAGE_SIZE, skip }).find(),
+      allPages(
+        async (skip) =>
+          (await open()).stack().query({ organization_uid: organizationUid, limit: PAGE_SIZE, skip }).find(),
+        'stacks',
       ),
     fetchDeliveryTokens: (apiKey) =>
-      allPages(async (skip) =>
-        (await open()).stack({ api_key: apiKey }).deliveryToken().query({ limit: PAGE_SIZE, skip }).find(),
+      allPages(
+        async (skip) =>
+          (await open()).stack({ api_key: apiKey }).deliveryToken().query({ limit: PAGE_SIZE, skip }).find(),
+        'delivery tokens',
       ),
     scopedOrganizationUid: () => {
       const uid: unknown = configHandler.get(OAUTH_ORG_UID_CONFIG_FIELD);
