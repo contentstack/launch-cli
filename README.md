@@ -61,6 +61,9 @@ with exit code 2 and name their V2 replacements. `launch:functions:serve` is liv
 * [`csdx launch:projects:list`](#csdx-launchprojectslist)
 * [`csdx launch:projects:update`](#csdx-launchprojectsupdate)
 * [`csdx launch:rollback`](#csdx-launchrollback)
+* [`csdx launch:variables:list`](#csdx-launchvariableslist)
+* [`csdx launch:variables:set`](#csdx-launchvariablesset)
+* [`csdx launch:variables:unset`](#csdx-launchvariablesunset)
 
 ## `csdx help [COMMAND]`
 
@@ -118,9 +121,12 @@ Create an environment in a Launch project and follow its first deployment
 USAGE
   $ csdx launch:env:create [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--name <value>]
     [--description <value>] [--branch <value>] [--framework <value>] [--build-cmd <value>] [--server-cmd <value>]
-    [--output-dir <value>] [--res-mode <value>] [--auto-deploy <value>] [--cs-auth <value>]
+    [--output-dir <value>] [--res-mode <value>] [--auto-deploy <value>] [--cs-auth <value>] [--var <value>...] [--dotenv
+    <value>...] [--from-stack] [-a <value>]
 
 FLAGS
+  -a, --alias=<value>        Alias of a delivery token saved with csdx auth:tokens:add, used with --from-stack without a
+                             prompt
   -c, --config=<value>       Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>     Current working directory
       --auto-deploy=<value>  Deploy on every push, GitHub projects only (enable | disable)
@@ -128,14 +134,19 @@ FLAGS
       --build-cmd=<value>    Build command
       --cs-auth=<value>      Contentstack Authentication (enable | disable)
       --description=<value>  Environment description (255 characters or fewer)
+      --dotenv=<value>...    Path to a dotenv file, repeatable. Use - to read dotenv content from standard input
       --framework=<value>    Framework preset (Gatsby | NextJs | CRA | CSR | Analog | Angular | Nuxt | Astro | VueJs |
                              Remix | Other)
+      --from-stack           Import the variables of a Contentstack stack. Asks for the stack and a delivery token on a
+                             terminal
       --name=<value>         Environment name (200 characters or fewer)
       --org=<value>          Organization UID
       --output-dir=<value>   Output directory
       --project=<value>      Project name or UID
       --res-mode=<value>     Response mode (buffered | streaming)
       --server-cmd=<value>   Server command
+      --var=<value>...       Environment variable as KEY=VALUE, repeatable. A KEY with no value is asked at a hidden
+                             prompt, or read from standard input when piped
 
 DESCRIPTION
   Create an environment in a Launch project and follow its first deployment
@@ -366,9 +377,12 @@ Create a Launch project, its first environment, and its first deployment
 USAGE
   $ csdx launch:projects:create [-c <value>] [-d <value>] [--org <value>] [--type <value>] [--name <value>] [--description
     <value>] [--env-name <value>] [--branch <value>] [--framework <value>] [--build-cmd <value>] [--server-cmd <value>]
-    [--output-dir <value>] [--res-mode <value>] [--auto-deploy <value>] [--cs-auth <value>]
+    [--output-dir <value>] [--res-mode <value>] [--auto-deploy <value>] [--cs-auth <value>] [--var <value>...] [--dotenv
+    <value>...] [--from-stack] [-a <value>]
 
 FLAGS
+  -a, --alias=<value>        Alias of a delivery token saved with csdx auth:tokens:add, used with --from-stack without a
+                             prompt
   -c, --config=<value>       Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>     Current working directory
       --auto-deploy=<value>  Deploy on every push, GitHub projects only (enable | disable)
@@ -376,15 +390,20 @@ FLAGS
       --build-cmd=<value>    Build command
       --cs-auth=<value>      Contentstack Authentication (enable | disable)
       --description=<value>  Project description (255 characters or fewer)
+      --dotenv=<value>...    Path to a dotenv file, repeatable. Use - to read dotenv content from standard input
       --env-name=<value>     Name of the environment created with the project (200 characters or fewer)
       --framework=<value>    Framework preset (Gatsby | NextJs | CRA | CSR | Analog | Angular | Nuxt | Astro | VueJs |
                              Remix | Other)
+      --from-stack           Import the variables of a Contentstack stack. Asks for the stack and a delivery token on a
+                             terminal
       --name=<value>         Project name (200 characters or fewer)
       --org=<value>          Organization UID
       --output-dir=<value>   Output directory
       --res-mode=<value>     Response mode (buffered | streaming)
       --server-cmd=<value>   Server command
       --type=<value>         Project type (GitHub | FileUpload)
+      --var=<value>...       Environment variable as KEY=VALUE, repeatable. A KEY with no value is asked at a hidden
+                             prompt, or read from standard input when piped
 
 DESCRIPTION
   Create a Launch project, its first environment, and its first deployment
@@ -515,6 +534,98 @@ DESCRIPTION
 ```
 
 _See code: [src/commands/launch/rollback.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/rollback.ts)_
+
+## `csdx launch:variables:list`
+
+List the environment variables of an environment, with their values masked
+
+```
+USAGE
+  $ csdx launch:variables:list [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--limit
+    <value>] [--skip <value>]
+
+FLAGS
+  -c, --config=<value>    Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>  Current working directory
+      --env=<value>       Environment name or UID
+      --limit=<value>     Number of records to fetch (1-1000)
+      --org=<value>       Organization UID
+      --project=<value>   Project name or UID
+      --skip=<value>      Number of records to skip
+
+DESCRIPTION
+  List the environment variables of an environment, with their values masked
+
+EXAMPLES
+  $ csdx launch:variables:list --org <org-uid> --project <name-or-uid> --env <name-or-uid>
+```
+
+_See code: [src/commands/launch/variables/list.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/variables/list.ts)_
+
+## `csdx launch:variables:set`
+
+Add or change environment variables from --var, --dotenv or a detected .env file; later sources win
+
+```
+USAGE
+  $ csdx launch:variables:set [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--var
+    <value>...] [--dotenv <value>...] [--from-stack] [-a <value>]
+
+FLAGS
+  -a, --alias=<value>      Alias of a delivery token saved with csdx auth:tokens:add, used with --from-stack without a
+                           prompt
+  -c, --config=<value>     Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>   Current working directory
+      --dotenv=<value>...  Path to a dotenv file, repeatable. Use - to read dotenv content from standard input
+      --env=<value>        Environment name or UID
+      --from-stack         Import the variables of a Contentstack stack. Asks for the stack and a delivery token on a
+                           terminal
+      --org=<value>        Organization UID
+      --project=<value>    Project name or UID
+      --var=<value>...     Environment variable as KEY=VALUE, repeatable. A KEY with no value is asked at a hidden
+                           prompt, or read from standard input when piped
+
+DESCRIPTION
+  Add or change environment variables from --var, --dotenv or a detected .env file; later sources win
+
+EXAMPLES
+  $ csdx launch:variables:set --org <org-uid> --project <name-or-uid> --env <name-or-uid> --var API_URL=https://example.test DEBUG=true
+
+  $ csdx launch:variables:set --org <org-uid> --project <name-or-uid> --env <name-or-uid> --dotenv .env.staging
+
+  $ printf '%s' "$TOKEN" | csdx launch:variables:set --org <org-uid> --project <name-or-uid> --env <name-or-uid> --var API_TOKEN
+```
+
+_See code: [src/commands/launch/variables/set.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/variables/set.ts)_
+
+## `csdx launch:variables:unset`
+
+Remove environment variables from an environment, after asking for confirmation
+
+```
+USAGE
+  $ csdx launch:variables:unset [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--key
+    <value>...] [-y]
+
+FLAGS
+  -c, --config=<value>    Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>  Current working directory
+  -y, --yes               Skip the confirmation prompt
+      --env=<value>       Environment name or UID
+      --key=<value>...    Environment variable key, repeatable
+      --org=<value>       Organization UID
+      --project=<value>   Project name or UID
+
+DESCRIPTION
+  Remove environment variables from an environment, after asking for confirmation
+
+EXAMPLES
+  $ csdx launch:variables:unset --org <org-uid> --project <name-or-uid> --env <name-or-uid> --key API_KEY
+
+  $ csdx launch:variables:unset --org <org-uid> --project <name-or-uid> --env <name-or-uid> --key API_KEY --key DEBUG --yes
+```
+
+_See code: [src/commands/launch/variables/unset.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/variables/unset.ts)_
 <!-- commandsstop -->
 
 # How to do development Locally?

@@ -62,6 +62,7 @@ export interface EnvironmentUpdate {
   isContentstackAuthenticationEnabled?: boolean;
   isCachePrimingEnabled?: boolean;
   passwordProtection?: PasswordProtectionUpdate;
+  environmentVariables?: EnvironmentVariableInput[];
 }
 
 export type IdentifiedEnvironment = Environment & { uid: string };
@@ -94,6 +95,12 @@ export interface DetectedFramework {
 }
 
 export interface EnvironmentRequest {
+  org: string;
+  dataDir?: string;
+  vars?: string[];
+  envFiles?: string[];
+  fromStack?: boolean;
+  alias?: string;
   framework?: FrameworkPreset;
   buildCmd?: string;
   outputDir?: string;

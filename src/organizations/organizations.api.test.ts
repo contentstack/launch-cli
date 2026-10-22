@@ -23,6 +23,12 @@ function pagedSession(pages: CmaCollection[], scoped?: string) {
       fetched.push(uid);
       return { uid, name: 'Scoped Org' };
     },
+    fetchStacks: async () => {
+      throw new Error('this test lists no stacks');
+    },
+    fetchDeliveryTokens: async () => {
+      throw new Error('this test lists no delivery tokens');
+    },
     scopedOrganizationUid: () => scoped,
   };
 
@@ -36,6 +42,12 @@ function failingSession(error: unknown, scoped?: string): OrganizationsApi {
     },
     fetchOrganization: async () => {
       throw error;
+    },
+    fetchStacks: async () => {
+      throw new Error('this test lists no stacks');
+    },
+    fetchDeliveryTokens: async () => {
+      throw new Error('this test lists no delivery tokens');
     },
     scopedOrganizationUid: () => scoped,
   });
@@ -174,6 +186,12 @@ describe('OrganizationsApi.available', () => {
       const api = new OrganizationsApi({
         fetchOrganizations: async () => ({}),
         fetchOrganization: async () => found,
+        fetchStacks: async () => {
+          throw new Error('this test lists no stacks');
+        },
+        fetchDeliveryTokens: async () => {
+          throw new Error('this test lists no delivery tokens');
+        },
         scopedOrganizationUid: () => 'org7',
       });
 

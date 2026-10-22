@@ -73,6 +73,9 @@
       "launch:env": {
         "description": "Manage the environments of a Launch project"
       },
+      "launch:variables": {
+        "description": "List, set and remove the environment variables of a Launch environment"
+      },
       "launch:functions": {
         "description": "Run Launch cloud functions locally"
       }
@@ -94,8 +97,8 @@
     "postpack": "shx rm -f oclif.manifest.json",
     "prepack": "npm run build && oclif manifest && oclif readme",
     "prepare": "husky",
-    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand",
-    "test:coverage": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand --coverage",
+    "test": "node --max-old-space-size=8192 --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand",
+    "test:coverage": "node --max-old-space-size=8192 --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand --coverage",
     "version": "oclif readme && git add README.md"
   },
   "overrides": {
@@ -106,22 +109,22 @@
     "@eslint/eslintrc": {
       "ajv": "^6.12.6"
     },
-    "qs": "^6.16.0",
+    "qs": "^6.16.1",
     "tmp": "^0.2.4",
-    "fast-uri": "^3.1.8",
+    "fast-uri": "^3.1.9",
     "proxy-addr": "^2.0.8",
     "minimatch@10.2.5": {
-      "brace-expansion": "^5.0.9"
+      "brace-expansion": "^5.0.12"
     },
     "minimatch@9.0.9": {
-      "brace-expansion": "^2.1.4"
+      "brace-expansion": "^2.1.7"
     },
     "minimatch@5.1.9": {
-      "brace-expansion": "^2.1.4"
+      "brace-expansion": "^2.1.7"
     },
     "serialize-javascript": "^7.1.0",
     "diff": "^8.0.3",
-    "brace-expansion@1": "^1.1.18",
+    "brace-expansion@1": "^1.1.21",
     "istanbul-lib-processinfo": {
       "uuid": "^11.1.1"
     }
@@ -158,7 +161,10 @@
       "launch:projects:get": "LNCH-PRJ-GET",
       "launch:projects:list": "LNCH-PRJ-LS",
       "launch:projects:update": "LNCH-PRJ-UPD",
-      "launch:rollback": "LNCH-RLBK"
+      "launch:rollback": "LNCH-RLBK",
+      "launch:variables:list": "LNCH-VAR-LS",
+      "launch:variables:set": "LNCH-VAR-SET",
+      "launch:variables:unset": "LNCH-VAR-UNSET"
     }
   }
 }

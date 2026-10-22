@@ -195,6 +195,16 @@ describe('askChoices', () => {
     expect(validate(['a'])).toBe(true);
   });
 
+  it('accepts an empty answer when one is not required', async () => {
+    const { asked, ux } = scriptedUx([[]]);
+
+    await askChoices(ux, 'Which ones?', [{ name: 'A', value: 'a' }], { requireOne: false });
+    const validate = (asked[0] as { validate(value: unknown): true | string }).validate;
+
+    expect(validate([])).toBe(true);
+    expect(validate(undefined)).toBe(true);
+  });
+
   it.each([[[]], [undefined], ['b']])('answers no choice at all when the prompt returns %p', async (answer) => {
     const { ux } = scriptedUx([answer]);
 

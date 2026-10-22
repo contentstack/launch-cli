@@ -7,6 +7,7 @@ import { catalog, resolution } from '../../../resources';
 import { DEPLOYMENT_WAIT_TIMEOUT_MS } from '../../../deployments/deployment.watcher';
 import { EnvironmentCreator } from '../../../environments/environment.create';
 import { serverCommandFrameworkGate } from '../../../environments/environment.inputs';
+import { aliasRequiresFromStack } from '../../../variables/variable.rules';
 import EnvironmentsCreate from './create';
 
 function commandUnderTest(resolved: Record<string, unknown>) {
@@ -45,6 +46,10 @@ describe('launch:env:create', () => {
       'res-mode': 'buffered',
       'auto-deploy': 'enable',
       'cs-auth': 'disable',
+      var: ['A=1', 'B'],
+      dotenv: ['a.env', '-'],
+      'from-stack': true,
+      alias: 'my-prod',
     }).run();
 
     expect(requests).toEqual([
@@ -63,6 +68,10 @@ describe('launch:env:create', () => {
         resMode: 'buffered',
         autoDeploy: 'enable',
         csAuth: 'disable',
+        vars: ['A=1', 'B'],
+        envFiles: ['a.env', '-'],
+        fromStack: true,
+        alias: 'my-prod',
       },
     ]);
     expect(timings).toEqual([DEPLOYMENT_WAIT_TIMEOUT_MS]);
@@ -89,9 +98,13 @@ describe('launch:env:create', () => {
       'res-mode': {},
       'auto-deploy': {},
       'cs-auth': {},
+      var: {},
+      dotenv: {},
+      'from-stack': {},
+      alias: {},
     });
     expect(Object.keys(EnvironmentsCreate.flags).sort()).toEqual(Object.keys(EnvironmentsCreate.inputs).sort());
-    expect(EnvironmentsCreate.rules).toEqual([serverCommandFrameworkGate]);
+    expect(EnvironmentsCreate.rules).toEqual([serverCommandFrameworkGate, aliasRequiresFromStack]);
   });
 
   it('describes --name and --description as the environment its own, leaving the project wording alone', () => {

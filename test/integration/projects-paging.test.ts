@@ -18,6 +18,12 @@ const UNUSED_CMA: CmaSession = {
   fetchOrganization: async () => {
     throw new Error('this test fetches no organization');
   },
+  fetchStacks: async () => {
+    throw new Error('this test lists no stacks');
+  },
+  fetchDeliveryTokens: async () => {
+    throw new Error('this test lists no delivery tokens');
+  },
   scopedOrganizationUid: () => undefined,
 };
 

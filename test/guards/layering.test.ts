@@ -10,13 +10,15 @@ const RESOURCES = readdirSync(SRC, { withFileTypes: true })
   .map((entry) => entry.name);
 
 const RESOURCE_EDGES: Record<string, string[]> = {
-  projects: ['environments', 'deployments', 'git', 'uploads'],
+  projects: ['environments', 'deployments', 'git', 'uploads', 'variables'],
   functions: [],
-  environments: ['deployments', 'git', 'uploads'],
+  environments: ['deployments', 'git', 'uploads', 'variables'],
   deployments: [],
   git: [],
   organizations: [],
   uploads: [],
+  stacks: [],
+  variables: ['environments', 'stacks'],
 };
 
 function sourceFilesIn(layer: string): string[] {
@@ -130,8 +132,8 @@ describe('layering between resources', () => {
     }
   });
 
-  it('records the edges the projects resource really uses, and no others', () => {
-    expect(RESOURCE_EDGES.projects).toEqual(['environments', 'deployments', 'git', 'uploads']);
+  it('records the edges the projects resource and its commands really use, and no others', () => {
+    expect(RESOURCE_EDGES.projects).toEqual(['environments', 'deployments', 'git', 'uploads', 'variables']);
 
     expect([...new Set(sourceFilesIn('projects').flatMap((path) => crossResourceEdges(path)))].sort()).toEqual([
       'deployments',
@@ -139,6 +141,15 @@ describe('layering between resources', () => {
       'git',
       'uploads',
     ]);
+
+    const commandFiles = filesUnder('commands/launch/projects', true).filter((path) => !path.endsWith('.test.ts'));
+    const reachedByCommands = commandFiles.flatMap((path) =>
+      importedPaths(path)
+        .map((specifier) => resourceOf(specifier, directoryOf(path)))
+        .filter((target): target is string => target !== undefined && target !== 'projects'),
+    );
+
+    expect([...new Set(reachedByCommands)].sort()).toEqual(['deployments', 'environments', 'variables']);
   });
 
   it('reports a disallowed edge rather than passing vacuously', () => {

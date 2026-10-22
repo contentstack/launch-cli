@@ -3,6 +3,7 @@ import { flagsFor, inputs } from '../../../core/inputs';
 import { defaultWatchTiming } from '../../../deployments/deployment.watcher';
 import { serverCommandFrameworkGate } from '../../../environments/environment.inputs';
 import { ProjectCreator } from '../../../projects/project.create';
+import { aliasRequiresFromStack } from '../../../variables/variable.rules';
 
 const createInputs = inputs({
   org: { required: true },
@@ -18,6 +19,10 @@ const createInputs = inputs({
   'res-mode': {},
   'auto-deploy': {},
   'cs-auth': {},
+  var: {},
+  dotenv: {},
+  'from-stack': {},
+  alias: {},
 });
 
 export default class ProjectsCreate extends LaunchCommand<typeof createInputs> {
@@ -36,7 +41,7 @@ export default class ProjectsCreate extends LaunchCommand<typeof createInputs> {
 
   static flags = flagsFor(createInputs);
 
-  static rules = [serverCommandFrameworkGate];
+  static rules = [serverCommandFrameworkGate, aliasRequiresFromStack];
 
   async run(): Promise<void> {
     const resolved = this.resolved;
@@ -57,6 +62,10 @@ export default class ProjectsCreate extends LaunchCommand<typeof createInputs> {
       resMode: resolved['res-mode'],
       autoDeploy: resolved['auto-deploy'],
       csAuth: resolved['cs-auth'],
+      vars: resolved.var,
+      envFiles: resolved['dotenv'],
+      fromStack: resolved['from-stack'],
+      alias: resolved.alias,
     });
   }
 }
