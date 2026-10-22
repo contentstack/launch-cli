@@ -18,9 +18,10 @@ describe('variable parse', () => {
     expect(parseAssignment('API_KEY')).toEqual({ key: 'API_KEY', value: undefined });
   });
 
-  it('accepts a colon as the separator only when no equals sign is present', () => {
+  it('splits on whichever of the equals sign and the colon comes first, so the value may hold the other', () => {
     expect(parseAssignment('API_URL:value')).toEqual({ key: 'API_URL', value: 'value' });
     expect(parseAssignment('API_URL=https://x.test:8080')).toEqual({ key: 'API_URL', value: 'https://x.test:8080' });
+    expect(parseAssignment('API_URL:https://x.test?a=b')).toEqual({ key: 'API_URL', value: 'https://x.test?a=b' });
   });
 
   it('trims the key but not the value', () => {

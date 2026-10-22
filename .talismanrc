@@ -10,7 +10,7 @@ fileignoreconfig:
 - filename: src/transport/rest-client.test.ts
   checksum: 3b5751449c61f7a1d71b978ed03b9472f714e12dd1679f691bbd4dd8f84be923
 - filename: src/transport/cma-client.ts
-  checksum: 87d8c6f8a41ea520ecc5fb4b6f71467d44af95f55d1facec1de4778fe22677b3
+  checksum: 0e144de22c757e8d3efd31c892d6de56796a49ce2c18d0e41ba16eff8dc3d24e
 - filename: src/transport/auth-strategy.test.ts
   checksum: a4f3e3ea7db10dbf82abbac0207d2231ee740916f476fcda836a2268505295ef
 - filename: src/projects/types.ts
@@ -233,7 +233,7 @@ fileignoreconfig:
     - "a project name passed on argv to the project resolver"
     - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
 - filename: AGENTS.md
-  checksum: 66b94ec2bcb34947bcda15e6364dceee7edb50bfe851e26e6c737425315e81da
+  checksum: 4766a4bf28eab95d90878b825979cef70c83a79a24fb9450a52d617ce0933f78
   allowed_patterns:
     - "Do not add an exemption to a guard to make a new file pass"
     - "passes its own error wording to `client.request\\(req, MESSAGES\\)`"
@@ -303,7 +303,7 @@ fileignoreconfig:
 - filename: src/functions/function.logger.test.ts
   checksum: 840b2b2b7f938e0862881871e8d568112631c58e12cf6c8a5be32e7552b8cf9e
 - filename: src/transport/cma-client.test.ts
-  checksum: 9eb4958cd7fa07822954d14c5860c5ca18f0880e4390716ebfa9c826add49311
+  checksum: 471361febb8e08a50af8cf7e8f81824adc7a31af6231d78baf0e125823f43686
 - filename: src/core/catalog.test.ts
   checksum: bf8c203a8efc40a75f5407ceb29a639ea9a6e1fa081d02260def2d7e0fab958a
 - filename: test/credential-guard.setup.ts
@@ -373,9 +373,9 @@ fileignoreconfig:
 - filename: src/variables/variable.page.test.ts
   checksum: 9a4e63c0dbfd35b499149a98ce5642787097e9491746b4b874b2eda88f1d2b50
 - filename: src/variables/variable.parse.test.ts
-  checksum: 01441ffca77438dbd29420ad38fbfee160dfa535434e4a3eca1c57c47eeebaa0
+  checksum: d620d89c4b5cafb80dcf696f430c8fa4e696dfc744f814bcdd74324243010460
 - filename: src/variables/variable.parse.ts
-  checksum: 9dbb9e0c8715e319aa70a4b6a49ae255a3a89207081f6bff0f4c21ea91eed7e7
+  checksum: 87be9f454ce0ffb48ff5729ccd3c1b105ce9f1030b32278c3359555b983c2142
 - filename: src/variables/variable.presenter.test.ts
   checksum: 62e8b0eff16ed4408d929092ce6808aeabea001a6cc15780d46c4ac4226eec3d
 - filename: src/variables/variable.presenter.ts

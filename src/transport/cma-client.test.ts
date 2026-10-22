@@ -209,7 +209,7 @@ describe('createCmaSession', () => {
     ]);
   });
 
-  it('gives up after a bounded number of pages when the server keeps answering', async () => {
+  it('raises after a bounded number of pages when the server keeps answering, rather than dropping the rest', async () => {
     let calls = 0;
     sdkClient.mockReset();
     sdkClient.mockResolvedValue({
@@ -224,10 +224,22 @@ describe('createCmaSession', () => {
     });
     const session = createCmaSession({ cma: 'https://api.contentstack.io', analyticsInfo: 'cli/2.0.0' });
 
-    const { items } = await session.fetchStacks('org7');
-
+    await expect(session.fetchStacks('org7')).rejects.toThrow(
+      'Stopped after fetching 100 pages of stacks without reaching the end of the list.',
+    );
     expect(calls).toBe(100);
-    expect(items).toHaveLength(100);
+  });
+
+  it('names delivery tokens when it is their list that cannot be finished', async () => {
+    sdkClient.mockReset();
+    sdkClient.mockResolvedValue({
+      stack: () => ({ deliveryToken: () => ({ query: () => ({ find: async () => ({ items: [{ token: 'same' }] }) }) }) }),
+    });
+    const session = createCmaSession({ cma: 'https://api.contentstack.io', analyticsInfo: 'cli/2.0.0' });
+
+    await expect(session.fetchDeliveryTokens('blt1')).rejects.toThrow(
+      'Stopped after fetching 100 pages of delivery tokens without reaching the end of the list.',
+    );
   });
 
   it('treats a reply with no items as an empty list', async () => {

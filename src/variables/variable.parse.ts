@@ -6,9 +6,9 @@ export interface Assignment {
 }
 
 function separatorIndex(token: string): number {
-  const equals = token.indexOf('=');
+  const separators = [token.indexOf('='), token.indexOf(':')].filter((index) => index !== -1);
 
-  return equals === -1 ? token.indexOf(':') : equals;
+  return separators.length === 0 ? -1 : Math.min(...separators);
 }
 
 export function parseAssignment(token: string): Assignment {

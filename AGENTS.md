@@ -343,7 +343,10 @@ under `--data-dir`, always printing the file it chose, and fails with exit 2 whe
 exit 2 naming `--dotenv -` for two or more. The API refuses an empty value, so `KEY=` is a usage error naming
 the key, and an empty value inside a dotenv file is skipped with its key reported. No value reaches stdout, a
 prompt message, a confirmation or an error: `list` masks through `redactedColumn`, and a failed `PATCH` is worded from
-`ENVIRONMENT_ERROR_MESSAGES`, never from the API's own text.
+`ENVIRONMENT_ERROR_MESSAGES`. A code with no entry there falls back to the API's own message, which the
+service words from keys at most, never from a value (CL-7179). The stack and delivery-token lookups behind
+`--from-stack` walk the Management API 100 per page and raise `CmaScanLimitError` after `MAX_PAGES` pages rather
+than return a truncated list.
 
 `projects:create` and `env:create` take `--var` and `--dotenv` and reach the same resolver through
 `EnvironmentBuilder`, which asks last - after Contentstack Authentication, where V1 asked - with no auto-detection.
