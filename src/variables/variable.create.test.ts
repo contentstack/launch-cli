@@ -1,7 +1,11 @@
+import { randomUUID } from 'node:crypto';
 import { CancelledError, UsageError } from '../core/errors';
 import type { UxLike } from '../core/prompt';
 import type { ServiceContext } from '../core/service-context';
 import { variablesForCreate } from './variable.create';
+
+const PICKED_TOKEN = `cs-${randomUUID()}`;
+const SAVED_TOKEN = `cs-${randomUUID()}`;
 
 const STACK = 'Import variables from a stack';
 const SKIP = 'Skip adding environment variables';
@@ -42,7 +46,7 @@ function fakes(options: { isTTY?: boolean; answers?: Record<string, unknown>; fi
       api: {
         stacks: {
           list: async () => [{ name: 'Shop', apiKey: 'blt1' }],
-          deliveryTokens: async () => [{ name: 'prod-token', token: 'cs-picked-value', environment: 'production' }],
+          deliveryTokens: async () => [{ name: 'prod-token', token: PICKED_TOKEN, environment: 'production' }],
         },
         variables: { stackTemplate: async () => [{ key: 'CONTENTSTACK_API_HOST', value: 'api.example.test' }] },
       },
@@ -249,7 +253,7 @@ describe('variable create', () => {
   it('imports through --from-stack and --alias without asking, merging it before a typed --var', async () => {
     const { services, io, asked, printed } = fakes();
     const savedToken = (alias: string) =>
-      alias === 'my-prod' ? { token: 'cs-saved-value', apiKey: 'blt9', environment: 'staging' } : undefined;
+      alias === 'my-prod' ? { token: SAVED_TOKEN, apiKey: 'blt9', environment: 'staging' } : undefined;
 
     const variables = await variablesForCreate(
       { vars: ['CONTENTSTACK_ENVIRONMENT=override'], envFiles: undefined, dataDir: '/work', org: 'org1', fromStack: true, alias: 'my-prod' },
@@ -261,7 +265,7 @@ describe('variable create', () => {
     expect(variables).toEqual([
       { key: 'CONTENTSTACK_API_HOST', value: 'api.example.test' },
       { key: 'CONTENTSTACK_API_KEY', value: 'blt9' },
-      { key: 'CONTENTSTACK_DELIVERY_TOKEN', value: 'cs-saved-value' },
+      { key: 'CONTENTSTACK_DELIVERY_TOKEN', value: SAVED_TOKEN },
       { key: 'CONTENTSTACK_ENVIRONMENT', value: 'override' },
     ]);
     expect(asked).toEqual([]);
@@ -270,7 +274,7 @@ describe('variable create', () => {
       'No value was available for CONTENTSTACK_CDN, so it was not imported.',
       '\u2714 4 variables ready to set \u2014 4 from stack, CONTENTSTACK_ENVIRONMENT overridden by --var',
     ]);
-    expect(printed.join('\n')).not.toContain('cs-saved-value');
+    expect(printed.join('\n')).not.toContain(SAVED_TOKEN);
   });
 
   it('refuses --from-stack without --alias when there is no terminal, asking nothing', async () => {
@@ -308,7 +312,7 @@ describe('variable create', () => {
       'EXTRA',
     ]);
     expect(printed.join('\n')).toContain('4 from stack');
-    expect(printed.join('\n')).not.toContain('cs-picked-value');
+    expect(printed.join('\n')).not.toContain(PICKED_TOKEN);
   });
 
   it('refuses Skip combined with the stack choice', async () => {
