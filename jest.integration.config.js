@@ -10,6 +10,7 @@ const config = {
     ],
   },
   transformIgnorePatterns: ['/node_modules/(?!uuid/)'],
+  moduleNameMapper: { '^chalk$': require.resolve('chalk') },
   globalSetup: '<rootDir>/test/integration/jest.global-setup.ts',
   globalTeardown: '<rootDir>/test/integration/jest.global-teardown.ts',
   setupFiles: ['<rootDir>/test/integration/jest.setup-env.ts'],
