@@ -76,7 +76,7 @@ export async function askOptionalText(
   return text === '' ? undefined : text;
 }
 
-export const PROMPT_PAGE_SIZE = 15;
+export const PROMPT_PAGE_SIZE = 7;
 
 function scrolling(choices: Choice[]): { loop: false; pageSize: number } {
   return { loop: false, pageSize: Math.min(choices.length, PROMPT_PAGE_SIZE) };

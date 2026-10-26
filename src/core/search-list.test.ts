@@ -1,10 +1,14 @@
+import { PROMPT_PAGE_SIZE } from './prompt';
 import type { SearchListClass } from './search-list';
 import {
+  MORE_CHOICES_HINT,
   UnlistedAnswer,
   answerFor,
+  launchPaginated,
   launchSearchList,
   refuseUnlisted,
   registerSearchList,
+  scrollWindow,
   startingPointer,
   unlistedMessage,
   utilitiesLoader,
@@ -14,8 +18,12 @@ const load = utilitiesLoader();
 const SearchList = load('inquirer-search-list') as SearchListClass;
 
 interface Prompt {
-  opt: { validate: (value: unknown, answers?: unknown) => unknown };
+  opt: { validate: (value: unknown, answers?: unknown) => unknown; pageSize?: number };
   pointer: number;
+  paginator: { paginate: unknown };
+  render(): void;
+  onDownKey(): void;
+  onUpKey(): void;
   rl: { line: string };
   selected: unknown;
   filterChoices(): void;
@@ -71,6 +79,56 @@ describe('launchSearchList', () => {
 
     expect(prompt.pointer).toBe(0);
     expect(prompt.getCurrentValue()).toBe('Gatsby');
+  });
+
+  it('stops at the last choice instead of wrapping round to the first', () => {
+    const prompt = open({ default: 'Other' });
+    prompt.render = jest.fn();
+
+    prompt.onDownKey();
+
+    expect(prompt.pointer).toBe(2);
+    expect(prompt.render).toHaveBeenCalled();
+  });
+
+  it('stops at the first choice instead of wrapping round to the last', () => {
+    const prompt = open({});
+    prompt.render = jest.fn();
+
+    prompt.onUpKey();
+
+    expect(prompt.pointer).toBe(0);
+  });
+
+  it('still moves between choices inside the list', () => {
+    const prompt = open({});
+    prompt.render = jest.fn();
+
+    prompt.onDownKey();
+    prompt.onDownKey();
+    prompt.onUpKey();
+
+    expect(prompt.pointer).toBe(1);
+  });
+
+  it('stops at the last match of what was typed', () => {
+    const prompt = typed(open({}), 'Oth');
+    prompt.render = jest.fn();
+
+    prompt.onDownKey();
+
+    expect(prompt.pointer).toBe(0);
+  });
+
+  it('shows PROMPT_PAGE_SIZE choices at a time through a window that does not repeat the list', () => {
+    const prompt = open({});
+
+    expect(prompt.opt.pageSize).toBe(PROMPT_PAGE_SIZE);
+    expect(prompt.paginator.paginate).toBe(scrollWindow);
+  });
+
+  it('keeps a page size the question sets itself', () => {
+    expect(open({ pageSize: 3 }).opt.pageSize).toBe(3);
   });
 
   it('submits the highlighted match of what was typed', () => {
@@ -162,6 +220,56 @@ describe('launchSearchList', () => {
   });
 });
 
+describe('scrollWindow', () => {
+  const LINES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].join('\n');
+  const HINT = '\u001b[2m(Use ↑/↓ to see more options)\u001b[22m';
+  const shown = (active: number) => scrollWindow(LINES, active, 5).split('\n');
+
+  it('shows a list that fits the page whole, with no hint', () => {
+    expect(scrollWindow('a\nb\nc', 2, 5)).toBe('a\nb\nc');
+  });
+
+  it('starts at the top of a longer list and says there are more', () => {
+    expect(shown(0)).toEqual(['a', 'b', 'c', 'd', 'e', HINT]);
+  });
+
+  it('keeps the highlight in the middle while scrolling down', () => {
+    expect(shown(4)).toEqual(['c', 'd', 'e', 'f', 'g', HINT]);
+  });
+
+  it('ends at the last choice and never shows the first one again after it', () => {
+    expect(shown(7)).toEqual(['d', 'e', 'f', 'g', 'h', HINT]);
+  });
+});
+
+describe('launchPaginated', () => {
+  interface Paginated {
+    paginator: { paginate(output: string, active: number): string };
+  }
+
+  class Upstream {
+    paginator = {
+      paginate: (output: string) => `${output}\n\u001b[2m(Move up and down to reveal more choices)\u001b[22m`,
+    };
+  }
+
+  it('points at the up and down arrows instead of the upstream wording', () => {
+    const Prompt = launchPaginated(Upstream as never) as unknown as new () => Paginated;
+
+    expect(new Prompt().paginator.paginate('a\nb', 0)).toBe(`a\nb\n\u001b[2m${MORE_CHOICES_HINT}\u001b[22m`);
+    expect(MORE_CHOICES_HINT).toBe('(Use ↑/↓ to see more options)');
+  });
+
+  it('leaves a page without the hint untouched', () => {
+    class Short {
+      paginator = { paginate: (output: string) => output };
+    }
+    const Prompt = launchPaginated(Short as never) as unknown as new () => Paginated;
+
+    expect(new Prompt().paginator.paginate('a\nb', 0)).toBe('a\nb');
+  });
+});
+
 describe('answerFor', () => {
   it('answers with the value of the choice whose name was typed in full', () => {
     expect(answerFor(CHOICES, 'NextJs')).toBe('NextJs');
@@ -224,8 +332,8 @@ describe('registerSearchList', () => {
 
     registerSearchList(fakeLoad);
 
-    expect(loaded).toEqual(['inquirer', 'inquirer-search-list']);
-    expect(registered).toHaveLength(1);
+    expect(loaded).toEqual(['inquirer', 'inquirer-search-list', 'inquirer/lib/prompts/list', 'inquirer/lib/prompts/checkbox']);
+    expect(registered.map(([name]) => name)).toEqual(['search-list', 'list', 'checkbox']);
     expect(registered[0][0]).toBe('search-list');
     expect((registered[0][1] as SearchListClass).prototype).toBeInstanceOf(SearchList);
     expect(registered[0][1]).not.toBe(SearchList);
@@ -237,5 +345,11 @@ describe('registerSearchList', () => {
     registerSearchList();
 
     expect((inquirer.prompt.prompts['search-list'] as SearchListClass).prototype).toBeInstanceOf(SearchList);
+    for (const type of ['list', 'checkbox']) {
+      const Upstream = load(`inquirer/lib/prompts/${type}`) as SearchListClass;
+
+      expect((inquirer.prompt.prompts[type] as SearchListClass).prototype).toBeInstanceOf(Upstream);
+      expect(inquirer.prompt.prompts[type]).not.toBe(Upstream);
+    }
   });
 });

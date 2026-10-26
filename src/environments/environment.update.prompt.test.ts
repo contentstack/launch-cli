@@ -77,7 +77,7 @@ describe('promptForEnvironmentUpdate', () => {
         { name: 'Password protection', value: 'passwordProtection' },
       ],
       loop: false,
-      pageSize: 12,
+      pageSize: 7,
       validate: expect.any(Function),
     });
   });

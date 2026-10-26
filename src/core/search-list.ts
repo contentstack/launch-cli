@@ -1,5 +1,8 @@
 import { createRequire } from 'node:module';
 
+import { PROMPT_PAGE_SIZE } from './prompt';
+import { styled } from './style';
+
 export interface SearchChoice {
   name?: string;
   value: unknown;
@@ -8,11 +11,13 @@ export interface SearchChoice {
 export type Validator = (value: unknown, answers?: unknown) => unknown;
 
 export interface SearchListPrompt {
-  opt: { default?: unknown; validate: Validator };
+  opt: { default?: unknown; validate: Validator; pageSize?: number };
   rl: { line: string };
   pointer: number;
   list: SearchChoice[];
   filterList: SearchChoice[];
+  paginator: Paginator;
+  render(): void;
   getCurrentValue(line?: unknown): unknown;
 }
 
@@ -51,12 +56,59 @@ export function startingPointer(list: SearchChoice[], initial: unknown): number 
   return Math.max(index, 0);
 }
 
+export const MORE_CHOICES_HINT = '(Use ↑/↓ to see more options)';
+
+const UPSTREAM_HINT = '(Move up and down to reveal more choices)';
+
+interface Paginator {
+  paginate(output: string, active: number, pageSize?: number): string;
+}
+
+export type PaginatedClass = new (...params: never[]) => { paginator: Paginator };
+
+export function launchPaginated(Prompt: PaginatedClass): PaginatedClass {
+  return class LaunchPaginated extends Prompt {
+    constructor(...params: never[]) {
+      super(...params);
+      const paginate = this.paginator.paginate.bind(this.paginator);
+      this.paginator.paginate = (output, active, pageSize) =>
+        paginate(output, active, pageSize).replace(UPSTREAM_HINT, MORE_CHOICES_HINT);
+    }
+  };
+}
+
+export function scrollWindow(output: string, active: number, pageSize = PROMPT_PAGE_SIZE): string {
+  const lines = output.split('\n');
+
+  if (lines.length <= pageSize) {
+    return output;
+  }
+
+  const top = Math.min(Math.max(active - Math.floor(pageSize / 2), 0), lines.length - pageSize);
+
+  return [...lines.slice(top, top + pageSize), styled(MORE_CHOICES_HINT, 'dim', true)].join(
+    '\n',
+  );
+}
+
 export function launchSearchList(SearchList: SearchListClass): SearchListClass {
   return class LaunchSearchList extends SearchList {
     constructor(...params: never[]) {
       super(...params);
       this.pointer = startingPointer(this.list, this.opt.default);
       this.opt.validate = refuseUnlisted(this.opt.validate);
+      this.opt.pageSize = this.opt.pageSize ?? PROMPT_PAGE_SIZE;
+      this.paginator = { paginate: scrollWindow };
+    }
+
+    onDownKey(): void {
+      this.pointer = Math.min(this.pointer + 1, Math.max(this.filterList.length - 1, 0));
+      this.render();
+    }
+
+    onUpKey(): void {
+      this.pointer = Math.max(this.pointer - 1, 0);
+      this.render();
     }
 
     getCurrentValue(line?: unknown): unknown {
@@ -99,4 +151,8 @@ export function registerSearchList(load: ModuleLoader = utilitiesLoader()): void
   const inquirer = load('inquirer') as PromptRegistry;
 
   inquirer.registerPrompt('search-list', launchSearchList(load('inquirer-search-list') as SearchListClass));
+
+  for (const type of ['list', 'checkbox']) {
+    inquirer.registerPrompt(type, launchPaginated(load(`inquirer/lib/prompts/${type}`) as PaginatedClass));
+  }
 }
