@@ -96,6 +96,15 @@ describe('variable create', () => {
     expect(printed).toEqual([]);
   });
 
+  it('returns nothing on a terminal with --no-vars, asking nothing, reading nothing and printing nothing', async () => {
+    const { services, io, asked, reads, printed } = fakes({ files: { '/work/.env': 'X=1' } });
+
+    expect(await variablesForCreate({ ...NONE, noVars: true }, services, io)).toEqual([]);
+    expect(asked).toEqual([]);
+    expect(reads).toEqual([]);
+    expect(printed).toEqual([]);
+  });
+
   it('treats empty flag lists as no flags', async () => {
     const { services, io, asked } = fakes({ answers: { 'Add environment variables': [SKIP] } });
 

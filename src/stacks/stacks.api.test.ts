@@ -45,6 +45,24 @@ describe('stacks api', () => {
     expect(asked.stacks).toEqual(['org7']);
   });
 
+  it('leaves out a stack the Management API says belongs to another organization', async () => {
+    const { api } = session(
+      {
+        items: [
+          { name: 'Shop', api_key: 'blt1', org_uid: 'org7' },
+          { name: 'Elsewhere', api_key: 'blt2', org_uid: 'org9' },
+          { name: 'Unmarked', api_key: 'blt3' },
+        ],
+      },
+      {},
+    );
+
+    await expect(api.list('org7')).resolves.toEqual([
+      { name: 'Shop', apiKey: 'blt1' },
+      { name: 'Unmarked', apiKey: 'blt3' },
+    ]);
+  });
+
   it('names a stack by its api key when it has no name and skips an entry with no api key', async () => {
     const { api } = session(
       { items: [{ api_key: 'blt1' }, { name: 'Nameless key' }, { name: 'Empty', api_key: '  ' }, null, 'text', { name: '  ', api_key: 'blt3' }] },

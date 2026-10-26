@@ -5,14 +5,14 @@ import { variableFlags, variableResolution } from './variable.inputs';
 
 describe('variable inputs', () => {
   it('names each flag as the Commands Details "All flags" tables name it', () => {
-    expect(Object.keys(variableFlags)).toEqual(['var', 'dotenv', 'key', 'from-stack', 'alias']);
+    expect(Object.keys(variableFlags)).toEqual(['var', 'dotenv', 'key', 'from-stack', 'alias', 'no-vars']);
   });
 
   it.each(['var', 'dotenv', 'key'] as const)('declares %s repeatable so each occurrence and each value is kept', (name) => {
     expect(variableFlags[name].multiple).toBe(true);
   });
 
-  it.each(['var', 'dotenv', 'key', 'from-stack', 'alias'] as const)('never marks %s required at parse time', (name) => {
+  it.each(['var', 'dotenv', 'key', 'from-stack', 'alias', 'no-vars'] as const)('never marks %s required at parse time', (name) => {
     expect(variableFlags[name].required).toBeFalsy();
   });
 
@@ -38,6 +38,17 @@ describe('variable inputs', () => {
 
     expect(parsed.flags['from-stack']).toBe(true);
     expect(parsed.flags.alias).toBe('my-prod');
+  });
+
+  it('parses --no-vars as a presence-only flag', async () => {
+    const parsed = await Parser.parse(['--no-vars'], { flags: { 'no-vars': variableFlags['no-vars'] } });
+
+    expect(variableFlags['no-vars'].type).toBe('boolean');
+    expect(parsed.flags['no-vars']).toBe(true);
+  });
+
+  it('leaves the sources out of an oclif exclusive group, since --help would show them excluding each other', () => {
+    expect(variableFlags['no-vars'].exclusive).toBeUndefined();
   });
 
   it('describes --var without showing a value that looks like a secret', () => {

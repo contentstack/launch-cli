@@ -166,9 +166,14 @@ describe('integration: launch:env:create on the wire', () => {
       return [
         cma
           .get('/v3/stacks')
-          .query({ organization_uid: ORG_UID, limit: '100', skip: '0' })
+          .matchHeader('organization_uid', ORG_UID)
+          .query({ limit: '100', skip: '0', query: JSON.stringify({ org_uid: ORG_UID }) })
           .reply(200, { stacks: [{ name: 'Shop', api_key: 'blt9stackkey' }] }),
-        cma.get('/v3/stacks').query({ organization_uid: ORG_UID, limit: '100', skip: '1' }).reply(200, { stacks: [] }),
+        cma
+          .get('/v3/stacks')
+          .matchHeader('organization_uid', ORG_UID)
+          .query({ limit: '100', skip: '1', query: JSON.stringify({ org_uid: ORG_UID }) })
+          .reply(200, { stacks: [] }),
         cma
           .get('/v3/stacks/delivery_tokens')
           .query({ limit: '100', skip: '0' })
@@ -273,6 +278,19 @@ describe('integration: launch:env:create on the wire', () => {
       const { error } = await onTerminal(() => runCommand(WITH_AUTH, config));
 
       expect(error).toBeUndefined();
+      expect(sent[0].environmentVariables).toEqual([]);
+    });
+
+    it('creates with no variables and asks nothing when --no-vars is given on a terminal', async () => {
+      const prompts = answerPrompts({});
+      const sent: { environmentVariables?: unknown }[] = [];
+      stubCreate(sent);
+      stubFollowUp('LIVE');
+
+      const { error } = await onTerminal(() => runCommand([...WITH_AUTH, '--no-vars'], config));
+
+      expect(error).toBeUndefined();
+      expect(prompts.messages).toEqual([]);
       expect(sent[0].environmentVariables).toEqual([]);
     });
 

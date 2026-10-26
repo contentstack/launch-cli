@@ -29,8 +29,12 @@ function failureReason(error: unknown): string {
   return textOf(error) ?? 'the Contentstack Management API gave no reason';
 }
 
-function stackOf(value: unknown): Stack[] {
-  if (!isRecord(value)) {
+function ofAnotherOrganization(value: Record<string, unknown>, organizationUid: string): boolean {
+  return textOf(value.org_uid) !== undefined && value.org_uid !== organizationUid;
+}
+
+function stackOf(value: unknown, organizationUid: string): Stack[] {
+  if (!isRecord(value) || ofAnotherOrganization(value, organizationUid)) {
     return [];
   }
 
@@ -78,7 +82,7 @@ export class StacksApi {
     try {
       const { items } = await this.cma.fetchStacks(organizationUid);
 
-      return (items ?? []).flatMap(stackOf);
+      return (items ?? []).flatMap((item) => stackOf(item, organizationUid));
     } catch (error) {
       throw new StackLookupError('the stacks of this organization', failureReason(error));
     }

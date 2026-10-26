@@ -101,6 +101,7 @@ export interface EnvironmentRequest {
   envFiles?: string[];
   fromStack?: boolean;
   alias?: string;
+  noVars?: boolean;
   framework?: FrameworkPreset;
   buildCmd?: string;
   outputDir?: string;

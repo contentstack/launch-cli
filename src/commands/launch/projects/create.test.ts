@@ -1,7 +1,7 @@
 import type { defaultWatchTiming } from '../../../deployments/deployment.watcher';
 import { DEPLOYMENT_WAIT_TIMEOUT_MS } from '../../../deployments/deployment.watcher';
 import { serverCommandFrameworkGate } from '../../../environments/environment.inputs';
-import { aliasRequiresFromStack } from '../../../variables/variable.rules';
+import { aliasRequiresFromStack, noVarsAlone } from '../../../variables/variable.rules';
 import { ProjectCreator } from '../../../projects/project.create';
 
 type WatchTiming = ReturnType<typeof defaultWatchTiming>;
@@ -101,7 +101,7 @@ describe('launch:projects:create', () => {
   });
 
   it('declares only the framework gate as a rule, leaving GitHub-only flags on FileUpload to a confirmation', () => {
-    expect(ProjectsCreate.rules).toEqual([serverCommandFrameworkGate, aliasRequiresFromStack]);
+    expect(ProjectsCreate.rules).toEqual([serverCommandFrameworkGate, aliasRequiresFromStack, noVarsAlone]);
   });
 
   it('declares every flag it reads and requires only the organization', () => {
@@ -123,6 +123,7 @@ describe('launch:projects:create', () => {
       'dotenv',
       'from-stack',
       'alias',
+      'no-vars',
     ]);
     expect(Object.keys(ProjectsCreate.flags).sort()).toEqual(Object.keys(ProjectsCreate.inputs).sort());
     expect(
