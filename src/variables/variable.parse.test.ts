@@ -1,4 +1,5 @@
 import { UsageError } from '../core/errors';
+import { TYPED_QUESTION } from './variable.chooser';
 import { parseAssignment, splitLine } from './variable.parse';
 
 describe('variable parse', () => {
@@ -79,5 +80,15 @@ describe('variable parse split line', () => {
   it.each([['A="unterminated'], ["A='unterminated"]])('refuses an unterminated quote (%p) without echoing the text', (line) => {
     expect(() => splitLine(line)).toThrow(UsageError);
     expect(() => splitLine(line)).toThrow('The line has an opening quote with no closing quote.');
+  });
+
+  it('reads the example in the manual entry question as three pairs, one per separator and one quoted', () => {
+    const example = /\(Ex: (.+)\)$/.exec(TYPED_QUESTION)?.[1] ?? '';
+
+    expect(splitLine(example).map(parseAssignment)).toEqual([
+      { key: 'KEY1', value: 'value1' },
+      { key: 'KEY2', value: 'value2' },
+      { key: 'KEY3', value: 'value with spaces' },
+    ]);
   });
 });

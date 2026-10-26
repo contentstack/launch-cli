@@ -27,16 +27,24 @@ export class VariableRemover {
     }
 
     const name = held.name ?? environment;
-    const listed = [...new Set(request.keys)].join(', ');
+    const keys = [...new Set(request.keys)];
+    const listed = keys.join(', ');
+    const single = keys.length === 1;
+    const subject = `${single ? 'variable' : 'variables'} ${listed}`;
+    const question = `Are you sure you want to remove the ${subject} from the "${name}" environment?`;
 
-    if (!(await this.confirm(`Are you sure you want to remove ${listed} from "${name}"?`))) {
+    if (!(await this.confirm(question))) {
       return false;
     }
 
     await unsetVariables(this.services.api.variables, scope, request.keys);
 
     this.services.ux.print(
-      styled(`✔ ${listed} removed from ${name}.`, 'green', this.services.outputIsTTY === true),
+      styled(
+        `✔ ${single ? 'Variable' : 'Variables'} ${listed} removed from the "${name}" environment.`,
+        'green',
+        this.services.outputIsTTY === true,
+      ),
     );
 
     return true;
