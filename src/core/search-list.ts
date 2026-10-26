@@ -58,37 +58,43 @@ export function startingPointer(list: SearchChoice[], initial: unknown): number 
 
 export const MORE_CHOICES_HINT = '(Use ↑/↓ to see more options)';
 
-const UPSTREAM_HINT = '(Move up and down to reveal more choices)';
-
 interface Paginator {
   paginate(output: string, active: number, pageSize?: number): string;
 }
 
 export type PaginatedClass = new (...params: never[]) => { paginator: Paginator };
 
+export function pageScroller(): Paginator {
+  let top = 0;
+
+  return {
+    paginate(output: string, active: number, pageSize = PROMPT_PAGE_SIZE): string {
+      const lines = output.split('\n');
+
+      if (lines.length <= pageSize) {
+        return output;
+      }
+
+      if (active < top) {
+        top = active;
+      } else if (active >= top + pageSize) {
+        top = active - pageSize + 1;
+      }
+
+      top = Math.min(Math.max(top, 0), lines.length - pageSize);
+
+      return [...lines.slice(top, top + pageSize), styled(MORE_CHOICES_HINT, 'dim', true)].join('\n');
+    },
+  };
+}
+
 export function launchPaginated(Prompt: PaginatedClass): PaginatedClass {
   return class LaunchPaginated extends Prompt {
     constructor(...params: never[]) {
       super(...params);
-      const paginate = this.paginator.paginate.bind(this.paginator);
-      this.paginator.paginate = (output, active, pageSize) =>
-        paginate(output, active, pageSize).replace(UPSTREAM_HINT, MORE_CHOICES_HINT);
+      this.paginator = pageScroller();
     }
   };
-}
-
-export function scrollWindow(output: string, active: number, pageSize = PROMPT_PAGE_SIZE): string {
-  const lines = output.split('\n');
-
-  if (lines.length <= pageSize) {
-    return output;
-  }
-
-  const top = Math.min(Math.max(active - Math.floor(pageSize / 2), 0), lines.length - pageSize);
-
-  return [...lines.slice(top, top + pageSize), styled(MORE_CHOICES_HINT, 'dim', true)].join(
-    '\n',
-  );
 }
 
 export function launchSearchList(SearchList: SearchListClass): SearchListClass {
@@ -98,7 +104,7 @@ export function launchSearchList(SearchList: SearchListClass): SearchListClass {
       this.pointer = startingPointer(this.list, this.opt.default);
       this.opt.validate = refuseUnlisted(this.opt.validate);
       this.opt.pageSize = this.opt.pageSize ?? PROMPT_PAGE_SIZE;
-      this.paginator = { paginate: scrollWindow };
+      this.paginator = pageScroller();
     }
 
     onDownKey(): void {
