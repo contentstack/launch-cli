@@ -8,7 +8,7 @@ import {
   launchSearchList,
   refuseUnlisted,
   registerSearchList,
-  scrollWindow,
+  pageScroller,
   startingPointer,
   unlistedMessage,
   utilitiesLoader,
@@ -20,7 +20,7 @@ const SearchList = load('inquirer-search-list') as SearchListClass;
 interface Prompt {
   opt: { validate: (value: unknown, answers?: unknown) => unknown; pageSize?: number };
   pointer: number;
-  paginator: { paginate: unknown };
+  paginator: { paginate(output: string, active: number, pageSize?: number): string };
   render(): void;
   onDownKey(): void;
   onUpKey(): void;
@@ -120,11 +120,11 @@ describe('launchSearchList', () => {
     expect(prompt.pointer).toBe(0);
   });
 
-  it('shows PROMPT_PAGE_SIZE choices at a time through a window that does not repeat the list', () => {
+  it('shows PROMPT_PAGE_SIZE choices at a time through the page scroller', () => {
     const prompt = open({});
 
     expect(prompt.opt.pageSize).toBe(PROMPT_PAGE_SIZE);
-    expect(prompt.paginator.paginate).toBe(scrollWindow);
+    expect(prompt.paginator.paginate(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].join('\n'), 0)).toContain(MORE_CHOICES_HINT);
   });
 
   it('keeps a page size the question sets itself', () => {
@@ -220,53 +220,75 @@ describe('launchSearchList', () => {
   });
 });
 
-describe('scrollWindow', () => {
+describe('pageScroller', () => {
   const LINES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].join('\n');
   const HINT = '\u001b[2m(Use ↑/↓ to see more options)\u001b[22m';
-  const shown = (active: number) => scrollWindow(LINES, active, 5).split('\n');
+
+  function walk(...actives: number[]): string[][] {
+    const scroller = pageScroller();
+
+    return actives.map((active) => scroller.paginate(LINES, active, 5).split('\n'));
+  }
 
   it('shows a list that fits the page whole, with no hint', () => {
-    expect(scrollWindow('a\nb\nc', 2, 5)).toBe('a\nb\nc');
+    expect(pageScroller().paginate('a\nb\nc', 2, 5)).toBe('a\nb\nc');
   });
 
   it('starts at the top of a longer list and says there are more', () => {
-    expect(shown(0)).toEqual(['a', 'b', 'c', 'd', 'e', HINT]);
+    expect(walk(0)[0]).toEqual(['a', 'b', 'c', 'd', 'e', HINT]);
   });
 
-  it('keeps the highlight in the middle while scrolling down', () => {
-    expect(shown(4)).toEqual(['c', 'd', 'e', 'f', 'g', HINT]);
+  it('keeps the page still while the arrow moves down to its last row', () => {
+    expect(walk(0, 1, 2, 3, 4)[4]).toEqual(['a', 'b', 'c', 'd', 'e', HINT]);
+  });
+
+  it('scrolls one row at a time once the arrow is on the last row, keeping it there', () => {
+    const pages = walk(0, 1, 2, 3, 4, 5, 6);
+
+    expect(pages[5]).toEqual(['b', 'c', 'd', 'e', 'f', HINT]);
+    expect(pages[6]).toEqual(['c', 'd', 'e', 'f', 'g', HINT]);
   });
 
   it('ends at the last choice and never shows the first one again after it', () => {
-    expect(shown(7)).toEqual(['d', 'e', 'f', 'g', 'h', HINT]);
+    expect(walk(0, 1, 2, 3, 4, 5, 6, 7, 7)[8]).toEqual(['d', 'e', 'f', 'g', 'h', HINT]);
+  });
+
+  it('keeps the page still while the arrow moves back up, and scrolls once it goes above the top row', () => {
+    const pages = walk(7, 6, 5, 4, 3, 2);
+
+    expect(pages[4]).toEqual(['d', 'e', 'f', 'g', 'h', HINT]);
+    expect(pages[5]).toEqual(['c', 'd', 'e', 'f', 'g', HINT]);
+  });
+
+  it('opens on the page that holds a choice offered further down, with it on the last row', () => {
+    expect(walk(6)[0]).toEqual(['c', 'd', 'e', 'f', 'g', HINT]);
   });
 });
 
 describe('launchPaginated', () => {
   interface Paginated {
-    paginator: { paginate(output: string, active: number): string };
+    paginator: { paginate(output: string, active: number, pageSize?: number): string };
   }
 
   class Upstream {
-    paginator = {
-      paginate: (output: string) => `${output}\n\u001b[2m(Move up and down to reveal more choices)\u001b[22m`,
-    };
+    paginator = { paginate: (output: string) => output };
   }
 
-  it('points at the up and down arrows instead of the upstream wording', () => {
+  it('pages with its own scroller, which keeps the arrow moving and says how to see more', () => {
     const Prompt = launchPaginated(Upstream as never) as unknown as new () => Paginated;
+    const prompt = new Prompt();
+    const lines = Array.from({ length: 10 }, (_, index) => `c${index}`).join('\n');
 
-    expect(new Prompt().paginator.paginate('a\nb', 0)).toBe(`a\nb\n\u001b[2m${MORE_CHOICES_HINT}\u001b[22m`);
+    expect(prompt.paginator.paginate(lines, 3, 7).split('\n')).toEqual([
+      'c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', `\u001b[2m${MORE_CHOICES_HINT}\u001b[22m`,
+    ]);
     expect(MORE_CHOICES_HINT).toBe('(Use ↑/↓ to see more options)');
   });
 
-  it('leaves a page without the hint untouched', () => {
-    class Short {
-      paginator = { paginate: (output: string) => output };
-    }
-    const Prompt = launchPaginated(Short as never) as unknown as new () => Paginated;
+  it('gives each prompt a scroller of its own', () => {
+    const Prompt = launchPaginated(Upstream as never) as unknown as new () => Paginated;
 
-    expect(new Prompt().paginator.paginate('a\nb', 0)).toBe('a\nb');
+    expect(new Prompt().paginator).not.toBe(new Prompt().paginator);
   });
 });
 

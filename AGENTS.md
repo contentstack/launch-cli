@@ -410,7 +410,15 @@ replaced, and still sees every listed answer.
 The same wrapper makes the pickers scroll like the lists: `PROMPT_PAGE_SIZE` rows at a time, and the
 arrow stops at the first and last entry. Upstream, the up and down arrow handlers wrap round and the
 bundled inquirer 3 paginator repeats the list three times to look endless, so the wrapper overrides both
-arrow handlers and swaps the paginator for `scrollWindow`, a window that stops at both ends.
+arrow handlers and swaps the paginator for `pageScroller`.
+
+*Every list scrolls the same way.* `registerSearchList` also registers `list` and `checkbox` as
+`launchPaginated` subclasses, so all three prompt types page through `pageScroller` and print
+`(Use ↑/↓ to see more options)` under a list that scrolls. inquirer's own paginator holds the arrow in
+the middle of the page and slides the list under it, then lets the arrow move again near the end;
+`pageScroller` keeps the page still while the arrow moves to its top or bottom row, and only then
+scrolls one row at a time. Each prompt gets its own scroller, since it remembers which row the page
+starts at.
 
 Together these are the prompt-side twin of `oneOf` on the flag side (`--cs-auth yes` has always been
 exit 2); the two now agree, and no prompt module needs its own check.

@@ -228,7 +228,7 @@ fileignoreconfig:
     - "a project name passed on argv to the project resolver"
     - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
 - filename: AGENTS.md
-  checksum: c3276952d1eb16ea53f89363c9a70b59a19efc21fe087ea89ee70946c4b7cfc7
+  checksum: dcebcddea3f29849c0b287e9cf8786a4e306394fe96b9ca4136525298eee6379
   allowed_patterns:
     - "Do not add an exemption to a guard to make a new file pass"
     - "passes its own error wording to `client.request\\(req, MESSAGES\\)`"
