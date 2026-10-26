@@ -22,11 +22,12 @@ export interface ChooserPrompt {
 
 export const STACK_CHOICE = 'Import variables from a stack';
 export const FILE_CHOICE = 'Import variables from a dotenv file';
-export const TYPED_CHOICE = 'Type KEY=VALUE pairs';
+export const TYPED_CHOICE = 'Manually add custom variables';
 export const SKIP_CHOICE = 'Skip adding environment variables';
 const FILE_QUESTION = 'Path to the dotenv file';
-const TYPED_QUESTION = 'KEY=VALUE pairs separated by spaces';
-const TYPED_LABEL = '--var';
+export const TYPED_QUESTION =
+  'Enter variables separated by spaces (Ex: KEY1=value1 KEY2:value2 KEY3="value with spaces")';
+const TYPED_LABEL = 'manual entry';
 
 async function askForFile(
   detected: string | undefined,

@@ -10,7 +10,7 @@ const SAVED_TOKEN = `cs-${randomUUID()}`;
 const STACK = 'Import variables from a stack';
 const SKIP = 'Skip adding environment variables';
 const FILE = 'Import variables from a dotenv file';
-const TYPED = 'Type KEY=VALUE pairs';
+const TYPED = 'Manually add custom variables';
 
 function fakes(options: { isTTY?: boolean; answers?: Record<string, unknown>; files?: Record<string, string> } = {}) {
   const files = options.files ?? {};
@@ -188,7 +188,7 @@ describe('variable create', () => {
       answers: {
         'Add environment variables': [FILE, TYPED],
         'Path to the dotenv file': 'a.env',
-        'KEY=VALUE pairs separated by spaces': 'API_URL="sk live secret" N=2',
+        'Enter variables separated by spaces (Ex: KEY1=value1 KEY2:value2 KEY3="value with spaces")': 'API_URL="sk live secret" N=2',
       },
     });
 
@@ -199,7 +199,8 @@ describe('variable create', () => {
       { key: 'F', value: '1' },
       { key: 'N', value: '2' },
     ]);
-    expect(printed.join('\n')).toContain('API_URL overridden by --var');
+    expect(printed.join('\n')).toContain('API_URL overridden by manual entry');
+    expect(printed.join('\n')).not.toContain('--var');
     expect(printed.join('\n')).not.toContain('sk live secret');
   });
 
@@ -207,7 +208,7 @@ describe('variable create', () => {
     const { services, io, asked } = fakes({
       answers: {
         'Add environment variables': [TYPED],
-        'KEY=VALUE pairs separated by spaces': 'API_KEY',
+        'Enter variables separated by spaces (Ex: KEY1=value1 KEY2:value2 KEY3="value with spaces")': 'API_KEY',
         'Value for API_KEY': 's3cret',
       },
     });
@@ -220,7 +221,7 @@ describe('variable create', () => {
 
   it('echoes the typed keys with masked values and never a value', async () => {
     const { services, io, printed } = fakes({
-      answers: { 'Add environment variables': [TYPED], 'KEY=VALUE pairs separated by spaces': 'A=never-printed-value' },
+      answers: { 'Add environment variables': [TYPED], 'Enter variables separated by spaces (Ex: KEY1=value1 KEY2:value2 KEY3="value with spaces")': 'A=never-printed-value' },
     });
 
     await variablesForCreate(NONE, services, io);
@@ -251,7 +252,7 @@ describe('variable create', () => {
     );
 
     const malformed = fakes({
-      answers: { 'Add environment variables': [TYPED], 'KEY=VALUE pairs separated by spaces': 'A="oops' },
+      answers: { 'Add environment variables': [TYPED], 'Enter variables separated by spaces (Ex: KEY1=value1 KEY2:value2 KEY3="value with spaces")': 'A="oops' },
     });
 
     await expect(variablesForCreate(NONE, malformed.services, malformed.io)).rejects.toThrow(
@@ -301,7 +302,7 @@ describe('variable create', () => {
         'Add environment variables': [STACK, TYPED],
         Stack: '0',
         'Delivery token': '0',
-        'KEY=VALUE pairs separated by spaces': 'EXTRA=1',
+        'Enter variables separated by spaces (Ex: KEY1=value1 KEY2:value2 KEY3="value with spaces")': 'EXTRA=1',
       },
     });
 
@@ -311,7 +312,7 @@ describe('variable create', () => {
       'Add environment variables',
       'Stack',
       'Delivery token',
-      'KEY=VALUE pairs separated by spaces',
+      'Enter variables separated by spaces (Ex: KEY1=value1 KEY2:value2 KEY3="value with spaces")',
     ]);
     expect(variables.map((variable) => variable.key)).toEqual([
       'CONTENTSTACK_API_HOST',

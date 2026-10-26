@@ -925,9 +925,9 @@ describe('integration: launch:projects:create on the wire', () => {
       const file = join(dataDir, 'picked.env');
       writeFileSync(file, 'API_URL=from-file\nFROM_FILE=1\n');
       const prompts = answerPrompts({
-        'Add environment variables': ['Import variables from a dotenv file', 'Type KEY=VALUE pairs'],
+        'Add environment variables': ['Import variables from a dotenv file', 'Manually add custom variables'],
         'Path to the dotenv file': file,
-        'KEY=VALUE pairs separated by spaces': 'API_URL=typed DEBUG=true',
+        'Enter variables separated by spaces (Ex: KEY1=value1 KEY2:value2 KEY3="value with spaces")': 'API_URL=typed DEBUG=true',
       });
       stubGitLookups();
       const create = captureBody();
@@ -939,7 +939,7 @@ describe('integration: launch:projects:create on the wire', () => {
       expect(prompts.messages).toEqual([
         'Add environment variables',
         'Path to the dotenv file',
-        'KEY=VALUE pairs separated by spaces',
+        'Enter variables separated by spaces (Ex: KEY1=value1 KEY2:value2 KEY3="value with spaces")',
       ]);
       expect(create.scope.isDone()).toBe(true);
       expect(create.body()?.environment?.environmentVariables).toEqual([
@@ -959,12 +959,12 @@ describe('integration: launch:projects:create on the wire', () => {
         'Add environment variables': [
           'Import variables from a stack',
           'Import variables from a dotenv file',
-          'Type KEY=VALUE pairs',
+          'Manually add custom variables',
         ],
         Stack: '0',
         'Delivery token': '0',
         'Path to the dotenv file': file,
-        'KEY=VALUE pairs separated by spaces': 'FROM_FILE=typed EXTRA=1',
+        'Enter variables separated by spaces (Ex: KEY1=value1 KEY2:value2 KEY3="value with spaces")': 'FROM_FILE=typed EXTRA=1',
       });
       stubGitLookups();
       const lookups = stubStackPickers();
@@ -979,7 +979,7 @@ describe('integration: launch:projects:create on the wire', () => {
         'Stack',
         'Delivery token',
         'Path to the dotenv file',
-        'KEY=VALUE pairs separated by spaces',
+        'Enter variables separated by spaces (Ex: KEY1=value1 KEY2:value2 KEY3="value with spaces")',
       ]);
       expect(lookups.every((scope) => scope.isDone())).toBe(true);
       expect(create.body()?.environment?.environmentVariables).toEqual([
@@ -997,7 +997,7 @@ describe('integration: launch:projects:create on the wire', () => {
 
     it('refuses Skip combined with another source before creating anything', async () => {
       answerPrompts({
-        'Add environment variables': ['Skip adding environment variables', 'Type KEY=VALUE pairs'],
+        'Add environment variables': ['Skip adding environment variables', 'Manually add custom variables'],
       });
       stubGitLookups();
       const create = captureBody();

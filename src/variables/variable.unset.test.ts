@@ -59,9 +59,9 @@ describe('variable remover', () => {
 
     expect(removed).toBe(true);
     expect(order).toEqual(['get', 'confirm', 'patch']);
-    expect(questions).toEqual(['Are you sure you want to remove API_KEY from "staging"?']);
+    expect(questions).toEqual(['Are you sure you want to remove the variable API_KEY from the "staging" environment?']);
     expect(patches).toEqual([{ ...SCOPE, unset: ['API_KEY'] }]);
-    expect(printed).toEqual(['✔ API_KEY removed from staging.']);
+    expect(printed).toEqual(['✔ Variable API_KEY removed from the "staging" environment.']);
   });
 
   it('names several keys together', async () => {
@@ -69,8 +69,8 @@ describe('variable remover', () => {
 
     await remover.remove({ ...SCOPE, keys: ['API_KEY', 'DEBUG'] });
 
-    expect(questions).toEqual(['Are you sure you want to remove API_KEY, DEBUG from "staging"?']);
-    expect(printed).toEqual(['✔ API_KEY, DEBUG removed from staging.']);
+    expect(questions).toEqual(['Are you sure you want to remove the variables API_KEY, DEBUG from the "staging" environment?']);
+    expect(printed).toEqual(['✔ Variables API_KEY, DEBUG removed from the "staging" environment.']);
   });
 
   it('falls back to the environment reference when the environment carries no name', async () => {
@@ -78,8 +78,8 @@ describe('variable remover', () => {
 
     await remover.remove({ ...SCOPE, keys: ['A'] });
 
-    expect(questions).toEqual(['Are you sure you want to remove A from "env1"?']);
-    expect(printed).toEqual(['✔ A removed from env1.']);
+    expect(questions).toEqual(['Are you sure you want to remove the variable A from the "env1" environment?']);
+    expect(printed).toEqual(['✔ Variable A removed from the "env1" environment.']);
   });
 
   it('returns false and changes nothing when the user declines', async () => {
