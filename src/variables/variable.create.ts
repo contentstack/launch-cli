@@ -15,6 +15,7 @@ export interface CreateVariablesRequest {
   org: string;
   fromStack?: boolean;
   alias?: string;
+  noVars?: boolean;
 }
 
 const CHOOSE_MESSAGE = 'Add environment variables';
@@ -45,6 +46,10 @@ export async function variablesForCreate(
   io: VariableIo = DEFAULT_VARIABLE_IO,
   savedToken: (alias: string) => SavedToken | undefined = readSavedToken,
 ): Promise<EnvironmentVariableInput[]> {
+  if (request.noVars === true) {
+    return [];
+  }
+
   const stack: StackImporter = (alias) => importFromStack({ org: request.org, alias }, { services, savedToken });
 
   if (given(request.vars) || given(request.envFiles) || request.fromStack === true) {

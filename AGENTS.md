@@ -351,7 +351,10 @@ than return a truncated list.
 `projects:create` and `env:create` take `--var` and `--dotenv` and reach the same resolver through
 `EnvironmentBuilder`, which asks last - after Contentstack Authentication, where V1 asked - with no auto-detection.
 With neither flag it offers a checkbox over the sources plus `Skip adding environment variables`, which cannot be
-combined with the others; without a terminal it sends an empty list.
+combined with the others; without a terminal it sends an empty list. `--no-vars` is the flag form of that Skip
+choice, so a fully flagged create on a terminal asks nothing: it sends an empty list without the checkbox. Combined
+with `--var`, `--dotenv` or `--from-stack` it is a usage error from the `noVarsAlone` rule rather than oclif's
+`exclusive`, whose `--help` usage line would show those three sources excluding each other.
 
 **`--from-stack` and `--alias`.** `--from-stack` is a bare flag on `variables:set`, `projects:create` and
 `env:create`; `--alias <name>` (`-a`) names a delivery token saved with `csdx auth:tokens:add`, and is a usage error
@@ -360,7 +363,10 @@ without `--from-stack` (`aliasRequiresFromStack`). With an alias the token is re
 a terminal gets a stack picker then a delivery-token picker (names only); without a terminal it is a usage error
 naming `--alias`. The five variables come from `GET /cms/environment-variables` (API host and CDN, scheme stripped)
 plus the stack's API key, the token and its environment. `src/stacks/` owns the Contentstack stack lookups through
-`CmaSession.fetchStacks` / `fetchDeliveryTokens`, which page 100 at a time; `variables` may import `stacks` and
+`CmaSession.fetchStacks` / `fetchDeliveryTokens`, which page 100 at a time. `fetchStacks` scopes by organization on the
+stack handle (`stack({ organization_uid })`), which the SDK sends as the `organization_uid` header and an `org_uid`
+query filter (inside `query()` it would be a plain query parameter), and `StacksApi.list` also drops
+any stack whose `org_uid` names another organization; `variables` may import `stacks` and
 `environments` and nothing else (`RESOURCE_EDGES`). A delivery token value is never printed or logged.
 
 Two harness traps. `@oclif/test`'s `runCommand` joins argv with spaces and splits it again, so a value containing a

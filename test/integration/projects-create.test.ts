@@ -767,6 +767,36 @@ describe('integration: launch:projects:create on the wire', () => {
     expect(onWire).toEqual([]);
   });
 
+  it('asks nothing on a terminal when every value is a flag and --no-vars says there are no variables', async () => {
+    let body: { environment?: { environmentVariables?: unknown } } | undefined;
+    const prompts = answerPrompts({});
+    stubGitLookups();
+    const create = hub()
+      .post('/manage/projects', (sent: typeof body) => {
+        body = sent;
+        return true;
+      })
+      .query({})
+      .reply(201, { project: CREATED_PROJECT });
+    stubFollowUp('LIVE');
+
+    const { error } = await onTerminal(() => runCommand([...gitFlags(), '--no-vars'], config));
+
+    expect(error).toBeUndefined();
+    expect(prompts.messages).toEqual([]);
+    expect(create.isDone()).toBe(true);
+    expect(body?.environment?.environmentVariables).toEqual([]);
+    expect(onWire).toEqual([]);
+  });
+
+  it('refuses --no-vars with --var with exit 2 before any request', async () => {
+    const { error } = await runCommand([...gitFlags(), '--no-vars', '--var', 'A=1'], config);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toContain('--no-vars');
+    expect(onWire).toEqual([]);
+  });
+
   it('sends the variables from --var and --dotenv in the create body and prints no value', async () => {
     let body: { environment?: { environmentVariables?: unknown } } | undefined;
     stubGitLookups();
@@ -849,9 +879,14 @@ describe('integration: launch:projects:create on the wire', () => {
       return [
         cma
           .get('/v3/stacks')
-          .query({ organization_uid: ORG_UID, limit: '100', skip: '0' })
+          .matchHeader('organization_uid', ORG_UID)
+          .query({ limit: '100', skip: '0', query: JSON.stringify({ org_uid: ORG_UID }) })
           .reply(200, { stacks: [{ name: 'Shop', api_key: 'blt9stackkey' }] }),
-        cma.get('/v3/stacks').query({ organization_uid: ORG_UID, limit: '100', skip: '1' }).reply(200, { stacks: [] }),
+        cma
+          .get('/v3/stacks')
+          .matchHeader('organization_uid', ORG_UID)
+          .query({ limit: '100', skip: '1', query: JSON.stringify({ org_uid: ORG_UID }) })
+          .reply(200, { stacks: [] }),
         cma
           .get('/v3/stacks/delivery_tokens')
           .query({ limit: '100', skip: '0' })
