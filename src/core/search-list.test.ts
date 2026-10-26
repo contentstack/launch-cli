@@ -1,3 +1,4 @@
+import { PROMPT_PAGE_SIZE } from './prompt';
 import type { SearchListClass } from './search-list';
 import {
   UnlistedAnswer,
@@ -5,6 +6,7 @@ import {
   launchSearchList,
   refuseUnlisted,
   registerSearchList,
+  scrollWindow,
   startingPointer,
   unlistedMessage,
   utilitiesLoader,
@@ -14,8 +16,12 @@ const load = utilitiesLoader();
 const SearchList = load('inquirer-search-list') as SearchListClass;
 
 interface Prompt {
-  opt: { validate: (value: unknown, answers?: unknown) => unknown };
+  opt: { validate: (value: unknown, answers?: unknown) => unknown; pageSize?: number };
   pointer: number;
+  paginator: { paginate: unknown };
+  render(): void;
+  onDownKey(): void;
+  onUpKey(): void;
   rl: { line: string };
   selected: unknown;
   filterChoices(): void;
@@ -71,6 +77,56 @@ describe('launchSearchList', () => {
 
     expect(prompt.pointer).toBe(0);
     expect(prompt.getCurrentValue()).toBe('Gatsby');
+  });
+
+  it('stops at the last choice instead of wrapping round to the first', () => {
+    const prompt = open({ default: 'Other' });
+    prompt.render = jest.fn();
+
+    prompt.onDownKey();
+
+    expect(prompt.pointer).toBe(2);
+    expect(prompt.render).toHaveBeenCalled();
+  });
+
+  it('stops at the first choice instead of wrapping round to the last', () => {
+    const prompt = open({});
+    prompt.render = jest.fn();
+
+    prompt.onUpKey();
+
+    expect(prompt.pointer).toBe(0);
+  });
+
+  it('still moves between choices inside the list', () => {
+    const prompt = open({});
+    prompt.render = jest.fn();
+
+    prompt.onDownKey();
+    prompt.onDownKey();
+    prompt.onUpKey();
+
+    expect(prompt.pointer).toBe(1);
+  });
+
+  it('stops at the last match of what was typed', () => {
+    const prompt = typed(open({}), 'Oth');
+    prompt.render = jest.fn();
+
+    prompt.onDownKey();
+
+    expect(prompt.pointer).toBe(0);
+  });
+
+  it('shows PROMPT_PAGE_SIZE choices at a time through a window that does not repeat the list', () => {
+    const prompt = open({});
+
+    expect(prompt.opt.pageSize).toBe(PROMPT_PAGE_SIZE);
+    expect(prompt.paginator.paginate).toBe(scrollWindow);
+  });
+
+  it('keeps a page size the question sets itself', () => {
+    expect(open({ pageSize: 3 }).opt.pageSize).toBe(3);
   });
 
   it('submits the highlighted match of what was typed', () => {
@@ -159,6 +215,28 @@ describe('launchSearchList', () => {
 
   it('echoes nothing before a choice is made', () => {
     expect(open({}).selected).toBe('');
+  });
+});
+
+describe('scrollWindow', () => {
+  const LINES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].join('\n');
+  const HINT = '\u001b[2m(Move up and down to reveal more choices)\u001b[22m';
+  const shown = (active: number) => scrollWindow(LINES, active, 5).split('\n');
+
+  it('shows a list that fits the page whole, with no hint', () => {
+    expect(scrollWindow('a\nb\nc', 2, 5)).toBe('a\nb\nc');
+  });
+
+  it('starts at the top of a longer list and says there are more', () => {
+    expect(shown(0)).toEqual(['a', 'b', 'c', 'd', 'e', HINT]);
+  });
+
+  it('keeps the highlight in the middle while scrolling down', () => {
+    expect(shown(4)).toEqual(['c', 'd', 'e', 'f', 'g', HINT]);
+  });
+
+  it('ends at the last choice and never shows the first one again after it', () => {
+    expect(shown(7)).toEqual(['d', 'e', 'f', 'g', 'h', HINT]);
   });
 });
 

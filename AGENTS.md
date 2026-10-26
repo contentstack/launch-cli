@@ -378,8 +378,8 @@ payload inline.
 on an arrow or a digit and ignores every letter, so text can never become the answer and nothing
 needs validating. Every choice prompt (`askOption`, and the checkbox `askChoices`) passes `loop: false`, so the
 arrow stops at the last entry instead of wrapping to the first, and a `pageSize` of the choice count
-capped at `PROMPT_PAGE_SIZE` (15), so a short list shows whole and a 100-entry picker scrolls in a
-fixed window. `askChoices` refuses an empty selection at the prompt, naming <space>. Project type, branch, Framework preset, Response mode and Contentstack
+capped at `PROMPT_PAGE_SIZE` (5), so a list of five or fewer shows whole and anything longer - the
+eleven framework presets, the env:update checklist - scrolls five at a time in a fixed window. `askChoices` refuses an empty selection at the prompt, naming <space>. Project type, branch, Framework preset, Response mode and Contentstack
 Authentication are all asked this way. Prefer it: the `❯` always shows what Enter will take, where a
 search box hides the list the moment the filter matches nothing. The branch picker is on this side
 despite fetching `PICKER_PAGE_SIZE` branches, because `noteTruncation` already prints the escape
@@ -401,6 +401,10 @@ answers with an `UnlistedAnswer`. The wrapper installs `refuseUnlisted` over `th
 its constructor, so that answer never leaves the prompt: inquirer renders `"my-site" is not one of
 the options. Pick one from the list.` and asks again. A caller's own `validate` is wrapped, not
 replaced, and still sees every listed answer.
+The same wrapper makes the pickers scroll like the lists: `PROMPT_PAGE_SIZE` rows at a time, and the
+arrow stops at the first and last entry. Upstream, the up and down arrow handlers wrap round and the
+bundled inquirer 3 paginator repeats the list three times to look endless, so the wrapper overrides both
+arrow handlers and swaps the paginator for `scrollWindow`, a window that stops at both ends.
 
 Together these are the prompt-side twin of `oneOf` on the flag side (`--cs-auth yes` has always been
 exit 2); the two now agree, and no prompt module needs its own check.

@@ -86,9 +86,9 @@ describe('prompt helpers', () => {
 
   it.each([
     [3, 3],
-    [15, 15],
-    [16, 15],
-    [100, 15],
+    [5, 5],
+    [6, 5],
+    [100, 5],
   ])('shows %i choices %i rows at a time, so a short list is shown whole and a long one scrolls', async (count, rows) => {
     const { asked, ux } = scriptedUx(['c0']);
     const choices = Array.from({ length: count }, (_, index) => ({ name: `C${index}`, value: `c${index}` }));
@@ -96,7 +96,7 @@ describe('prompt helpers', () => {
     await askOption(ux, 'Pick one', choices);
 
     expect((asked[0] as { pageSize: number }).pageSize).toBe(rows);
-    expect(PROMPT_PAGE_SIZE).toBe(15);
+    expect(PROMPT_PAGE_SIZE).toBe(5);
   });
 
   it('cancels rather than accepting nothing at a list of options', async () => {
