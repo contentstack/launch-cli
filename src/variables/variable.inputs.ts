@@ -21,6 +21,9 @@ export const variableFlags = {
     char: 'a',
     description: 'Alias of a delivery token saved with csdx auth:tokens:add, used with --from-stack without a prompt',
   }),
+  'no-vars': Flags.boolean({
+    description: 'Create the environment with no variables, without asking for them on a terminal',
+  }),
 };
 
 export const variableResolution = {
@@ -29,4 +32,5 @@ export const variableResolution = {
   key: {} satisfies ResolutionSpec<string[]>,
   'from-stack': {} satisfies ResolutionSpec<boolean>,
   alias: {} satisfies ResolutionSpec<string>,
+  'no-vars': {} satisfies ResolutionSpec<boolean>,
 };

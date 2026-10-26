@@ -85,7 +85,7 @@ export function createCmaSession(options: CmaSessionOptions): CmaSession {
     fetchStacks: (organizationUid) =>
       allPages(
         async (skip) =>
-          (await open()).stack().query({ organization_uid: organizationUid, limit: PAGE_SIZE, skip }).find(),
+          (await open()).stack({ organization_uid: organizationUid }).query({ limit: PAGE_SIZE, skip }).find(),
         'stacks',
       ),
     fetchDeliveryTokens: (apiKey) =>

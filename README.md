@@ -122,7 +122,7 @@ USAGE
   $ csdx launch:env:create [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--name <value>]
     [--description <value>] [--branch <value>] [--framework <value>] [--build-cmd <value>] [--server-cmd <value>]
     [--output-dir <value>] [--res-mode <value>] [--auto-deploy <value>] [--cs-auth <value>] [--var <value>...] [--dotenv
-    <value>...] [--from-stack] [-a <value>]
+    <value>...] [--from-stack] [-a <value>] [--no-vars]
 
 FLAGS
   -a, --alias=<value>        Alias of a delivery token saved with csdx auth:tokens:add, used with --from-stack without a
@@ -140,6 +140,7 @@ FLAGS
       --from-stack           Import the variables of a Contentstack stack. Asks for the stack and a delivery token on a
                              terminal
       --name=<value>         Environment name (200 characters or fewer)
+      --no-vars              Create the environment with no variables, without asking for them on a terminal
       --org=<value>          Organization UID
       --output-dir=<value>   Output directory
       --project=<value>      Project name or UID
@@ -378,7 +379,7 @@ USAGE
   $ csdx launch:projects:create [-c <value>] [-d <value>] [--org <value>] [--type <value>] [--name <value>] [--description
     <value>] [--env-name <value>] [--branch <value>] [--framework <value>] [--build-cmd <value>] [--server-cmd <value>]
     [--output-dir <value>] [--res-mode <value>] [--auto-deploy <value>] [--cs-auth <value>] [--var <value>...] [--dotenv
-    <value>...] [--from-stack] [-a <value>]
+    <value>...] [--from-stack] [-a <value>] [--no-vars]
 
 FLAGS
   -a, --alias=<value>        Alias of a delivery token saved with csdx auth:tokens:add, used with --from-stack without a
@@ -397,6 +398,7 @@ FLAGS
       --from-stack           Import the variables of a Contentstack stack. Asks for the stack and a delivery token on a
                              terminal
       --name=<value>         Project name (200 characters or fewer)
+      --no-vars              Create the environment with no variables, without asking for them on a terminal
       --org=<value>          Organization UID
       --output-dir=<value>   Output directory
       --res-mode=<value>     Response mode (buffered | streaming)

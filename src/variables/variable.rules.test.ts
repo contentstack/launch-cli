@@ -1,5 +1,5 @@
 import { UsageError } from '../core/errors';
-import { aliasRequiresFromStack } from './variable.rules';
+import { aliasRequiresFromStack, noVarsAlone } from './variable.rules';
 
 describe('variable rules', () => {
   it('refuses --alias without --from-stack, naming both', () => {
@@ -27,4 +27,21 @@ describe('variable rules', () => {
   it('accepts --from-stack on its own', () => {
     expect(() => aliasRequiresFromStack({ 'from-stack': true }, {})).not.toThrow();
   });
+
+  it.each([[{ var: ['A=1'] }], [{ dotenv: ['a.env'] }], [{ 'from-stack': true }]])(
+    'refuses --no-vars with a variable source (%p)',
+    (source) => {
+      expect(() => noVarsAlone({ 'no-vars': true, ...source }, {})).toThrow(UsageError);
+      expect(() => noVarsAlone({ 'no-vars': true, ...source }, {})).toThrow(
+        '--no-vars cannot be combined with --var, --dotenv or --from-stack.',
+      );
+    },
+  );
+
+  it.each([[{ 'no-vars': true }], [{ 'no-vars': false, var: ['A=1'] }], [{ var: [], dotenv: [], 'from-stack': false, 'no-vars': true }]])(
+    'accepts --no-vars alone and the sources without it (%p)',
+    (resolved) => {
+      expect(() => noVarsAlone(resolved, {})).not.toThrow();
+    },
+  );
 });

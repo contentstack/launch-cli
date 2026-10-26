@@ -125,7 +125,7 @@ describe('createCmaSession', () => {
     expect(createCmaSession({ analyticsInfo: 'cli/2.0.0' }).scopedOrganizationUid()).toBeUndefined();
   });
 
-  it('lists the stacks of one organization through the SDK', async () => {
+  it('lists the stacks of one organization through the SDK, scoped by the organization on the stack handle', async () => {
     const recorded: { stack: unknown[][]; query: unknown[] } = { stack: [], query: [] };
     const client = {
       stack: (...args: unknown[]) => {
@@ -144,10 +144,10 @@ describe('createCmaSession', () => {
 
     await expect(session.fetchStacks('org7')).resolves.toEqual({ items: [{ name: 'Shop', api_key: 'blt1' }] });
 
-    expect(recorded.stack).toEqual([[], []]);
+    expect(recorded.stack).toEqual([[{ organization_uid: 'org7' }], [{ organization_uid: 'org7' }]]);
     expect(recorded.query).toEqual([
-      { organization_uid: 'org7', limit: 100, skip: 0 },
-      { organization_uid: 'org7', limit: 100, skip: 1 },
+      { limit: 100, skip: 0 },
+      { limit: 100, skip: 1 },
     ]);
   });
 
@@ -203,9 +203,9 @@ describe('createCmaSession', () => {
 
     expect(items).toHaveLength(51);
     expect(asked).toEqual([
-      { organization_uid: 'org7', limit: 100, skip: 0 },
-      { organization_uid: 'org7', limit: 100, skip: 50 },
-      { organization_uid: 'org7', limit: 100, skip: 51 },
+      { limit: 100, skip: 0 },
+      { limit: 100, skip: 50 },
+      { limit: 100, skip: 51 },
     ]);
   });
 

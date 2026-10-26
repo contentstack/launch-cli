@@ -7,7 +7,7 @@ import { catalog, resolution } from '../../../resources';
 import { DEPLOYMENT_WAIT_TIMEOUT_MS } from '../../../deployments/deployment.watcher';
 import { EnvironmentCreator } from '../../../environments/environment.create';
 import { serverCommandFrameworkGate } from '../../../environments/environment.inputs';
-import { aliasRequiresFromStack } from '../../../variables/variable.rules';
+import { aliasRequiresFromStack, noVarsAlone } from '../../../variables/variable.rules';
 import EnvironmentsCreate from './create';
 
 function commandUnderTest(resolved: Record<string, unknown>) {
@@ -102,9 +102,10 @@ describe('launch:env:create', () => {
       dotenv: {},
       'from-stack': {},
       alias: {},
+      'no-vars': {},
     });
     expect(Object.keys(EnvironmentsCreate.flags).sort()).toEqual(Object.keys(EnvironmentsCreate.inputs).sort());
-    expect(EnvironmentsCreate.rules).toEqual([serverCommandFrameworkGate, aliasRequiresFromStack]);
+    expect(EnvironmentsCreate.rules).toEqual([serverCommandFrameworkGate, aliasRequiresFromStack, noVarsAlone]);
   });
 
   it('describes --name and --description as the environment its own, leaving the project wording alone', () => {
