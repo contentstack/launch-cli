@@ -1,8 +1,10 @@
 import { PROMPT_PAGE_SIZE } from './prompt';
 import type { SearchListClass } from './search-list';
 import {
+  MORE_CHOICES_HINT,
   UnlistedAnswer,
   answerFor,
+  launchPaginated,
   launchSearchList,
   refuseUnlisted,
   registerSearchList,
@@ -220,7 +222,7 @@ describe('launchSearchList', () => {
 
 describe('scrollWindow', () => {
   const LINES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].join('\n');
-  const HINT = '\u001b[2m(Move up and down to reveal more choices)\u001b[22m';
+  const HINT = '\u001b[2m(Use ↑/↓ to see more options)\u001b[22m';
   const shown = (active: number) => scrollWindow(LINES, active, 5).split('\n');
 
   it('shows a list that fits the page whole, with no hint', () => {
@@ -237,6 +239,34 @@ describe('scrollWindow', () => {
 
   it('ends at the last choice and never shows the first one again after it', () => {
     expect(shown(7)).toEqual(['d', 'e', 'f', 'g', 'h', HINT]);
+  });
+});
+
+describe('launchPaginated', () => {
+  interface Paginated {
+    paginator: { paginate(output: string, active: number): string };
+  }
+
+  class Upstream {
+    paginator = {
+      paginate: (output: string) => `${output}\n\u001b[2m(Move up and down to reveal more choices)\u001b[22m`,
+    };
+  }
+
+  it('points at the up and down arrows instead of the upstream wording', () => {
+    const Prompt = launchPaginated(Upstream as never) as unknown as new () => Paginated;
+
+    expect(new Prompt().paginator.paginate('a\nb', 0)).toBe(`a\nb\n\u001b[2m${MORE_CHOICES_HINT}\u001b[22m`);
+    expect(MORE_CHOICES_HINT).toBe('(Use ↑/↓ to see more options)');
+  });
+
+  it('leaves a page without the hint untouched', () => {
+    class Short {
+      paginator = { paginate: (output: string) => output };
+    }
+    const Prompt = launchPaginated(Short as never) as unknown as new () => Paginated;
+
+    expect(new Prompt().paginator.paginate('a\nb', 0)).toBe('a\nb');
   });
 });
 
@@ -302,8 +332,8 @@ describe('registerSearchList', () => {
 
     registerSearchList(fakeLoad);
 
-    expect(loaded).toEqual(['inquirer', 'inquirer-search-list']);
-    expect(registered).toHaveLength(1);
+    expect(loaded).toEqual(['inquirer', 'inquirer-search-list', 'inquirer/lib/prompts/list', 'inquirer/lib/prompts/checkbox']);
+    expect(registered.map(([name]) => name)).toEqual(['search-list', 'list', 'checkbox']);
     expect(registered[0][0]).toBe('search-list');
     expect((registered[0][1] as SearchListClass).prototype).toBeInstanceOf(SearchList);
     expect(registered[0][1]).not.toBe(SearchList);
@@ -315,5 +345,11 @@ describe('registerSearchList', () => {
     registerSearchList();
 
     expect((inquirer.prompt.prompts['search-list'] as SearchListClass).prototype).toBeInstanceOf(SearchList);
+    for (const type of ['list', 'checkbox']) {
+      const Upstream = load(`inquirer/lib/prompts/${type}`) as SearchListClass;
+
+      expect((inquirer.prompt.prompts[type] as SearchListClass).prototype).toBeInstanceOf(Upstream);
+      expect(inquirer.prompt.prompts[type]).not.toBe(Upstream);
+    }
   });
 });

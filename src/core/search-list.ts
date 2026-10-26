@@ -16,7 +16,7 @@ export interface SearchListPrompt {
   pointer: number;
   list: SearchChoice[];
   filterList: SearchChoice[];
-  paginator: { paginate(output: string, active: number, pageSize?: number): string };
+  paginator: Paginator;
   render(): void;
   getCurrentValue(line?: unknown): unknown;
 }
@@ -56,6 +56,27 @@ export function startingPointer(list: SearchChoice[], initial: unknown): number 
   return Math.max(index, 0);
 }
 
+export const MORE_CHOICES_HINT = '(Use ↑/↓ to see more options)';
+
+const UPSTREAM_HINT = '(Move up and down to reveal more choices)';
+
+interface Paginator {
+  paginate(output: string, active: number, pageSize?: number): string;
+}
+
+export type PaginatedClass = new (...params: never[]) => { paginator: Paginator };
+
+export function launchPaginated(Prompt: PaginatedClass): PaginatedClass {
+  return class LaunchPaginated extends Prompt {
+    constructor(...params: never[]) {
+      super(...params);
+      const paginate = this.paginator.paginate.bind(this.paginator);
+      this.paginator.paginate = (output, active, pageSize) =>
+        paginate(output, active, pageSize).replace(UPSTREAM_HINT, MORE_CHOICES_HINT);
+    }
+  };
+}
+
 export function scrollWindow(output: string, active: number, pageSize = PROMPT_PAGE_SIZE): string {
   const lines = output.split('\n');
 
@@ -65,7 +86,7 @@ export function scrollWindow(output: string, active: number, pageSize = PROMPT_P
 
   const top = Math.min(Math.max(active - Math.floor(pageSize / 2), 0), lines.length - pageSize);
 
-  return [...lines.slice(top, top + pageSize), styled('(Move up and down to reveal more choices)', 'dim', true)].join(
+  return [...lines.slice(top, top + pageSize), styled(MORE_CHOICES_HINT, 'dim', true)].join(
     '\n',
   );
 }
@@ -130,4 +151,8 @@ export function registerSearchList(load: ModuleLoader = utilitiesLoader()): void
   const inquirer = load('inquirer') as PromptRegistry;
 
   inquirer.registerPrompt('search-list', launchSearchList(load('inquirer-search-list') as SearchListClass));
+
+  for (const type of ['list', 'checkbox']) {
+    inquirer.registerPrompt(type, launchPaginated(load(`inquirer/lib/prompts/${type}`) as PaginatedClass));
+  }
 }
