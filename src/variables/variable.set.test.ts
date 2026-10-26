@@ -259,7 +259,7 @@ describe('default variable io', () => {
   describe('asking which sources to use', () => {
     const STACK = 'Import variables from a stack';
     const FILE = 'Import variables from a dotenv file';
-    const TYPED = 'Type KEY=VALUE pairs';
+    const TYPED = 'Manually add custom variables';
 
     it('offers the three sources, with no Skip, on a terminal when no source flag was given', async () => {
       const { setter, asked } = fakes({}, { 'Add variables from': [] });
@@ -303,7 +303,7 @@ describe('default variable io', () => {
         {
           'Add variables from': [FILE, TYPED],
           'Path to the dotenv file': '/work/.env.local',
-          'KEY=VALUE pairs separated by spaces': 'TYPED=2',
+          'Enter variables separated by spaces (Ex: KEY1=value1 KEY2:value2 KEY3="value with spaces")': 'TYPED=2',
         },
       );
 
@@ -314,7 +314,7 @@ describe('default variable io', () => {
         { key: 'FROM_FILE', value: '1' },
         { key: 'TYPED', value: '2' },
       ]);
-      expect(printed.at(-1)).toBe('✔ 2 variables set — 1 from /work/.env.local, 1 from --var');
+      expect(printed.at(-1)).toBe('✔ 2 variables set — 1 from /work/.env.local, 1 from manual entry');
     });
 
     it.each([

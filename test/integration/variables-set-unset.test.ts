@@ -251,8 +251,8 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
     const sent = wire();
     const scope = patchEndpoint(sent);
     const prompts = answerPrompts({
-      'Add variables from': ['Type KEY=VALUE pairs'],
-      'KEY=VALUE pairs separated by spaces': 'API_URL=typed-value DEBUG=true',
+      'Add variables from': ['Manually add custom variables'],
+      'Enter variables separated by spaces (Ex: KEY1=value1 KEY2:value2 KEY3="value with spaces")': 'API_URL=typed-value DEBUG=true',
     });
 
     const { error, stdout } = await onTerminal(() =>
@@ -260,12 +260,12 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
     );
 
     expect(error).toBeUndefined();
-    expect(prompts.messages).toEqual(['Add variables from', 'KEY=VALUE pairs separated by spaces']);
+    expect(prompts.messages).toEqual(['Add variables from', 'Enter variables separated by spaces (Ex: KEY1=value1 KEY2:value2 KEY3="value with spaces")']);
     expect(prompts.payloads[0]).toMatchObject({ type: 'checkbox' });
     expect((prompts.payloads[0].choices as { value: string }[]).map((choice) => choice.value)).toEqual([
       'Import variables from a stack',
       'Import variables from a dotenv file',
-      'Type KEY=VALUE pairs',
+      'Manually add custom variables',
     ]);
     expect(scope.isDone()).toBe(true);
     expect(sent.patch).toEqual([
@@ -274,7 +274,8 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
       ],
       },
     ]);
-    expect(stdout).toContain('2 variables set \u2014 2 from --var');
+    expect(stdout).toContain('2 variables set \u2014 2 from manual entry');
+    expect(stdout).not.toContain('--var');
     expect(stdout).not.toContain('typed-value');
   });
 
@@ -446,7 +447,7 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
     expect(error).toBeUndefined();
     expect(sent.order).toEqual(['get', 'patch']);
     expect(sent.patch).toEqual([{ unset: ['key1'] }]);
-    expect(stdout).toContain('\u2714 key1 removed from production.');
+    expect(stdout).toContain('\u2714 Variable key1 removed from the "production" environment.');
     expect(stdout).not.toContain('value1');
   });
 
@@ -475,7 +476,7 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
   it('exits 3 and sends no PATCH when the user declines', async () => {
     const sent = wire();
     unsetEndpoints(sent);
-    answerPrompts({ 'Are you sure you want to remove key1 from "production"?': false });
+    answerPrompts({ 'Are you sure you want to remove the variable key1 from the "production" environment?': false });
 
     const { error, stdout } = await onTerminal(() =>
       runCommand(['launch:variables:unset', ...SCOPE, '--key', 'key1'], config),

@@ -72,11 +72,11 @@ describe('launch:variables:unset', () => {
     await command.run();
 
     expect(inquired).toEqual([
-      { type: 'confirm', name: 'confirm', message: 'Are you sure you want to remove API_KEY from "staging"?', default: false },
+      { type: 'confirm', name: 'confirm', message: 'Are you sure you want to remove the variable API_KEY from the "staging" environment?', default: false },
     ]);
     expect(calls).toEqual(['get', 'patch']);
     expect(updates).toEqual([{ ...SCOPE, unset: ['API_KEY'] }]);
-    expect(lines).toEqual(['✔ API_KEY removed from staging.']);
+    expect(lines).toEqual(['✔ Variable API_KEY removed from the "staging" environment.']);
     expect(lines.join('')).not.toContain('never-printed-value');
   });
 
@@ -87,7 +87,7 @@ describe('launch:variables:unset', () => {
 
     expect(inquired).toEqual([]);
     expect(calls).toEqual(['get', 'patch']);
-    expect(lines).toEqual(['✔ API_KEY removed from staging.']);
+    expect(lines).toEqual(['✔ Variable API_KEY removed from the "staging" environment.']);
   });
 
   it('says the variables were not removed and exits 3 without writing when the user declines', async () => {
@@ -108,7 +108,7 @@ describe('launch:variables:unset', () => {
     expect(error).toBeInstanceOf(UsageError);
     expect(error.exitCode).toBe(2);
     expect(error.message).toBe(
-      'Are you sure you want to remove API_KEY from "staging"? Pass --yes to confirm without an interactive terminal.',
+      'Are you sure you want to remove the variable API_KEY from the "staging" environment? Pass --yes to confirm without an interactive terminal.',
     );
     expect(inquired).toEqual([]);
     expect(updates).toEqual([]);
