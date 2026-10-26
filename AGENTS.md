@@ -384,8 +384,8 @@ payload inline.
 on an arrow or a digit and ignores every letter, so text can never become the answer and nothing
 needs validating. Every choice prompt (`askOption`, and the checkbox `askChoices`) passes `loop: false`, so the
 arrow stops at the last entry instead of wrapping to the first, and a `pageSize` of the choice count
-capped at `PROMPT_PAGE_SIZE` (5), so a list of five or fewer shows whole and anything longer - the
-eleven framework presets, the env:update checklist - scrolls five at a time in a fixed window. `askChoices` refuses an empty selection at the prompt, naming <space>. Project type, branch, Framework preset, Response mode and Contentstack
+capped at `PROMPT_PAGE_SIZE` (7), so a list of seven or fewer shows whole and anything longer - the
+eleven framework presets, the env:update checklist - scrolls seven at a time in a fixed window. `askChoices` refuses an empty selection at the prompt, naming <space>. Project type, branch, Framework preset, Response mode and Contentstack
 Authentication are all asked this way. Prefer it: the `❯` always shows what Enter will take, where a
 search box hides the list the moment the filter matches nothing. The branch picker is on this side
 despite fetching `PICKER_PAGE_SIZE` branches, because `noteTruncation` already prints the escape

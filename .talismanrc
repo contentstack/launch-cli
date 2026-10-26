@@ -143,7 +143,7 @@ fileignoreconfig:
   ignore_detectors:
     - filename
 - filename: src/environments/environment.update.prompt.test.ts
-  checksum: aba0798b045427e567582dc8ff446156985d1cebb73cbbabd65ec34b8d1251f1
+  checksum: 6653e245baac00cef348acfc0aa2f32d03a7ff63ca3c320ee56a0c6250775004
   ignore_detectors:
     - filename
 - filename: src/environments/environment.presenter.ts
@@ -228,7 +228,7 @@ fileignoreconfig:
     - "a project name passed on argv to the project resolver"
     - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
 - filename: AGENTS.md
-  checksum: 0c3a7b0168b801761d2c0f9b60457b4dfda1c2455ffd1cbae9aaeaf024b97a20
+  checksum: c3276952d1eb16ea53f89363c9a70b59a19efc21fe087ea89ee70946c4b7cfc7
   allowed_patterns:
     - "Do not add an exemption to a guard to make a new file pass"
     - "passes its own error wording to `client.request\\(req, MESSAGES\\)`"
@@ -314,9 +314,9 @@ fileignoreconfig:
 - filename: src/environments/environment.errors.ts
   checksum: 3e17db3577ba944633f97063d208bdec57c833d4b6c38e203796a9fea43baacc
 - filename: src/core/prompt.ts
-  checksum: 392a98c458361eaf4e32d9e1bf253a34d1aca0566fd0b8c8d1bd78d1c6bc193c
+  checksum: e9154ec91c36f7a8e8c2f91ec13fa554cfbf5fe3b8506db44fb7c68bdef8efa8
 - filename: src/core/prompt.test.ts
-  checksum: 18a42e513d9d762a38c6d3161e3c2414f17eb7ed6e1e44fdcd2c3c4ddd446afc
+  checksum: 7be5497acf4cee870667751d44aa230e309784df76dc9e95d5ec2c4e6e6a57e0
 - filename: test/integration/environments-update.test.ts
   checksum: 4cd0106bf1881d373d23f063314627057d85cab0c43b793f013ffc2ca8859036
 - filename: src/commands/launch/env/update.ts
