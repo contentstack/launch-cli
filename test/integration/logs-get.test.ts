@@ -1059,4 +1059,131 @@ describe('integration: launch:logs:get on the wire', () => {
     expect(error?.message).toContain('--env');
     expect(onWire).toEqual([]);
   });
+
+  it('T62a: exits 2 naming --org with no flags at all and no terminal, and sends nothing', async () => {
+    const ownership = ownedProject();
+
+    const { error, stdout } = await runCommand(['launch:logs:get', '--data-dir', DATA_DIR], config);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toContain('--org');
+    expect(stdout).toBe('');
+    expect(ownership.isDone()).toBe(false);
+    expect(nock.pendingMocks()).toHaveLength(1);
+    expect(onWire).toEqual([]);
+  });
+
+  it('T62b: exits 2 naming --project when only --org is given and there is no terminal, and sends nothing', async () => {
+    const ownership = ownedProject();
+
+    const { error, stdout } = await runCommand(['launch:logs:get', '--org', ORG_UID, '--data-dir', DATA_DIR], config);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toContain('--project');
+    expect(stdout).toBe('');
+    expect(ownership.isDone()).toBe(false);
+    expect(nock.pendingMocks()).toHaveLength(1);
+    expect(onWire).toEqual([]);
+  });
+
+  describe('with no flags on a terminal', () => {
+    const CMA_URL = 'https://cma.integration.test';
+    const ORGANIZATION_QUERY = { limit: '100', asc: 'name', include_count: 'true', skip: '0' };
+    const PICKED = ['Choose an organization', 'Choose a project', 'Choose an environment'];
+
+    let restoreStdin: () => void;
+    let restoreStdout: () => void;
+
+    beforeEach(() => {
+      restoreStdin = stdinReportingTTY(true);
+      restoreStdout = stdoutReportingTTY(true);
+    });
+
+    afterEach(() => {
+      restoreStdout();
+      restoreStdin();
+    });
+
+    function pickerLists(): nock.Scope[] {
+      return [
+        nock(CMA_URL)
+          .matchHeader('authtoken', 'test-authtoken')
+          .get('/v3/organizations')
+          .query(ORGANIZATION_QUERY)
+          .reply(200, { organizations: [{ uid: ORG_UID, name: 'Acme Production' }], count: 1 }),
+        nock(LAUNCH_HUB_URL)
+          .matchHeader('x-organization-uid', ORG_UID)
+          .get('/manage/projects')
+          .query({ limit: '100', skip: '0' })
+          .reply(200, { pagination: { count: 1, limit: 100, skip: 0 }, projects: [{ uid: PROJECT_UID, name: 'sample-project' }] }),
+        hub()
+          .get(`/manage/projects/${PROJECT_UID}/environments`)
+          .query({ limit: '100', skip: '0' })
+          .reply(200, { pagination: { count: 1, limit: 100, skip: 0 }, environments: [{ uid: ENV_UID, name: 'production' }] }),
+      ];
+    }
+
+    function latestDeployment(): nock.Scope {
+      return hub()
+        .get(DEPLOYMENTS)
+        .query({ limit: '1', skip: '0' })
+        .reply(200, { ...listFixture, deployments: [{ uid: DEPLOYMENT_UID, deploymentNumber: 4, status: 'LIVE' }] });
+    }
+
+    it('T62c: asks organization, project, environment in order, never the deployment or the type, and prints the build logs', async () => {
+      const answered = answerPrompts({
+        'Choose an organization': ORG_UID,
+        'Choose a project': PROJECT_UID,
+        'Choose an environment': ENV_UID,
+      });
+      const lists = pickerLists();
+      const latest = latestDeployment();
+      const other = hub().get(DEPLOYMENTS).query({ limit: '100', skip: '0' }).reply(200, listFixture);
+      const poll = deploymentGet('LIVE');
+      const first = buildLogs([LINE_ONE]);
+      const drain = buildLogs([]);
+      const serverRead = hub().get(SERVER_LOGS).query(true).reply(200, { serverLogs: [] });
+      const liveRead = liveRoute().reply(200, '', { 'content-type': 'text/event-stream' });
+
+      const { error, stdout } = await runCommand(['launch:logs:get', '--data-dir', DATA_DIR], config);
+
+      expect(error).toBeUndefined();
+      expect(process.exitCode).toBe(0);
+      expect(answered.messages).toEqual(PICKED);
+      expect(lists.every((scope) => scope.isDone())).toBe(true);
+      expect([latest, poll, first, drain].every((scope) => scope.isDone())).toBe(true);
+      expect(other.isDone()).toBe(false);
+      expect(serverRead.isDone()).toBe(false);
+      expect(liveRead.isDone()).toBe(false);
+      expect(outputLines(stdout)).toEqual(['10:00:00  Installing dependencies...', 'Deployment #4 is LIVE.']);
+      expect(onWire).toEqual([]);
+    });
+
+    it('T62d: with only --type server asks organization, project, environment, then reads the default one hour window', async () => {
+      jest.spyOn(Date, 'now').mockReturnValue(NOW);
+      const answered = answerPrompts({
+        'Choose an organization': ORG_UID,
+        'Choose a project': PROJECT_UID,
+        'Choose an environment': ENV_UID,
+      });
+      const lists = pickerLists();
+      const latest = latestDeployment();
+      const read = serverLogs({ startTime: NOW - 3_600_000, endTime: NOW }, [
+        { timestamp: '2026-10-28T11:30:00.000Z', message: 'GET /index 200', source: 'edge-fn-source' },
+      ]);
+      const build = hub().get(BUILD_LOGS).query(true).reply(200, { deploymentLogs: [] });
+
+      const { error, stdout } = await runCommand(['launch:logs:get', '--type', 'server', '--data-dir', DATA_DIR], config);
+
+      expect(error).toBeUndefined();
+      expect(process.exitCode).toBe(0);
+      expect(answered.messages).toEqual(PICKED);
+      expect(lists.every((scope) => scope.isDone())).toBe(true);
+      expect([latest, read].every((scope) => scope.isDone())).toBe(true);
+      expect(build.isDone()).toBe(false);
+      expect(outputLines(stdout)).toEqual(['11:30:00  GET /index 200']);
+      expect(stdout).not.toContain('edge-fn-source');
+      expect(onWire).toEqual([]);
+    });
+  });
 });
