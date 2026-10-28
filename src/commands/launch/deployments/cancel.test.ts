@@ -156,7 +156,7 @@ describe('launch:deployments:cancel', () => {
       org: { required: true },
       project: { required: true },
       env: { required: true },
-      deployment: { required: true },
+      deployment: { required: true, picker: 'in-flight' },
       yes: {},
     });
     expect(Object.keys(DeploymentsCancel.flags).sort()).toEqual(Object.keys(DeploymentsCancel.inputs).sort());

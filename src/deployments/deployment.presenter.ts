@@ -2,7 +2,7 @@ import { stripVTControlCharacters } from 'node:util';
 
 import type { TableColumn } from '../core/render';
 import { styled } from '../core/style';
-import { isAbsent, messageOf } from '../core/values';
+import { isAbsent, messageOf, withoutControlCharacters } from '../core/values';
 import type { Deployment, DeploymentLog } from './types';
 
 const GUTTER = '  ';
@@ -211,16 +211,37 @@ export interface DeploymentDetailRow {
   value: string;
 }
 
-export interface DeploymentScopeLabels {
-  org: string;
-  project: string;
-  environment: string;
-}
-
 const SHORT_COMMIT_LENGTH = 7;
 
+const SUBJECT_MAX_LENGTH = 72;
+
+function singleLine(value: string): string {
+  return withoutControlCharacters(value).trim();
+}
+
 function text(value: string | undefined | null): string {
-  return value === undefined || value === null || isAbsent(value) ? '-' : value;
+  if (value === undefined || value === null || isAbsent(value)) {
+    return '-';
+  }
+
+  const line = singleLine(value);
+
+  return line === '' ? '-' : line;
+}
+
+function commitSubject(message: string | undefined | null): string {
+  const subject = (message ?? '')
+    .split(/\r\n|[\n\r]/)
+    .map(singleLine)
+    .find((line) => line !== '');
+
+  if (subject === undefined) {
+    return '-';
+  }
+
+  const units = [...subject];
+
+  return units.length > SUBJECT_MAX_LENGTH ? `${units.slice(0, SUBJECT_MAX_LENGTH - 1).join('')}\u2026` : subject;
 }
 
 function shortCommit(value: string | undefined): string {
@@ -255,12 +276,6 @@ export const DEPLOYMENT_DETAIL_COLUMNS: TableColumn<DeploymentDetailRow>[] = [
 
 export const DEPLOYMENT_VALUE_COLUMN = 1;
 
-export function deploymentLogsHint(scope: DeploymentScopeLabels, deploymentUid: string): string {
-  const flags = `--org ${scope.org} --project ${scope.project} --env ${scope.environment}`;
-
-  return `csdx launch:logs:get ${flags} --deployment ${deploymentUid}`;
-}
-
 export function deploymentVariablesSummary(deployment: Deployment): string {
   const count = Array.isArray(deployment.environmentVariables) ? deployment.environmentVariables.length : 0;
 
@@ -269,17 +284,13 @@ export function deploymentVariablesSummary(deployment: Deployment): string {
 
 export function deploymentDetailRows(
   deployment: Deployment,
-  scope: DeploymentScopeLabels,
   showGit: boolean,
 ): DeploymentDetailRow[] {
   const gitRows: DeploymentDetailRow[] = [
     { field: 'BRANCH', value: text(deployment.gitBranch) },
     { field: 'COMMIT', value: text(deployment.commitHash) },
-    { field: 'COMMIT MESSAGE', value: text(deployment.commitMessage) },
+    { field: 'COMMIT MESSAGE', value: commitSubject(deployment.commitMessage) },
   ];
-  const logs =
-    deployment.uid === undefined || isAbsent(deployment.uid) ? '-' : deploymentLogsHint(scope, deployment.uid);
-
   return [
     { field: 'DEPLOYMENT UID', value: text(deployment.uid) },
     { field: 'STATUS', value: text(deployment.status) },
@@ -288,6 +299,5 @@ export function deploymentDetailRows(
     { field: 'ENVIRONMENT VARIABLES', value: deploymentVariablesSummary(deployment) },
     { field: 'CREATED AT', value: text(deployment.createdAt) },
     { field: 'UPDATED AT', value: text(deployment.updatedAt) },
-    { field: 'BUILD LOGS', value: logs },
   ];
 }

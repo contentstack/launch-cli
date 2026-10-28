@@ -1,4 +1,5 @@
 import { styled } from './style';
+import { withoutControlCharacters } from './values';
 import type { UxLike } from './prompt';
 
 export interface Pagination {
@@ -16,7 +17,7 @@ const UNPRINTABLE = '-';
 
 function cellText(value: unknown): string {
   if (typeof value === 'string') {
-    return value;
+    return withoutControlCharacters(value);
   }
 
   if (value === undefined || value === null) {

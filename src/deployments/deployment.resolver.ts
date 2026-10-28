@@ -1,9 +1,8 @@
 import { UsageError } from '../core/errors';
 import { LaunchApiError } from '../transport/errors';
+import { DEPLOYMENT_NOT_FOUND_CODE } from './deployment.errors';
 import type { DeploymentsApi, GetDeploymentParams } from './deployments.api';
 import type { Deployment } from './types';
-
-export const DEPLOYMENT_NOT_FOUND_CODE = 'launch.DEPLOYMENT.NOT_FOUND';
 
 export function deploymentNotFound(uid: string): UsageError {
   return new UsageError(`No deployment with UID "${uid}" found in this environment.`);

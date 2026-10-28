@@ -6,13 +6,14 @@ import {
   deploymentRollbackQuestion,
   rolledBackLine,
 } from '../../../deployments/deployment.presenter';
+import { ALL_DEPLOYMENTS } from '../../../deployments/deployment.prompt';
 import { fetchDeployment } from '../../../deployments/deployment.resolver';
 
 const rollbackInputs = inputs({
   org: { required: true },
   project: { required: true },
   env: { required: true },
-  deployment: { required: true },
+  deployment: { required: true, picker: ALL_DEPLOYMENTS },
   reason: {},
   yes: {},
 });

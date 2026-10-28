@@ -58,6 +58,7 @@ file and line that broke its rule, and each was proven red by reintroducing its 
 | `test/guards/prompt-types.test.ts` | Every prompt call in `src` names a literal `type`, and every such type is registered with the real inquirer `cliux.inquire` uses once `LaunchCommand.init` has run. inquirer silently turns an unregistered type into a plain text box. | D1: `search-list` used, never registered |
 | `test/integration/transport-content-type.test.ts` | For every method in `HTTP_METHODS`, a bodyless request carries no content type and a request with a body carries `application/json`, asserted on the wire. `withoutDefaultContentType` suppresses the utility client's default, so a bodyless POST, PUT or PATCH (for example `deployments:cancel`) no longer goes out as `application/x-www-form-urlencoded`. Only `utility-http-client.ts` builds an `HttpClient` and only `rest-client.ts` sets the JSON type. | D5: every DELETE sent `Content-Type: application/json` |
 | `test/guards/tty-streams.test.ts` | `stdin.isTTY`, and the `isTTY` it becomes on the service context, are read only to decide whether the CLI may prompt (a read next to a prompt or a refusal to prompt) or on the plumbing lines that carry it there. Anything deciding what to draw reads `outputIsTTY` / `process.stdout.isTTY`. | D6: heartbeat drawn into a redirected file |
+| `test/integration/deployments-request-bodies.test.ts` | A deployments mutation puts on the wire only the fields the management service DTO declares - `{commitHash?, uploadUid?}` for a create, `{deployment, reason?}` for a rollback - and never `environment`, which is the URL path. The service validates with `whitelist` and `forbidNonWhitelisted`, so any other key is a bare 400. | Live harness: `deployments:create` and `:rollback` sent `{environment, ...}` and failed with `Bad request` |
 | `test/integration/retired-commands.test.ts` (named commands) | Every `launch:…` command named anywhere in `src` - a retirement message, a failure hint, an example - is either a registered command or on `PLANNED_COMMANDS` with the ticket that builds it, and a command drops off that list once it ships. | Review: retirement messages and hints pointed at commands the beta does not have |
 | `test/guards/prompt-funnel.test.ts` | Every prompt goes through `LaunchCommand`'s `ux`, built once as `cancelOnInterrupt(cliux)`, so Ctrl-C at any prompt exits 3. The wrapper stays attached to `SIGINT` until the signal has reached every listener (it detaches in a microtask): inquirer's `cli-cursor` loads `signal-exit`, which re-raises `SIGINT` - exit 130 - when it finds itself the only listener, so a `once` listener made every list and checkbox prompt exit 130 (`src/core/interruptible-ux.test.ts` pins it). No source calls `cliux.inquire` / `prompt` / `confirm` under any name, hands `cliux` on as a value, or imports a prompt library; `search-list.ts` may register a type but never prompt. | D2: Ctrl-C exited 130 |
 
@@ -627,6 +628,22 @@ there is **no server-side maximum at all**.
 `PROJECT_SCAN_PAGE_SIZE` and `ENVIRONMENT_SCAN_PAGE_SIZE` (100 each) live beside the `pages()`
 each repository builds on `scanPages`, because the page size is that repository's decision and not a
 CLI-wide one; the scan-limit error each raises carries its own wording.
+
+**The deployment commands (CL-7170).** `deployments:list`, `:get`, `:create`, `:rollback` and `:cancel`.
+
+- `--deployment` is a 24-hex uid, validated in its resolution spec (`UsageError`, exit 2, nothing sent), so `get`,
+  `rollback` and `cancel` share it. It depends on `--org`, `--project` and `--env`. `get` leaves it optional and
+  defaults to the latest deployment; `rollback` and `cancel` declare `picker` on the input (`all`, or `in-flight`
+  for `cancel`), which is the only case where the spec's `promptWhen` lets the picker run (`promptForDeployment`,
+  `src/deployments/deployment.prompt.ts`), so a terminal gets a list of the environment's newest deployments and
+  anything else gets the exit-2 missing-value error. A supplied flag never prompts.
+- The service answers HTTP 200 `{ "deployment": null }` for a deployment that is not in the environment, so
+  `DeploymentsApi.get` words that as the same 404 `launch.DEPLOYMENT.NOT_FOUND` a missing one gets, and the commands
+  report the generic `No deployment with UID "<uid>" found in this environment.`
+- Request bodies carry no `environment`; see the guard table. A validation rejection the service sends keyed by
+  field with only the generic `Bad request` is worded by `LaunchApiError` from the field and its code.
+- Every table cell is stripped of control characters and line breaks by `renderTable`, and the presenter shows
+  only the first line of a commit message, truncated to 72 characters.
 
 **The deployment wait/stream loop.** `src/deployments/deployment.watcher.ts` polls a deployment to a
 terminal state and is the single place any command waits on one. `POST /projects` creates the

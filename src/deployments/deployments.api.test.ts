@@ -6,6 +6,7 @@ import {
   CANCEL_NOT_ALLOWED_RAW_MESSAGE,
   DEPLOYMENT_ERROR_MESSAGES,
   DeploymentUnsuccessfulError,
+  INVALID_DEPLOYMENT_UID_RAW_MESSAGE,
 } from './deployment.errors';
 import { DeploymentsApi } from './deployments.api';
 
@@ -74,6 +75,18 @@ describe('DeploymentsApi', () => {
     );
   });
 
+  it.each([
+    [{}, { limit: undefined, skip: undefined }],
+    [{ rollbackEligible: false }, { limit: undefined, skip: undefined }],
+    [{ rollbackEligible: true }, { limit: undefined, skip: undefined, rollbackEligible: 'true' }],
+  ])('asks the list for %j with the query %j', async (extra, query) => {
+    const { client, requests } = fakeRestClient({ pagination: { count: 0 }, deployments: [] });
+
+    await new DeploymentsApi(client).list({ ...SCOPE, ...extra });
+
+    expect(requests[0].query).toStrictEqual(query);
+  });
+
   it('unwraps the deployment envelope on a single get', async () => {
     const deployment = { uid: DEPLOYMENT, status: 'DEPLOYING' };
     const { client, requests } = fakeRestClient({ deployment });
@@ -96,6 +109,35 @@ describe('DeploymentsApi', () => {
       'The Launch API returned a deployment response without a deployment.',
     );
   });
+
+  it('words a 200 with a null deployment, which is how the server answers a deployment outside the environment, as the 404 not-found error', async () => {
+    const { client, messages } = fakeRestClient({ deployment: null });
+
+    const failure = (await new DeploymentsApi(client)
+      .get({ ...SCOPE, deployment: DEPLOYMENT })
+      .catch((error: unknown) => error)) as LaunchApiError;
+
+    expect(failure).toBeInstanceOf(LaunchApiError);
+    expect(failure.status).toBe(404);
+    expect(failure.code).toBe('launch.DEPLOYMENT.NOT_FOUND');
+    expect(failure.message).toBe(DEPLOYMENT_ERROR_MESSAGES['launch.DEPLOYMENT.NOT_FOUND']);
+    expect(messages).toHaveLength(1);
+  });
+
+  it.each([[undefined], ['a string'], [7], [[]]])(
+    'keeps a get whose deployment is %p a malformed response, because the server only ever answers null for a missing deployment',
+    async (deployment) => {
+      const { client } = fakeRestClient({ deployment });
+
+      const failure = (await new DeploymentsApi(client)
+        .get({ ...SCOPE, deployment: DEPLOYMENT })
+        .catch((error: unknown) => error)) as LaunchApiError;
+
+      expect(failure).toBeInstanceOf(LaunchApiError);
+      expect(failure.status).toBe(200);
+      expect(failure.code).toBe('launch.RESPONSE.MALFORMED');
+    },
+  );
 
   it('raises a malformed-response error when a get returns nothing at all', async () => {
     const { client } = fakeRestClient(undefined);
@@ -134,9 +176,9 @@ describe('DeploymentsApi', () => {
   });
 
   it.each([
-    ['the branch tip', {}, { environment: ENVIRONMENT }],
-    ['a commit', { commitHash: 'abc123' }, { environment: ENVIRONMENT, commitHash: 'abc123' }],
-    ['an upload', { uploadUid: 'up-1' }, { environment: ENVIRONMENT, uploadUid: 'up-1' }],
+    ['the branch tip', {}, {}],
+    ['a commit', { commitHash: 'abc123' }, { commitHash: 'abc123' }],
+    ['an upload', { uploadUid: 'up-1' }, { uploadUid: 'up-1' }],
   ])('creates %s with a POST of exactly the given body, scoped to the org and project, and returns the new uid', async (_label, extra, body) => {
     const created = { uid: DEPLOYMENT, status: 'QUEUED' };
     const { client, requests, messages } = fakeRestClient({ deployment: created });
@@ -153,7 +195,17 @@ describe('DeploymentsApi', () => {
 
     await new DeploymentsApi(client).create({ ...SCOPE, commitHash: undefined, uploadUid: undefined });
 
-    expect(Object.keys(requests[0].body as object)).toEqual(['environment']);
+    expect(requests[0].body).toEqual({});
+    expect(Object.keys(requests[0].body as object)).toEqual([]);
+  });
+
+  it('never puts the environment in the create body, because the server rejects any field its DTO does not declare', async () => {
+    const { client, requests } = fakeRestClient({ deployment: { uid: DEPLOYMENT } });
+
+    await new DeploymentsApi(client).create({ ...SCOPE, commitHash: 'abc123' });
+
+    expect(requests[0].path).toBe(BASE);
+    expect(requests[0].body).not.toHaveProperty('environment');
   });
 
   it.each([[undefined], [null], [''], ['  ']])(
@@ -203,7 +255,7 @@ describe('DeploymentsApi', () => {
         path: `${BASE}/rollback`,
         orgUid: ORG,
         projectUid: PROJECT,
-        body: { deployment: DEPLOYMENT, environment: ENVIRONMENT, reason: 'bad release' },
+        body: { deployment: DEPLOYMENT, reason: 'bad release' },
       },
     ]);
     expect(messages[0]).toBe(DEPLOYMENT_ERROR_MESSAGES);
@@ -214,8 +266,8 @@ describe('DeploymentsApi', () => {
 
     await new DeploymentsApi(client).rollback({ ...SCOPE, deployment: DEPLOYMENT, reason });
 
-    expect(requests[0].body).toEqual({ deployment: DEPLOYMENT, environment: ENVIRONMENT });
-    expect(Object.keys(requests[0].body as object)).toEqual(['deployment', 'environment']);
+    expect(requests[0].body).toEqual({ deployment: DEPLOYMENT });
+    expect(Object.keys(requests[0].body as object)).toEqual(['deployment']);
   });
 
   it.each([
@@ -232,6 +284,17 @@ describe('DeploymentsApi', () => {
     expect(failure.message).not.toBe(code);
     expect(failure.message).not.toBe('raw');
     expect(failure.message).toBe(DEPLOYMENT_ERROR_MESSAGES[code]);
+  });
+
+  it.each([
+    ['the code', [{ field: 'deployment', code: 'launch.DEPLOYMENT.INVALID_DEPLOYMENT_UID', message: 'raw' }]],
+    ['the raw message as the code', [{ code: INVALID_DEPLOYMENT_UID_RAW_MESSAGE, message: INVALID_DEPLOYMENT_UID_RAW_MESSAGE }]],
+  ])('words an invalid deployment uid refused with %s in the CLI own words', (_name, errors) => {
+    const failure = new LaunchApiError(400, errors, DEPLOYMENT_ERROR_MESSAGES);
+
+    expect(failure.message).toBe('That is not a valid deployment UID. A deployment UID is 24 hexadecimal characters.');
+    expect(failure.message).not.toContain('12 bytes');
+    expect(failure.message).not.toBe('raw');
   });
 
   it('gives the rollback refusals three distinct messages', () => {

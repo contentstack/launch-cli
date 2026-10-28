@@ -176,7 +176,7 @@ describe('launch:deployments:rollback', () => {
       org: { required: true },
       project: { required: true },
       env: { required: true },
-      deployment: { required: true },
+      deployment: { required: true, picker: 'all' },
       reason: {},
       yes: {},
     });

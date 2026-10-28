@@ -2,6 +2,8 @@ import { Flags } from '@contentstack/cli-utilities';
 
 import { UsageError } from '../core/errors';
 import type { ResolutionSpec } from '../core/resolution';
+import { UID_PATTERN } from '../core/resource-ref';
+import { promptForDeployment } from './deployment.prompt';
 
 export const PICK_COMMIT = '\0pick-commit';
 
@@ -61,6 +63,8 @@ export function withBareCommit(argv: readonly string[]): string[] {
   return rewritten;
 }
 
+export const DEPLOYMENT_DEPENDENCIES = { deployment: ['org', 'project', 'env'] } as const;
+
 export const deploymentFlags = {
   deployment: Flags.string({ description: 'Deployment UID' }),
   commit: Flags.string({
@@ -76,8 +80,24 @@ export const deploymentFlags = {
 
 export const deploymentResolution = {
   deployment: {
-    normalize: async (value) => value.trim(),
-  } satisfies ResolutionSpec<string>,
+    dependsOn: DEPLOYMENT_DEPENDENCIES.deployment,
+    promptWhen: (input) => input.picker !== undefined,
+    prompt: ({ input, services, resolved }) =>
+      promptForDeployment(
+        services,
+        { org: resolved.org, project: resolved.project, environment: resolved.env },
+        input.picker,
+      ),
+    normalize: async (value) => {
+      const uid = value.trim();
+
+      if (!UID_PATTERN.test(uid)) {
+        throw new UsageError(`--deployment must be a deployment UID (24 hexadecimal characters); "${uid}" is not.`);
+      }
+
+      return uid;
+    },
+  } satisfies ResolutionSpec<string, 'org' | 'project' | 'env'>,
   commit: {
     normalize: async (value) => {
       if (value === BLANK_COMMIT) {

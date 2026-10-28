@@ -79,6 +79,25 @@ function cancelScope(): nock.Scope {
     .matchHeader('x-cs-api-version', '1.0');
 }
 
+const OLDER_UID = 'c0d1e2f3a4b5c6d7e8f90123';
+const RUNNING_UID = 'f1e2d3c4b5a60718293a4b5c';
+const QUEUED_UID = 'f2e2d3c4b5a60718293a4b5c';
+const LISTED = {
+  pagination: { count: 4, limit: 100 },
+  deployments: [
+    { uid: RUNNING_UID, status: 'DEPLOYING', commitHash: '1234567aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+    { uid: QUEUED_UID, status: 'QUEUED' },
+    { uid: DEPLOYMENT_UID, status: 'LIVE', commitHash: '9fceb02d0ae598e95dc970b74767f19372d61af8' },
+    { uid: OLDER_UID, status: 'FAILED', createdAt: '2025-11-06T07:39:19.230Z' },
+  ],
+};
+
+function listing(page: unknown = LISTED): nock.Scope {
+  projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
+
+  return hub().get(DEPLOYMENTS).query({ limit: 100, skip: 0 }).reply(200, page as nock.Body);
+}
+
 function lookup(): nock.Scope {
   projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
 
@@ -267,5 +286,130 @@ describe('integration: launch:deployments:cancel on the wire', () => {
 
     expect(error?.oclif?.exit).toBe(1);
     expect(error?.message).toBe('No deployment found with that UID.');
+  });
+
+  it('offers only the deployments in flight at a terminal when --deployment is omitted and cancels the chosen full uid', async () => {
+    const listed = listing();
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
+    const found = hub()
+      .get(`${DEPLOYMENTS}/${QUEUED_UID}`)
+      .reply(200, { deployment: { uid: QUEUED_UID, status: 'QUEUED' } });
+    const cancel = cancelScope().post(`${DEPLOYMENTS}/${QUEUED_UID}/cancel`).reply(200, {});
+    const question = `Cancel deployment "${QUEUED_UID}"? This cannot be undone.`;
+    const prompts = answerPrompts({ 'Choose a deployment to cancel': QUEUED_UID, [question]: true });
+
+    const { error, stdout } = await onTerminal(() => runCommand(args(), config));
+
+    expect(error).toBeUndefined();
+    expect(prompts.messages).toEqual(['Choose a deployment to cancel', question]);
+    expect(prompts.payloads[0]).toMatchObject({
+      type: 'list',
+      choices: [
+        { name: `${RUNNING_UID}  DEPLOYING  1234567`, value: RUNNING_UID },
+        { name: `${QUEUED_UID}  QUEUED`, value: QUEUED_UID },
+      ],
+    });
+    expect(listed.isDone()).toBe(true);
+    expect(found.isDone()).toBe(true);
+    expect(cancel.isDone()).toBe(true);
+    expect(stdout).toBe(`✔ Deployment "${QUEUED_UID}" cancelled.\n`);
+    expect(onWire).toEqual([]);
+  });
+
+  it('never lists or prompts for a deployment when --deployment is given, and the list interceptor stays pending', async () => {
+    lookup();
+    const listed = hub().get(DEPLOYMENTS).query({ limit: 100, skip: 0 }).reply(200, LISTED);
+    cancelScope().post(CANCEL_PATH).reply(200, {});
+    const prompts = answerPrompts({ [QUESTION]: true });
+
+    const { error } = await onTerminal(() => runCommand(args('--deployment', DEPLOYMENT_UID), config));
+
+    expect(error).toBeUndefined();
+    expect(prompts.messages).toEqual([QUESTION]);
+    expect(listed.isDone()).toBe(false);
+    expect(onWire).toEqual([]);
+  });
+
+  it('exits 2 saying nothing is in progress, with nothing asked, when every deployment has finished', async () => {
+    listing({
+      pagination: { count: 2, limit: 100 },
+      deployments: [
+        { uid: DEPLOYMENT_UID, status: 'LIVE' },
+        { uid: OLDER_UID, status: 'FAILED' },
+      ],
+    });
+    const prompts = answerPrompts({});
+
+    const { error } = await onTerminal(() => runCommand(args(), config));
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe('No deployments in progress that can be cancelled.');
+    expect(prompts.messages).toEqual([]);
+    expect(onWire).toEqual([]);
+  });
+
+  it('leaves a deployment the server marks not cancellable out of the picker', async () => {
+    listing({
+      pagination: { count: 2, limit: 100 },
+      deployments: [
+        { uid: RUNNING_UID, status: 'DEPLOYING', isCancellable: false },
+        { uid: QUEUED_UID, status: 'QUEUED' },
+      ],
+    });
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
+    hub().get(`${DEPLOYMENTS}/${QUEUED_UID}`).reply(200, { deployment: { uid: QUEUED_UID, status: 'QUEUED' } });
+    cancelScope().post(`${DEPLOYMENTS}/${QUEUED_UID}/cancel`).reply(200, {});
+    const prompts = answerPrompts({
+      'Choose a deployment to cancel': QUEUED_UID,
+      [`Cancel deployment "${QUEUED_UID}"? This cannot be undone.`]: true,
+    });
+
+    const { error } = await onTerminal(() => runCommand(args(), config));
+
+    expect(error).toBeUndefined();
+    expect(prompts.payloads[0]).toMatchObject({ choices: [{ name: `${QUEUED_UID}  QUEUED`, value: QUEUED_UID }] });
+    expect(onWire).toEqual([]);
+  });
+
+  it('exits 3 and cancels nothing when Ctrl-C is pressed at the deployment picker', async () => {
+    listing();
+    const cancel = cancelScope().post(`${DEPLOYMENTS}/${RUNNING_UID}/cancel`).reply(200, {});
+    const prompts = answerPrompts({ 'Choose a deployment to cancel': CTRL_C });
+
+    const { error } = await onTerminal(() => runCommand(args(), config));
+
+    expect(error?.oclif?.exit).toBe(3);
+    expect(error?.message).toBe('Cancelled. Nothing was changed.');
+    expect(prompts.messages).toEqual(['Choose a deployment to cancel']);
+    expect(cancel.isDone()).toBe(false);
+    expect(onWire).toEqual([]);
+    expect(process.listenerCount('SIGINT')).toBe(0);
+  });
+
+  it('exits 2 for a deployment uid of another environment, answered as 200 with a null deployment, and never cancels', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
+    const found = hub().get(`${DEPLOYMENTS}/${DEPLOYMENT_UID}`).reply(200, { deployment: null });
+    const cancel = cancelScope().post(CANCEL_PATH).reply(200, {});
+
+    const { error } = await runCommand(args('--deployment', DEPLOYMENT_UID, '--yes'), config);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe(`No deployment with UID "${DEPLOYMENT_UID}" found in this environment.`);
+    expect(found.isDone()).toBe(true);
+    expect(cancel.isDone()).toBe(false);
+    expect(nock.pendingMocks()).toEqual([POST_PENDING]);
+    expect(onWire).toEqual([]);
+  });
+
+  it('exits 2 for a malformed deployment uid and sends nothing at all', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
+    const found = hub().get(`${DEPLOYMENTS}/6accca6d34`).reply(200, getFixture);
+
+    const { error } = await runCommand(args('--deployment', '6accca6d34', '--yes'), config);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe('--deployment must be a deployment UID (24 hexadecimal characters); "6accca6d34" is not.');
+    expect(found.isDone()).toBe(false);
+    expect(onWire).toEqual([]);
   });
 });

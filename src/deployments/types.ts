@@ -29,6 +29,7 @@ export interface Deployment {
   commitHash?: string;
   commitMessage?: string;
   environmentVariables?: unknown[] | null;
+  isCancellable?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

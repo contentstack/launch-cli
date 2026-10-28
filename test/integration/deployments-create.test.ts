@@ -179,7 +179,7 @@ describe('integration: launch:deployments:create on the wire', () => {
     nock.restore();
   });
 
-  it('T20: deploys the branch tip of a GitHub project with a body of only the environment and exits 0 on LIVE', async () => {
+  it('T20: deploys the branch tip of a GitHub project with an empty body, the environment being in the path, and exits 0 on LIVE', async () => {
     gitProject();
     const create = captureCreate();
     const signed = signedUpload();
@@ -190,8 +190,8 @@ describe('integration: launch:deployments:create on the wire', () => {
 
     expect(error).toBeUndefined();
     expect(create.scope.isDone()).toBe(true);
-    expect(create.body()).toEqual({ environment: ENV_UID });
-    expect(Object.keys(create.body() as object)).toEqual(['environment']);
+    expect(create.body()).toEqual({});
+    expect(Object.keys(create.body() as object)).toEqual([]);
     expect(create.contentType()).toBe('application/json');
     expect(signed.scope.isDone()).toBe(false);
     expect(commits.isDone()).toBe(false);
@@ -199,7 +199,7 @@ describe('integration: launch:deployments:create on the wire', () => {
     expect(onWire).toEqual([]);
   });
 
-  it('T21: deploys the named commit with a body of the environment and the commit hash, asking nothing', async () => {
+  it('T21: deploys the named commit with a body of only the commit hash, asking nothing', async () => {
     gitProject();
     const create = captureCreate();
     const signed = signedUpload();
@@ -210,7 +210,7 @@ describe('integration: launch:deployments:create on the wire', () => {
     const { error } = await onTerminal(() => runCommand(createArgs('--commit', COMMIT, '--data-dir', dataDir), config));
 
     expect(error).toBeUndefined();
-    expect(create.body()).toEqual({ environment: ENV_UID, commitHash: COMMIT });
+    expect(create.body()).toEqual({ commitHash: COMMIT });
     expect(prompts.messages).toEqual([]);
     expect(commits.isDone()).toBe(false);
     expect(signed.scope.isDone()).toBe(false);
@@ -247,7 +247,7 @@ describe('integration: launch:deployments:create on the wire', () => {
     expect(error).toBeUndefined();
     expect(signed.scope.isDone()).toBe(true);
     expect(put.isDone()).toBe(true);
-    expect(create.body()).toEqual({ environment: ENV_UID, uploadUid: signed.uploadUid });
+    expect(create.body()).toEqual({ uploadUid: signed.uploadUid });
     expect(onWire).toEqual([]);
   });
 
@@ -283,7 +283,7 @@ describe('integration: launch:deployments:create on the wire', () => {
     expect(onWire).toEqual([]);
   });
 
-  it('T26: redeploys the last bundle with --last-upload, sending only the environment and never asking for a signed url', async () => {
+  it('T26: redeploys the last bundle with --last-upload, sending an empty body and never asking for a signed url', async () => {
     fileProject();
     const signed = signedUpload();
     const put = nock(UPLOAD_HOST).put('/bucket').reply(201, '');
@@ -293,8 +293,8 @@ describe('integration: launch:deployments:create on the wire', () => {
     const { error } = await runCommand(createArgs('--last-upload', '--data-dir', dataDir), config);
 
     expect(error).toBeUndefined();
-    expect(create.body()).toEqual({ environment: ENV_UID });
-    expect(Object.keys(create.body() as object)).toEqual(['environment']);
+    expect(create.body()).toEqual({});
+    expect(Object.keys(create.body() as object)).toEqual([]);
     expect(signed.scope.isDone()).toBe(false);
     expect(nock.pendingMocks().some((mock) => mock.includes('upload/signed_url'))).toBe(true);
     expect(put.isDone()).toBe(false);
@@ -361,7 +361,7 @@ describe('integration: launch:deployments:create on the wire', () => {
     },
   );
 
-  it('T30: redeploys the last bundle with no directory present, sending only the environment and attempting no archive', async () => {
+  it('T30: redeploys the last bundle with no directory present, sending an empty body and attempting no archive', async () => {
     fileProject();
     const signed = signedUpload();
     const create = captureCreate();
@@ -370,7 +370,7 @@ describe('integration: launch:deployments:create on the wire', () => {
     const { error, stdout } = await runCommand(createArgs('--last-upload', '--data-dir', missingDir), config);
 
     expect(error).toBeUndefined();
-    expect(create.body()).toEqual({ environment: ENV_UID });
+    expect(create.body()).toEqual({});
     expect(signed.scope.isDone()).toBe(false);
     expect(stdout).not.toContain('Preparing zip file');
     expect(onWire).toEqual([]);
@@ -432,7 +432,7 @@ describe('integration: launch:deployments:create on the wire', () => {
         { name: `${second.slice(0, 7)}  second change`, value: second },
       ],
     });
-    expect(create.body()).toEqual({ environment: ENV_UID, commitHash: second });
+    expect(create.body()).toEqual({ commitHash: second });
     expect(onWire).toEqual([]);
   });
 
@@ -599,6 +599,22 @@ describe('integration: launch:deployments:create on the wire', () => {
       expect(onWire).toEqual([]);
     },
   );
+
+  it('words a field-keyed validation rejection from the server with the field and its reason, never a bare Bad request', async () => {
+    gitProject();
+    const create = captureCreate(400, {
+      errors: [{ environment: { code: 'property environment should not exist', message: 'Bad request' } }],
+      status: 400,
+    });
+
+    const { error } = await runCommand(createArgs('--data-dir', dataDir), config);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.message).toBe('The Launch API rejected the request: environment: property environment should not exist');
+    expect(error?.message).not.toBe('Bad request');
+    expect(create.scope.isDone()).toBe(true);
+    expect(onWire).toEqual([]);
+  });
 
   it('T38: refuses an archive under the minimum size with exit 2 before asking for a signed url', async () => {
     fileProject();

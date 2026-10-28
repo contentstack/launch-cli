@@ -6,13 +6,14 @@ import {
   deploymentCancelledLine,
   deploymentNotCancelledLine,
 } from '../../../deployments/deployment.presenter';
+import { IN_FLIGHT_DEPLOYMENTS } from '../../../deployments/deployment.prompt';
 import { fetchDeployment } from '../../../deployments/deployment.resolver';
 
 const cancelInputs = inputs({
   org: { required: true },
   project: { required: true },
   env: { required: true },
-  deployment: { required: true },
+  deployment: { required: true, picker: IN_FLIGHT_DEPLOYMENTS },
   yes: {},
 });
 

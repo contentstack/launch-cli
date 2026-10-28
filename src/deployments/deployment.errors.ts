@@ -2,13 +2,25 @@ import { EXIT_CANCELLED, EXIT_RUNTIME } from '../core/constants';
 import { LaunchError } from '../core/errors';
 import type { ErrorMessages } from '../transport/errors';
 
+export const DEPLOYMENT_NOT_FOUND_CODE = 'launch.DEPLOYMENT.NOT_FOUND';
+
+export const INVALID_DEPLOYMENT_UID_CODE = 'launch.DEPLOYMENT.INVALID_DEPLOYMENT_UID';
+
+export const INVALID_DEPLOYMENT_UID_RAW_MESSAGE =
+  'Invalid deployment_uid. Argument passed in must be a string of 12 bytes or a string of 24 hex characters.';
+
+const INVALID_DEPLOYMENT_UID_MESSAGE =
+  'That is not a valid deployment UID. A deployment UID is 24 hexadecimal characters.';
+
 export const CANCEL_NOT_ALLOWED_CODE = 'launch.DEPLOYMENT.CANCEL_NOT_ALLOWED';
 
 export const CANCEL_NOT_ALLOWED_RAW_MESSAGE =
   'This deployment has progressed beyond the point where it can be cancelled.';
 
 export const DEPLOYMENT_ERROR_MESSAGES: ErrorMessages = {
-  'launch.DEPLOYMENT.NOT_FOUND': 'No deployment found with that UID.',
+  [DEPLOYMENT_NOT_FOUND_CODE]: 'No deployment found with that UID.',
+  [INVALID_DEPLOYMENT_UID_CODE]: INVALID_DEPLOYMENT_UID_MESSAGE,
+  [INVALID_DEPLOYMENT_UID_RAW_MESSAGE]: INVALID_DEPLOYMENT_UID_MESSAGE,
   'launch.DEPLOYMENT.CREATE_FAILED': 'The Launch API could not start a deployment.',
   [CANCEL_NOT_ALLOWED_CODE]:
     'This deployment can no longer be cancelled because it is already past the point where cancelling is possible.',
