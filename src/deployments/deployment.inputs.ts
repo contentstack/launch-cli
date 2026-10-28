@@ -65,6 +65,16 @@ export function withBareCommit(argv: readonly string[]): string[] {
 
 export const DEPLOYMENT_DEPENDENCIES = { deployment: ['org', 'project', 'env'] } as const;
 
+function deploymentUidOf(value: string): string {
+  const uid = value.trim();
+
+  if (!UID_PATTERN.test(uid)) {
+    throw new UsageError(`--deployment must be a deployment UID (24 hexadecimal characters); "${uid}" is not.`);
+  }
+
+  return uid;
+}
+
 export const deploymentFlags = {
   deployment: Flags.string({ description: 'Deployment UID' }),
   commit: Flags.string({
@@ -88,15 +98,7 @@ export const deploymentResolution = {
         { org: resolved.org, project: resolved.project, environment: resolved.env },
         input.picker,
       ),
-    normalize: async (value) => {
-      const uid = value.trim();
-
-      if (!UID_PATTERN.test(uid)) {
-        throw new UsageError(`--deployment must be a deployment UID (24 hexadecimal characters); "${uid}" is not.`);
-      }
-
-      return uid;
-    },
+    normalize: async (value) => deploymentUidOf(value),
   } satisfies ResolutionSpec<string, 'org' | 'project' | 'env'>,
   commit: {
     normalize: async (value) => {

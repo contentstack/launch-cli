@@ -92,6 +92,20 @@ describe('DeploymentFollower.announceLive', () => {
     expect(timeline).toEqual(['print Deployment URL https://custom.example.test']);
   });
 
+  it('announces the preview url, with a scheme, when the deployment url is empty and a domain also exists', async () => {
+    const { follower, timeline } = harness();
+
+    await follower.announceLive({ uid: 'd1', deploymentUrl: '', previewUrl: 'preview.example.test' }, [
+      { url: 'https://www.example.com' },
+    ]);
+
+    expect(timeline).toEqual([
+      'print Deployment URL https://preview.example.test',
+      `sleep ${SITE_OPEN_DELAY_MS}`,
+      'open https://preview.example.test',
+    ]);
+  });
+
   it('prints nothing and opens nothing when there is no url to show', async () => {
     const { follower, timeline } = harness();
 

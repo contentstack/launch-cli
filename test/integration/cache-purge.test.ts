@@ -6,7 +6,7 @@ import type { Interfaces } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
-import { answerPrompts, onTerminal } from '../support/terminal';
+import { CTRL_C, answerPrompts, onTerminal } from '../support/terminal';
 import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
 import { projectOwnership } from '../support/project-ownership';
 
@@ -24,10 +24,10 @@ const FOREIGN_ENV_UID = randomBytes(12).toString('hex');
 const OTHER_ORG_UID = randomBytes(9).toString('hex');
 const DATA_DIR = tmpdir();
 const QUOTA_CODE = 'launch.ORGANIZATION.REVALIDATE_RATE_LIMIT_EXCEEDED';
-const QUOTA_MESSAGE = 'This organization has reached its daily CDN cache purge limit. The limit resets at 00:00 UTC.';
+const QUOTA_MESSAGE = "You have reached today's cache revalidation limit for this organization. It resets at 00:00 UTC.";
+const FAILED_MESSAGE = 'Failed to start cache revalidation. Try again.';
 const CRITERIA = ['--path', '--tags', '--hosts'];
 const ONE_OF = `Pass exactly one of ${CRITERIA.join(', ')}`;
-const TASK_LINE = '→ CDN cache revalidation task initiated.';
 const INITIATED = { message: 'The CDN cache revalidation task has been initiated.' };
 
 const SCANNED = {
@@ -57,12 +57,19 @@ function purgeArgs(...extra: string[]): string[] {
   return ['launch:cache:purge', '--org', ORG_UID, '--project', PROJECT_UID, '--data-dir', DATA_DIR, ...extra];
 }
 
-function lookupAndPurge(body: nock.RequestBodyMatcher) {
+const TWO_DOMAINS = {
+  environment: {
+    ...getFixture.environment,
+    domains: [{ url: 'https://example.com' }, { url: 'https://www.example.com/' }],
+  },
+};
+
+function lookupAndPurge(body: nock.RequestBodyMatcher, environment: unknown = getFixture) {
   projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
   const lookup = nock(LAUNCH_HUB_URL)
     .matchHeader('x-project-uid', PROJECT_UID)
     .get(ENV_PATH)
-    .reply(200, getFixture);
+    .reply(200, environment as nock.Body);
   const purge = nock(LAUNCH_HUB_URL)
     .matchHeader('x-organization-uid', ORG_UID)
     .matchHeader('x-project-uid', PROJECT_UID)
@@ -167,15 +174,28 @@ describe('integration: launch:cache:purge on the wire', () => {
     expect(onWire).toEqual([]);
   });
 
-  it('names the environment, not the uid, in the success line, with no escape codes off a terminal', async () => {
-    lookupAndPurge({ cachePath: { path: '/blog', isPrefix: true } });
+  it.each([
+    ['--path /blog', ['--path', '/blog'], { cachePath: { path: '/blog', isPrefix: false } }, '/blog.'],
+    ['--path /blog/*', ['--path', '/blog/*'], { cachePath: { path: '/blog', isPrefix: true } }, '/blog.'],
+    ['--path /*', ['--path', '/*'], { cachePath: { path: '/', isPrefix: true } }, '/.'],
+    ['--tags a,b', ['--tags', 'a,b'], { cacheTags: ['a', 'b'] }, 'tags: a, b.'],
+    [
+      '--hosts www.example.com,example.com',
+      ['--hosts', 'www.example.com,example.com'],
+      { hostnames: ['www.example.com', 'example.com'] },
+      '2 domains.',
+    ],
+    ['--hosts example.com', ['--hosts', 'example.com'], { hostnames: ['example.com'] }, '1 domain.'],
+  ])('prints exactly one plain success line for %s', async (_label, flags, body, named) => {
+    lookupAndPurge(body);
 
-    const { error, stdout } = await runCommand(purgeArgs('--env', ENV_UID, '--path', '/blog/*'), config);
+    const { error, stdout } = await runCommand(purgeArgs('--env', ENV_UID, ...flags), config);
 
     expect(error).toBeUndefined();
-    expect(stdout).toBe(
-      `✔ Cache purge initiated for path /blog/* (prefix match) in environment "production".\n${TASK_LINE}\n`,
-    );
+    expect(stdout).toBe(`✔ Cache purge initiated for ${named}\n`);
+    expect(stdout).not.toContain('\u001b');
+    expect(stdout).not.toContain('→');
+    expect(stdout).not.toContain('production');
   });
 
   it('exits 2 naming all three flags when none is given, without a terminal, and reads and purges nothing', async () => {
@@ -189,17 +209,270 @@ describe('integration: launch:cache:purge on the wire', () => {
     expect(onWire).toEqual([]);
   });
 
-  it('exits 2 the same way on a terminal, and never prompts for a criterion', async () => {
-    const { lookup, purge } = lookupAndPurge({});
-    const prompts = answerPrompts({});
+  it('sends --path with --prefix as a prefix match and prints the path as entered', async () => {
+    const { purge } = lookupAndPurge({ cachePath: { path: '/blog', isPrefix: true } });
 
-    const { error } = await onTerminal(() => runCommand(purgeArgs('--env', ENV_UID), config));
+    const { error, stdout } = await runCommand(purgeArgs('--env', ENV_UID, '--path', '/blog', '--prefix'), config);
+
+    expect(error).toBeUndefined();
+    expect(purge.isDone()).toBe(true);
+    expect(stdout).toBe('✔ Cache purge initiated for /blog.\n');
+    expect(onWire).toEqual([]);
+  });
+
+  it.each([
+    ['/blog/*', { cachePath: { path: '/blog', isPrefix: true } }, '/blog.'],
+    ['/*', { cachePath: { path: '/', isPrefix: true } }, '/.'],
+  ])('sends %s with --prefix as one prefix match, without stripping twice', async (typed, body, named) => {
+    const { purge } = lookupAndPurge(body);
+
+    const { error, stdout } = await runCommand(purgeArgs('--env', ENV_UID, '--path', typed, '--prefix'), config);
+
+    expect(error).toBeUndefined();
+    expect(purge.isDone()).toBe(true);
+    expect(stdout).toBe(`✔ Cache purge initiated for ${named}\n`);
+  });
+
+  it.each([
+    ['--tags', 'a'],
+    ['--hosts', 'example.com'],
+  ])('exits 2 for --prefix with %s, naming --prefix and --path, with no lookup and no POST', async (flag, value) => {
+    const { lookup, purge } = lookupAndPurge({});
+
+    const { error } = await runCommand(purgeArgs('--env', ENV_UID, '--prefix', flag, value), config);
 
     expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toBe(`${ONE_OF}; none was supplied.`);
+    expect(error?.message).toBe('--prefix is only used with --path.');
+    expect([lookup.isDone(), purge.isDone()]).toEqual([false, false]);
+    expect(onWire).toEqual([]);
+  });
+
+  it.each([
+    ['off a terminal', false],
+    ['on a terminal', true],
+  ])('exits 2 for --prefix alone %s, without asking anything or sending a request', async (_label, terminal) => {
+    const { lookup, purge } = lookupAndPurge({});
+    const prompts = answerPrompts({});
+    const args = purgeArgs('--env', ENV_UID, '--prefix');
+
+    const { error } = await (terminal ? onTerminal(() => runCommand(args, config)) : runCommand(args, config));
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe('--prefix is only used with --path.');
     expect(prompts.messages).toEqual([]);
     expect([lookup.isDone(), purge.isDone()]).toEqual([false, false]);
     expect(onWire).toEqual([]);
+  });
+
+  it('exits 2 on a terminal with two criteria supplied, without prompting or sending a request', async () => {
+    const { lookup, purge } = lookupAndPurge({});
+    const prompts = answerPrompts({});
+
+    const { error } = await onTerminal(() =>
+      runCommand(purgeArgs('--env', ENV_UID, '--path', '/blog', '--tags', 'a'), config),
+    );
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe(`${ONE_OF}; --path, --tags were supplied.`);
+    expect(prompts.messages).toEqual([]);
+    expect([lookup.isDone(), purge.isDone()]).toEqual([false, false]);
+  });
+
+  it('exits 2 on a terminal with all three criteria supplied, without prompting or sending a request', async () => {
+    const { lookup, purge } = lookupAndPurge({});
+    const prompts = answerPrompts({});
+
+    const { error } = await onTerminal(() =>
+      runCommand(purgeArgs('--env', ENV_UID, '--path', '/blog', '--tags', 'a', '--hosts', 'h'), config),
+    );
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe(`${ONE_OF}; --path, --tags, --hosts were supplied.`);
+    expect(prompts.messages).toEqual([]);
+    expect([lookup.isDone(), purge.isDone()]).toEqual([false, false]);
+  });
+
+  it('does not ask what to purge on a terminal when --tags was supplied', async () => {
+    const { purge } = lookupAndPurge({ cacheTags: ['a'] });
+    const prompts = answerPrompts({});
+
+    const { error, stdout } = await onTerminal(() => runCommand(purgeArgs('--env', ENV_UID, '--tags', 'a'), config));
+
+    expect(error).toBeUndefined();
+    expect(prompts.messages).toEqual([]);
+    expect(purge.isDone()).toBe(true);
+    expect(stdout).toBe('✔ Cache purge initiated for tags: a.\n');
+  });
+
+  it('asks the environment, then what to purge, then the tags, and sends them', async () => {
+    const list = nock(LAUNCH_HUB_URL)
+      .get(`/manage/projects/${PROJECT_UID}/environments`)
+      .query({ limit: '100', skip: '0' })
+      .reply(200, SCANNED);
+    const { purge } = lookupAndPurge({ cacheTags: ['a', 'b'] });
+    const prompts = answerPrompts({
+      'Choose an environment': ENV_UID,
+      'What do you want to purge?': 'tags',
+      'Cache tags to purge (comma-separated)': 'a, b',
+    });
+
+    const { error, stdout } = await onTerminal(() => runCommand(purgeArgs(), config));
+
+    expect(error).toBeUndefined();
+    expect(prompts.messages).toEqual([
+      'Choose an environment',
+      'What do you want to purge?',
+      'Cache tags to purge (comma-separated)',
+    ]);
+    expect(prompts.payloads[1]).toMatchObject({
+      type: 'list',
+      loop: false,
+      choices: [
+        { name: 'Path', value: 'path' },
+        { name: 'Cache tags', value: 'tags' },
+        { name: 'Hostnames', value: 'hosts' },
+      ],
+    });
+    expect([list.isDone(), purge.isDone()]).toEqual([true, true]);
+    expect(stdout).toBe('✔ Cache purge initiated for tags: a, b.\n');
+    expect(onWire).toEqual([]);
+  });
+
+  it.each([
+    ['yes', true],
+    ['no', false],
+  ])('asks the path, then the prefix question, and sends isPrefix for the answer %s', async (_label, answer) => {
+    const { purge } = lookupAndPurge({ cachePath: { path: '/blog', isPrefix: answer } });
+    const prompts = answerPrompts({
+      'What do you want to purge?': 'path',
+      'Path to purge (for example /blog)': '/blog',
+      'Purge everything under this path? (prefix match)': answer,
+    });
+
+    const { error, stdout } = await onTerminal(() => runCommand(purgeArgs('--env', ENV_UID), config));
+
+    expect(error).toBeUndefined();
+    expect(prompts.messages).toEqual([
+      'What do you want to purge?',
+      'Path to purge (for example /blog)',
+      'Purge everything under this path? (prefix match)',
+    ]);
+    expect(prompts.payloads[2]).toMatchObject({ type: 'confirm', default: false });
+    expect(purge.isDone()).toBe(true);
+    expect(stdout).toBe('✔ Cache purge initiated for /blog.\n');
+  });
+
+  it('sends the root path with the prefix answer, and skips the prefix question for a typed /* or /blog/*', async () => {
+    const root = lookupAndPurge({ cachePath: { path: '/', isPrefix: true } });
+    const asked = answerPrompts({
+      'What do you want to purge?': 'path',
+      'Path to purge (for example /blog)': '/',
+      'Purge everything under this path? (prefix match)': true,
+    });
+
+    const first = await onTerminal(() => runCommand(purgeArgs('--env', ENV_UID), config));
+
+    expect(first.error).toBeUndefined();
+    expect(root.purge.isDone()).toBe(true);
+    expect(asked.messages).toHaveLength(3);
+    nock.cleanAll();
+    jest.restoreAllMocks();
+    jest.spyOn(configHandler, 'get').mockImplementation((setting: string) => CONFIG[setting]);
+    jest.spyOn(authHandler, 'compareOAuthExpiry').mockResolvedValue(undefined);
+
+    for (const [typed, body] of [
+      ['/*', { cachePath: { path: '/', isPrefix: true } }],
+      ['/blog/*', { cachePath: { path: '/blog', isPrefix: true } }],
+    ] as const) {
+      const { purge } = lookupAndPurge(body);
+      const prompts = answerPrompts({
+        'What do you want to purge?': 'path',
+        'Path to purge (for example /blog)': typed,
+      });
+
+      const { error } = await onTerminal(() => runCommand(purgeArgs('--env', ENV_UID), config));
+
+      expect(error).toBeUndefined();
+      expect(prompts.messages).toEqual(['What do you want to purge?', 'Path to purge (for example /blog)']);
+      expect(purge.isDone()).toBe(true);
+      nock.cleanAll();
+    }
+  });
+
+  it('cleans the typed tags, and asks again for an answer that is empty once cleaned', async () => {
+    const { purge } = lookupAndPurge({ cacheTags: ['b', 'a'] });
+    const prompts = answerPrompts({
+      'What do you want to purge?': 'tags',
+      'Cache tags to purge (comma-separated)': ' b , a ,, b ',
+    });
+
+    const { error, stdout } = await onTerminal(() => runCommand(purgeArgs('--env', ENV_UID), config));
+    const validate = prompts.payloads[1].validate as (value: string) => unknown;
+
+    expect(error).toBeUndefined();
+    expect(purge.isDone()).toBe(true);
+    expect(stdout).toBe('✔ Cache purge initiated for tags: b, a.\n');
+    expect(typeof validate(',')).toBe('string');
+    expect(validate('a')).toBe(true);
+  });
+
+  it("offers the environment's domains as bare hostnames from the one environment read and sends the picks", async () => {
+    const { lookup, purge } = lookupAndPurge({ hostnames: ['example.com', 'www.example.com'] }, TWO_DOMAINS);
+    const prompts = answerPrompts({
+      'What do you want to purge?': 'hosts',
+      'Which hostnames do you want to purge?': ['example.com', 'www.example.com'],
+    });
+
+    const { error, stdout } = await onTerminal(() => runCommand(purgeArgs('--env', ENV_UID), config));
+    const validate = prompts.payloads[1].validate as (value: unknown) => unknown;
+
+    expect(error).toBeUndefined();
+    expect(prompts.payloads[0].choices).toEqual([
+      { name: 'Path', value: 'path' },
+      { name: 'Cache tags', value: 'tags' },
+      { name: 'Hostnames', value: 'hosts' },
+    ]);
+    expect(prompts.payloads[1]).toMatchObject({
+      type: 'checkbox',
+      choices: [
+        { name: 'example.com', value: 'example.com' },
+        { name: 'www.example.com', value: 'www.example.com' },
+      ],
+    });
+    expect(typeof validate([])).toBe('string');
+    expect([lookup.isDone(), purge.isDone()]).toEqual([true, true]);
+    expect(stdout).toBe('✔ Cache purge initiated for 2 domains.\n');
+    expect(onWire).toEqual([]);
+  });
+
+  it('leaves Hostnames out of the list when the environment has no domain', async () => {
+    const withoutDomains = { environment: { ...getFixture.environment, domains: [] } };
+    const { purge } = lookupAndPurge({ cacheTags: ['a'] }, withoutDomains);
+    const prompts = answerPrompts({
+      'What do you want to purge?': 'tags',
+      'Cache tags to purge (comma-separated)': 'a',
+    });
+
+    const { error } = await onTerminal(() => runCommand(purgeArgs('--env', ENV_UID), config));
+
+    expect(error).toBeUndefined();
+    expect(prompts.payloads[0].choices).toEqual([
+      { name: 'Path', value: 'path' },
+      { name: 'Cache tags', value: 'tags' },
+    ]);
+    expect(purge.isDone()).toBe(true);
+  });
+
+  it('exits 3 with no POST and no success line when Ctrl-C answers the criterion prompt', async () => {
+    const { lookup, purge } = lookupAndPurge({});
+    answerPrompts({ 'What do you want to purge?': CTRL_C });
+
+    const { error, stdout } = await onTerminal(() => runCommand(purgeArgs('--env', ENV_UID), config));
+
+    expect(error?.oclif?.exit).toBe(3);
+    expect(lookup.isDone()).toBe(true);
+    expect(purge.isDone()).toBe(false);
+    expect(stdout).not.toContain('✔');
   });
 
   it('exits 2 naming the two flags supplied and sends no request about the environment', async () => {
@@ -261,12 +534,13 @@ describe('integration: launch:cache:purge on the wire', () => {
         return [429, { errors: [{ code: QUOTA_CODE, message: 'Rate limit exceeded' }], status: 429 }];
       });
 
-    const { error, stderr } = await runCommand(purgeArgs('--env', ENV_UID, '--path', '/blog'), config);
+    const { error, stderr, stdout } = await runCommand(purgeArgs('--env', ENV_UID, '--path', '/blog'), config);
 
     expect(error?.oclif?.exit).toBe(1);
     expect(error?.message).toBe(QUOTA_MESSAGE);
     expect(posts).toBe(1);
     expect(stderr).not.toContain('\u001b');
+    expect(stdout).toBe('');
     expect(onWire).toEqual([]);
   });
 
@@ -281,6 +555,28 @@ describe('integration: launch:cache:purge on the wire', () => {
 
     expect(error?.oclif?.exit).toBe(1);
     expect(stderr).toBe(`error: ${QUOTA_MESSAGE}\n`);
+  });
+
+  it('exits 1 with the generic failure wording on a 409 and no success line', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
+    nock(LAUNCH_HUB_URL).matchHeader('x-project-uid', PROJECT_UID).get(ENV_PATH).reply(200, getFixture);
+    let posts = 0;
+    nock(LAUNCH_HUB_URL)
+      .post(PURGE_PATH)
+      .times(2)
+      .reply(() => {
+        posts += 1;
+        return [409, { errors: [{ code: 'launch.CONFLICT', message: 'api conflict text' }], status: 409 }];
+      });
+
+    const { error, stdout, stderr } = await runCommand(purgeArgs('--env', ENV_UID, '--path', '/blog'), config);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.message).toBe(FAILED_MESSAGE);
+    expect(stderr).not.toContain('api conflict text');
+    expect(stdout).not.toContain('✔');
+    expect(posts).toBe(1);
+    expect(onWire).toEqual([]);
   });
 
   it('exits 1 with the permission wording on a 403 and sends the POST once', async () => {

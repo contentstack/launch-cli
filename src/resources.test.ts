@@ -163,12 +163,14 @@ describe('resolution', () => {
       .filter(([, spec]) => spec.dependsOn !== undefined)
       .map(([key]) => key);
 
-    expect(withDependencies).toEqual(['project', 'env', 'deployment']);
-    expect(Object.keys(DEPENDENCIES)).toEqual(['project', 'env', 'deployment']);
-    expect(table.deployment.dependsOn).toBe(DEPENDENCIES.deployment);
-    expect(DEPENDENCIES.deployment).toEqual(['org', 'project', 'env']);
+    const expected = ['project', 'env', 'deployment'];
+
+    expect(withDependencies).toEqual(expected);
+    expect(Object.keys(DEPENDENCIES)).toEqual(expected);
     expect(table.env.dependsOn).toBe(DEPENDENCIES.env);
     expect(DEPENDENCIES.env).toEqual(['org', 'project']);
+    expect(table.deployment.dependsOn).toBe(DEPENDENCIES.deployment);
+    expect(DEPENDENCIES.deployment).toEqual(['org', 'project', 'env']);
   });
 
   it('delegates the org prompt to the organization picker and normalises nothing', async () => {

@@ -1,3 +1,5 @@
+import { randomBytes } from 'node:crypto';
+
 import { Parser } from '@oclif/core';
 
 import { UsageError } from '../core/errors';
@@ -188,5 +190,21 @@ describe('deployment inputs', () => {
     [{ required: true }, false],
   ])('prompts for a deployment declared as %p: %p', (input, prompts) => {
     expect(deploymentResolution.deployment.promptWhen(input)).toBe(prompts);
+  });
+});
+
+describe('deployment flag at parse time', () => {
+  const UID = randomBytes(12).toString('hex');
+
+  it('leaves validation to the resolution step so the usage error keeps its exact wording', async () => {
+    const parsed = await Parser.parse(['--deployment', 'not-a-uid'], { flags: deploymentFlags });
+
+    expect(parsed.flags.deployment).toBe('not-a-uid');
+  });
+
+  it.each([[UID], [UID.toUpperCase()], [` ${UID} `], ['']])('parses %p from argv untouched', async (value) => {
+    const parsed = await Parser.parse(['--deployment', value], { flags: deploymentFlags });
+
+    expect(parsed.flags.deployment).toBe(value);
   });
 });

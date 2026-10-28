@@ -5,7 +5,7 @@ import { exactlyOneOf } from '../core/rules';
 import { inputs } from '../core/inputs';
 import type { UxLike } from '../core/prompt';
 import type { ApiSurface } from '../resources';
-import { cacheFlags, cacheResolution, criterionOf } from './cache.inputs';
+import { cacheFlags, cacheResolution, criterionOf, splitList } from './cache.inputs';
 
 function services(): ResolveServices {
   const ux: UxLike = { print: () => undefined, inquire: async () => undefined as never };
@@ -22,8 +22,9 @@ function normalize(flag: 'path' | 'tags' | 'hosts', value: string): Promise<unkn
 const purgeInputs = inputs({ path: {}, tags: {}, hosts: {} });
 
 describe('cache inputs', () => {
-  it('names the three purge criteria and declares none of them required', () => {
-    expect(Object.entries(cacheFlags).map(([flag]) => flag)).toEqual(['path', 'tags', 'hosts']);
+  it('names the purge criteria and --prefix and declares none of them required', () => {
+    expect(Object.entries(cacheFlags).map(([flag]) => flag)).toEqual(['path', 'prefix', 'tags', 'hosts']);
+    expect(cacheFlags.prefix.type).toBe('boolean');
     for (const flag of Object.values(cacheFlags)) {
       expect((flag as { required?: boolean }).required).toBeFalsy();
     }
@@ -125,5 +126,41 @@ describe('criterionOf', () => {
 
   it('sends hosts as hostnames and nothing else', () => {
     expect(criterionOf({ hosts: ['example.com'] })).toStrictEqual({ hostnames: ['example.com'] });
+  });
+});
+
+describe('criterionOf with a prefix', () => {
+  it('sends the path as a prefix match when --prefix was passed', () => {
+    expect(criterionOf({ path: { path: '/blog', isPrefix: false, typed: '/blog' }, prefix: true })).toStrictEqual({
+      cachePath: { path: '/blog', isPrefix: true },
+    });
+  });
+
+  it('keeps a typed /* a prefix match when --prefix was passed too, without stripping twice', () => {
+    expect(criterionOf({ path: { path: '/blog', isPrefix: true, typed: '/blog/*' }, prefix: true })).toStrictEqual({
+      cachePath: { path: '/blog', isPrefix: true },
+    });
+    expect(criterionOf({ path: { path: '/', isPrefix: true, typed: '/*' }, prefix: true })).toStrictEqual({
+      cachePath: { path: '/', isPrefix: true },
+    });
+  });
+
+  it.each([[false], [undefined]])('leaves an exact path exact when prefix is %p', (prefix) => {
+    expect(criterionOf({ path: { path: '/blog', isPrefix: false, typed: '/blog' }, prefix })).toStrictEqual({
+      cachePath: { path: '/blog', isPrefix: false },
+    });
+  });
+});
+
+describe('splitList', () => {
+  it('cleans a comma-separated answer the way --tags does', () => {
+    expect(splitList(' b , a ,, b ')).toEqual(['b', 'a']);
+    expect(splitList(',')).toEqual([]);
+  });
+
+  it('adds no maximum: 101 distinct tags stay 101', () => {
+    const many = Array.from({ length: 101 }, (_unused, index) => `tag-${index}`);
+
+    expect(splitList(many.join(','))).toEqual(many);
   });
 });

@@ -1,7 +1,7 @@
 import { UsageError } from './errors';
 import type { InputSource } from './resolution';
 import type { InputSources, ResolvedValues } from './rules';
-import { atLeastOneOf, exactlyOneOf, onlyWithValueOf, requireValueOf } from './rules';
+import { atLeastOneOf, atMostOneOf, exactlyOneOf, onlyWithFlag, onlyWithValueOf, requireValueOf } from './rules';
 
 function from(source: InputSource, values: ResolvedValues): InputSources {
   return Object.fromEntries(Object.keys(values).map((key) => [key, source]));
@@ -189,5 +189,60 @@ describe('requireValueOf', () => {
     expect(() => requireValueOf('branch', 'type', ['GitHub'], 'FileUpload')).toThrow(
       '--branch is only supported when --type is one of GitHub; --type is FileUpload.',
     );
+  });
+});
+
+describe('onlyWithFlag', () => {
+  it('fails naming both flags when the flag was supplied and its partner was not', () => {
+    const rule = onlyWithFlag('prefix', 'path');
+
+    expect(() => rule(...typed({ prefix: true }))).toThrow(UsageError);
+    expect(() => rule(...typed({ prefix: true }))).toThrow('--prefix is only used with --path.');
+    expect(() => rule(...typed({ prefix: true, tags: ['a'] }))).toThrow('--prefix is only used with --path.');
+  });
+
+  it('passes when the partner was supplied too', () => {
+    const rule = onlyWithFlag('prefix', 'path');
+
+    expect(() => rule(...typed({ prefix: true, path: '/blog' }))).not.toThrow();
+  });
+
+  it.each([[false], [undefined], [null], ['']])('does not count %p as a supplied flag', (value) => {
+    const rule = onlyWithFlag('prefix', 'path');
+
+    expect(() => rule(...typed({ prefix: value, tags: ['a'] }))).not.toThrow();
+  });
+
+  it('does not count a partner that came from a default as supplied', () => {
+    const rule = onlyWithFlag('prefix', 'path');
+
+    expect(() => rule({ prefix: true, path: '/blog' }, { prefix: 'flag', path: 'default' })).toThrow(
+      '--prefix is only used with --path.',
+    );
+  });
+});
+
+describe('atMostOneOf', () => {
+  it('passes for none and for exactly one supplied', () => {
+    const rule = atMostOneOf('limit', 'skip');
+
+    expect(() => rule({}, {})).not.toThrow();
+    expect(() => rule({ limit: 10 }, { limit: 'flag' })).not.toThrow();
+  });
+
+  it('fails with the exactly-one wording naming the supplied flags when two were supplied', () => {
+    const rule = atMostOneOf('limit', 'skip');
+
+    expect(() => rule(...typed({ limit: 10, skip: 5 }))).toThrow(UsageError);
+    expect(() => rule(...typed({ limit: 10, skip: 5 }))).toThrow(
+      'Pass exactly one of --limit, --skip; --limit, --skip were supplied.',
+    );
+  });
+
+  it('does not count a default or an empty value as supplied', () => {
+    const rule = atMostOneOf('limit', 'skip');
+
+    expect(() => rule({ limit: 10, skip: 0 }, { limit: 'flag', skip: 'default' })).not.toThrow();
+    expect(() => rule(...typed({ limit: 10, skip: '' }))).not.toThrow();
   });
 });

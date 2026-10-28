@@ -6,6 +6,7 @@ export interface CachePath {
 
 export interface PurgeTarget {
   path?: CachePath;
+  prefix?: boolean;
   tags?: string[];
   hosts?: string[];
 }
