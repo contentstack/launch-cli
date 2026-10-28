@@ -62,6 +62,7 @@ with exit code 2 and name their V2 replacements. `launch:functions:serve` is liv
 * [`csdx launch:projects:list`](#csdx-launchprojectslist)
 * [`csdx launch:projects:update`](#csdx-launchprojectsupdate)
 * [`csdx launch:rollback`](#csdx-launchrollback)
+* [`csdx launch:site:open`](#csdx-launchsiteopen)
 * [`csdx launch:variables:list`](#csdx-launchvariableslist)
 * [`csdx launch:variables:set`](#csdx-launchvariablesset)
 * [`csdx launch:variables:unset`](#csdx-launchvariablesunset)
@@ -576,6 +577,34 @@ DESCRIPTION
 ```
 
 _See code: [src/commands/launch/rollback.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/rollback.ts)_
+
+## `csdx launch:site:open`
+
+Open an environment's live site in your browser, or print its URL when there is no terminal
+
+```
+USAGE
+  $ csdx launch:site:open [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--deployment
+    <value>]
+
+FLAGS
+  -c, --config=<value>      Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>    Current working directory
+      --deployment=<value>  Deployment UID
+      --env=<value>         Environment name or UID
+      --org=<value>         Organization UID
+      --project=<value>     Project name or UID
+
+DESCRIPTION
+  Open an environment's live site in your browser, or print its URL when there is no terminal
+
+EXAMPLES
+  $ csdx launch:site:open --org <org-uid> --project <name-or-uid> --env <name-or-uid>
+
+  $ url=$(csdx launch:site:open --org <org-uid> --project <name-or-uid> --env <name-or-uid>)
+```
+
+_See code: [src/commands/launch/site/open.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/site/open.ts)_
 
 ## `csdx launch:variables:list`
 

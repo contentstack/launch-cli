@@ -76,6 +76,9 @@
       "launch:cache": {
         "description": "Purge the CDN cache of a Launch environment"
       },
+      "launch:site": {
+        "description": "Open the live site of a Launch environment"
+      },
       "launch:variables": {
         "description": "List, set and remove the environment variables of a Launch environment"
       },
@@ -166,6 +169,7 @@
       "launch:projects:list": "LNCH-PRJ-LS",
       "launch:projects:update": "LNCH-PRJ-UPD",
       "launch:rollback": "LNCH-RLBK",
+      "launch:site:open": "LNCH-SITE-OPN",
       "launch:variables:list": "LNCH-VAR-LS",
       "launch:variables:set": "LNCH-VAR-SET",
       "launch:variables:unset": "LNCH-VAR-UNSET"

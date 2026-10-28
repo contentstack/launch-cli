@@ -162,6 +162,8 @@ src/
                 which reads the Contentstack Management API rather than Launch
   cache/        the CDN cache purge behind launch:cache:purge: CacheApi, the --path / --prefix / --tags / --hosts
                 inputs and their normalisation, the criterion prompt and the success lines
+  site/         the URL choice for an environment's live site (`siteUrlOf`, shared with the deployment follower),
+                the opening and not-found lines, behind launch:site:open
   functions/    the cloud-function runtime and the serve flags, treated as a resource
   resources.ts  the composition root: it assembles the catalog, the resolution table,
                 the dependency map and the api surface out of the resources

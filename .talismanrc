@@ -2,7 +2,7 @@ fileignoreconfig:
 - filename: src/core/failure.test.ts
   checksum: 242d43885d1e3ef46edf1e347899a90549ebf95ec6827426746852f7a6dfc418
 - filename: test/integration/retired-commands.test.ts
-  checksum: 620ae8b1cc10b2d1aed68418a0a82cfb0bb23edd99ad93e6f10ddf5089f446dd
+  checksum: f43448a6d3855c3823d65dd66150bbd26410ae0be8a921476ca8a948d65caa16
 - filename: test/integration/manage-base-path.test.ts
   checksum: 79eb9ad420ea47d5bee8045d812c45b010bbeeafcaf5f85d11653140b0cd0db1
 - filename: src/transport/rest-client.ts
@@ -228,7 +228,7 @@ fileignoreconfig:
     - "a project name passed on argv to the project resolver"
     - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
 - filename: AGENTS.md
-  checksum: b7a5a3e72e2716dc9ac640fc6ea62ae587a0c12c019d060a7af16572ee9c8635
+  checksum: 562fc91581867ca4682ce2181379aeedd6c50ff666fa706c558eabfb688e1a46
   allowed_patterns:
     - "Do not add an exemption to a guard to make a new file pass"
     - "passes its own error wording to `client.request\\(req, MESSAGES\\)`"
@@ -252,7 +252,7 @@ fileignoreconfig:
 - filename: src/git/local-repository.ts
   checksum: b9091ed135dfebdf590a5412bbfba2b2f96d4a177cf944a20909b93405268e9f
 - filename: test/guards/layering.test.ts
-  checksum: f8d2a8cab01feca56c55bc17fb1bced4cf76575d87b19aaee9b73bab595e52a1
+  checksum: 2f1b3934e685c2366e45c75f379d63c0ca7bee11108df1e0010ead13159c6b9b
 - filename: src/commands/launch/projects/create.test.ts
   checksum: 9c40b4b6ed4f7d678ecb921a71f5af7284cd685c1337f47144456ae43a38b1ad
 - filename: src/commands/launch/projects/delete.test.ts
@@ -324,7 +324,7 @@ fileignoreconfig:
 - filename: src/commands/launch/env/update.test.ts
   checksum: 2da219594e7bdd589adc0eff9ff035252a75aaa51dfa20514b18fd3266d7b752
 - filename: README.md
-  checksum: f47fffd7f735ceeef84a3d7c4ea317a81f8b40e923000d2f4c06535b48efddca
+  checksum: 64557ff94fa3dffc2481a8f2bce583965184be7a38ac6425457397de0b8bff96
   allowed_patterns:
     - "password-protection"
     - "-p, --password"
