@@ -1,0 +1,365 @@
+import { Errors } from '@oclif/core';
+
+import { EXIT_CANCELLED } from '../../../core/constants';
+import { UsageError } from '../../../core/errors';
+import * as interruptible from '../../../core/interruptible-ux';
+import type { UxLike } from '../../../core/prompt';
+import { catalog } from '../../../resources';
+import { DeploymentUnsuccessfulError } from '../../../deployments/deployment.errors';
+import { DeploymentFollower } from '../../../deployments/deployment.follower';
+import type { DeploymentOutcome } from '../../../deployments/deployment.watcher';
+import { LaunchApiError } from '../../../transport/errors';
+import LogsGet from './get';
+
+const NOW = Date.parse('2026-10-28T12:00:00.000Z');
+
+interface Options {
+  resolved?: Record<string, unknown>;
+  latest?: unknown;
+  get?: () => Promise<unknown>;
+  serverLogs?: unknown[];
+  outputIsTTY?: boolean;
+}
+
+function commandUnderTest(options: Options = {}) {
+  const lines: string[] = [];
+  const ux: UxLike = {
+    print: (message: string) => {
+      lines.push(message);
+    },
+    inquire: async () => undefined as never,
+  };
+  const latestCalls: unknown[] = [];
+  const getCalls: unknown[] = [];
+  const windowCalls: unknown[] = [];
+  const command = Object.create(LogsGet.prototype) as LogsGet;
+
+  Object.assign(command, {
+    ux,
+    resolved: { org: 'org1', project: 'proj1', env: 'env1', 'log-type': 'deployment', ...options.resolved },
+    services: {
+      ux,
+      isTTY: false,
+      outputIsTTY: options.outputIsTTY ?? false,
+      api: {
+        deployments: {
+          latest: async (params: unknown) => {
+            latestCalls.push(params);
+            return 'latest' in options ? options.latest : { uid: 'dLatest' };
+          },
+          get: async (params: unknown) => {
+            getCalls.push(params);
+            return options.get === undefined ? { uid: 'd1', status: 'LIVE' } : options.get();
+          },
+        },
+        serverLogs: {
+          window: async (params: unknown) => {
+            windowCalls.push(params);
+            return options.serverLogs ?? [];
+          },
+        },
+      },
+    },
+  });
+
+  return { command, lines, latestCalls, getCalls, windowCalls };
+}
+
+function outcome(kind: DeploymentOutcome['kind'], status: string, deployment: object = {}): DeploymentOutcome {
+  return { kind, status, deployment };
+}
+
+describe('LogsGet', () => {
+  beforeEach(() => {
+    jest.spyOn(Date, 'now').mockReturnValue(NOW);
+  });
+
+  it('exposes the log type as --type and never as --log-type', () => {
+    expect(Object.keys(LogsGet.flags).sort()).toEqual(['deployment', 'env', 'org', 'project', 'since', 'type', 'until']);
+    expect(LogsGet.flags.type).toBe(catalog['log-type']);
+  });
+
+  it('declares the window rules and the log type input the rules read', () => {
+    expect(LogsGet.rules).toHaveLength(2);
+    expect(Object.keys(LogsGet.inputs)).toContain('log-type');
+  });
+
+  it('refuses --type live with exit 2 before reading anything', async () => {
+    const { command, latestCalls, getCalls, windowCalls } = commandUnderTest({ resolved: { 'log-type': 'live' } });
+
+    const running = command.run();
+
+    await expect(running).rejects.toThrow(UsageError);
+    await expect(running).rejects.toThrow('--type live is not available yet');
+    expect([latestCalls, getCalls, windowCalls]).toEqual([[], [], []]);
+  });
+
+  it('refuses a missing latest deployment with exit 2 for both types', async () => {
+    for (const type of ['deployment', 'server']) {
+      const { command, windowCalls } = commandUnderTest({ resolved: { 'log-type': type }, latest: undefined });
+
+      await expect(command.run()).rejects.toThrow('No deployments found in this environment.');
+      expect(windowCalls).toEqual([]);
+    }
+  });
+
+  it('verifies a given deployment with a get and never asks for the latest', async () => {
+    const { command, latestCalls, getCalls, windowCalls } = commandUnderTest({
+      resolved: { 'log-type': 'server', deployment: 'd9' },
+    });
+
+    await command.run();
+
+    expect(getCalls).toEqual([{ org: 'org1', project: 'proj1', environment: 'env1', deployment: 'd9' }]);
+    expect(latestCalls).toEqual([]);
+    expect(windowCalls).toEqual([
+      {
+        org: 'org1',
+        project: 'proj1',
+        environment: 'env1',
+        deployment: 'd9',
+        startTime: NOW - 3_600_000,
+        endTime: NOW,
+      },
+    ]);
+  });
+
+  it('reads the server logs of the latest deployment when none is given', async () => {
+    const { command, latestCalls, getCalls, windowCalls } = commandUnderTest({ resolved: { 'log-type': 'server' } });
+
+    await command.run();
+
+    expect(latestCalls).toEqual([{ org: 'org1', project: 'proj1', environment: 'env1' }]);
+    expect(getCalls).toEqual([]);
+    expect(windowCalls).toEqual([expect.objectContaining({ deployment: 'dLatest' })]);
+  });
+
+  it('turns a not-found verification into the generic exit-2 wording and reads no logs', async () => {
+    const missing = new LaunchApiError(404, [{ code: 'launch.DEPLOYMENT.NOT_FOUND', message: 'raw' }]);
+    const { command, windowCalls } = commandUnderTest({
+      resolved: { 'log-type': 'server', deployment: 'd9' },
+      get: async () => Promise.reject(missing),
+    });
+
+    const running = command.run();
+
+    await expect(running).rejects.toThrow(UsageError);
+    await expect(running).rejects.toThrow('No deployment with UID "d9" found in this environment.');
+    expect(windowCalls).toEqual([]);
+  });
+
+  it('propagates a failed verification untouched', async () => {
+    const failure = new LaunchApiError(500, [{ code: 'launch.UNKNOWN', message: 'boom' }]);
+    const { command } = commandUnderTest({ resolved: { deployment: 'd9' }, get: async () => Promise.reject(failure) });
+
+    await expect(command.run()).rejects.toBe(failure);
+  });
+
+  it('prints the server lines and stays quiet about the cap at 4999 lines', async () => {
+    const serverLogs = Array.from({ length: 4999 }, (_, index) => ({
+      timestamp: '2026-10-28T11:30:00.000Z',
+      message: `line ${index}`,
+    }));
+    const { command, lines } = commandUnderTest({ resolved: { 'log-type': 'server' }, serverLogs });
+
+    await command.run();
+
+    expect(lines).toHaveLength(4999);
+    expect(lines[0]).toBe('2026-10-28 11:30:00.000:  line 0');
+    expect(lines.join('\n')).not.toContain('Showing the newest');
+  });
+
+  it('prints the cap notice last at exactly 5000 lines and not at 5001', async () => {
+    const entries = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({ timestamp: '2026-10-28T11:30:00.000Z', message: `line ${index}` }));
+    const capped = commandUnderTest({ resolved: { 'log-type': 'server' }, serverLogs: entries(5000) });
+    const over = commandUnderTest({ resolved: { 'log-type': 'server' }, serverLogs: entries(5001) });
+
+    await capped.command.run();
+    await over.command.run();
+
+    expect(capped.lines).toHaveLength(5001);
+    expect(capped.lines.at(-1)).toBe(
+      'Showing the newest 5000 server log lines in this window. Narrow --since/--until to see earlier ones.',
+    );
+    expect(over.lines).toHaveLength(5001);
+    expect(over.lines.join('\n')).not.toContain('Showing the newest');
+  });
+
+  it('prints the empty server notice for the resolved window, yellow on a terminal', async () => {
+    const { command, lines } = commandUnderTest({ resolved: { 'log-type': 'server' }, outputIsTTY: true });
+
+    await command.run();
+
+    expect(lines).toEqual([
+      '\u001b[33mNo server logs found between 2026-10-28T11:00:00.000Z and 2026-10-28T12:00:00.000Z.\u001b[39m',
+    ]);
+  });
+
+  it('prints the 24 hour notice before the lines and sends the window as the user gave it', async () => {
+    const serverLogs = [{ timestamp: '2026-10-27T11:00:00.000Z', message: 'old' }];
+    const { command, lines, windowCalls } = commandUnderTest({
+      resolved: { 'log-type': 'server', since: '2d' },
+      serverLogs,
+    });
+
+    await command.run();
+
+    expect(lines).toEqual([
+      'Server logs are kept for 24 hours; showing from 2026-10-27T12:00:00.000Z.',
+      '2026-10-27 11:00:00.000:  old',
+    ]);
+    expect(windowCalls).toEqual([expect.objectContaining({ startTime: NOW - 172_800_000, endTime: NOW })]);
+  });
+
+  it('prints no notice for a window of exactly 24 hours', async () => {
+    const { command, lines } = commandUnderTest({
+      resolved: { 'log-type': 'server', since: '24h' },
+      serverLogs: [{ message: 'x' }],
+    });
+
+    await command.run();
+
+    expect(lines).toEqual(['x']);
+  });
+
+  it('rejects a bad window before any read', async () => {
+    const { command, windowCalls } = commandUnderTest({ resolved: { 'log-type': 'server', since: 'yesterday' } });
+
+    await expect(command.run()).rejects.toThrow(UsageError);
+    expect(windowCalls).toEqual([]);
+  });
+
+  it('propagates a failed server read', async () => {
+    const failure = new LaunchApiError(500, [{ code: 'launch.UNKNOWN', message: 'boom' }]);
+    const { command } = commandUnderTest({ resolved: { 'log-type': 'server' } });
+    Object.assign((command as unknown as { services: { api: { serverLogs: object } } }).services.api.serverLogs, {
+      window: async () => Promise.reject(failure),
+    });
+
+    await expect(command.run()).rejects.toBe(failure);
+  });
+
+  it('follows the latest deployment, prints the status line after the lines and releases the listener', async () => {
+    const release = jest.fn();
+    jest.spyOn(interruptible, 'onInterrupt').mockReturnValue(release);
+    const seen: { scope?: unknown; stop?: AbortSignal } = {};
+    jest.spyOn(DeploymentFollower.prototype, 'watch').mockImplementation(async function (this: DeploymentFollower, scope, stop) {
+      seen.scope = scope;
+      seen.stop = stop;
+      (this as unknown as { services: { ux: UxLike } }).services.ux.print('a build line');
+      return outcome('success', 'LIVE', { deploymentNumber: 4 });
+    });
+    const { command, lines } = commandUnderTest();
+
+    await command.run();
+
+    expect(seen.scope).toEqual({ org: 'org1', project: 'proj1', environment: 'env1', deployment: 'dLatest' });
+    expect(seen.stop?.aborted).toBe(false);
+    expect(lines).toEqual(['a build line', 'Deployment #4 is LIVE.']);
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('prints the empty notice before the status line when the follower printed nothing', async () => {
+    jest.spyOn(DeploymentFollower.prototype, 'watch').mockResolvedValue(outcome('failure', 'FAILED', {}));
+    const { command, lines } = commandUnderTest({ resolved: { deployment: 'd1' }, outputIsTTY: true });
+
+    await command.run();
+
+    expect(lines).toEqual([
+      '\u001b[33mNo deployment logs found for deployment d1.\u001b[39m',
+      'Deployment is FAILED.',
+    ]);
+  });
+
+  it('counts the unavailable notice as output so it never claims there were no logs', async () => {
+    jest.spyOn(DeploymentFollower.prototype, 'watch').mockImplementation(async function (this: DeploymentFollower) {
+      (this as unknown as { services: { ux: UxLike } }).services.ux.print('  ! Could not read the deployment logs (x).');
+      return outcome('success', 'LIVE', { deploymentNumber: 1 });
+    });
+    const { command, lines } = commandUnderTest();
+
+    await command.run();
+
+    expect(lines).toEqual(['  ! Could not read the deployment logs (x).', 'Deployment #1 is LIVE.']);
+  });
+
+  it('exits 1 with the timed-out message and prints no status line when the wait ran out', async () => {
+    jest.spyOn(DeploymentFollower.prototype, 'watch').mockResolvedValue(outcome('timed-out', 'DEPLOYING', {}));
+    const { command, lines } = commandUnderTest({ resolved: { deployment: 'd1' } });
+
+    const running = command.run();
+
+    await expect(running).rejects.toThrow(DeploymentUnsuccessfulError);
+    await expect(running).rejects.toThrow(
+      'Stopped waiting after 20 minutes; the deployment was still DEPLOYING. ' +
+        'Run csdx launch:logs:get --org org1 --project proj1 --env env1 --deployment d1 again to keep following it.',
+    );
+    expect(lines).toEqual([]);
+  });
+
+  it('stops on Ctrl-C with the yellow line and exit 3, then releases the listener', async () => {
+    const release = jest.fn();
+    let interrupt: () => void = () => undefined;
+    jest.spyOn(interruptible, 'onInterrupt').mockImplementation((listener) => {
+      interrupt = listener;
+      return release;
+    });
+    jest.spyOn(DeploymentFollower.prototype, 'watch').mockImplementation(
+      (_scope, stop) =>
+        new Promise((_resolve, reject) => {
+          stop?.addEventListener('abort', () => reject(stop.reason), { once: true });
+          interrupt();
+        }),
+    );
+    const { command, lines } = commandUnderTest({ outputIsTTY: true });
+
+    const running = command.run();
+
+    await expect(running).rejects.toBeInstanceOf(Errors.ExitError);
+    await expect(running).rejects.toMatchObject({ oclif: { exit: EXIT_CANCELLED } });
+    expect(lines).toEqual(['\u001b[33mStopped following the logs.\u001b[39m']);
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('rethrows a failure that is not the interrupt and still releases the listener', async () => {
+    const release = jest.fn();
+    jest.spyOn(interruptible, 'onInterrupt').mockReturnValue(release);
+    const failure = new LaunchApiError(500, [{ code: 'launch.UNKNOWN', message: 'boom' }]);
+    jest.spyOn(DeploymentFollower.prototype, 'watch').mockRejectedValue(failure);
+    const { command, lines } = commandUnderTest();
+
+    await expect(command.run()).rejects.toBe(failure);
+    expect(lines).toEqual([]);
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not take the interrupt path for a failure when the signal was aborted with another reason', async () => {
+    const release = jest.fn();
+    let interrupt: () => void = () => undefined;
+    jest.spyOn(interruptible, 'onInterrupt').mockImplementation((listener) => {
+      interrupt = listener;
+      return release;
+    });
+    const failure = new LaunchApiError(500, [{ code: 'launch.UNKNOWN', message: 'boom' }]);
+    jest.spyOn(DeploymentFollower.prototype, 'watch').mockImplementation(async () => {
+      interrupt();
+      throw failure;
+    });
+    const { command, lines } = commandUnderTest();
+
+    await expect(command.run()).rejects.toBe(failure);
+    expect(lines).toEqual([]);
+  });
+
+  it('registers no interrupt listener and reads no deployment logs for --type server', async () => {
+    const listener = jest.spyOn(interruptible, 'onInterrupt');
+    const watch = jest.spyOn(DeploymentFollower.prototype, 'watch');
+    const { command } = commandUnderTest({ resolved: { 'log-type': 'server' } });
+
+    await command.run();
+
+    expect(listener).not.toHaveBeenCalled();
+    expect(watch).not.toHaveBeenCalled();
+  });
+});

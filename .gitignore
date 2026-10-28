@@ -25,3 +25,4 @@ coverage/
 # Written by functions:serve into the project directory, as V1 did.
 logs/
 !/src/logs/
+!/src/commands/launch/logs/

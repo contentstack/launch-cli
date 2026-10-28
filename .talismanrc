@@ -1,8 +1,12 @@
 fileignoreconfig:
+- filename: test/integration/logs-get.test.ts
+  checksum: e9970c9c7e3adcb0521e28faae852dc9baa7bf455bff87a635f35e1375f923c3
+- filename: src/commands/launch/logs/get.test.ts
+  checksum: 725a9e30b0782f63a14b7b12125dbdfb3bc3220f4124b9b4fab9d1123040100d
 - filename: src/core/failure.test.ts
   checksum: 242d43885d1e3ef46edf1e347899a90549ebf95ec6827426746852f7a6dfc418
 - filename: test/integration/retired-commands.test.ts
-  checksum: 8d4f6fcdbfffdd4434eeefe020413730e2737bd2a3a1f8890946fe64b6290ec4
+  checksum: 91937f1da2822919d4ecdaa25324d67473b7b289e986ec0ff6999480ea0d3f70
 - filename: test/integration/manage-base-path.test.ts
   checksum: 79eb9ad420ea47d5bee8045d812c45b010bbeeafcaf5f85d11653140b0cd0db1
 - filename: src/transport/rest-client.ts
@@ -252,7 +256,7 @@ fileignoreconfig:
 - filename: src/git/local-repository.ts
   checksum: b9091ed135dfebdf590a5412bbfba2b2f96d4a177cf944a20909b93405268e9f
 - filename: test/guards/layering.test.ts
-  checksum: 888178e556906ce153e2686eb82bbc2aeb624a3a1f97a62ac9051ba95e1fe4cd
+  checksum: ee583108579c403cf5c389faccb4dcbecc6f8816a92b7c43cc22f56789f008f1
 - filename: src/commands/launch/projects/create.test.ts
   checksum: 9c40b4b6ed4f7d678ecb921a71f5af7284cd685c1337f47144456ae43a38b1ad
 - filename: src/commands/launch/projects/delete.test.ts
@@ -324,7 +328,7 @@ fileignoreconfig:
 - filename: src/commands/launch/env/update.test.ts
   checksum: 2da219594e7bdd589adc0eff9ff035252a75aaa51dfa20514b18fd3266d7b752
 - filename: README.md
-  checksum: 65f161ac92dca833cec232587631cadb092eef71a222da5fbe796788035ddc8e
+  checksum: e16168ac0870e0913de2d022522d000f2259208cf036fa5df1f8e8b975c11ba8
   allowed_patterns:
     - "password-protection"
     - "-p, --password"

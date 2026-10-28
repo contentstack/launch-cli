@@ -11,6 +11,7 @@ import { variableFlags, variableResolution } from './variables/variable.inputs';
 import { cacheFlags, cacheResolution } from './cache/cache.inputs';
 import { deploymentFlags, deploymentResolution } from './deployments/deployment.inputs';
 import { logsFlags, logsResolution } from './logs/logs.inputs';
+import { ServerLogsApi } from './logs/server-logs.api';
 import { ProjectsApi } from './projects/projects.api';
 import { EnvironmentsApi } from './environments/environments.api';
 import { DeploymentsApi } from './deployments/deployments.api';
@@ -39,6 +40,7 @@ export type Catalog = typeof catalog;
 export type FlagKey = keyof Catalog;
 
 export const resolution = {
+  ...logsResolution,
   ...projectResolution,
   ...organizationResolution,
   ...coreResolution,
@@ -46,7 +48,6 @@ export const resolution = {
   ...variableResolution,
   ...cacheResolution,
   ...deploymentResolution,
-  ...logsResolution,
 };
 
 export type Resolution = typeof resolution;
@@ -67,6 +68,7 @@ export interface ApiSurface {
   environments: EnvironmentsApi;
   deployments: DeploymentsApi;
   deploymentLogs: DeploymentLogsApi;
+  serverLogs: ServerLogsApi;
   git: GitApi;
   uploads: UploadsApi;
   stacks: StacksApi;
@@ -81,6 +83,7 @@ export function buildApi(client: RestApiClient, cma: CmaSession, logsClient: Res
     environments: new EnvironmentsApi(client),
     deployments: new DeploymentsApi(client),
     deploymentLogs: new DeploymentLogsApi(logsClient),
+    serverLogs: new ServerLogsApi(logsClient),
     git: new GitApi(client),
     uploads: new UploadsApi(client),
     stacks: new StacksApi(cma),

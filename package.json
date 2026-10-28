@@ -79,6 +79,9 @@
       "launch:deployments": {
         "description": "List and inspect the deployments of a Launch environment"
       },
+      "launch:logs": {
+        "description": "Read Launch deployment, server and live logs"
+      },
       "launch:variables": {
         "description": "List, set and remove the environment variables of a Launch environment"
       },
@@ -169,6 +172,7 @@
       "launch:functions": "LNCH-FN",
       "launch:functions:serve": "LNCH-FN-SRV",
       "launch:logs": "LNCH-LGS",
+      "launch:logs:get": "LNCH-LGS-GET",
       "launch:open": "LNCH-OPN",
       "launch:projects:create": "LNCH-PRJ-CRT",
       "launch:projects:delete": "LNCH-PRJ-DEL",

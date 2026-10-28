@@ -2,6 +2,7 @@ import type { ApiSurface } from './resources';
 import { DEPENDENCIES, buildApi, catalog, resolutionTable } from './resources';
 import { DeploymentsApi } from './deployments/deployments.api';
 import { DeploymentLogsApi } from './deployments/deployment-logs.api';
+import { ServerLogsApi } from './logs/server-logs.api';
 import { EnvironmentsApi } from './environments/environments.api';
 import { UploadsApi } from './uploads/uploads.api';
 import { CacheApi } from './cache/cache.api';
@@ -193,11 +194,13 @@ describe('the api surface', () => {
       'git',
       'organizations',
       'projects',
+      'serverLogs',
       'stacks',
       'uploads',
       'variables',
     ]);
     expect(api.deploymentLogs).toBeInstanceOf(DeploymentLogsApi);
+    expect(api.serverLogs).toBeInstanceOf(ServerLogsApi);
     expect(api.organizations).toBeInstanceOf(OrganizationsApi);
     expect(api.projects).toBeInstanceOf(ProjectsApi);
     expect(api.environments).toBeInstanceOf(EnvironmentsApi);
@@ -207,7 +210,7 @@ describe('the api surface', () => {
     expect(api.cache).toBeInstanceOf(CacheApi);
   });
 
-  it('sends deployment log reads through the logs client and nothing else through it', async () => {
+  it('sends deployment and server log reads through the logs client and nothing else through it', async () => {
     const sent = { manage: [] as RestRequest[], logs: [] as RestRequest[] };
     const recording = (into: RestRequest[], body: unknown) =>
       ({
@@ -219,14 +222,18 @@ describe('the api surface', () => {
     const api = buildApi(
       recording(sent.manage, { deployment: { uid: 'd1', status: 'LIVE' } }),
       UNUSED_CMA,
-      recording(sent.logs, { deploymentLogs: [] }),
+      recording(sent.logs, { deploymentLogs: [], serverLogs: [] }),
     );
     const scope = { org: 'o1', project: 'p1', environment: 'e1', deployment: 'd1' };
 
     await api.deploymentLogs.after({ ...scope, timestamp: '2026-09-25T10:00:00.000Z' });
+    await api.serverLogs.window({ ...scope, startTime: 1, endTime: 2 });
     await api.deployments.get(scope);
 
-    expect(sent.logs.map((req) => req.path)).toEqual(['/projects/p1/environments/e1/deployments/d1/logs/deployment-logs']);
+    expect(sent.logs.map((req) => req.path)).toEqual([
+      '/projects/p1/environments/e1/deployments/d1/logs/deployment-logs',
+      '/projects/p1/environments/e1/deployments/d1/logs/server-logs',
+    ]);
     expect(sent.manage.map((req) => req.path)).toEqual(['/projects/p1/environments/e1/deployments/d1']);
   });
 
