@@ -1,4 +1,4 @@
-import { siteUrlOf } from './site.url';
+import { previewUrlOf, siteUrlOf } from './site.url';
 
 describe('siteUrlOf', () => {
   it("chooses the deployment's own url over any domain", () => {
@@ -45,6 +45,22 @@ describe('siteUrlOf', () => {
 
   it('returns nothing when no domain has a url either', () => {
     const url = siteUrlOf({ uid: 'd1' }, [{}, { url: '' }]);
+
+    expect(url).toBeUndefined();
+  });
+});
+
+describe('previewUrlOf', () => {
+  it('reads the preview url alone, adding the scheme, and ignores the deployment url', () => {
+    const bare = previewUrlOf({ uid: 'd1', deploymentUrl: 'https://my-site.contentstackapps.com', previewUrl: 'preview.example.test' });
+    const plain = previewUrlOf({ uid: 'd1', previewUrl: 'http://preview.example.test' });
+
+    expect(bare).toBe('https://preview.example.test');
+    expect(plain).toBe('http://preview.example.test');
+  });
+
+  it.each([[undefined], [''], ['   ']])('returns nothing for a preview url of %p even with a deployment url', (previewUrl) => {
+    const url = previewUrlOf({ uid: 'd1', deploymentUrl: 'https://my-site.contentstackapps.com', previewUrl });
 
     expect(url).toBeUndefined();
   });

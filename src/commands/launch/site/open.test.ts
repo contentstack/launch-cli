@@ -1,10 +1,16 @@
+import { randomBytes } from 'node:crypto';
+
 import { UsageError } from '../../../core/errors';
 import type { UxLike } from '../../../core/prompt';
+import { DEPLOYMENT_ERROR_MESSAGES } from '../../../deployments/deployment.errors';
 import { ENVIRONMENT_ERROR_MESSAGES } from '../../../environments/environment.errors';
 import { LaunchApiError } from '../../../transport/errors';
 import SiteOpen from './open';
 
 const SCOPE = { org: 'org1', project: 'proj1', environment: 'env1' };
+const DEPLOYMENT_UID = randomBytes(12).toString('hex');
+const DEPLOYMENT_SCOPE = { ...SCOPE, deployment: DEPLOYMENT_UID };
+const PREVIEW_URL = 'https://preview-1a2b.contentstackapps.com';
 const LIVE_URL = 'https://my-site.contentstackapps.com';
 
 interface Harness {
@@ -14,6 +20,9 @@ interface Harness {
   environmentFails?: Error;
   latest?: unknown;
   latestFails?: Error;
+  deployment?: string;
+  fetched?: unknown;
+  fetchFails?: Error;
 }
 
 function commandUnderTest(harness: Harness = {}) {
@@ -32,7 +41,7 @@ function commandUnderTest(harness: Harness = {}) {
 
   Object.assign(command, {
     ux,
-    resolved: { org: 'org1', project: 'proj1', env: 'env1' },
+    resolved: { org: 'org1', project: 'proj1', env: 'env1', deployment: harness.deployment },
     services: {
       ux,
       isTTY: false,
@@ -52,6 +61,16 @@ function commandUnderTest(harness: Harness = {}) {
           },
         },
         deployments: {
+          get: async (params: unknown) => {
+            calls.push('deployments.get');
+            got.push(params);
+
+            if (harness.fetchFails) {
+              throw harness.fetchFails;
+            }
+
+            return harness.fetched;
+          },
           latest: async (params: unknown) => {
             calls.push('deployments.latest');
             got.push(params);
@@ -194,7 +213,117 @@ describe('launch:site:open', () => {
     expect(opened).toEqual([]);
   });
 
-  it('declares org, project and env as its required inputs and nothing else', () => {
-    expect(SiteOpen.inputs).toEqual({ org: { required: true }, project: { required: true }, env: { required: true } });
+  it("opens the named deployment's preview url, not its deployment url, reading the environment first and never the latest", async () => {
+    const { command, stdout, calls, got, opened } = commandUnderTest({
+      deployment: DEPLOYMENT_UID,
+      fetched: { uid: DEPLOYMENT_UID, deploymentUrl: LIVE_URL, previewUrl: 'preview-1a2b.contentstackapps.com' },
+      environment: { uid: 'env1', domains: [{ url: 'https://www.example.com' }] },
+    });
+
+    await command.run();
+
+    expect(calls).toEqual(['environments.get', 'deployments.get']);
+    expect(got).toEqual([SCOPE, DEPLOYMENT_SCOPE]);
+    expect(stdout).toEqual([`\u001b[32m✔ Opening ${PREVIEW_URL} in your browser...\u001b[39m`]);
+    expect(opened).toEqual([PREVIEW_URL]);
+  });
+
+  it('prints only the preview url and starts no browser for a named deployment when stdout is not a terminal', async () => {
+    const { command, stdout, stderr, opened } = commandUnderTest({
+      outputIsTTY: false,
+      deployment: DEPLOYMENT_UID,
+      fetched: { uid: DEPLOYMENT_UID, previewUrl: PREVIEW_URL },
+    });
+
+    await command.run();
+
+    expect(stdout).toEqual([PREVIEW_URL]);
+    expect(stderr).toEqual([]);
+    expect(opened).toEqual([]);
+  });
+
+  it.each([['absent', undefined], ['empty', ''], ['whitespace only', '   ']])(
+    'says the website url was not found in yellow on stdout and exits 2 when the named deployment has a %s preview url',
+    async (_label, previewUrl) => {
+      const { command, stdout, stderr, calls, got, opened } = commandUnderTest({
+        deployment: DEPLOYMENT_UID,
+        fetched: { uid: DEPLOYMENT_UID, deploymentUrl: LIVE_URL, ...(previewUrl === undefined ? {} : { previewUrl }) },
+        environment: { uid: 'env1', domains: [{ url: 'https://www.example.com' }] },
+      });
+
+      const code = await exitCodeOf(command.run());
+
+      expect(code).toBe(2);
+      expect(stdout).toEqual(['\u001b[33mWebsite URL not found.\u001b[39m']);
+      expect(stderr).toEqual([]);
+      expect(opened).toEqual([]);
+      expect(calls).toEqual(['environments.get', 'deployments.get']);
+      expect(got).toEqual([SCOPE, DEPLOYMENT_SCOPE]);
+    },
+  );
+
+  it('writes the plain message to stderr, nothing to stdout, and exits 2 for a named deployment without a preview url and no terminal', async () => {
+    const { command, stdout, stderr, opened } = commandUnderTest({
+      outputIsTTY: false,
+      deployment: DEPLOYMENT_UID,
+      fetched: { uid: DEPLOYMENT_UID, deploymentUrl: LIVE_URL },
+    });
+
+    const code = await exitCodeOf(command.run());
+
+    expect(code).toBe(2);
+    expect(stdout).toEqual([]);
+    expect(stderr).toEqual(['Website URL not found.\n']);
+    expect(opened).toEqual([]);
+  });
+
+  it('reports a deployment the environment does not have as a usage error in the api wording, printing and opening nothing', async () => {
+    const notFound = new LaunchApiError(404, [{ code: 'launch.DEPLOYMENT.NOT_FOUND' }], DEPLOYMENT_ERROR_MESSAGES);
+    const { command, calls, stdout, stderr, opened } = commandUnderTest({
+      deployment: DEPLOYMENT_UID,
+      fetchFails: notFound,
+    });
+
+    const error = (await command.run().catch((thrown: unknown) => thrown)) as UsageError;
+
+    expect(error).toBeInstanceOf(UsageError);
+    expect(error.exitCode).toBe(2);
+    expect(error.message).toBe('No deployment found with that UID.');
+    expect(calls).toEqual(['environments.get', 'deployments.get']);
+    expect(stdout).toEqual([]);
+    expect(stderr).toEqual([]);
+    expect(opened).toEqual([]);
+  });
+
+  it('propagates any other failure reading the named deployment untouched, printing and opening nothing', async () => {
+    const failure = new LaunchApiError(500, []);
+    const { command, calls, stdout, stderr, opened } = commandUnderTest({
+      deployment: DEPLOYMENT_UID,
+      fetchFails: failure,
+    });
+
+    await expect(command.run()).rejects.toBe(failure);
+    expect(failure.exitCode).toBe(1);
+    expect(calls).toEqual(['environments.get', 'deployments.get']);
+    expect(stdout).toEqual([]);
+    expect(stderr).toEqual([]);
+    expect(opened).toEqual([]);
+  });
+
+  it('reads no deployment when the environment is missing, even with --deployment', async () => {
+    const failure = new LaunchApiError(500, []);
+    const { command, calls } = commandUnderTest({ deployment: DEPLOYMENT_UID, environmentFails: failure });
+
+    await expect(command.run()).rejects.toBe(failure);
+    expect(calls).toEqual(['environments.get']);
+  });
+
+  it('declares org, project and env as required inputs and --deployment as optional', () => {
+    expect(SiteOpen.inputs).toEqual({
+      org: { required: true },
+      project: { required: true },
+      env: { required: true },
+      deployment: {},
+    });
   });
 });

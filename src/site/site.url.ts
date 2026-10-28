@@ -20,3 +20,9 @@ export function siteUrlOf(deployment: Deployment | undefined, domains: readonly 
 
   return domain === undefined ? undefined : deploymentUrlOf({ uid: deployment.uid, deploymentUrl: domain.url });
 }
+
+export function previewUrlOf(deployment: Deployment): string | undefined {
+  const previewUrl = deployment.previewUrl?.trim();
+
+  return previewUrl ? deploymentUrlOf({ uid: deployment.uid, previewUrl }) : undefined;
+}

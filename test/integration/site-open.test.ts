@@ -28,6 +28,9 @@ const DATA_DIR = tmpdir();
 const ENVIRONMENTS_PATH = `/manage/projects/${PROJECT_UID}/environments`;
 const ENV_PATH = `${ENVIRONMENTS_PATH}/${ENV_UID}`;
 const DEPLOYMENTS_PATH = `${ENV_PATH}/deployments`;
+const DEPLOYMENT_UID = randomBytes(12).toString('hex');
+const DEPLOYMENT_PATH = `${DEPLOYMENTS_PATH}/${DEPLOYMENT_UID}`;
+const PREVIEW_URL = 'https://preview-1a2b.contentstackapps.com';
 const LIVE_URL = 'https://sample-project.contentstackapps.com';
 const DOMAIN_URL = 'https://production-sample-project.contentstackapps.com';
 const NOT_FOUND_LINE = 'Website URL not found.';
@@ -225,6 +228,68 @@ describe('integration: launch:site:open on the wire', () => {
     expect([ownership, environment, deployments].map((scope) => scope.isDone())).toEqual([true, true, true]);
     expect(onWire).toEqual([]);
     expect(nock.pendingMocks()).toEqual([]);
+  });
+
+  it("opens the named deployment's preview url, not its deployment url, reading the environment first and never the list", async () => {
+    withTerminal(true);
+    const ownership = projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
+    const environment = nock(LAUNCH_HUB_URL)
+      .matchHeader('x-organization-uid', ORG_UID)
+      .matchHeader('x-project-uid', PROJECT_UID)
+      .get(ENV_PATH)
+      .reply(200, () => {
+        sent.push(`GET ${ENV_PATH}`);
+        return getFixture;
+      });
+    const deployment = nock(LAUNCH_HUB_URL)
+      .matchHeader('x-organization-uid', ORG_UID)
+      .matchHeader('x-project-uid', PROJECT_UID)
+      .get(DEPLOYMENT_PATH)
+      .reply(200, () => {
+        sent.push(`GET ${DEPLOYMENT_PATH}`);
+        return { deployment: { uid: DEPLOYMENT_UID, deploymentUrl: LIVE_URL, previewUrl: PREVIEW_URL } };
+      });
+    const list = nock(LAUNCH_HUB_URL).get(DEPLOYMENTS_PATH).query(true).reply(200, { deployments: [] });
+
+    const { error, stdout } = await runOpen(openArgs('--env', ENV_UID, '--deployment', DEPLOYMENT_UID));
+
+    expect(error).toBeUndefined();
+    expect(stripVTControlCharacters(stdout)).toContain(`✔ Opening ${PREVIEW_URL} in your browser...`);
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(open).toHaveBeenCalledWith(PREVIEW_URL);
+    expect(sent).toEqual([`GET ${ENV_PATH}`, `GET ${DEPLOYMENT_PATH}`]);
+    expect([ownership, environment, deployment].map((scope) => scope.isDone())).toEqual([true, true, true]);
+    expect(list.isDone()).toBe(false);
+    expect(onWire).toEqual([]);
+  });
+
+  it('refuses a deployment that is not a 24-hex uid before any request reaches the wire', async () => {
+    withTerminal(true);
+
+    const { error, stdout } = await runOpen(openArgs('--env', ENV_UID, '--deployment', 'not-a-uid'));
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toContain('--deployment');
+    expect(stdout).toBe('');
+    expect(onWire).toEqual([]);
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it('exits 2 with the not-found wording for a deployment the environment does not have', async () => {
+    withTerminal(true);
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
+    nock(LAUNCH_HUB_URL).get(ENV_PATH).reply(200, getFixture);
+    const deployment = nock(LAUNCH_HUB_URL)
+      .get(DEPLOYMENT_PATH)
+      .reply(404, { errors: [{ code: 'launch.DEPLOYMENT.NOT_FOUND', message: 'Deployment not found' }] });
+
+    const { error, stdout } = await runOpen(openArgs('--env', ENV_UID, '--deployment', DEPLOYMENT_UID));
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe('No deployment found with that UID.');
+    expect(deployment.isDone()).toBe(true);
+    expect(stdout).toBe('');
+    expect(open).not.toHaveBeenCalled();
   });
 
   it('refuses a project that belongs to another organization before reading the environment', async () => {

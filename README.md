@@ -584,14 +584,16 @@ Open an environment's live site in your browser, or print its URL when there is 
 
 ```
 USAGE
-  $ csdx launch:site:open [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>]
+  $ csdx launch:site:open [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--deployment
+    <value>]
 
 FLAGS
-  -c, --config=<value>    Path to the local '.cs-launch.json' file
-  -d, --data-dir=<value>  Current working directory
-      --env=<value>       Environment name or UID
-      --org=<value>       Organization UID
-      --project=<value>   Project name or UID
+  -c, --config=<value>      Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>    Current working directory
+      --deployment=<value>  Deployment UID
+      --env=<value>         Environment name or UID
+      --org=<value>         Organization UID
+      --project=<value>     Project name or UID
 
 DESCRIPTION
   Open an environment's live site in your browser, or print its URL when there is no terminal
