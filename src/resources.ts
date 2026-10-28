@@ -10,6 +10,7 @@ import {
 import { variableFlags, variableResolution } from './variables/variable.inputs';
 import { cacheFlags, cacheResolution } from './cache/cache.inputs';
 import { deploymentFlags, deploymentResolution } from './deployments/deployment.inputs';
+import { logsFlags, logsResolution } from './logs/logs.inputs';
 import { ProjectsApi } from './projects/projects.api';
 import { EnvironmentsApi } from './environments/environments.api';
 import { DeploymentsApi } from './deployments/deployments.api';
@@ -31,6 +32,7 @@ export const catalog = {
   ...variableFlags,
   ...cacheFlags,
   ...deploymentFlags,
+  ...logsFlags,
 };
 
 export type Catalog = typeof catalog;
@@ -44,6 +46,7 @@ export const resolution = {
   ...variableResolution,
   ...cacheResolution,
   ...deploymentResolution,
+  ...logsResolution,
 };
 
 export type Resolution = typeof resolution;
