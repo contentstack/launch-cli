@@ -10,7 +10,7 @@ import open from 'open';
 
 import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
 import { projectOwnership } from '../support/project-ownership';
-import { stdinReportingTTY, stdoutReportingTTY } from '../support/terminal';
+import { answerPrompts, CTRL_C, stdinReportingTTY, stdoutReportingTTY } from '../support/terminal';
 
 import getFixture from '../fixtures/environment-get.json';
 import listFixture from '../fixtures/environments-list.json';
@@ -33,6 +33,7 @@ const DEPLOYMENT_PATH = `${DEPLOYMENTS_PATH}/${DEPLOYMENT_UID}`;
 const PREVIEW_URL = 'https://preview-1a2b.contentstackapps.com';
 const LIVE_URL = 'https://sample-project.contentstackapps.com';
 const DOMAIN_URL = 'https://production-sample-project.contentstackapps.com';
+const QUESTION = 'Which domain do you want to open?';
 const NOT_FOUND_LINE = 'Website URL not found.';
 
 const SCANNED = {
@@ -91,6 +92,14 @@ function runOpen(args: string[]) {
   return runCommand(args, config, { stripAnsi: false });
 }
 
+function chooseDefault(): void {
+  answerPrompts({ [QUESTION]: LIVE_URL });
+}
+
+function forbidPrompts() {
+  return answerPrompts({});
+}
+
 function withTerminal(stdout: boolean, stdin = stdout): void {
   restoreStreams.push(stdoutReportingTTY(stdout), stdinReportingTTY(stdin));
 }
@@ -129,8 +138,11 @@ describe('integration: launch:site:open on the wire', () => {
 
   it('opens the latest deployment url of an environment named on the command line and says so on a terminal', async () => {
     withTerminal(true);
+    chooseDefault();
     const scan = nock(LAUNCH_HUB_URL).get(ENVIRONMENTS_PATH).query({ limit: '100', skip: '0' }).reply(200, SCANNED);
-    const { ownership, environment, deployments } = reads([{ uid: 'd1', deploymentUrl: 'sample-project.contentstackapps.com' }]);
+    const { ownership, environment, deployments } = reads([
+      { uid: 'd1', deploymentUrl: 'sample-project.contentstackapps.com' },
+    ]);
 
     const { error, stdout } = await runOpen(openArgs('--env', 'production'));
 
@@ -138,7 +150,12 @@ describe('integration: launch:site:open on the wire', () => {
     expect(stripVTControlCharacters(stdout)).toContain(`✔ Opening ${LIVE_URL} in your browser...`);
     expect(open).toHaveBeenCalledTimes(1);
     expect(open).toHaveBeenCalledWith(LIVE_URL);
-    expect([ownership, scan, environment, deployments].map((scope) => scope.isDone())).toEqual([true, true, true, true]);
+    expect([ownership, scan, environment, deployments].map((scope) => scope.isDone())).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
     expect(onWire).toEqual([]);
   });
 
@@ -179,6 +196,7 @@ describe('integration: launch:site:open on the wire', () => {
 
   it('still prints the opening line and exits 0 when the browser cannot be launched', async () => {
     withTerminal(true);
+    chooseDefault();
     (open as unknown as jest.Mock).mockImplementation(() => {
       throw new Error('spawn xdg-open ENOENT');
     });
@@ -219,6 +237,7 @@ describe('integration: launch:site:open on the wire', () => {
 
   it('sends only GET requests, the environment before the deployments, and nothing unmatched', async () => {
     withTerminal(true);
+    chooseDefault();
     const { ownership, environment, deployments } = reads([{ uid: 'd1', deploymentUrl: LIVE_URL }]);
 
     const { error } = await runOpen(openArgs('--env', ENV_UID));
@@ -261,6 +280,139 @@ describe('integration: launch:site:open on the wire', () => {
     expect([ownership, environment, deployment].map((scope) => scope.isDone())).toEqual([true, true, true]);
     expect(list.isDone()).toBe(false);
     expect(onWire).toEqual([]);
+  });
+
+  it('asks which domain to open as a single-select list with the default first and preselected, and opens only the one picked', async () => {
+    withTerminal(true);
+    const prompts = answerPrompts({ [QUESTION]: DOMAIN_URL });
+    reads([{ uid: 'd1', deploymentUrl: 'sample-project.contentstackapps.com' }]);
+
+    const { error, stdout } = await runOpen(openArgs('--env', ENV_UID));
+
+    expect(error).toBeUndefined();
+    expect(prompts.messages).toEqual([QUESTION]);
+    expect(prompts.payloads).toHaveLength(1);
+    expect(prompts.payloads[0]).toMatchObject({
+      type: 'list',
+      name: 'value',
+      default: LIVE_URL,
+      choices: [
+        { name: 'sample-project.contentstackapps.com (default)', value: LIVE_URL },
+        { name: 'production-sample-project.contentstackapps.com', value: DOMAIN_URL },
+      ],
+    });
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(open).toHaveBeenCalledWith(DOMAIN_URL);
+    expect(stripVTControlCharacters(stdout)).toContain(`✔ Opening ${DOMAIN_URL} in your browser...`);
+    expect(onWire).toEqual([]);
+  });
+
+  it('exits 3 and opens nothing when Ctrl-C is pressed at the domain prompt, having sent only the two reads', async () => {
+    withTerminal(true);
+    answerPrompts({ [QUESTION]: CTRL_C });
+    reads([{ uid: 'd1', deploymentUrl: LIVE_URL }]);
+
+    const { error, stdout } = await runOpen(openArgs('--env', ENV_UID));
+
+    expect(error?.oclif?.exit).toBe(3);
+    expect(open).not.toHaveBeenCalled();
+    expect(stripVTControlCharacters(stdout)).not.toContain('✔ Opening');
+    expect(sent).toEqual([`GET ${ENV_PATH}`, `GET ${DEPLOYMENTS_PATH}`]);
+    expect(onWire).toEqual([]);
+  });
+
+  it('has no --domain flag: it is refused as unknown with exit 2 before any request or browser', async () => {
+    withTerminal(true);
+    forbidPrompts();
+    reads([{ uid: 'd1', deploymentUrl: LIVE_URL }]);
+
+    const { error } = await runOpen(openArgs('--env', ENV_UID, '--domain', 'www.example.com'));
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toContain('Nonexistent flag');
+    expect(sent).toEqual([]);
+    expect(onWire).toEqual([]);
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['stdin is a terminal and stdout is piped', false, true],
+    ['neither stream is a terminal', false, false],
+  ])('prints only the default url, asks nothing and opens nothing when %s', async (_label, stdout, stdin) => {
+    withTerminal(stdout, stdin);
+    const prompts = forbidPrompts();
+    reads([{ uid: 'd1', deploymentUrl: LIVE_URL }]);
+
+    const { error, stdout: printed } = await runOpen(openArgs('--env', ENV_UID));
+
+    expect(error).toBeUndefined();
+    expect(printed).toBe(`${LIVE_URL}\n`);
+    expect(prompts.messages).toEqual([]);
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it('opens the default url without asking when stdout is a terminal but stdin is not', async () => {
+    withTerminal(true, false);
+    const prompts = forbidPrompts();
+    reads([{ uid: 'd1', deploymentUrl: LIVE_URL }]);
+
+    const { error, stdout } = await runOpen(openArgs('--env', ENV_UID));
+
+    expect(error).toBeUndefined();
+    expect(prompts.messages).toEqual([]);
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(open).toHaveBeenCalledWith(LIVE_URL);
+    expect(stripVTControlCharacters(stdout)).toContain(`✔ Opening ${LIVE_URL} in your browser...`);
+  });
+
+  it('asks nothing for a named deployment on a terminal and opens its preview url', async () => {
+    withTerminal(true);
+    const prompts = forbidPrompts();
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
+    nock(LAUNCH_HUB_URL)
+      .get(ENV_PATH)
+      .reply(200, () => {
+        sent.push(`GET ${ENV_PATH}`);
+        return getFixture;
+      });
+    nock(LAUNCH_HUB_URL)
+      .get(DEPLOYMENT_PATH)
+      .reply(200, () => {
+        sent.push(`GET ${DEPLOYMENT_PATH}`);
+        return { deployment: { uid: DEPLOYMENT_UID, deploymentUrl: LIVE_URL, previewUrl: PREVIEW_URL } };
+      });
+
+    const { error } = await runOpen(openArgs('--env', ENV_UID, '--deployment', DEPLOYMENT_UID));
+
+    expect(error).toBeUndefined();
+    expect(prompts.messages).toEqual([]);
+    expect(open).toHaveBeenCalledWith(PREVIEW_URL);
+    expect(sent).toEqual([`GET ${ENV_PATH}`, `GET ${DEPLOYMENT_PATH}`]);
+  });
+
+  it('exits 2 with the yellow not-found line and asks nothing when there is no deployment but two domains', async () => {
+    withTerminal(true);
+    const prompts = forbidPrompts();
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
+    nock(LAUNCH_HUB_URL)
+      .get(ENV_PATH)
+      .reply(200, {
+        environment: {
+          ...getFixture.environment,
+          domains: [{ url: DOMAIN_URL }, { url: 'https://www.example.com' }],
+        },
+      });
+    nock(LAUNCH_HUB_URL)
+      .get(DEPLOYMENTS_PATH)
+      .query({ limit: '1', skip: '0' })
+      .reply(200, { pagination: { count: 0, limit: 1, skip: 0 }, deployments: [] });
+
+    const { error, stdout } = await runOpen(openArgs('--env', ENV_UID));
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(stdout).toContain(`\u001b[33m${NOT_FOUND_LINE}\u001b[39m`);
+    expect(prompts.messages).toEqual([]);
+    expect(open).not.toHaveBeenCalled();
   });
 
   it('refuses a deployment that is not a 24-hex uid before any request reaches the wire', async () => {
@@ -319,7 +471,9 @@ describe('integration: launch:site:open on the wire', () => {
   it('exits 2 with the not-found wording for an environment uid of another project, reading no deployment', async () => {
     withTerminal(true);
     projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
-    const lookup = nock(LAUNCH_HUB_URL).get(`${ENVIRONMENTS_PATH}/${OTHER_PROJECT_ENV_UID}`).reply(404, notFoundFixture);
+    const lookup = nock(LAUNCH_HUB_URL)
+      .get(`${ENVIRONMENTS_PATH}/${OTHER_PROJECT_ENV_UID}`)
+      .reply(404, notFoundFixture);
     const deployments = nock(LAUNCH_HUB_URL)
       .get(`${ENVIRONMENTS_PATH}/${OTHER_PROJECT_ENV_UID}/deployments`)
       .query(true)
@@ -338,8 +492,13 @@ describe('integration: launch:site:open on the wire', () => {
     withTerminal(true);
     projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
     nock(LAUNCH_HUB_URL).get(ENVIRONMENTS_PATH).query({ limit: '100', skip: '0' }).reply(200, SCANNED);
-    const environment = nock(LAUNCH_HUB_URL).get(/\/environments\/[0-9a-f]{24}$/).reply(200, getFixture);
-    const deployments = nock(LAUNCH_HUB_URL).get(/\/deployments$/).query(true).reply(200, { deployments: [] });
+    const environment = nock(LAUNCH_HUB_URL)
+      .get(/\/environments\/[0-9a-f]{24}$/)
+      .reply(200, getFixture);
+    const deployments = nock(LAUNCH_HUB_URL)
+      .get(/\/deployments$/)
+      .query(true)
+      .reply(200, { deployments: [] });
 
     const { error } = await runOpen(openArgs('--env', 'other-project-env'));
 

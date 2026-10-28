@@ -732,7 +732,7 @@ _See code: [src/commands/launch/rollback.ts](https://github.com/contentstack/lau
 
 ## `csdx launch:site:open`
 
-Open an environment's live site in your browser, or print its URL when there is no terminal
+Open an environment's live site in your browser, or print its URL when there is no terminal. On a terminal, when the environment has more than one domain, you choose which one to open; --deployment opens that deployment's preview URL without asking.
 
 ```
 USAGE
@@ -748,10 +748,14 @@ FLAGS
       --project=<value>     Project name or UID
 
 DESCRIPTION
-  Open an environment's live site in your browser, or print its URL when there is no terminal
+  Open an environment's live site in your browser, or print its URL when there is no terminal. On a terminal, when the
+  environment has more than one domain, you choose which one to open; --deployment opens that deployment's preview URL
+  without asking.
 
 EXAMPLES
   $ csdx launch:site:open --org <org-uid> --project <name-or-uid> --env <name-or-uid>
+
+  $ csdx launch:site:open --org <org-uid> --project <name-or-uid> --env <name-or-uid> --deployment <uid>
 
   $ url=$(csdx launch:site:open --org <org-uid> --project <name-or-uid> --env <name-or-uid>)
 ```
