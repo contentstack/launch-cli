@@ -71,4 +71,15 @@ describe('CacheApi', () => {
     expect(error).toMatchObject({ status: 403, exitCode: 1 });
     expect((error as Error).message).toBe('Purging the CDN cache needs permission to update the environment.');
   });
+
+  it.each([500, 409, 429])('rewords a %i from the purge as a failure to start the revalidation', async (status) => {
+    const { client } = fakeRestClient(new LaunchApiError(status, [{ code: 'launch.OTHER', message: 'api text' }]));
+
+    const error = await purgeTags(client).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(LaunchApiError);
+    expect(error).toMatchObject({ status, exitCode: 1 });
+    expect((error as Error).message).toBe('Failed to start cache revalidation. Try again.');
+    expect((error as Error).message).not.toContain('api text');
+  });
 });
