@@ -1,6 +1,6 @@
 fileignoreconfig:
 - filename: test/integration/logs-get.test.ts
-  checksum: 64ab2aa1650e0a16d51f933b3f6c0662d6c4215d6597a73aa017e4bb816e8835
+  checksum: aa4da9d2e96bc109fdc8e4cc87558ff4e7187e55f77e68612322a68739958d1e
 - filename: src/commands/launch/logs/get.test.ts
   checksum: 5ee3d8ba6b014b3a9ac558a750a9a58782bb679d32d30b621e41f977dcc98a0a
 - filename: src/core/failure.test.ts
