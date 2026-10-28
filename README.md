@@ -46,6 +46,8 @@ with exit code 2 and name their V2 replacements. `launch:functions:serve` is liv
 * [`csdx launch`](#csdx-launch)
 * [`csdx launch:cache:purge`](#csdx-launchcachepurge)
 * [`csdx launch:deployments`](#csdx-launchdeployments)
+* [`csdx launch:deployments:get`](#csdx-launchdeploymentsget)
+* [`csdx launch:deployments:list`](#csdx-launchdeploymentslist)
 * [`csdx launch:env:create`](#csdx-launchenvcreate)
 * [`csdx launch:env:delete`](#csdx-launchenvdelete)
 * [`csdx launch:env:get`](#csdx-launchenvget)
@@ -148,6 +150,61 @@ DESCRIPTION
 ```
 
 _See code: [src/commands/launch/deployments/index.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/deployments/index.ts)_
+
+## `csdx launch:deployments:get`
+
+Show a deployment of a Launch environment, the latest one unless --deployment names another
+
+```
+USAGE
+  $ csdx launch:deployments:get [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--deployment
+    <value>]
+
+FLAGS
+  -c, --config=<value>      Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>    Current working directory
+      --deployment=<value>  Deployment UID
+      --env=<value>         Environment name or UID
+      --org=<value>         Organization UID
+      --project=<value>     Project name or UID
+
+DESCRIPTION
+  Show a deployment of a Launch environment, the latest one unless --deployment names another
+
+EXAMPLES
+  $ csdx launch:deployments:get --org <org-uid> --project <name-or-uid> --env <name-or-uid>
+
+  $ csdx launch:deployments:get --org <org-uid> --project <name-or-uid> --env <name-or-uid> --deployment <deployment-uid>
+```
+
+_See code: [src/commands/launch/deployments/get.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/deployments/get.ts)_
+
+## `csdx launch:deployments:list`
+
+List the deployments of a Launch environment
+
+```
+USAGE
+  $ csdx launch:deployments:list [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--limit
+    <value>] [--skip <value>]
+
+FLAGS
+  -c, --config=<value>    Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>  Current working directory
+      --env=<value>       Environment name or UID
+      --limit=<value>     Number of records to fetch (1-1000)
+      --org=<value>       Organization UID
+      --project=<value>   Project name or UID
+      --skip=<value>      Number of records to skip
+
+DESCRIPTION
+  List the deployments of a Launch environment
+
+EXAMPLES
+  $ csdx launch:deployments:list --org <org-uid> --project <name-or-uid> --env <name-or-uid>
+```
+
+_See code: [src/commands/launch/deployments/list.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/deployments/list.ts)_
 
 ## `csdx launch:env:create`
 

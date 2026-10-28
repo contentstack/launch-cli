@@ -1,0 +1,29 @@
+{
+  "pagination": {
+    "count": 2,
+    "limit": 100
+  },
+  "deployments": [
+    {
+      "uid": "d1e2f3a4b5c6d7e8f9012345",
+      "status": "LIVE",
+      "deploymentNumber": 2,
+      "gitBranch": "main",
+      "commitHash": "9fceb02d0ae598e95dc970b74767f19372d61af8",
+      "commitMessage": "Ship the homepage",
+      "deploymentUrl": "production-sample-project.contentstackapps.com",
+      "createdAt": "2025-11-07T08:00:00.000Z",
+      "updatedAt": "2025-11-07T08:10:00.000Z"
+    },
+    {
+      "uid": "c0d1e2f3a4b5c6d7e8f90123",
+      "status": "FAILED",
+      "deploymentNumber": 1,
+      "gitBranch": "develop",
+      "commitHash": "1111111aaaaaaa2222222bbbbbbb333333333ccc",
+      "commitMessage": "Break the build",
+      "createdAt": "2025-11-06T07:39:19.230Z",
+      "updatedAt": "2025-11-06T07:39:53.582Z"
+    }
+  ]
+}

@@ -2,7 +2,7 @@ fileignoreconfig:
 - filename: src/core/failure.test.ts
   checksum: 242d43885d1e3ef46edf1e347899a90549ebf95ec6827426746852f7a6dfc418
 - filename: test/integration/retired-commands.test.ts
-  checksum: 620ae8b1cc10b2d1aed68418a0a82cfb0bb23edd99ad93e6f10ddf5089f446dd
+  checksum: 29cf490fe6d469d85371dd25f0a85908d2176c2ef0111f98e107903d024407eb
 - filename: test/integration/manage-base-path.test.ts
   checksum: 79eb9ad420ea47d5bee8045d812c45b010bbeeafcaf5f85d11653140b0cd0db1
 - filename: src/transport/rest-client.ts
@@ -324,7 +324,7 @@ fileignoreconfig:
 - filename: src/commands/launch/env/update.test.ts
   checksum: 2da219594e7bdd589adc0eff9ff035252a75aaa51dfa20514b18fd3266d7b752
 - filename: README.md
-  checksum: 2e2ca75a02e98610c5fd8a3fa01a1def99b5ec161c80b2a76532fe039f051926
+  checksum: 07adfa52c80f1cf40fe4ba39c8332063713d8abff22d038359681ae89a0304de
   allowed_patterns:
     - "password-protection"
     - "-p, --password"
@@ -411,4 +411,20 @@ fileignoreconfig:
   checksum: 5ea6a0fcd331496ca19773e90dab81e09eb5290b8f22a1880bffc7916f3778b2
 - filename: test/integration/variables-set-unset.test.ts
   checksum: 7af9dde4711849d0908d0de54347055a7c2a8d8920f9fcc0b24382b02bceaed9
+- filename: test/fixtures/deployments-list.json
+  checksum: 2f10f24dc0ceb8e85f5201b7c1530c0c540c044ef50b732cc29e07289112316e
+- filename: test/integration/deployments-get.test.ts
+  checksum: 80a4b8e9c4b389f6a072c8282f9eedcc8560553759df2a930279a6d99c8e0c55
+- filename: test/integration/deployments-list.test.ts
+  checksum: c661f0bd3682ea5b0bfeed782a7c5d03ed75bd86aa1c283bb4b2bda1325bab00
+- filename: src/deployments/deployment.inputs.test.ts
+  checksum: 94044301e647755e3ec9b686ab6c2cb473bc958a80ef1723c0c2c760bccdfa5f
+- filename: test/fixtures/deployment-get.json
+  checksum: acae8ee5ba96a2aafcf43e0b35b3bd22df78bb9ddbe3bad5e7f86c537316721a
+- filename: src/commands/launch/deployments/get.test.ts
+  checksum: ba40d169408d10610c1a8265f100329e14dc5b462dc041d0ed316b3257fbdf48
+- filename: src/commands/launch/deployments/list.test.ts
+  checksum: e493cd51e7c65bbf5b4f71704478b7a669bca4342efc865a1363bc508fe6f9f0
+- filename: src/deployments/deployment.presenter.test.ts
+  checksum: c25521f1db09a0e4ed3cce2b7350660da17d4551a1165e0629b611a3ab8acd53
 version: "1.0"

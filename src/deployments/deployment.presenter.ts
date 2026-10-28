@@ -1,7 +1,8 @@
 import { stripVTControlCharacters } from 'node:util';
 
+import type { TableColumn } from '../core/render';
 import { styled } from '../core/style';
-import { messageOf } from '../core/values';
+import { isAbsent, messageOf } from '../core/values';
 import type { Deployment, DeploymentLog } from './types';
 
 const GUTTER = '  ';
@@ -179,4 +180,90 @@ export function firstDeploymentFailureMessage(failure: FirstDeploymentFailure): 
     `Run csdx launch:deployments:create ${scope}${environment} to try the deployment again, ` +
     `or csdx launch:logs:get ${scope}${environment}${deployment} to see why it did not succeed.`
   );
+}
+
+export interface DeploymentDetailRow {
+  field: string;
+  value: string;
+}
+
+export interface DeploymentScopeLabels {
+  org: string;
+  project: string;
+  environment: string;
+}
+
+const SHORT_COMMIT_LENGTH = 7;
+
+function text(value: string | undefined | null): string {
+  return value === undefined || value === null || isAbsent(value) ? '-' : value;
+}
+
+function shortCommit(value: string | undefined): string {
+  const hash = text(value);
+
+  return hash.length > SHORT_COMMIT_LENGTH ? hash.slice(0, SHORT_COMMIT_LENGTH) : hash;
+}
+
+export function deploymentColumns(showGit: boolean): TableColumn<Deployment>[] {
+  const columns: TableColumn<Deployment>[] = [
+    { header: 'DEPLOYMENT UID', value: (deployment) => text(deployment.uid) },
+    { header: 'STATUS', value: (deployment) => text(deployment.status) },
+  ];
+
+  if (showGit) {
+    columns.push({ header: 'COMMIT', value: (deployment) => shortCommit(deployment.commitHash) });
+  }
+
+  columns.push({ header: 'UPDATED', value: (deployment) => text(deployment.updatedAt) });
+
+  if (showGit) {
+    columns.push({ header: 'BRANCH', value: (deployment) => text(deployment.gitBranch) });
+  }
+
+  return columns;
+}
+
+export const DEPLOYMENT_DETAIL_COLUMNS: TableColumn<DeploymentDetailRow>[] = [
+  { header: 'FIELD', value: (row) => row.field },
+  { header: 'VALUE', value: (row) => row.value },
+];
+
+export const DEPLOYMENT_VALUE_COLUMN = 1;
+
+export function deploymentLogsHint(scope: DeploymentScopeLabels, deploymentUid: string): string {
+  const flags = `--org ${scope.org} --project ${scope.project} --env ${scope.environment}`;
+
+  return `csdx launch:logs:get ${flags} --deployment ${deploymentUid}`;
+}
+
+export function deploymentVariablesSummary(deployment: Deployment): string {
+  const count = Array.isArray(deployment.environmentVariables) ? deployment.environmentVariables.length : 0;
+
+  return `${count} (list them with csdx launch:variables:list)`;
+}
+
+export function deploymentDetailRows(
+  deployment: Deployment,
+  scope: DeploymentScopeLabels,
+  showGit: boolean,
+): DeploymentDetailRow[] {
+  const gitRows: DeploymentDetailRow[] = [
+    { field: 'BRANCH', value: text(deployment.gitBranch) },
+    { field: 'COMMIT', value: text(deployment.commitHash) },
+    { field: 'COMMIT MESSAGE', value: text(deployment.commitMessage) },
+  ];
+  const logs =
+    deployment.uid === undefined || isAbsent(deployment.uid) ? '-' : deploymentLogsHint(scope, deployment.uid);
+
+  return [
+    { field: 'DEPLOYMENT UID', value: text(deployment.uid) },
+    { field: 'STATUS', value: text(deployment.status) },
+    ...(showGit ? gitRows : []),
+    { field: 'URL', value: text(deploymentUrlOf(deployment)) },
+    { field: 'ENVIRONMENT VARIABLES', value: deploymentVariablesSummary(deployment) },
+    { field: 'CREATED AT', value: text(deployment.createdAt) },
+    { field: 'UPDATED AT', value: text(deployment.updatedAt) },
+    { field: 'BUILD LOGS', value: logs },
+  ];
 }

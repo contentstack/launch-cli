@@ -4,7 +4,11 @@ import {
   colouredLogMessage,
   firstDeploymentFailureMessage,
   deploymentLogLine,
+  deploymentColumns,
+  deploymentDetailRows,
+  deploymentLogsHint,
   deploymentLogsUnavailableLine,
+  deploymentVariablesSummary,
   deploymentUrlLine,
   deploymentUrlOf,
   wrapLogMessage,
@@ -190,5 +194,109 @@ describe('firstDeploymentFailureMessage', () => {
         'run csdx launch:deployments:get --org org1 --project proj1 --env env9 --deployment dep1 to see how it ends, ' +
         'or csdx launch:logs:get --org org1 --project proj1 --env env9 --deployment dep1 to follow it.',
     );
+  });
+});
+
+const SCOPE = { org: 'org1', project: 'proj1', environment: 'env1' };
+const STATUSES = ['QUEUED', 'LIVE', 'DEPLOYED', 'ARCHIVED', 'DEPLOYING', 'SKIPPED', 'FAILED', 'CANCELLED', 'PROMOTING'];
+
+function rowOf(rows: { field: string; value: string }[], field: string): string | undefined {
+  return rows.find((row) => row.field === field)?.value;
+}
+
+function cellsOf(deployment: object, header: string): string {
+  const column = deploymentColumns(true).find((candidate) => candidate.header === header);
+
+  return column?.value(deployment) ?? 'no such column';
+}
+
+describe('deployment table presenter', () => {
+  it.each(STATUSES)('writes the status %s verbatim in the list cell and the get row', (status) => {
+    expect(cellsOf({ uid: UID, status }, 'STATUS')).toBe(status);
+    expect(rowOf(deploymentDetailRows({ uid: UID, status }, SCOPE, true), 'STATUS')).toBe(status);
+  });
+
+  it.each([[undefined], [null], [''], ['   ']])('shows a dash for a status of %p', (status) => {
+    expect(cellsOf({ uid: UID, status }, 'STATUS')).toBe('-');
+    expect(rowOf(deploymentDetailRows({ uid: UID, status } as never, SCOPE, true), 'STATUS')).toBe('-');
+  });
+
+  it('labels the id DEPLOYMENT UID in the list and the get view, never a bare UID', () => {
+    const headers = deploymentColumns(true).map((column) => column.header);
+    const fields = deploymentDetailRows({ uid: UID }, SCOPE, true).map((row) => row.field);
+
+    expect(headers[0]).toBe('DEPLOYMENT UID');
+    expect(fields[0]).toBe('DEPLOYMENT UID');
+    expect([...headers, ...fields]).not.toContain('UID');
+  });
+
+  it('shows the git columns and rows for a git project and none of them for a file-upload project', () => {
+    const deployment = { uid: UID, gitBranch: 'main', commitHash: 'abcdef0123456789', commitMessage: 'Ship it' };
+    const gitHeaders = deploymentColumns(true).map((column) => column.header);
+    const plainHeaders = deploymentColumns(false).map((column) => column.header);
+    const gitRows = deploymentDetailRows(deployment, SCOPE, true);
+    const plainRows = deploymentDetailRows(deployment, SCOPE, false);
+
+    expect(gitHeaders).toEqual(['DEPLOYMENT UID', 'STATUS', 'COMMIT', 'UPDATED', 'BRANCH']);
+    expect(plainHeaders).toEqual(['DEPLOYMENT UID', 'STATUS', 'UPDATED']);
+    expect(rowOf(gitRows, 'BRANCH')).toBe('main');
+    expect(rowOf(gitRows, 'COMMIT')).toBe('abcdef0123456789');
+    expect(rowOf(gitRows, 'COMMIT MESSAGE')).toBe('Ship it');
+    expect(plainRows.map((row) => row.field)).not.toContain('BRANCH');
+    expect(plainRows.map((row) => row.field)).not.toContain('COMMIT');
+    expect(plainRows.map((row) => row.field)).not.toContain('COMMIT MESSAGE');
+  });
+
+  it('shortens the commit in the list to seven characters and leaves a shorter value whole', () => {
+    expect(cellsOf({ uid: UID, commitHash: 'abcdef0123456789' }, 'COMMIT')).toBe('abcdef0');
+    expect(cellsOf({ uid: UID, commitHash: 'abcdefg' }, 'COMMIT')).toBe('abcdefg');
+    expect(cellsOf({ uid: UID, commitHash: 'abc' }, 'COMMIT')).toBe('abc');
+    expect(cellsOf({ uid: UID }, 'COMMIT')).toBe('-');
+  });
+
+  it('counts environment variables without showing a key or a value and points at variables:list', () => {
+    const keys = [0, 1, 2].map(() => randomBytes(6).toString('hex'));
+    const values = [0, 1, 2].map(() => randomBytes(6).toString('hex'));
+    const deployment = {
+      uid: UID,
+      environmentVariables: keys.map((key, index) => ({ key, value: values[index] })),
+    };
+
+    const rows = deploymentDetailRows(deployment, SCOPE, true);
+    const shown = JSON.stringify(rows);
+
+    expect(rowOf(rows, 'ENVIRONMENT VARIABLES')).toBe('3 (list them with csdx launch:variables:list)');
+    for (const secret of [...keys, ...values]) {
+      expect(shown).not.toContain(secret);
+    }
+  });
+
+  it.each([[null], [[]], [undefined]])('counts %p environment variables as 0 without throwing', (variables) => {
+    const deployment = { uid: UID, environmentVariables: variables } as never;
+
+    expect(deploymentVariablesSummary(deployment)).toBe('0 (list them with csdx launch:variables:list)');
+    expect(() => deploymentDetailRows(deployment, SCOPE, true)).not.toThrow();
+  });
+
+  it('names the logs command with the full scope and the deployment, or a dash when there is no uid', () => {
+    expect(deploymentLogsHint(SCOPE, 'dep9')).toBe(
+      'csdx launch:logs:get --org org1 --project proj1 --env env1 --deployment dep9',
+    );
+    expect(rowOf(deploymentDetailRows({ uid: 'dep9' }, SCOPE, true), 'BUILD LOGS')).toBe(
+      'csdx launch:logs:get --org org1 --project proj1 --env env1 --deployment dep9',
+    );
+    expect(rowOf(deploymentDetailRows({}, SCOPE, true), 'BUILD LOGS')).toBe('-');
+  });
+
+  it('falls back to a dash for every absent field and prefers the deployment url over the preview url', () => {
+    const rows = deploymentDetailRows({ uid: UID }, SCOPE, true);
+
+    for (const field of ['BRANCH', 'COMMIT', 'COMMIT MESSAGE', 'URL', 'CREATED AT', 'UPDATED AT']) {
+      expect(rowOf(rows, field)).toBe('-');
+    }
+
+    expect(
+      rowOf(deploymentDetailRows({ uid: UID, deploymentUrl: 'a.example.test', previewUrl: 'b.example.test' }, SCOPE, true), 'URL'),
+    ).toBe('https://a.example.test');
   });
 });

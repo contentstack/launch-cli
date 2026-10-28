@@ -30,8 +30,6 @@ let config: Interfaces.Config;
 
 const PLANNED_COMMANDS: Record<string, string> = {
   'launch:deployments:create': 'CL-7170',
-  'launch:deployments:get': 'CL-7170',
-  'launch:deployments:list': 'CL-7170',
   'launch:deployments:rollback': 'CL-7170',
   'launch:logs:get': 'CL-7171',
   'launch:site:open': 'CL-7172',
@@ -153,6 +151,20 @@ describe('integration: retired V1 command names', () => {
     const registered = new Set(config.commands.map((command) => command.id));
 
     expect(Object.entries(PLANNED_COMMANDS).filter(([id]) => registered.has(id))).toEqual([]);
+  });
+
+  it('registers deployments:list and deployments:get as real commands while launch:deployments stays retired', async () => {
+    const registered = new Set(config.commands.map((command) => command.id));
+    const { error } = await runCommand(['launch:deployments'], config);
+
+    expect(registered.has('launch:deployments:list')).toBe(true);
+    expect(registered.has('launch:deployments:get')).toBe(true);
+    expect(PLANNED_COMMANDS['launch:deployments:list']).toBeUndefined();
+    expect(PLANNED_COMMANDS['launch:deployments:get']).toBeUndefined();
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe(
+      'csdx launch:deployments was removed in Launch CLI v2. Use csdx launch:deployments:list instead.',
+    );
   });
 
   it('lists the V2 topics under launch --help', async () => {
