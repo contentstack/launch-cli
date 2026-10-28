@@ -377,9 +377,7 @@ describe('integration: launch:deployments:rollback on the wire', () => {
       const { error } = await onTerminal(() => runCommand(args('--deployment', value, '--yes'), config));
 
       expect(error?.oclif?.exit).toBe(2);
-      expect(error?.message).toBe(
-        `--deployment must be a deployment UID (24 hexadecimal characters); "${value}" is not.`,
-      );
+      expect(error?.message).toContain(`--deployment must be a deployment UID (24 hexadecimal characters); "${value}" is not.`);
       expect(prompts.messages).toEqual([]);
       expect(found.isDone()).toBe(false);
       expect(rollback.isDone()).toBe(false);

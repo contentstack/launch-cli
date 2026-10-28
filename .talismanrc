@@ -415,11 +415,11 @@ fileignoreconfig:
 - filename: test/fixtures/deployments-list.json
   checksum: 2f10f24dc0ceb8e85f5201b7c1530c0c540c044ef50b732cc29e07289112316e
 - filename: test/integration/deployments-get.test.ts
-  checksum: cd609bc7cc48467f2337d9a03fd8509cd8288623699b62e9be298f61fdb747bb
+  checksum: 2c5ecc5d4b2583207324094f2490450f0c58bafc8e12c4b5373e652954c3750b
 - filename: test/integration/deployments-list.test.ts
   checksum: c661f0bd3682ea5b0bfeed782a7c5d03ed75bd86aa1c283bb4b2bda1325bab00
 - filename: src/deployments/deployment.inputs.test.ts
-  checksum: 6a417975de36730a446a00347f1fa3e3570f8ad7491c99efc306b77736fdde65
+  checksum: 917537f4ee0740d68ecf76958bc9ba3c40a15c03afec6a85a7340176c3e52ee5
 - filename: test/fixtures/deployment-get.json
   checksum: acae8ee5ba96a2aafcf43e0b35b3bd22df78bb9ddbe3bad5e7f86c537316721a
 - filename: src/commands/launch/deployments/get.test.ts
@@ -439,9 +439,9 @@ fileignoreconfig:
 - filename: src/deployments/deployment.create.test.ts
   checksum: 2b0e481b6fb349bca249daee5ac1450a2942e55a4e0b0eed3c11a9b0a44bc39c
 - filename: test/integration/deployments-rollback.test.ts
-  checksum: ee3f865a515dbb354528416a054381771d64e1907506f7d788ed47492bbc45c3
+  checksum: 664e521495df2ac9ea9d9cbb581021dcecdf4ae4fcb1a80255235ca4a837b57a
 - filename: test/integration/deployments-cancel.test.ts
-  checksum: 60dc44d64d0a0d954100fb900c8ad173a75fba2f4dd3e95f7d45ead1a59360db
+  checksum: 45ef7e64118cc9a9d136f53eb70611c023e03df07929784ea2f05f8c25319ac6
 - filename: src/commands/launch/deployments/cancel.test.ts
   checksum: af0d06d6cc6c2b8ca93cb30cc82b03621cc52cfa663fa86667160e701bf42f35
 - filename: src/commands/launch/deployments/rollback.test.ts

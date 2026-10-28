@@ -408,7 +408,7 @@ describe('integration: launch:deployments:cancel on the wire', () => {
     const { error } = await runCommand(args('--deployment', '6accca6d34', '--yes'), config);
 
     expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toBe('--deployment must be a deployment UID (24 hexadecimal characters); "6accca6d34" is not.');
+    expect(error?.message).toContain('--deployment must be a deployment UID (24 hexadecimal characters); "6accca6d34" is not.');
     expect(found.isDone()).toBe(false);
     expect(onWire).toEqual([]);
   });

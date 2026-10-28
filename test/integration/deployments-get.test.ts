@@ -199,9 +199,7 @@ describe('integration: launch:deployments:get on the wire', () => {
       const { error, stdout } = await runCommand(getArgs('--deployment', value), config);
 
       expect(error?.oclif?.exit).toBe(2);
-      expect(error?.message).toBe(
-        `--deployment must be a deployment UID (24 hexadecimal characters); "${value}" is not.`,
-      );
+      expect(error?.message).toContain(`--deployment must be a deployment UID (24 hexadecimal characters); "${value}" is not.`);
       expect(error?.message).not.toContain('12 bytes');
       expect(stdout).toBe('');
       expect(found.isDone()).toBe(false);

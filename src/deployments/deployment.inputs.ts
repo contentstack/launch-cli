@@ -76,7 +76,10 @@ function deploymentUidOf(value: string): string {
 }
 
 export const deploymentFlags = {
-  deployment: Flags.string({ description: 'Deployment UID' }),
+  deployment: Flags.string({
+    description: 'Deployment UID',
+    parse: async (input) => (input.trim() === '' ? input : deploymentUidOf(input)),
+  }),
   commit: Flags.string({
     description:
       'GitHub projects: deploy this commit. Pass --commit with no value to pick one from the recent commits',

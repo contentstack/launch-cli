@@ -173,7 +173,7 @@ describe('deployment inputs', () => {
 
     expect(failure).toBeInstanceOf(UsageError);
     expect((failure as UsageError).exitCode).toBe(2);
-    expect((failure as Error).message).toBe(
+    expect((failure as Error).message).toContain(
       `--deployment must be a deployment UID (24 hexadecimal characters); "${value}" is not.`,
     );
   });
@@ -196,13 +196,25 @@ describe('deployment inputs', () => {
 describe('deployment flag at parse time', () => {
   const UID = randomBytes(12).toString('hex');
 
-  it('leaves validation to the resolution step so the usage error keeps its exact wording', async () => {
-    const parsed = await Parser.parse(['--deployment', 'not-a-uid'], { flags: deploymentFlags });
+  it('refuses a value that is not a uid while the arguments are parsed, before anything is resolved', async () => {
+    const refusal = (await Parser.parse(['--deployment', 'not-a-uid'], { flags: deploymentFlags }).catch(
+      (thrown: unknown) => thrown,
+    )) as UsageError;
 
-    expect(parsed.flags.deployment).toBe('not-a-uid');
+    expect(refusal).toBeInstanceOf(UsageError);
+    expect(refusal.exitCode).toBe(2);
+    expect(refusal.message).toContain(
+      '--deployment must be a deployment UID (24 hexadecimal characters); "not-a-uid" is not.',
+    );
   });
 
-  it.each([[UID], [UID.toUpperCase()], [` ${UID} `], ['']])('parses %p from argv untouched', async (value) => {
+  it.each([[UID], [UID.toUpperCase()], [` ${UID} `]])('parses %p from argv as the trimmed uid', async (value) => {
+    const parsed = await Parser.parse(['--deployment', value], { flags: deploymentFlags });
+
+    expect(parsed.flags.deployment).toBe(value.trim());
+  });
+
+  it.each([[''], ['   ']])('lets the blank value %p through the parser so it reads as absent', async (value) => {
     const parsed = await Parser.parse(['--deployment', value], { flags: deploymentFlags });
 
     expect(parsed.flags.deployment).toBe(value);
