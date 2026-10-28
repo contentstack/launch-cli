@@ -4,7 +4,9 @@ import { writeToStderr } from '../../../core/failure';
 import { flagsFor, inputs } from '../../../core/inputs';
 import { LaunchCommand } from '../../../core/launch-command';
 import type { GetDeploymentParams } from '../../../deployments/deployments.api';
+import { domainChoices, askForDomain } from '../../../site/site.prompt';
 import { siteOpeningLine, siteUrlNotFoundLine } from '../../../site/site.presenter';
+import type { SiteDomain } from '../../../site/site.url';
 import { previewUrlOf, siteUrlOf } from '../../../site/site.url';
 import { LaunchApiError } from '../../../transport/errors';
 
@@ -24,10 +26,14 @@ function notFoundAsUsage(error: unknown): never {
 }
 
 export default class SiteOpen extends LaunchCommand<typeof openInputs> {
-  static description = "Open an environment's live site in your browser, or print its URL when there is no terminal";
+  static description =
+    "Open an environment's live site in your browser, or print its URL when there is no terminal. " +
+    'On a terminal, when the environment has more than one domain, you choose which one to open; ' +
+    "--deployment opens that deployment's preview URL without asking.";
 
   static examples = [
     '$ csdx launch:site:open --org <org-uid> --project <name-or-uid> --env <name-or-uid>',
+    '$ csdx launch:site:open --org <org-uid> --project <name-or-uid> --env <name-or-uid> --deployment <uid>',
     '$ url=$(csdx launch:site:open --org <org-uid> --project <name-or-uid> --env <name-or-uid>)',
   ];
 
@@ -41,10 +47,15 @@ export default class SiteOpen extends LaunchCommand<typeof openInputs> {
     const outputIsTTY = this.services.outputIsTTY === true;
 
     const environment = await this.services.api.environments.get(scope).catch(notFoundAsUsage);
-    const url =
-      deploymentUid === undefined
-        ? siteUrlOf(await this.services.api.deployments.latest(scope), environment.domains)
-        : await this.previewUrlOfDeployment({ ...scope, deployment: deploymentUid });
+    let url: string | undefined;
+
+    if (deploymentUid === undefined) {
+      url = siteUrlOf(await this.services.api.deployments.latest(scope), environment.domains);
+
+      url = url === undefined ? url : await this.chosenUrl(url, environment.domains, outputIsTTY);
+    } else {
+      url = await this.previewUrlOfDeployment({ ...scope, deployment: deploymentUid });
+    }
 
     if (url === undefined) {
       this.reportMissingUrl(outputIsTTY);
@@ -58,6 +69,16 @@ export default class SiteOpen extends LaunchCommand<typeof openInputs> {
 
     this.ux.print(siteOpeningLine(url, outputIsTTY));
     this.services.openUrl?.(url);
+  }
+
+  private async chosenUrl(
+    url: string,
+    domains: readonly SiteDomain[] | undefined,
+    outputIsTTY: boolean,
+  ): Promise<string> {
+    const choices = this.services.isTTY && outputIsTTY ? domainChoices(url, domains) : [];
+
+    return choices.length > 1 ? askForDomain(this.ux, choices) : url;
   }
 
   private async previewUrlOfDeployment(params: GetDeploymentParams): Promise<string | undefined> {
