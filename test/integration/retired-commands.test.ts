@@ -162,6 +162,19 @@ describe('integration: retired V1 command names', () => {
     expect(stdout).toContain('launch:functions');
   });
 
+  it('lists the launch:cache topic with its own description under launch --help', async () => {
+    const { stdout } = await runCommand(['launch', '--help'], config);
+
+    expect(stdout).toContain('launch:cache');
+    expect(stdout).toContain('Purge the CDN cache of a Launch environment');
+  });
+
+  it("lists the cache resource's verb under launch:cache --help", async () => {
+    const { stdout } = await runCommand(['launch:cache', '--help'], config);
+
+    expect(stdout).toContain('launch:cache:purge');
+  });
+
   it("lists the projects resource's verbs under launch:projects --help", async () => {
     const { stdout } = await runCommand(['launch:projects', '--help'], config);
 

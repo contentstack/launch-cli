@@ -1,13 +1,17 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 
 import nock from 'nock';
 
-import { LaunchNetworkError } from '../../src/transport/errors';
+import { CacheApi } from '../../src/cache/cache.api';
+import { PURGE_QUOTA_CODE } from '../../src/cache/cache.errors';
+import { LaunchApiError, LaunchNetworkError } from '../../src/transport/errors';
 import { RestApiClient } from '../../src/transport/rest-client';
 
 const ORIGIN = 'https://launch-api.transport.test';
 const BASE_PATH = '/manage';
 const ORG_UID = 'blt4d9e2a7c1f6b3085';
+const PROJECT_UID = randomBytes(12).toString('hex');
+const ENV_UID = randomBytes(12).toString('hex');
 const ANALYTICS_INFO = '@contentstack/cli-launch/2.0.0-alpha.0 darwin-arm64 node-v22.0.0';
 
 const TIMEOUT_ERROR = { message: 'timeout of 2000ms exceeded', code: 'ECONNABORTED' };
@@ -21,6 +25,14 @@ function buildClient(overrides: Partial<ConstructorParameters<typeof RestApiClie
     sleep: async () => undefined,
     ...overrides,
   });
+}
+
+function purgeAttempts(count: number, code: string): nock.Scope[] {
+  return Array.from({ length: count }, () =>
+    nock(ORIGIN)
+      .post(`${BASE_PATH}/projects/${PROJECT_UID}/environments/${ENV_UID}/revalidate-cdn-cache`)
+      .reply(429, { errors: [{ code, message: 'Too many requests.' }], status: 429 }),
+  );
 }
 
 function postAttempts(count: number): nock.Scope[] {
@@ -44,6 +56,29 @@ describe('integration: transport-level retries', () => {
 
   afterAll(() => {
     nock.restore();
+  });
+
+  it('retries a purge answered 429 with another code up to the budget, one attempt per interceptor', async () => {
+    const attempts = purgeAttempts(6, 'launch.RATE_LIMITED');
+
+    const rejection = await new CacheApi(buildClient({ maxRetries: 3 }))
+      .purge({ org: ORG_UID, project: PROJECT_UID, environment: ENV_UID, criterion: { cacheTags: ['a'] } })
+      .catch((error: unknown) => error);
+
+    expect(rejection).toBeInstanceOf(LaunchApiError);
+    expect(attempts.map((attempt) => attempt.isDone())).toEqual([true, true, true, true, false, false]);
+  });
+
+  it('sends a purge answered with the quota 429 exactly once', async () => {
+    const attempts = purgeAttempts(6, PURGE_QUOTA_CODE);
+
+    const rejection = await new CacheApi(buildClient({ maxRetries: 3 }))
+      .purge({ org: ORG_UID, project: PROJECT_UID, environment: ENV_UID, criterion: { cacheTags: ['a'] } })
+      .catch((error: unknown) => error);
+
+    expect(rejection).toBeInstanceOf(LaunchApiError);
+    expect((rejection as LaunchApiError).code).toBe(PURGE_QUOTA_CODE);
+    expect(attempts.map((attempt) => attempt.isDone())).toEqual([true, false, false, false, false, false]);
   });
 
   it('sends a timed-out POST exactly once and explains the failure to the caller', async () => {

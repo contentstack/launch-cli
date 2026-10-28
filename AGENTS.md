@@ -160,6 +160,8 @@ src/
   git/          the internal git-namespace / repository / branch lookups
   organizations/ the --org flag, its organization picker, and the lookup behind it,
                 which reads the Contentstack Management API rather than Launch
+  cache/        the CDN cache purge behind launch:cache:purge: CacheApi, the --path / --tags / --hosts
+                inputs and their normalisation, and the success lines
   functions/    the cloud-function runtime and the serve flags, treated as a resource
   resources.ts  the composition root: it assembles the catalog, the resolution table,
                 the dependency map and the api surface out of the resources
@@ -552,6 +554,16 @@ mutation, because the server may already have acted on it. A `Retry-After` given
 lengthens the wait up to `MAX_RETRY_AFTER_MS` (30 s); an HTTP date or anything unparseable falls back
 to the policy's own backoff.
 
+A request can opt out of retrying a 429 by code: `RestRequest.noRetryCodes` lists the error codes whose 429
+is final, and `RetryPolicy.shouldRetry` takes the codes the answer carried and refuses to retry when any is
+listed. It is per request, so a 429 with any other code, or with no code, and every request that sets nothing,
+still retries on the usual budget. Only `CacheApi.purge` sets it, with
+`launch.ORGANIZATION.REVALIDATE_RATE_LIMIT_EXCEEDED`: that quota is a fixed UTC day already spent, so a retry
+only delays the error and can never succeed. `test/integration/transport-retry.test.ts` proves on the wire that the
+quota 429 is sent once and an ordinary 429 is sent `maxRetries + 1` times. `launch:cache:purge` rewords a 403 from
+the purge whatever its code (`asPurgeFailure`), and a 404 from its environment read as the usage error `No
+environment with UID "<uid>" found in this project.` (exit 2), so a foreign environment is refused before any POST.
+
 A proxy URL shown in a diagnostic has its `user:…@` part removed first (`withoutCredentials`), and
 `https_proxy`/`http_proxy` are read as well as the uppercase names.
 
@@ -821,7 +833,7 @@ checklist and nothing else; the create summary says `ready to set` because the e
 oclif's native `exclusive` / `relationships` on the flag definition, where it also shows in `--help` -
 and a simple range does too: `limit` and `skip` carry oclif's own `min`/`max` rather than being
 checked later. A rule that must read a *resolved* value (one that config, a prompt or a default may
-have supplied) belongs in `src/core/rules.ts` - there are three: `atLeastOneOf` and `exactlyOneOf` (no consumer yet;
+have supplied) belongs in `src/core/rules.ts` - there are three: `exactlyOneOf` (used by `cache:purge`), `atLeastOneOf` (no consumer yet;
 see "Built ahead of use" below) and `onlyWithValueOf` (used by `projects:create`) - declared as a `static rules = [...]` array on the command. `resolveInputs` evaluates them after resolution,
 and a failing rule is a usage error (exit 2).
 
@@ -834,7 +846,7 @@ gate value `onlyWithValueOf` reads is a value, not a "was it supplied?" question
 wherever it came from. Write the next rule when a command needs it; a rule
 kept alive only by its own test proves nothing.
 
-**Built ahead of use.** Four pieces of production code have no caller yet, on purpose, each held
+**Built ahead of use.** Three pieces of production code have no caller yet, on purpose, each held
 for a named ticket whose shape it already fits. Nothing else in `src` is uncalled; add to this list
 rather than leave an orphan unexplained.
 
@@ -842,7 +854,6 @@ rather than leave an orphan unexplained.
 |---|---|---|
 | `DeploymentsApi.list` | CL-7170 (`deployments:*`) | a `DeploymentScope` plus paging -> `DeploymentsPage` |
 | `src/core/redact.ts` | CL-7169 (variables) | see below |
-| `exactlyOneOf` | CL-7172 (`cache:purge`) | "purge these paths, or everything, not both" - and it judges what the user supplied, not defaults |
 | `atLeastOneOf` | no ticket yet - its caller, `projects:update`, now prompts for missing fields instead | "at least one of these flags" for the next command that must not prompt - and it judges what the user supplied, not defaults |
 
 **Redaction.** `src/core/redact.ts` (`REDACTED`, `redactedColumn`) has no caller yet; it is kept

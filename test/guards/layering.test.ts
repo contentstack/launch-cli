@@ -19,6 +19,7 @@ const RESOURCE_EDGES: Record<string, string[]> = {
   uploads: [],
   stacks: [],
   variables: ['environments', 'stacks'],
+  cache: [],
 };
 
 function sourceFilesIn(layer: string): string[] {

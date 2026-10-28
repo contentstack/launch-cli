@@ -8,6 +8,8 @@ import type { HttpClientLike } from './rest-client';
 import { RestApiClient } from './rest-client';
 import { DEFAULT_REQUEST_TIMEOUT_MS } from './retry-policy';
 
+const QUOTA_CODE = 'launch.ORGANIZATION.REVALIDATE_RATE_LIMIT_EXCEEDED';
+
 interface RecordedCall {
   method: string;
   path: string;
@@ -350,6 +352,75 @@ describe('RestApiClient', () => {
 
     await expect(buildClient(http).request({ method: 'POST', path: '/deployments' })).resolves.toEqual({ ok: 1 });
     expect(http.calls).toHaveLength(2);
+  });
+
+  it('throws a 429 whose code the request opted out of after one attempt, without sleeping', async () => {
+    const http = fakeHttpClient([{ status: 429, data: { errors: [{ code: QUOTA_CODE, message: 'x' }] } }]);
+
+    const error = await buildClient(http)
+      .request({ method: 'POST', path: '/x', noRetryCodes: [QUOTA_CODE] })
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(LaunchApiError);
+    expect((error as LaunchApiError).status).toBe(429);
+    expect((error as LaunchApiError).code).toBe(QUOTA_CODE);
+    expect(http.calls).toHaveLength(1);
+    expect(http.waits).toEqual([]);
+  });
+
+  it.each([
+    ['another code', { errors: [{ code: 'launch.RATE_LIMITED', message: 'slow down' }] }],
+    ['an empty body', {}],
+    ['an entry with no code', { errors: [{ message: 'slow down' }] }],
+  ])('keeps retrying a 429 carrying %s when the request opted out of a different code', async (_label, data) => {
+    const http = fakeHttpClient([{ status: 429, data }]);
+
+    const error = await buildClient(http, { maxRetries: 3 })
+      .request({ method: 'POST', path: '/x', noRetryCodes: [QUOTA_CODE] })
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(LaunchApiError);
+    expect((error as LaunchApiError).status).toBe(429);
+    expect(http.calls).toHaveLength(4);
+    expect(http.waits).toHaveLength(3);
+  });
+
+  it('retries a 429 carrying the quota code when the request did not opt out, because the opt-out is per request', async () => {
+    const http = fakeHttpClient([{ status: 429, data: { errors: [{ code: QUOTA_CODE, message: 'x' }] } }]);
+
+    const error = await buildClient(http, { maxRetries: 3 })
+      .request({ method: 'POST', path: '/x' })
+      .catch((caught: unknown) => caught);
+
+    expect((error as LaunchApiError).code).toBe(QUOTA_CODE);
+    expect(http.calls).toHaveLength(4);
+    expect(http.waits).toHaveLength(3);
+  });
+
+  it('retries an ordinary 429 and then stops on the quota 429 that follows it', async () => {
+    const http = fakeHttpClient([
+      { status: 429, data: { errors: [{ code: 'launch.RATE_LIMITED', message: 'slow down' }] } },
+      { status: 429, data: { errors: [{ code: QUOTA_CODE, message: 'x' }] } },
+    ]);
+
+    const error = await buildClient(http, { maxRetries: 3 })
+      .request({ method: 'POST', path: '/x', noRetryCodes: [QUOTA_CODE] })
+      .catch((caught: unknown) => caught);
+
+    expect((error as LaunchApiError).code).toBe(QUOTA_CODE);
+    expect(http.calls).toHaveLength(2);
+    expect(http.waits).toHaveLength(1);
+  });
+
+  it('stops on an opted-out code listed beside others in the same 429 body', async () => {
+    const http = fakeHttpClient([
+      { status: 429, data: { errors: [{ message: 'first' }, { code: QUOTA_CODE, message: 'x' }] } },
+    ]);
+
+    await expect(
+      buildClient(http).request({ method: 'POST', path: '/x', noRetryCodes: ['launch.OTHER', QUOTA_CODE] }),
+    ).rejects.toBeInstanceOf(LaunchApiError);
+    expect(http.calls).toHaveLength(1);
   });
 
   it('returns the payload when a retried request eventually succeeds', async () => {
