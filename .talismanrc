@@ -2,7 +2,7 @@ fileignoreconfig:
 - filename: src/core/failure.test.ts
   checksum: 242d43885d1e3ef46edf1e347899a90549ebf95ec6827426746852f7a6dfc418
 - filename: test/integration/retired-commands.test.ts
-  checksum: f43448a6d3855c3823d65dd66150bbd26410ae0be8a921476ca8a948d65caa16
+  checksum: 4f1a3d7b6b6684986f720a44dcd4d4c014a64dd15c41d41d0266afb0ebe828c0
 - filename: test/integration/manage-base-path.test.ts
   checksum: 79eb9ad420ea47d5bee8045d812c45b010bbeeafcaf5f85d11653140b0cd0db1
 - filename: src/transport/rest-client.ts
@@ -253,7 +253,7 @@ fileignoreconfig:
 - filename: src/git/local-repository.ts
   checksum: b9091ed135dfebdf590a5412bbfba2b2f96d4a177cf944a20909b93405268e9f
 - filename: test/guards/layering.test.ts
-  checksum: 2f1b3934e685c2366e45c75f379d63c0ca7bee11108df1e0010ead13159c6b9b
+  checksum: fea55eeb036ea4acb1cc4d177ae9cbfc1a06bbc5a1ea65b2f5c82717cd0251a9
 - filename: src/commands/launch/projects/create.test.ts
   checksum: 9c40b4b6ed4f7d678ecb921a71f5af7284cd685c1337f47144456ae43a38b1ad
 - filename: src/commands/launch/projects/delete.test.ts
@@ -325,7 +325,7 @@ fileignoreconfig:
 - filename: src/commands/launch/env/update.test.ts
   checksum: 2da219594e7bdd589adc0eff9ff035252a75aaa51dfa20514b18fd3266d7b752
 - filename: README.md
-  checksum: 64557ff94fa3dffc2481a8f2bce583965184be7a38ac6425457397de0b8bff96
+  checksum: bf25a0ec7922815814f3a2552a54cd4c6316ea816d99a1d22fd178f5fda1c304
   allowed_patterns:
     - "password-protection"
     - "-p, --password"
@@ -419,7 +419,7 @@ fileignoreconfig:
 - filename: test/integration/deployments-list.test.ts
   checksum: c661f0bd3682ea5b0bfeed782a7c5d03ed75bd86aa1c283bb4b2bda1325bab00
 - filename: src/deployments/deployment.inputs.test.ts
-  checksum: fadf3bbeb96eb17876a9ff019f7fa9df5e9287de483e7f5a0cb37608caf74f15
+  checksum: 6a417975de36730a446a00347f1fa3e3570f8ad7491c99efc306b77736fdde65
 - filename: test/fixtures/deployment-get.json
   checksum: acae8ee5ba96a2aafcf43e0b35b3bd22df78bb9ddbe3bad5e7f86c537316721a
 - filename: src/commands/launch/deployments/get.test.ts
