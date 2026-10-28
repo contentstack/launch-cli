@@ -91,7 +91,7 @@ fileignoreconfig:
     - "'SECRET=hunter2'"
     - "formFieldKey"
 - filename: test/integration/projects-create.test.ts
-  checksum: 0161c3bba176134df0bc1a3a29cda4e1c0b143afbee202c110cdfed19b08d8e0
+  checksum: c0048672753c6c796d4135aa2df448a390ea9534dd028473c6faf4ee89a949a6
 - filename: test/fixtures/README.md
   checksum: d801c84c8b7d7f38f967573e9a3a70da4405b7cbcbf10d2a6e5be3d65fb3daa1
   allowed_patterns:
@@ -232,7 +232,7 @@ fileignoreconfig:
     - "a project name passed on argv to the project resolver"
     - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
 - filename: AGENTS.md
-  checksum: 7dfeca32920074bbd374b41f014f27d4675a19781a92ca8ec630786f6a6a0d63
+  checksum: d6b5a1836dd0b46e819d787597ed14d16d6d6b0ab43641a333733e86078ac16e
   allowed_patterns:
     - "Do not add an exemption to a guard to make a new file pass"
     - "passes its own error wording to `client.request\\(req, MESSAGES\\)`"
@@ -434,7 +434,7 @@ fileignoreconfig:
 - filename: test/integration/deployments-create.test.ts
   checksum: 43bfebbfbc892f0fed6de4b1539c902e1f8c1a3d4878dbd884469455090dfdcd
 - filename: src/deployments/deployment.watcher.test.ts
-  checksum: 8143bd6ac5b3d69ec2517718a80f6ec044e3ca8ea6a7b4a02554eb848ffe1064
+  checksum: 68ce45de0545af878ae283e13c1cec9329998066598059186645fda003c31d64
 - filename: src/deployments/deployment.create.ts
   checksum: ca64f3b29a68c4a2755a88a141e2cd9dbd6fa851a2776876d78c40f3168492e3
 - filename: src/commands/launch/deployments/create.test.ts
