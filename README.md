@@ -49,6 +49,7 @@ with exit code 2 and name their V2 replacements. `launch:functions:serve` is liv
 * [`csdx launch:deployments:create`](#csdx-launchdeploymentscreate)
 * [`csdx launch:deployments:get`](#csdx-launchdeploymentsget)
 * [`csdx launch:deployments:list`](#csdx-launchdeploymentslist)
+* [`csdx launch:deployments:rollback`](#csdx-launchdeploymentsrollback)
 * [`csdx launch:env:create`](#csdx-launchenvcreate)
 * [`csdx launch:env:delete`](#csdx-launchenvdelete)
 * [`csdx launch:env:get`](#csdx-launchenvget)
@@ -239,6 +240,36 @@ EXAMPLES
 ```
 
 _See code: [src/commands/launch/deployments/list.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/deployments/list.ts)_
+
+## `csdx launch:deployments:rollback`
+
+Roll a Launch environment back to a previous deployment
+
+```
+USAGE
+  $ csdx launch:deployments:rollback [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--deployment
+    <value>] [--reason <value>] [-y]
+
+FLAGS
+  -c, --config=<value>      Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>    Current working directory
+  -y, --yes                 Skip the confirmation prompt
+      --deployment=<value>  Deployment UID
+      --env=<value>         Environment name or UID
+      --org=<value>         Organization UID
+      --project=<value>     Project name or UID
+      --reason=<value>      Why the environment is being rolled back, recorded with the rollback
+
+DESCRIPTION
+  Roll a Launch environment back to a previous deployment
+
+EXAMPLES
+  $ csdx launch:deployments:rollback --org <org-uid> --project <name-or-uid> --env <name-or-uid> --deployment <deployment-uid>
+
+  $ csdx launch:deployments:rollback --org <org-uid> --project <name-or-uid> --env <name-or-uid> --deployment <deployment-uid> --reason "bad release" --yes
+```
+
+_See code: [src/commands/launch/deployments/rollback.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/deployments/rollback.ts)_
 
 ## `csdx launch:env:create`
 

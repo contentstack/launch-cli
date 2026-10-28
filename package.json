@@ -158,6 +158,7 @@
       "launch:deployments:create": "LNCH-DPLMNT-CRT",
       "launch:deployments:get": "LNCH-DPLMNT-GET",
       "launch:deployments:list": "LNCH-DPLMNT-LS",
+      "launch:deployments:rollback": "LNCH-DPLMNT-RBK",
       "launch:environments": "LNCH-ENV",
       "launch:env:create": "LNCH-ENV-CRT",
       "launch:env:delete": "LNCH-ENV-DEL",

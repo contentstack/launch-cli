@@ -182,6 +182,18 @@ export function firstDeploymentFailureMessage(failure: FirstDeploymentFailure): 
   );
 }
 
+export function deploymentRollbackQuestion(uid: string): string {
+  return `Roll back this environment to deployment "${uid}"?`;
+}
+
+export function rolledBackLine(uid: string, outputIsTTY: boolean): string {
+  return styled(`\u2714 Rolled back to deployment "${uid}"`, 'green', outputIsTTY);
+}
+
+export function deploymentNotRolledBackLine(outputIsTTY: boolean): string {
+  return styled('Deployment not rolled back.', 'yellow', outputIsTTY);
+}
+
 export interface DeploymentDetailRow {
   field: string;
   value: string;

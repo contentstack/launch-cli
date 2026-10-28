@@ -35,11 +35,13 @@ async function createResolvedFrom(argv: string[]) {
 
 describe('deployment inputs', () => {
   it('names the flags the deployments commands add and shares them through the catalog', () => {
-    expect(Object.keys(deploymentFlags)).toEqual(['deployment', 'commit', 'last-upload']);
-    expect(Object.keys(deploymentResolution)).toEqual(['deployment', 'commit', 'last-upload']);
+    expect(Object.keys(deploymentFlags)).toEqual(['deployment', 'commit', 'reason', 'last-upload']);
+    expect(Object.keys(deploymentResolution)).toEqual(['deployment', 'commit', 'reason', 'last-upload']);
     expect(catalog.deployment).toBe(deploymentFlags.deployment);
     expect(catalog.commit).toBe(deploymentFlags.commit);
+    expect(catalog.reason).toBe(deploymentFlags.reason);
     expect(catalog['last-upload']).toBe(deploymentFlags['last-upload']);
+    expect(deploymentFlags.reason.required).toBeFalsy();
     expect(deploymentFlags.deployment.required).toBeFalsy();
     expect(deploymentFlags.commit.required).toBeFalsy();
     expect(deploymentFlags['last-upload'].required).toBeFalsy();

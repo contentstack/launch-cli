@@ -68,6 +68,7 @@ export const deploymentFlags = {
       'GitHub projects: deploy this commit. Pass --commit with no value to pick one from the recent commits',
     exclusive: ['last-upload'],
   }),
+  reason: Flags.string({ description: 'Why the environment is being rolled back, recorded with the rollback' }),
   'last-upload': Flags.boolean({
     description: 'FileUpload projects: redeploy the last uploaded bundle without uploading a new one',
   }),
@@ -85,6 +86,9 @@ export const deploymentResolution = {
 
       return value.trim();
     },
+  } satisfies ResolutionSpec<string>,
+  reason: {
+    normalize: async (value) => value.trim(),
   } satisfies ResolutionSpec<string>,
   'last-upload': { default: false } satisfies ResolutionSpec<boolean>,
 };

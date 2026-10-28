@@ -5,6 +5,9 @@ import {
   firstDeploymentFailureMessage,
   deploymentLogLine,
   deploymentColumns,
+  deploymentNotRolledBackLine,
+  deploymentRollbackQuestion,
+  rolledBackLine,
   deploymentDetailRows,
   deploymentLogsHint,
   deploymentLogsUnavailableLine,
@@ -298,5 +301,21 @@ describe('deployment table presenter', () => {
     expect(
       rowOf(deploymentDetailRows({ uid: UID, deploymentUrl: 'a.example.test', previewUrl: 'b.example.test' }, SCOPE, true), 'URL'),
     ).toBe('https://a.example.test');
+  });
+});
+
+describe('rollback wording', () => {
+  it('words the confirm questions with the deployment uid', () => {
+    expect(deploymentRollbackQuestion(UID)).toBe(`Roll back this environment to deployment "${UID}"?`);
+  });
+
+  it('prints the success lines in green on a terminal and as exact plain text otherwise', () => {
+    expect(rolledBackLine(UID, true)).toBe(`\u001b[32m✔ Rolled back to deployment "${UID}"\u001b[39m`);
+    expect(rolledBackLine(UID, false)).toBe(`✔ Rolled back to deployment "${UID}"`);
+  });
+
+  it('prints the decline lines in yellow on a terminal and plain otherwise', () => {
+    expect(deploymentNotRolledBackLine(true)).toBe('\u001b[33mDeployment not rolled back.\u001b[39m');
+    expect(deploymentNotRolledBackLine(false)).toBe('Deployment not rolled back.');
   });
 });

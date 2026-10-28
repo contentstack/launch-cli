@@ -187,4 +187,63 @@ describe('DeploymentsApi', () => {
     expect(error.name).toBe('DeploymentUnsuccessfulError');
     expect(error.message).toBe('Deployment FAILED.');
   });
+
+  it('posts the rollback body with the trimmed reason and the deployment scope', async () => {
+    const { client, requests, messages } = fakeRestClient({});
+
+    await new DeploymentsApi(client).rollback({ ...SCOPE, deployment: DEPLOYMENT, reason: '  bad release  ' });
+
+    expect(requests).toEqual([
+      {
+        method: 'POST',
+        path: `${BASE}/rollback`,
+        orgUid: ORG,
+        projectUid: PROJECT,
+        body: { deployment: DEPLOYMENT, environment: ENVIRONMENT, reason: 'bad release' },
+      },
+    ]);
+    expect(messages[0]).toBe(DEPLOYMENT_ERROR_MESSAGES);
+  });
+
+  it.each([[undefined], [''], ['   ']])('leaves the reason out of the rollback body for %j', async (reason) => {
+    const { client, requests } = fakeRestClient({});
+
+    await new DeploymentsApi(client).rollback({ ...SCOPE, deployment: DEPLOYMENT, reason });
+
+    expect(requests[0].body).toEqual({ deployment: DEPLOYMENT, environment: ENVIRONMENT });
+    expect(Object.keys(requests[0].body as object)).toEqual(['deployment', 'environment']);
+  });
+
+  it.each([
+    ['launch.DEPLOYMENT.ROLLBACK_NOT_ELIGIBLE', 409],
+    ['launch.DEPLOYMENT.NO_LIVE_DEPLOYMENT_FOUND', 409],
+    ['launch.DEPLOYMENT.NOT_FOUND', 404],
+    ['launch.DEPLOYMENT.ROLLBACK_INVALID_STATUS', 400],
+    ['launch.DEPLOYMENT.ROLLBACK_TO_CURRENT_DEPLOYMENT', 400],
+    ['launch.DEPLOYMENT.ROLLBACK_FAILED', 500],
+  ])('words the rollback refusal %s in the CLI own words', (code, status) => {
+    const failure = new LaunchApiError(status, [{ code, message: 'raw' }], DEPLOYMENT_ERROR_MESSAGES);
+
+    expect(failure.exitCode).toBe(1);
+    expect(failure.message).not.toBe(code);
+    expect(failure.message).not.toBe('raw');
+    expect(failure.message).toBe(DEPLOYMENT_ERROR_MESSAGES[code]);
+  });
+
+  it('gives the rollback refusals three distinct messages', () => {
+    const messages = [
+      'launch.DEPLOYMENT.ROLLBACK_NOT_ELIGIBLE',
+      'launch.DEPLOYMENT.NO_LIVE_DEPLOYMENT_FOUND',
+      'launch.DEPLOYMENT.NOT_FOUND',
+    ].map((code) => DEPLOYMENT_ERROR_MESSAGES[code]);
+
+    expect(new Set(messages).size).toBe(3);
+  });
+
+  it('propagates a rejected rollback unchanged', async () => {
+    const rejection = new LaunchApiError(409, [{ code: 'launch.DEPLOYMENT.ROLLBACK_NOT_ELIGIBLE', message: 'x' }]);
+    const client = { request: async () => Promise.reject(rejection) } as unknown as RestApiClient;
+
+    await expect(new DeploymentsApi(client).rollback({ ...SCOPE, deployment: DEPLOYMENT })).rejects.toBe(rejection);
+  });
 });

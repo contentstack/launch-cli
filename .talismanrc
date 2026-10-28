@@ -2,7 +2,7 @@ fileignoreconfig:
 - filename: src/core/failure.test.ts
   checksum: 242d43885d1e3ef46edf1e347899a90549ebf95ec6827426746852f7a6dfc418
 - filename: test/integration/retired-commands.test.ts
-  checksum: 45750f28fbfafeb4dc06f6f3e25371ff74e764e1c03d066a9e2a2941ccb6346c
+  checksum: 07f560d933d7aa4a2cac07ab27d0907b6aa573abdb2aaa8d9cb86faa3a08d746
 - filename: test/integration/manage-base-path.test.ts
   checksum: 79eb9ad420ea47d5bee8045d812c45b010bbeeafcaf5f85d11653140b0cd0db1
 - filename: src/transport/rest-client.ts
@@ -324,7 +324,7 @@ fileignoreconfig:
 - filename: src/commands/launch/env/update.test.ts
   checksum: 2da219594e7bdd589adc0eff9ff035252a75aaa51dfa20514b18fd3266d7b752
 - filename: README.md
-  checksum: c2f28523ed02d81f8228f7e19dd44654adaa7bc9b7120d88bd82e5d7063218cf
+  checksum: fa764d747e9821c029aeff750dc2b5f7e9a1bf49742af906fbd1bb98137e17ff
   allowed_patterns:
     - "password-protection"
     - "-p, --password"
@@ -418,7 +418,7 @@ fileignoreconfig:
 - filename: test/integration/deployments-list.test.ts
   checksum: c661f0bd3682ea5b0bfeed782a7c5d03ed75bd86aa1c283bb4b2bda1325bab00
 - filename: src/deployments/deployment.inputs.test.ts
-  checksum: 118ad82fbd7562365b75b5bdc11c65485dde86f713b1f8f40a88dd3516a29f98
+  checksum: 76dadc6dfb9ca234af47438ca8bfcea456f5a2471e4db39be80f7bfb70b56c59
 - filename: test/fixtures/deployment-get.json
   checksum: acae8ee5ba96a2aafcf43e0b35b3bd22df78bb9ddbe3bad5e7f86c537316721a
 - filename: src/commands/launch/deployments/get.test.ts
@@ -426,7 +426,7 @@ fileignoreconfig:
 - filename: src/commands/launch/deployments/list.test.ts
   checksum: e493cd51e7c65bbf5b4f71704478b7a669bca4342efc865a1363bc508fe6f9f0
 - filename: src/deployments/deployment.presenter.test.ts
-  checksum: c25521f1db09a0e4ed3cce2b7350660da17d4551a1165e0629b611a3ab8acd53
+  checksum: 508d864ecc1b136f6766e92a716f4164c286fffbaa83ac15a5650221b4ead8c8
 - filename: test/integration/deployments-create.test.ts
   checksum: 43bfebbfbc892f0fed6de4b1539c902e1f8c1a3d4878dbd884469455090dfdcd
 - filename: src/deployments/deployment.watcher.test.ts
@@ -438,5 +438,9 @@ fileignoreconfig:
 - filename: src/deployments/deployment.create.test.ts
   checksum: 2b0e481b6fb349bca249daee5ac1450a2942e55a4e0b0eed3c11a9b0a44bc39c
 - filename: src/deployments/deployments.api.test.ts
-  checksum: fcdd4f9604e12d49b1e0f8d205c3d8b48f3022037cb172daeeb913f0bb826e15
+  checksum: 42cd6f07eef6cd6dca4c01504df230e30429577867dd544245f1e7c8af217502
+- filename: test/integration/deployments-rollback.test.ts
+  checksum: e50b3ccf8748fa8c8e254ceb0838dd65619da6c6c2f874af6137be58812d9aed
+- filename: src/commands/launch/deployments/rollback.test.ts
+  checksum: e4eeb8815b52d45f9059643033ecd3f003f7958bff4c90e6854b73c2ff27a7bb
 version: "1.0"

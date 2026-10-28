@@ -25,6 +25,11 @@ export interface CreateDeploymentParams extends DeploymentScope {
   uploadUid?: string;
 }
 
+export interface RollbackDeploymentParams extends DeploymentScope {
+  deployment: string;
+  reason?: string;
+}
+
 export class DeploymentsApi {
   constructor(private readonly client: RestApiClient) {}
 
@@ -90,6 +95,26 @@ export class DeploymentsApi {
     }
 
     return deployment;
+  }
+
+  async rollback(params: RollbackDeploymentParams): Promise<void> {
+    const body: { deployment: string; environment: string; reason?: string } = {
+      deployment: params.deployment,
+      environment: params.environment,
+    };
+    const reason = params.reason?.trim();
+
+    if (reason !== undefined && reason !== '') {
+      body.reason = reason;
+    }
+
+    await this.request<unknown>({
+      method: 'POST',
+      path: `${DeploymentsApi.base(params)}/rollback`,
+      orgUid: params.org,
+      projectUid: params.project,
+      body,
+    });
   }
 
   async latest(params: DeploymentScope): Promise<IdentifiedDeployment | undefined> {
