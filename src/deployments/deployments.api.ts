@@ -1,6 +1,11 @@
 import { assertPage, hasUid, malformed, unwrap } from '../transport/envelope';
 import type { RestApiClient, RestRequest } from '../transport/rest-client';
-import { DEPLOYMENT_ERROR_MESSAGES } from './deployment.errors';
+import { LaunchApiError } from '../transport/errors';
+import {
+  CANCEL_NOT_ALLOWED_CODE,
+  CANCEL_NOT_ALLOWED_RAW_MESSAGE,
+  DEPLOYMENT_ERROR_MESSAGES,
+} from './deployment.errors';
 import type { Deployment, DeploymentResponse, DeploymentsPage, IdentifiedDeployment } from './types';
 
 export * from './types';
@@ -28,6 +33,16 @@ export interface CreateDeploymentParams extends DeploymentScope {
 export interface RollbackDeploymentParams extends DeploymentScope {
   deployment: string;
   reason?: string;
+}
+
+function isCancelNotAllowed(error: unknown): error is LaunchApiError {
+  return (
+    error instanceof LaunchApiError &&
+    error.status === 400 &&
+    error.errors.some(
+      (entry) => entry.code === CANCEL_NOT_ALLOWED_RAW_MESSAGE || entry.message === CANCEL_NOT_ALLOWED_RAW_MESSAGE,
+    )
+  );
 }
 
 export class DeploymentsApi {
@@ -115,6 +130,27 @@ export class DeploymentsApi {
       projectUid: params.project,
       body,
     });
+  }
+
+  async cancel(params: GetDeploymentParams): Promise<void> {
+    try {
+      await this.request<unknown>({
+        method: 'POST',
+        path: `${DeploymentsApi.pathOf(params)}/cancel`,
+        orgUid: params.org,
+        projectUid: params.project,
+      });
+    } catch (error) {
+      if (isCancelNotAllowed(error)) {
+        throw new LaunchApiError(
+          error.status,
+          [{ code: CANCEL_NOT_ALLOWED_CODE, message: CANCEL_NOT_ALLOWED_RAW_MESSAGE }],
+          DEPLOYMENT_ERROR_MESSAGES,
+        );
+      }
+
+      throw error;
+    }
   }
 
   async latest(params: DeploymentScope): Promise<IdentifiedDeployment | undefined> {

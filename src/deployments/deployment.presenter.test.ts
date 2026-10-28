@@ -4,7 +4,10 @@ import {
   colouredLogMessage,
   firstDeploymentFailureMessage,
   deploymentLogLine,
+  deploymentCancelQuestion,
+  deploymentCancelledLine,
   deploymentColumns,
+  deploymentNotCancelledLine,
   deploymentNotRolledBackLine,
   deploymentRollbackQuestion,
   rolledBackLine,
@@ -304,18 +307,23 @@ describe('deployment table presenter', () => {
   });
 });
 
-describe('rollback wording', () => {
+describe('rollback and cancel wording', () => {
   it('words the confirm questions with the deployment uid', () => {
     expect(deploymentRollbackQuestion(UID)).toBe(`Roll back this environment to deployment "${UID}"?`);
+    expect(deploymentCancelQuestion(UID)).toBe(`Cancel deployment "${UID}"? This cannot be undone.`);
   });
 
   it('prints the success lines in green on a terminal and as exact plain text otherwise', () => {
     expect(rolledBackLine(UID, true)).toBe(`\u001b[32m✔ Rolled back to deployment "${UID}"\u001b[39m`);
     expect(rolledBackLine(UID, false)).toBe(`✔ Rolled back to deployment "${UID}"`);
+    expect(deploymentCancelledLine(UID, true)).toBe(`\u001b[32m✔ Deployment "${UID}" cancelled.\u001b[39m`);
+    expect(deploymentCancelledLine(UID, false)).toBe(`✔ Deployment "${UID}" cancelled.`);
   });
 
   it('prints the decline lines in yellow on a terminal and plain otherwise', () => {
     expect(deploymentNotRolledBackLine(true)).toBe('\u001b[33mDeployment not rolled back.\u001b[39m');
     expect(deploymentNotRolledBackLine(false)).toBe('Deployment not rolled back.');
+    expect(deploymentNotCancelledLine(true)).toBe('\u001b[33mDeployment not cancelled.\u001b[39m');
+    expect(deploymentNotCancelledLine(false)).toBe('Deployment not cancelled.');
   });
 });

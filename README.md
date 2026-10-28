@@ -46,6 +46,7 @@ with exit code 2 and name their V2 replacements. `launch:functions:serve` is liv
 * [`csdx launch`](#csdx-launch)
 * [`csdx launch:cache:purge`](#csdx-launchcachepurge)
 * [`csdx launch:deployments`](#csdx-launchdeployments)
+* [`csdx launch:deployments:cancel`](#csdx-launchdeploymentscancel)
 * [`csdx launch:deployments:create`](#csdx-launchdeploymentscreate)
 * [`csdx launch:deployments:get`](#csdx-launchdeploymentsget)
 * [`csdx launch:deployments:list`](#csdx-launchdeploymentslist)
@@ -152,6 +153,35 @@ DESCRIPTION
 ```
 
 _See code: [src/commands/launch/deployments/index.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/deployments/index.ts)_
+
+## `csdx launch:deployments:cancel`
+
+Cancel a deployment of a Launch environment that is still in progress
+
+```
+USAGE
+  $ csdx launch:deployments:cancel [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--deployment
+    <value>] [-y]
+
+FLAGS
+  -c, --config=<value>      Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>    Current working directory
+  -y, --yes                 Skip the confirmation prompt
+      --deployment=<value>  Deployment UID
+      --env=<value>         Environment name or UID
+      --org=<value>         Organization UID
+      --project=<value>     Project name or UID
+
+DESCRIPTION
+  Cancel a deployment of a Launch environment that is still in progress
+
+EXAMPLES
+  $ csdx launch:deployments:cancel --org <org-uid> --project <name-or-uid> --env <name-or-uid> --deployment <deployment-uid>
+
+  $ csdx launch:deployments:cancel --org <org-uid> --project <name-or-uid> --env <name-or-uid> --deployment <deployment-uid> --yes
+```
+
+_See code: [src/commands/launch/deployments/cancel.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/deployments/cancel.ts)_
 
 ## `csdx launch:deployments:create`
 

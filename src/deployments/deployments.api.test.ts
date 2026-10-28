@@ -2,7 +2,11 @@ import { randomBytes } from 'node:crypto';
 
 import { LaunchApiError } from '../transport/errors';
 import type { RestApiClient, RestRequest } from '../transport/rest-client';
-import { DEPLOYMENT_ERROR_MESSAGES, DeploymentUnsuccessfulError } from './deployment.errors';
+import {
+  CANCEL_NOT_ALLOWED_RAW_MESSAGE,
+  DEPLOYMENT_ERROR_MESSAGES,
+  DeploymentUnsuccessfulError,
+} from './deployment.errors';
 import { DeploymentsApi } from './deployments.api';
 
 const ORG = randomBytes(9).toString('hex');
@@ -245,5 +249,52 @@ describe('DeploymentsApi', () => {
     const client = { request: async () => Promise.reject(rejection) } as unknown as RestApiClient;
 
     await expect(new DeploymentsApi(client).rollback({ ...SCOPE, deployment: DEPLOYMENT })).rejects.toBe(rejection);
+  });
+
+  it('posts a bodyless cancel to the deployment cancel path', async () => {
+    const { client, requests, messages } = fakeRestClient({});
+
+    await new DeploymentsApi(client).cancel({ ...SCOPE, deployment: DEPLOYMENT });
+
+    expect(requests).toEqual([
+      { method: 'POST', path: `${BASE}/${DEPLOYMENT}/cancel`, orgUid: ORG, projectUid: PROJECT },
+    ]);
+    expect('body' in requests[0]).toBe(false);
+    expect(messages[0]).toBe(DEPLOYMENT_ERROR_MESSAGES);
+  });
+
+  it.each([
+    ['the code', [{ code: 'launch.DEPLOYMENT.CANCEL_NOT_ALLOWED', message: 'x' }]],
+    ['the raw message as the code', [{ code: CANCEL_NOT_ALLOWED_RAW_MESSAGE, message: CANCEL_NOT_ALLOWED_RAW_MESSAGE }]],
+    ['the raw message alone', [{ message: CANCEL_NOT_ALLOWED_RAW_MESSAGE }]],
+  ])('words a cancel refused with %s as the cancel-not-allowed message', async (_name, errors) => {
+    const rejection = new LaunchApiError(400, errors, DEPLOYMENT_ERROR_MESSAGES);
+    const client = { request: async () => Promise.reject(rejection) } as unknown as RestApiClient;
+
+    const failure = (await new DeploymentsApi(client)
+      .cancel({ ...SCOPE, deployment: DEPLOYMENT })
+      .catch((error: unknown) => error)) as LaunchApiError;
+
+    expect(failure).toBeInstanceOf(LaunchApiError);
+    expect(failure.exitCode).toBe(1);
+    expect(failure.status).toBe(400);
+    expect(failure.code).toBe('launch.DEPLOYMENT.CANCEL_NOT_ALLOWED');
+    expect(failure.message).toBe(DEPLOYMENT_ERROR_MESSAGES['launch.DEPLOYMENT.CANCEL_NOT_ALLOWED']);
+    expect(failure.message).not.toBe(CANCEL_NOT_ALLOWED_RAW_MESSAGE);
+  });
+
+  it('leaves a 400 with another message, and a non-400 with the raw message, untouched on cancel', async () => {
+    const other = new LaunchApiError(400, [{ message: 'something else' }]);
+    const wrongStatus = new LaunchApiError(409, [{ message: CANCEL_NOT_ALLOWED_RAW_MESSAGE }]);
+    const notFound = new LaunchApiError(404, [{ code: 'launch.DEPLOYMENT.NOT_FOUND', message: 'x' }], DEPLOYMENT_ERROR_MESSAGES);
+    const plain = new Error('boom');
+
+    for (const rejection of [other, wrongStatus, notFound, plain]) {
+      const client = { request: async () => Promise.reject(rejection) } as unknown as RestApiClient;
+
+      await expect(new DeploymentsApi(client).cancel({ ...SCOPE, deployment: DEPLOYMENT })).rejects.toBe(rejection);
+    }
+
+    expect(notFound.message).toBe('No deployment found with that UID.');
   });
 });

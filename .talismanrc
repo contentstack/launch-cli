@@ -2,7 +2,7 @@ fileignoreconfig:
 - filename: src/core/failure.test.ts
   checksum: 242d43885d1e3ef46edf1e347899a90549ebf95ec6827426746852f7a6dfc418
 - filename: test/integration/retired-commands.test.ts
-  checksum: 07f560d933d7aa4a2cac07ab27d0907b6aa573abdb2aaa8d9cb86faa3a08d746
+  checksum: 8d4f6fcdbfffdd4434eeefe020413730e2737bd2a3a1f8890946fe64b6290ec4
 - filename: test/integration/manage-base-path.test.ts
   checksum: 79eb9ad420ea47d5bee8045d812c45b010bbeeafcaf5f85d11653140b0cd0db1
 - filename: src/transport/rest-client.ts
@@ -324,7 +324,7 @@ fileignoreconfig:
 - filename: src/commands/launch/env/update.test.ts
   checksum: 2da219594e7bdd589adc0eff9ff035252a75aaa51dfa20514b18fd3266d7b752
 - filename: README.md
-  checksum: fa764d747e9821c029aeff750dc2b5f7e9a1bf49742af906fbd1bb98137e17ff
+  checksum: 65f161ac92dca833cec232587631cadb092eef71a222da5fbe796788035ddc8e
   allowed_patterns:
     - "password-protection"
     - "-p, --password"
@@ -426,7 +426,7 @@ fileignoreconfig:
 - filename: src/commands/launch/deployments/list.test.ts
   checksum: e493cd51e7c65bbf5b4f71704478b7a669bca4342efc865a1363bc508fe6f9f0
 - filename: src/deployments/deployment.presenter.test.ts
-  checksum: 508d864ecc1b136f6766e92a716f4164c286fffbaa83ac15a5650221b4ead8c8
+  checksum: 246326b5147417991b450138e48bf05506f8d1b15a6d4a074627c214e1daa5b7
 - filename: test/integration/deployments-create.test.ts
   checksum: 43bfebbfbc892f0fed6de4b1539c902e1f8c1a3d4878dbd884469455090dfdcd
 - filename: src/deployments/deployment.watcher.test.ts
@@ -437,10 +437,14 @@ fileignoreconfig:
   checksum: 50c3f35c7246b49f6ebf5e48a9a9646ccbcb563c0c0e042fd38917e2f98cbba3
 - filename: src/deployments/deployment.create.test.ts
   checksum: 2b0e481b6fb349bca249daee5ac1450a2942e55a4e0b0eed3c11a9b0a44bc39c
-- filename: src/deployments/deployments.api.test.ts
-  checksum: 42cd6f07eef6cd6dca4c01504df230e30429577867dd544245f1e7c8af217502
 - filename: test/integration/deployments-rollback.test.ts
   checksum: e50b3ccf8748fa8c8e254ceb0838dd65619da6c6c2f874af6137be58812d9aed
+- filename: test/integration/deployments-cancel.test.ts
+  checksum: 9ab05fb14e29cd32eae65db8de120b4c3ddb6feb1962d1af220f6b668fb4595f
+- filename: src/commands/launch/deployments/cancel.test.ts
+  checksum: afc864fa9498c03b2d23d8ea65e26e3590ea4ce03aa09b98c23bd2a28bd77125
 - filename: src/commands/launch/deployments/rollback.test.ts
   checksum: e4eeb8815b52d45f9059643033ecd3f003f7958bff4c90e6854b73c2ff27a7bb
+- filename: src/deployments/deployments.api.test.ts
+  checksum: 1d0156a94477351919ccd2ec6f534c9a9ec47dc19fc72c9d705704b877b7460a
 version: "1.0"

@@ -167,12 +167,14 @@ describe('integration: retired V1 command names', () => {
     );
   });
 
-  it('registers deployments:rollback as a real command while launch:rollback stays retired', async () => {
+  it('registers deployments:rollback and deployments:cancel as real commands while launch:rollback stays retired', async () => {
     const registered = new Set(config.commands.map((command) => command.id));
     const { error } = await runCommand(['launch:rollback'], config);
 
     expect(registered.has('launch:deployments:rollback')).toBe(true);
+    expect(registered.has('launch:deployments:cancel')).toBe(true);
     expect(PLANNED_COMMANDS['launch:deployments:rollback']).toBeUndefined();
+    expect(PLANNED_COMMANDS['launch:deployments:cancel']).toBeUndefined();
     expect(error?.oclif?.exit).toBe(2);
     expect(error?.message).toBe(
       'csdx launch:rollback was removed in Launch CLI v2. Use csdx launch:deployments:rollback instead.',
