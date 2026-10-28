@@ -14,11 +14,13 @@ const ONE_OF = `Pass exactly one of ${CRITERIA.join(', ')}`;
 
 interface Harness {
   resolved?: Record<string, unknown>;
-  environment?: { uid?: string; name?: string };
+  environment?: { uid?: string; name?: string; domains?: { url?: string }[] };
   getFails?: Error;
   purgeFails?: Error;
   purgeResult?: unknown;
   outputIsTTY?: boolean;
+  isTTY?: boolean;
+  answers?: unknown[];
 }
 
 function commandUnderTest(harness: Harness) {
@@ -26,11 +28,18 @@ function commandUnderTest(harness: Harness) {
   const calls: string[] = [];
   const got: unknown[] = [];
   const purged: unknown[] = [];
+  const asked: Record<string, unknown>[] = [];
+  const answers = [...(harness.answers ?? [])];
   const ux: UxLike = {
     print: (message: string) => {
       lines.push(message);
     },
-    inquire: async () => undefined as never,
+    inquire: async <T>(payload: unknown): Promise<T> => {
+      asked.push(payload as Record<string, unknown>);
+      calls.push('ask');
+
+      return answers.shift() as T;
+    },
   };
   const command = Object.create(Purge.prototype) as Purge;
 
@@ -39,7 +48,7 @@ function commandUnderTest(harness: Harness) {
     resolved: { org: 'org1', project: 'proj1', env: 'env1', path: BLOG, ...harness.resolved },
     services: {
       ux,
-      isTTY: false,
+      isTTY: harness.isTTY ?? false,
       outputIsTTY: harness.outputIsTTY ?? false,
       api: {
         environments: {
@@ -70,7 +79,7 @@ function commandUnderTest(harness: Harness) {
     },
   });
 
-  return { command, lines, calls, got, purged };
+  return { command, lines, calls, got, purged, asked };
 }
 
 describe('launch:cache:purge', () => {
@@ -184,12 +193,124 @@ describe('launch:cache:purge', () => {
     expect(lines).toEqual([]);
   });
 
-  it('declares org, project and env as required, the three criteria as optional, and the exactlyOneOf rule', () => {
+  it('purges a typed path as a prefix when --prefix was passed', async () => {
+    const { command, purged, lines } = commandUnderTest({ resolved: { prefix: true } });
+
+    await command.run();
+
+    expect(purged).toEqual([{ ...SCOPE, criterion: { cachePath: { path: '/blog', isPrefix: true } } }]);
+    expect(lines).toEqual(['✔ Cache purge initiated for /blog.']);
+  });
+
+  it('does not ask anything when a criterion was supplied, on a terminal or not', async () => {
+    for (const resolved of [{ path: BLOG }, { path: undefined, tags: ['a'] }, { path: undefined, hosts: ['h'] }]) {
+      const { command, asked } = commandUnderTest({ resolved, isTTY: true });
+
+      await command.run();
+
+      expect(asked).toEqual([]);
+    }
+  });
+
+  it('refuses none supplied without a terminal before reading the environment or asking', async () => {
+    const { command, calls, asked } = commandUnderTest({ resolved: { path: undefined }, isTTY: false });
+
+    const error = await command.run().catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(UsageError);
+    expect((error as UsageError).exitCode).toBe(EXIT_USAGE);
+    expect((error as UsageError).message).toBe(`${ONE_OF}; none was supplied.`);
+    expect(calls).toEqual([]);
+    expect(asked).toEqual([]);
+  });
+
+  it('does not let --prefix alone count as a criterion, so nothing is asked and nothing is read', async () => {
+    const { command, calls } = commandUnderTest({ resolved: { path: undefined, prefix: true }, isTTY: false });
+
+    await expect(command.run()).rejects.toThrow(`${ONE_OF}; none was supplied.`);
+    expect(calls).toEqual([]);
+  });
+
+  it('reads the environment, then asks what to purge, offering its domains as bare hostnames', async () => {
+    const { command, calls, asked, purged, lines } = commandUnderTest({
+      resolved: { path: undefined },
+      isTTY: true,
+      environment: { uid: 'env1', domains: [{ url: 'https://example.com' }, { url: 'https://www.example.com/' }] },
+      answers: ['hosts', ['www.example.com']],
+    });
+
+    await command.run();
+
+    expect(calls).toEqual(['get', 'ask', 'ask', 'purge']);
+    expect(asked[0].choices).toEqual([
+      { name: 'Path', value: 'path' },
+      { name: 'Cache tags', value: 'tags' },
+      { name: 'Hostnames', value: 'hosts' },
+    ]);
+    expect(asked[1].choices).toEqual([
+      { name: 'example.com', value: 'example.com' },
+      { name: 'www.example.com', value: 'www.example.com' },
+    ]);
+    expect(purged).toEqual([{ ...SCOPE, criterion: { hostnames: ['www.example.com'] } }]);
+    expect(lines).toEqual(['✔ Cache purge initiated for 1 domain.']);
+  });
+
+  it.each([
+    ['has no domains', { uid: 'env1' }],
+    ['has an empty domain list', { uid: 'env1', domains: [] }],
+  ])('leaves Hostnames out of the list when the environment %s', async (_label, environment) => {
+    const { command, asked, purged } = commandUnderTest({
+      resolved: { path: undefined },
+      isTTY: true,
+      environment,
+      answers: ['tags', 'a, b'],
+    });
+
+    await command.run();
+
+    expect(asked[0].choices).toEqual([
+      { name: 'Path', value: 'path' },
+      { name: 'Cache tags', value: 'tags' },
+    ]);
+    expect(purged).toEqual([{ ...SCOPE, criterion: { cacheTags: ['a', 'b'] } }]);
+  });
+
+  it('purges the path and prefix answered at the prompt', async () => {
+    const { command, purged, lines } = commandUnderTest({
+      resolved: { path: undefined },
+      isTTY: true,
+      answers: ['path', '/blog', true],
+    });
+
+    await command.run();
+
+    expect(purged).toEqual([{ ...SCOPE, criterion: { cachePath: { path: '/blog', isPrefix: true } } }]);
+    expect(lines).toEqual(['✔ Cache purge initiated for /blog.']);
+  });
+
+  it('purges nothing when the criterion prompt is left unanswered', async () => {
+    const { command, calls, lines } = commandUnderTest({ resolved: { path: undefined }, isTTY: true, answers: [undefined] });
+
+    await expect(command.run()).rejects.toMatchObject({ exitCode: 3 });
+    expect(calls).toEqual(['get', 'ask']);
+    expect(lines).toEqual([]);
+  });
+
+  it('does not ask when the environment lookup fails on a terminal with nothing supplied', async () => {
+    const failure = new Error('lookup exploded');
+    const { command, calls } = commandUnderTest({ resolved: { path: undefined }, isTTY: true, getFails: failure });
+
+    await expect(command.run()).rejects.toBe(failure);
+    expect(calls).toEqual(['get']);
+  });
+
+  it('declares org, project and env as required, the criteria and --prefix as optional, and its two rules', () => {
     expect(Purge.inputs).toEqual({
       org: { required: true },
       project: { required: true },
       env: { required: true },
       path: {},
+      prefix: {},
       tags: {},
       hosts: {},
     });
@@ -198,21 +319,36 @@ describe('launch:cache:purge', () => {
       'hosts',
       'org',
       'path',
+      'prefix',
       'project',
       'tags',
     ]);
-    expect(Purge.rules).toHaveLength(1);
+    expect(Purge.flags.prefix.type).toBe('boolean');
+    expect(Purge.flags.prefix.required).toBeFalsy();
+    expect(Purge.rules).toHaveLength(2);
+    expect(Purge.examples).toContain(
+      '$ csdx launch:cache:purge --org <org-uid> --project <name-or-uid> --env <name-or-uid> --path /blog --prefix',
+    );
   });
 
-  it('refuses none, two and three criteria through its rule', () => {
-    const [rule] = Purge.rules ?? [];
+  it('refuses two and three criteria, and --prefix without --path, through its rules, and lets none through to the prompt', () => {
+    const run = (resolved: Record<string, unknown>, sources: Record<string, 'flag'>) =>
+      (Purge.rules ?? []).forEach((rule) => rule(resolved, sources));
     const supplied = { path: 'flag', tags: 'flag', hosts: 'flag' } as const;
 
-    expect(() => rule({}, {})).toThrow(`${ONE_OF}; none was supplied.`);
-    expect(() => rule({ path: BLOG, tags: ['a'] }, supplied)).toThrow(`${ONE_OF}; --path, --tags were supplied.`);
-    expect(() => rule({ path: BLOG, tags: ['a'], hosts: ['h'] }, supplied)).toThrow(
+    expect(() => run({}, {})).not.toThrow();
+    expect(() => run({ path: BLOG, tags: ['a'] }, supplied)).toThrow(`${ONE_OF}; --path, --tags were supplied.`);
+    expect(() => run({ path: BLOG, tags: ['a'], hosts: ['h'] }, supplied)).toThrow(
       `${ONE_OF}; --path, --tags, --hosts were supplied.`,
     );
-    expect(() => rule({ tags: ['a'] }, supplied)).not.toThrow();
+    expect(() => run({ tags: ['a'] }, supplied)).not.toThrow();
+    expect(() => run({ prefix: true }, { prefix: 'flag' })).toThrow('--prefix is only used with --path.');
+    expect(() => run({ prefix: true, tags: ['a'] }, { prefix: 'flag', tags: 'flag' })).toThrow(
+      '--prefix is only used with --path.',
+    );
+    expect(() => run({ prefix: true, hosts: ['h'] }, { prefix: 'flag', hosts: 'flag' })).toThrow(
+      '--prefix is only used with --path.',
+    );
+    expect(() => run({ prefix: true, path: BLOG }, { prefix: 'flag', path: 'flag' })).not.toThrow();
   });
 });

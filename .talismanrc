@@ -20,7 +20,7 @@ fileignoreconfig:
 - filename: src/core/service-context.test.ts
   checksum: 7bc4f6ca3ec8a960f84fb4c07453a287bb2bb0ccc7e06c5805a7f56df160024a
 - filename: src/core/rules.test.ts
-  checksum: 2dbc873f3e635a72b1b566311c04252d2a2c25142570006523415c81a91c7a6a
+  checksum: addfdcffa45491accbc861f28cc2f17528a7e9d77d4c852b302a75cd68d7bdee
 - filename: src/core/inputs.test.ts
   checksum: c5b4be7a0aa2f0878153f062e1500b2bdbd53bdd2d84bb7c13c731db3c3699c4
 - filename: .github/workflows/secrets-scan.yml
@@ -217,7 +217,7 @@ fileignoreconfig:
     - "b2c3d4e5f60718293a4b5c6d"
     - "c3d4e5f60718293a4b5c6d7e"
 - filename: src/core/rules.ts
-  checksum: ac94c82b5ce3805f986b5aeecc4e53579dfdf1473d9617c20bc126597657fe37
+  checksum: e76ecc51f119782824f465e2d30109cdde4a8b8f1464f2569f77f660dc28d0a7
   allowed_patterns:
     - "FlagKey"
 - filename: src/resources.ts
@@ -228,7 +228,7 @@ fileignoreconfig:
     - "a project name passed on argv to the project resolver"
     - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
 - filename: AGENTS.md
-  checksum: 2a47698f4c9e0f3576b0ccd5fd1852b144ee3729d4e1e38c828c0d77d042e3fd
+  checksum: b7a5a3e72e2716dc9ac640fc6ea62ae587a0c12c019d060a7af16572ee9c8635
   allowed_patterns:
     - "Do not add an exemption to a guard to make a new file pass"
     - "passes its own error wording to `client.request\\(req, MESSAGES\\)`"
@@ -411,4 +411,8 @@ fileignoreconfig:
   checksum: 5ea6a0fcd331496ca19773e90dab81e09eb5290b8f22a1880bffc7916f3778b2
 - filename: test/integration/variables-set-unset.test.ts
   checksum: 7af9dde4711849d0908d0de54347055a7c2a8d8920f9fcc0b24382b02bceaed9
+- filename: src/cache/cache.inputs.test.ts
+  checksum: 4c602f53a296caec6bab752c905a8abb3da2462ed83b0a5337e8838e87cd9dbd
+- filename: src/commands/launch/cache/purge.test.ts
+  checksum: f1a319cc3af775f28919e56fa17bd7b7e6b89cb4541db506ca8e5fac5edb6026
 version: "1.0"

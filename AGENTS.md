@@ -160,8 +160,8 @@ src/
   git/          the internal git-namespace / repository / branch lookups
   organizations/ the --org flag, its organization picker, and the lookup behind it,
                 which reads the Contentstack Management API rather than Launch
-  cache/        the CDN cache purge behind launch:cache:purge: CacheApi, the --path / --tags / --hosts
-                inputs and their normalisation, and the success lines
+  cache/        the CDN cache purge behind launch:cache:purge: CacheApi, the --path / --prefix / --tags / --hosts
+                inputs and their normalisation, the criterion prompt and the success lines
   functions/    the cloud-function runtime and the serve flags, treated as a resource
   resources.ts  the composition root: it assembles the catalog, the resolution table,
                 the dependency map and the api surface out of the resources
@@ -564,6 +564,17 @@ quota 429 is sent once and an ordinary 429 is sent `maxRetries + 1` times. `laun
 the purge whatever its code (`asPurgeFailure`), and a 404 from its environment read as the usage error `No
 environment with UID "<uid>" found in this project.` (exit 2), so a foreign environment is refused before any POST.
 
+`launch:cache:purge` takes `--path`, `--tags` or `--hosts`, and `--prefix` with `--path` (the flag form of ending the path
+in `/*`; `--prefix` without `--path` is `onlyWithFlag('prefix', 'path')`, exit 2 `--prefix is only used with --path.`).
+Two or three criteria are refused by `atMostOneOf` in the resolution chain. **None** supplied is not a rule: a rule
+runs in `init()`, before the command can read the environment's domains or prompt, so `run()` refuses it with the
+same `Pass exactly one of ...; none was supplied.` wording (`oneOfMessage`) when there is no terminal, before any
+request, and on a terminal asks `What do you want to purge?` (`promptForCriterion`, `src/cache/cache.prompt.ts`): Path
+(then the path, then `Purge everything under this path? (prefix match)`, default no, skipped for a typed `/*`), Cache
+tags (the `--tags` normaliser, no maximum) or Hostnames (a checkbox of the environment's own domains as bare hostnames,
+left out when it has none). The domains come from the environment `run()` reads first, so the prompt costs no request.
+`--prefix` alone never reaches the prompt. The success line is one `✔ Cache purge initiated for ...` line.
+
 A proxy URL shown in a diagnostic has its `user:…@` part removed first (`withoutCredentials`), and
 `https_proxy`/`http_proxy` are read as well as the uppercase names.
 
@@ -833,7 +844,7 @@ checklist and nothing else; the create summary says `ready to set` because the e
 oclif's native `exclusive` / `relationships` on the flag definition, where it also shows in `--help` -
 and a simple range does too: `limit` and `skip` carry oclif's own `min`/`max` rather than being
 checked later. A rule that must read a *resolved* value (one that config, a prompt or a default may
-have supplied) belongs in `src/core/rules.ts` - there are three: `exactlyOneOf` (used by `cache:purge`), `atLeastOneOf` (no consumer yet;
+have supplied) belongs in `src/core/rules.ts` - there are five: `atMostOneOf` and `onlyWithFlag` (used by `cache:purge`), `exactlyOneOf` and `atLeastOneOf` (no consumer yet;
 see "Built ahead of use" below) and `onlyWithValueOf` (used by `projects:create`) - declared as a `static rules = [...]` array on the command. `resolveInputs` evaluates them after resolution,
 and a failing rule is a usage error (exit 2).
 
@@ -846,7 +857,7 @@ gate value `onlyWithValueOf` reads is a value, not a "was it supplied?" question
 wherever it came from. Write the next rule when a command needs it; a rule
 kept alive only by its own test proves nothing.
 
-**Built ahead of use.** Three pieces of production code have no caller yet, on purpose, each held
+**Built ahead of use.** Four pieces of production code have no caller yet, on purpose, each held
 for a named ticket whose shape it already fits. Nothing else in `src` is uncalled; add to this list
 rather than leave an orphan unexplained.
 
@@ -854,6 +865,7 @@ rather than leave an orphan unexplained.
 |---|---|---|
 | `DeploymentsApi.list` | CL-7170 (`deployments:*`) | a `DeploymentScope` plus paging -> `DeploymentsPage` |
 | `src/core/redact.ts` | CL-7169 (variables) | see below |
+| `exactlyOneOf` | the next command that requires one of several flags and cannot prompt for it - `cache:purge` now uses `atMostOneOf` because it asks on a terminal | "exactly one of these flags", judging what the user supplied; `oneOfMessage` is shared with `atMostOneOf` and `cache:purge`'s no-terminal refusal |
 | `atLeastOneOf` | no ticket yet - its caller, `projects:update`, now prompts for missing fields instead | "at least one of these flags" for the next command that must not prompt - and it judges what the user supplied, not defaults |
 
 **Redaction.** `src/core/redact.ts` (`REDACTED`, `redactedColumn`) has no caller yet; it is kept

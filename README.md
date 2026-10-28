@@ -107,7 +107,7 @@ Purge an environment's CDN cache by path, cache tags or hostnames
 ```
 USAGE
   $ csdx launch:cache:purge [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--path
-    <value>] [--tags <value>] [--hosts <value>]
+    <value>] [--prefix] [--tags <value>] [--hosts <value>]
 
 FLAGS
   -c, --config=<value>    Path to the local '.cs-launch.json' file
@@ -117,6 +117,8 @@ FLAGS
       --org=<value>       Organization UID
       --path=<value>      Path to purge, for example /blog. End it with /* to purge everything beneath it, or pass /*
                           for the whole site
+      --prefix            With --path, purge everything beneath the path as well (a prefix match, like ending it with
+                          /*)
       --project=<value>   Project name or UID
       --tags=<value>      Comma-separated cache tags to purge
 
@@ -125,6 +127,8 @@ DESCRIPTION
 
 EXAMPLES
   $ csdx launch:cache:purge --org <org-uid> --project <name-or-uid> --env <name-or-uid> --path /blog
+
+  $ csdx launch:cache:purge --org <org-uid> --project <name-or-uid> --env <name-or-uid> --path /blog --prefix
 
   $ csdx launch:cache:purge --org <org-uid> --project <name-or-uid> --env <name-or-uid> --path "/blog/*"
 
