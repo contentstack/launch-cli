@@ -68,6 +68,32 @@ function scopeHeader(headers: Record<string, string>, name: string, value: strin
   headers[name] = value;
 }
 
+export interface RequestIdentity {
+  analyticsInfo: string;
+  auth: AuthStrategy;
+}
+
+export interface RequestScope {
+  orgUid?: string;
+  projectUid?: string;
+}
+
+export async function buildRequestHeaders(
+  identity: RequestIdentity,
+  scope: RequestScope,
+): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {
+    'X-CS-CLI': identity.analyticsInfo,
+    'x-cs-api-version': API_VERSION,
+    ...(await identity.auth.headers()),
+  };
+
+  scopeHeader(headers, 'x-organization-uid', scope.orgUid);
+  scopeHeader(headers, 'x-project-uid', scope.projectUid);
+
+  return headers;
+}
+
 const EXPIRED_TOKEN_MESSAGE = 'access token is invalid or expired';
 
 const GIT_PROVIDER_CODE_PREFIX = 'launch.GIT_PROVIDER.';
@@ -144,14 +170,7 @@ export class RestApiClient {
     const create = this.options.createHttpClient ?? createUtilityHttpClient;
     const client = create();
 
-    const headers: Record<string, string> = {
-      'X-CS-CLI': this.options.analyticsInfo,
-      'x-cs-api-version': API_VERSION,
-      ...(await this.options.auth.headers()),
-    };
-
-    scopeHeader(headers, 'x-organization-uid', req.orgUid);
-    scopeHeader(headers, 'x-project-uid', req.projectUid);
+    const headers = await buildRequestHeaders(this.options, req);
 
     client
       .baseUrl(this.options.baseUrl)

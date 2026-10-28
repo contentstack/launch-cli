@@ -7,6 +7,7 @@ import type { UxLike } from '../../../core/prompt';
 import { catalog } from '../../../resources';
 import { DeploymentUnsuccessfulError } from '../../../deployments/deployment.errors';
 import { DeploymentFollower } from '../../../deployments/deployment.follower';
+import { LiveLogFollower } from '../../../logs/live-log.follower';
 import type { DeploymentOutcome } from '../../../deployments/deployment.watcher';
 import { LaunchApiError } from '../../../transport/errors';
 import LogsGet from './get';
@@ -84,14 +85,69 @@ describe('LogsGet', () => {
     expect(Object.keys(LogsGet.inputs)).toContain('log-type');
   });
 
-  it('refuses --type live with exit 2 before reading anything', async () => {
+  it('T94: follows the live stream of the latest deployment without verifying it again or watching the build', async () => {
+    const release = jest.fn();
+    jest.spyOn(interruptible, 'onInterrupt').mockReturnValue(release);
+    const follow = jest.spyOn(LiveLogFollower.prototype, 'follow').mockResolvedValue(undefined);
+    const watch = jest.spyOn(DeploymentFollower.prototype, 'watch');
     const { command, latestCalls, getCalls, windowCalls } = commandUnderTest({ resolved: { 'log-type': 'live' } });
+
+    await command.run();
+
+    expect(follow).toHaveBeenCalledTimes(1);
+    expect(follow.mock.calls[0][0]).toEqual({ org: 'org1', project: 'proj1', environment: 'env1', deployment: 'dLatest' });
+    expect(follow.mock.calls[0][1]).toBeInstanceOf(AbortSignal);
+    expect(follow.mock.calls[0][1].aborted).toBe(false);
+    expect(latestCalls).toEqual([{ org: 'org1', project: 'proj1', environment: 'env1' }]);
+    expect(getCalls).toEqual([]);
+    expect(windowCalls).toEqual([]);
+    expect(watch).not.toHaveBeenCalled();
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('verifies a given deployment before following its live stream', async () => {
+    jest.spyOn(LiveLogFollower.prototype, 'follow').mockResolvedValue(undefined);
+    const { command, latestCalls, getCalls } = commandUnderTest({ resolved: { 'log-type': 'live', deployment: 'd9' } });
+
+    await command.run();
+
+    expect(getCalls).toEqual([{ org: 'org1', project: 'proj1', environment: 'env1', deployment: 'd9' }]);
+    expect(latestCalls).toEqual([]);
+  });
+
+  it('T92: stops a live stream on Ctrl-C with the yellow line and exit 3, then releases the listener', async () => {
+    const release = jest.fn();
+    let interrupt: () => void = () => undefined;
+    jest.spyOn(interruptible, 'onInterrupt').mockImplementation((listener) => {
+      interrupt = listener;
+      return release;
+    });
+    jest.spyOn(LiveLogFollower.prototype, 'follow').mockImplementation(
+      (_scope, stop) =>
+        new Promise((_resolve, reject) => {
+          stop.addEventListener('abort', () => reject(stop.reason), { once: true });
+          interrupt();
+        }),
+    );
+    const { command, lines } = commandUnderTest({ resolved: { 'log-type': 'live' }, outputIsTTY: true });
 
     const running = command.run();
 
-    await expect(running).rejects.toThrow(UsageError);
-    await expect(running).rejects.toThrow('--type live is not available yet');
-    expect([latestCalls, getCalls, windowCalls]).toEqual([[], [], []]);
+    await expect(running).rejects.toMatchObject({ oclif: { exit: EXIT_CANCELLED } });
+    expect(lines).toEqual(['\u001b[33mStopped following the logs.\u001b[39m']);
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets a failure of the live stream through and still releases the listener', async () => {
+    const release = jest.fn();
+    jest.spyOn(interruptible, 'onInterrupt').mockReturnValue(release);
+    const failure = new LaunchApiError(404, [{ code: 'launch.DEPLOYMENT.NOT_FOUND', message: 'gone' }]);
+    jest.spyOn(LiveLogFollower.prototype, 'follow').mockRejectedValue(failure);
+    const { command, lines } = commandUnderTest({ resolved: { 'log-type': 'live' } });
+
+    await expect(command.run()).rejects.toBe(failure);
+    expect(lines).toEqual([]);
+    expect(release).toHaveBeenCalledTimes(1);
   });
 
   it('refuses a missing latest deployment with exit 2 for both types', async () => {

@@ -2,6 +2,7 @@ import type { ApiSurface } from './resources';
 import { DEPENDENCIES, buildApi, catalog, resolutionTable } from './resources';
 import { DeploymentsApi } from './deployments/deployments.api';
 import { DeploymentLogsApi } from './deployments/deployment-logs.api';
+import { LiveLogsApi } from './logs/live-logs.api';
 import { ServerLogsApi } from './logs/server-logs.api';
 import { EnvironmentsApi } from './environments/environments.api';
 import { UploadsApi } from './uploads/uploads.api';
@@ -13,7 +14,9 @@ import * as prompt from './projects/project.prompt';
 import * as organizationPrompt from './organizations/organization.prompt';
 import { OrganizationsApi } from './organizations/organizations.api';
 import { ProjectResolver } from './projects/project.resolver';
+import { LOGS_ERROR_MESSAGES } from './logs/logs.errors';
 import type { CmaSession } from './transport/cma-client';
+import type { EventStreamClient } from './transport/event-stream';
 import type { RestApiClient, RestRequest } from './transport/rest-client';
 
 const UNUSED_CMA: CmaSession = {
@@ -184,7 +187,7 @@ describe('resolution', () => {
 describe('the api surface', () => {
   it('assembles one repository per resource from the single client', () => {
     const client = {} as never;
-    const api = buildApi(client, UNUSED_CMA, {} as never);
+    const api = buildApi(client, UNUSED_CMA, {} as never, {} as never);
 
     expect(Object.keys(api).sort()).toEqual([
       'cache',
@@ -192,6 +195,7 @@ describe('the api surface', () => {
       'deployments',
       'environments',
       'git',
+      'liveLogs',
       'organizations',
       'projects',
       'serverLogs',
@@ -201,6 +205,7 @@ describe('the api surface', () => {
     ]);
     expect(api.deploymentLogs).toBeInstanceOf(DeploymentLogsApi);
     expect(api.serverLogs).toBeInstanceOf(ServerLogsApi);
+    expect(api.liveLogs).toBeInstanceOf(LiveLogsApi);
     expect(api.organizations).toBeInstanceOf(OrganizationsApi);
     expect(api.projects).toBeInstanceOf(ProjectsApi);
     expect(api.environments).toBeInstanceOf(EnvironmentsApi);
@@ -223,6 +228,7 @@ describe('the api surface', () => {
       recording(sent.manage, { deployment: { uid: 'd1', status: 'LIVE' } }),
       UNUSED_CMA,
       recording(sent.logs, { deploymentLogs: [], serverLogs: [] }),
+      {} as never,
     );
     const scope = { org: 'o1', project: 'p1', environment: 'e1', deployment: 'd1' };
 
@@ -235,6 +241,23 @@ describe('the api surface', () => {
       '/projects/p1/environments/e1/deployments/d1/logs/server-logs',
     ]);
     expect(sent.manage.map((req) => req.path)).toEqual(['/projects/p1/environments/e1/deployments/d1']);
+  });
+
+  it('T84: opens the live route through the stream client and not through either rest client', async () => {
+    const opened: unknown[] = [];
+    const sent: RestRequest[] = [];
+    const rest = { request: async (req: RestRequest) => void sent.push(req) } as unknown as RestApiClient;
+    const stream = {
+      open: async (req: unknown, _onFrame: unknown, _signal: unknown, messages: unknown) => void opened.push([req, messages]),
+    } as unknown as EventStreamClient;
+    const scope = { org: 'o1', project: 'p1', environment: 'e1', deployment: 'd1' };
+
+    await buildApi(rest, UNUSED_CMA, rest, stream).liveLogs.open(scope, { onFrame: () => undefined }, new AbortController().signal);
+
+    expect(opened).toEqual([
+      [{ path: '/projects/p1/environments/e1/deployments/d1/logs/live', orgUid: 'o1', projectUid: 'p1' }, LOGS_ERROR_MESSAGES],
+    ]);
+    expect(sent).toEqual([]);
   });
 
   it('hands the organizations repository the CMA session it was given', async () => {
@@ -254,7 +277,7 @@ describe('the api surface', () => {
       scopedOrganizationUid: () => 'org7',
     };
 
-    const available = await buildApi({} as never, cma, {} as never).organizations.available();
+    const available = await buildApi({} as never, cma, {} as never, {} as never).organizations.available();
 
     expect(fetched).toEqual(['org7']);
     expect(available).toEqual({ organizations: [{ uid: 'org7', name: 'Scoped Org' }], scoped: true });

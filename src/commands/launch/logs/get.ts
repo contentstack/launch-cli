@@ -22,6 +22,7 @@ import {
   serverLogsRetentionLine,
   stoppedFollowingLine,
 } from '../../../logs/logs.presenter';
+import { LiveLogFollower } from '../../../logs/live-log.follower';
 import { parseLogWindow, type LogWindow } from '../../../logs/log-window';
 import { SERVER_LOGS_PAGE_CAP } from '../../../logs/types';
 
@@ -75,11 +76,6 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
 
   async run(): Promise<void> {
     const type = this.resolved['log-type'];
-
-    if (type === 'live') {
-      throw new UsageError('--type live is not available yet');
-    }
-
     const { org, project, env: environment } = this.resolved;
 
     if (type === 'server') {
@@ -91,7 +87,9 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
 
     const scope = await this.verifiedDeployment({ org, project, environment });
 
-    await this.followDeploymentLogs(scope);
+    await this.untilInterrupted((stop) =>
+      type === 'live' ? this.followLiveLogs(scope, stop) : this.followDeploymentLogs(scope, stop),
+    );
   }
 
   private async verifiedDeployment(environmentScope: Omit<LogScope, 'deployment'>): Promise<LogScope> {
@@ -136,7 +134,32 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
     }
   }
 
-  private async followDeploymentLogs(scope: LogScope): Promise<void> {
+  private async untilInterrupted(follow: (stop: AbortSignal) => Promise<void>): Promise<void> {
+    const stop = new AbortController();
+    const release = onInterrupt(() => stop.abort(new DeploymentWaitInterruptedError('Stopped following the logs.')));
+
+    try {
+      await follow(stop.signal);
+    } catch (error) {
+      if (stop.signal.aborted && error === stop.signal.reason) {
+        this.ux.print(stoppedFollowingLine(this.services.outputIsTTY === true));
+        this.exit(EXIT_CANCELLED);
+      }
+
+      throw error;
+    } finally {
+      release();
+    }
+  }
+
+  private followLiveLogs(scope: LogScope, stop: AbortSignal): Promise<void> {
+    return new LiveLogFollower(this.services, defaultWatchTiming(), { columns: process.stdout.columns }).follow(
+      scope,
+      stop,
+    );
+  }
+
+  private async followDeploymentLogs(scope: LogScope, stop: AbortSignal): Promise<void> {
     const outputIsTTY = this.services.outputIsTTY === true;
     let printed = 0;
     const counting: UxLike = {
@@ -147,30 +170,16 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
       },
     };
     const services: ServiceContext = { ...this.services, ux: counting };
-    const stop = new AbortController();
-    const release = onInterrupt(() => stop.abort(new DeploymentWaitInterruptedError('Stopped following the logs.')));
+    const outcome = await new DeploymentFollower(services, defaultWatchTiming()).watch(scope, stop);
 
-    try {
-      const outcome = await new DeploymentFollower(services, defaultWatchTiming()).watch(scope, stop.signal);
-
-      if (outcome.kind === 'timed-out') {
-        throw new DeploymentUnsuccessfulError(logsWaitTimedOutMessage(outcome.status, scope, scope.deployment));
-      }
-
-      if (printed === 0) {
-        this.ux.print(noDeploymentLogsLine(scope.deployment, outputIsTTY));
-      }
-
-      this.ux.print(deploymentStatusLine(outcome.deployment, outcome.status));
-    } catch (error) {
-      if (stop.signal.aborted && error === stop.signal.reason) {
-        this.ux.print(stoppedFollowingLine(outputIsTTY));
-        this.exit(EXIT_CANCELLED);
-      }
-
-      throw error;
-    } finally {
-      release();
+    if (outcome.kind === 'timed-out') {
+      throw new DeploymentUnsuccessfulError(logsWaitTimedOutMessage(outcome.status, scope, scope.deployment));
     }
+
+    if (printed === 0) {
+      this.ux.print(noDeploymentLogsLine(scope.deployment, outputIsTTY));
+    }
+
+    this.ux.print(deploymentStatusLine(outcome.deployment, outcome.status));
   }
 }

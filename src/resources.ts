@@ -11,6 +11,7 @@ import { variableFlags, variableResolution } from './variables/variable.inputs';
 import { cacheFlags, cacheResolution } from './cache/cache.inputs';
 import { deploymentFlags, deploymentResolution } from './deployments/deployment.inputs';
 import { logsFlags, logsResolution } from './logs/logs.inputs';
+import { LiveLogsApi } from './logs/live-logs.api';
 import { ServerLogsApi } from './logs/server-logs.api';
 import { ProjectsApi } from './projects/projects.api';
 import { EnvironmentsApi } from './environments/environments.api';
@@ -23,6 +24,7 @@ import { StacksApi } from './stacks/stacks.api';
 import { VariablesApi } from './variables/variables.api';
 import { CacheApi } from './cache/cache.api';
 import type { CmaSession } from './transport/cma-client';
+import type { EventStreamClient } from './transport/event-stream';
 import type { RestApiClient } from './transport/rest-client';
 
 export const catalog = {
@@ -69,6 +71,7 @@ export interface ApiSurface {
   deployments: DeploymentsApi;
   deploymentLogs: DeploymentLogsApi;
   serverLogs: ServerLogsApi;
+  liveLogs: LiveLogsApi;
   git: GitApi;
   uploads: UploadsApi;
   stacks: StacksApi;
@@ -76,7 +79,12 @@ export interface ApiSurface {
   cache: CacheApi;
 }
 
-export function buildApi(client: RestApiClient, cma: CmaSession, logsClient: RestApiClient): ApiSurface {
+export function buildApi(
+  client: RestApiClient,
+  cma: CmaSession,
+  logsClient: RestApiClient,
+  logsStream: EventStreamClient,
+): ApiSurface {
   return {
     organizations: new OrganizationsApi(cma),
     projects: new ProjectsApi(client),
@@ -84,6 +92,7 @@ export function buildApi(client: RestApiClient, cma: CmaSession, logsClient: Res
     deployments: new DeploymentsApi(client),
     deploymentLogs: new DeploymentLogsApi(logsClient),
     serverLogs: new ServerLogsApi(logsClient),
+    liveLogs: new LiveLogsApi(logsStream),
     git: new GitApi(client),
     uploads: new UploadsApi(client),
     stacks: new StacksApi(cma),

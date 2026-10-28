@@ -1,5 +1,9 @@
 import {
   deploymentStatusLine,
+  liveSessionEndedLine,
+  liveSessionLine,
+  liveStreamLostMessage,
+  noLiveLinesLine,
   logsWaitTimedOutMessage,
   noDeploymentLogsLine,
   noServerLogsLine,
@@ -109,5 +113,27 @@ describe('logs presenter', () => {
     ['text' as unknown as object, ''],
   ])('prints a fallback for the server entry %j', (log, line) => {
     expect(serverLogLine(log, false)).toBe(line);
+  });
+
+  it('T86: words the live session end in the local clock, dimmed on a terminal', () => {
+    const endsAt = new Date(2026, 9, 28, 14, 5, 9).getTime();
+
+    expect(liveSessionLine(endsAt, false)).toBe('Live session ends at 14:05:09; press Ctrl-C to stop.');
+    expect(liveSessionLine(endsAt, true)).toBe('\u001b[2mLive session ends at 14:05:09; press Ctrl-C to stop.\u001b[22m');
+  });
+
+  it('T88: words the server-limit end of a live session exactly', () => {
+    expect(liveSessionEndedLine()).toBe('The live session ended (server limit). Run the command again to keep following.');
+  });
+
+  it('words the live session that printed nothing in yellow on a terminal and plain on a pipe', () => {
+    expect(noLiveLinesLine(false)).toBe('No live server logs arrived during this session.');
+    expect(noLiveLinesLine(true)).toBe(yellow('No live server logs arrived during this session.'));
+  });
+
+  it('T90: words the lost live stream with the number of attempts', () => {
+    expect(liveStreamLostMessage(3)).toBe(
+      'Lost the connection to the live server logs after 3 attempts. Check your network connection and run the command again.',
+    );
   });
 });

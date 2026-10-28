@@ -1,5 +1,10 @@
 import { DEPLOYMENT_WAIT_TIMEOUT_MS } from '../deployments/deployment.watcher';
-import { deploymentLogLine, deploymentLogsHint, type DeploymentScopeLabels } from '../deployments/deployment.presenter';
+import {
+  clockOf,
+  deploymentLogLine,
+  deploymentLogsHint,
+  type DeploymentScopeLabels,
+} from '../deployments/deployment.presenter';
 import type { Deployment } from '../deployments/types';
 import { styled } from '../core/style';
 import { isRecord } from '../core/values';
@@ -49,6 +54,25 @@ export function serverLogsRetentionLine(clampedFrom: number, outputIsTTY: boolea
 
 export function stoppedFollowingLine(outputIsTTY: boolean): string {
   return styled('Stopped following the logs.', 'yellow', outputIsTTY);
+}
+
+export function liveSessionLine(endsAt: number, outputIsTTY: boolean): string {
+  return styled(`Live session ends at ${clockOf(endsAt)}; press Ctrl-C to stop.`, 'dim', outputIsTTY);
+}
+
+export function liveSessionEndedLine(): string {
+  return 'The live session ended (server limit). Run the command again to keep following.';
+}
+
+export function noLiveLinesLine(outputIsTTY: boolean): string {
+  return styled('No live server logs arrived during this session.', 'yellow', outputIsTTY);
+}
+
+export function liveStreamLostMessage(attempts: number): string {
+  return (
+    `Lost the connection to the live server logs after ${attempts} attempts. ` +
+    'Check your network connection and run the command again.'
+  );
 }
 
 export function deploymentStatusLine(deployment: Deployment, status: string): string {

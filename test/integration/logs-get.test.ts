@@ -1,4 +1,5 @@
 import { tmpdir } from 'node:os';
+import { Readable } from 'node:stream';
 
 import { authHandler, cliux, configHandler } from '@contentstack/cli-utilities';
 import type { Interfaces } from '@oclif/core';
@@ -6,11 +7,13 @@ import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
 import * as watcher from '../../src/deployments/deployment.watcher';
+import { EVENT_STREAM_IDLE_TIMEOUT_MS } from '../../src/transport/event-stream';
 import listFixture from '../fixtures/deployments-list.json';
 import notFoundFixture from '../fixtures/deployment-not-found.json';
 import { answerPrompts, stdinReportingTTY, stdoutReportingTTY } from '../support/terminal';
 import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
 import { projectOwnership } from '../support/project-ownership';
+import { trackTimers } from '../support/timers';
 
 const realWatchTiming = watcher.defaultWatchTiming;
 
@@ -39,6 +42,7 @@ const CONFIG: Record<string, unknown> = {
 const DEPLOYMENTS = `/manage/projects/${PROJECT_UID}/environments/${ENV_UID}/deployments`;
 const DEPLOYMENT_PATH = `${DEPLOYMENTS}/${DEPLOYMENT_UID}`;
 const BUILD_LOGS = `/logs/projects/${PROJECT_UID}/environments/${ENV_UID}/deployments/${DEPLOYMENT_UID}/logs/deployment-logs`;
+const LIVE_LOGS = `/logs/projects/${PROJECT_UID}/environments/${ENV_UID}/deployments/${DEPLOYMENT_UID}/logs/live`;
 const SERVER_LOGS = `/logs/projects/${PROJECT_UID}/environments/${ENV_UID}/deployments/${DEPLOYMENT_UID}/logs/server-logs`;
 
 const LINE_ONE = { message: 'Installing dependencies...', timestamp: '2026-10-28T10:00:00.000Z', stage: 'INSTALL' };
@@ -96,6 +100,22 @@ function serverLogs(window: { startTime: number; endTime: number }, entries: unk
     .get(SERVER_LOGS)
     .query({ startTime: String(window.startTime), endTime: String(window.endTime) })
     .reply(200, { serverLogs: entries });
+}
+
+const SESSION_FRAME = 'event: session\ndata: {"expiresAt":"2026-10-28T12:05:00.000Z"}\n\n';
+const SESSION_ENDED_FRAME = 'event: session-ended\ndata: {"reason":"timeout"}\n\n';
+const SESSION_ENDED_LINE = 'The live session ended (server limit). Run the command again to keep following.';
+
+function logFrame(message: string, timestamp = '2026-10-28T12:00:01.000Z'): string {
+  return `data: ${JSON.stringify({ timestamp, message, source: 'edge-function' })}\n\n`;
+}
+
+function liveRoute(): nock.Interceptor {
+  return hub().matchHeader('accept', 'text/event-stream').matchHeader('authtoken', 'test-authtoken').get(LIVE_LOGS);
+}
+
+function liveStream(body: string): nock.Scope {
+  return liveRoute().reply(200, body, { 'content-type': 'text/event-stream' });
 }
 
 function outputLines(stdout: string): string[] {
@@ -723,16 +743,255 @@ describe('integration: launch:logs:get on the wire', () => {
     }
   });
 
-  it('T60: refuses --type live as not available yet, with exit 2 and no deployment or log request', async () => {
+  it('T76: streams the live route with the event-stream headers and prints the frames on a pipe, exit 0', async () => {
     ownedProject();
     const verify = deploymentGet('LIVE');
+    const live = liveStream(
+      `${SESSION_FRAME}${logFrame('first line')}data: \n\n${logFrame('second line', '2026-10-28T12:00:02.500Z')}${SESSION_ENDED_FRAME}`,
+    );
+
+    const { error, stdout } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID, '--type', 'live'), config);
+
+    expect(error).toBeUndefined();
+    expect(verify.isDone()).toBe(true);
+    expect(live.isDone()).toBe(true);
+    expect(outputLines(stdout)).toEqual([
+      '2026-10-28 12:00:01.000:  first line',
+      '2026-10-28 12:00:02.500:  second line',
+      SESSION_ENDED_LINE,
+    ]);
+    expect(stdout).not.toContain(ESCAPE);
+    expect(stdout).not.toContain('edge-function');
+    expect(onWire).toEqual([]);
+  });
+
+  it('T88: ends on the server-limit frame with exit 0, one open and no reconnect', async () => {
+    ownedProject();
+    deploymentGet('LIVE');
+    const live = liveStream(SESSION_ENDED_FRAME);
+
+    const { error, stdout } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID, '--type', 'live'), config);
+
+    expect(error).toBeUndefined();
+    expect(live.isDone()).toBe(true);
+    expect(outputLines(stdout)).toEqual([SESSION_ENDED_LINE, 'No live server logs arrived during this session.']);
+    expect(onWire).toEqual([]);
+  });
+
+  it('T86: prints the dimmed session line once on a terminal, with the time of the session end', async () => {
+    const restoreStdout = stdoutReportingTTY(true);
+    jest.spyOn(cliux, 'loaderV2').mockReturnValue(undefined as never);
+
+    try {
+      ownedProject();
+      deploymentGet('LIVE');
+      liveStream(`${SESSION_FRAME}${logFrame('hello')}${SESSION_ENDED_FRAME}`);
+
+      const { error, stdout } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID, '--type', 'live'), config, {
+        stripAnsi: false,
+      });
+
+      expect(error).toBeUndefined();
+      expect(stdout).toContain(`${ESCAPE}[2mLive session ends at 12:05:00; press Ctrl-C to stop.${ESCAPE}[22m`);
+      expect(stdout).toContain(`${ESCAPE}[2m12:00:01${ESCAPE}[22m  hello`);
+    } finally {
+      restoreStdout();
+    }
+  });
+
+  it('T94: follows the latest deployment when --deployment is absent, with no prompt and no status read', async () => {
+    ownedProject();
+    const answered = answerPrompts({});
+    const restoreStdin = stdinReportingTTY(true);
+    const latest = hub()
+      .get(DEPLOYMENTS)
+      .query({ limit: '1', skip: '0' })
+      .reply(200, { ...listFixture, deployments: [{ uid: DEPLOYMENT_UID, deploymentNumber: 4, status: 'LIVE' }] });
+    const live = liveStream(`${logFrame('from latest')}${SESSION_ENDED_FRAME}`);
+
+    try {
+      const { error, stdout } = await runCommand(getArgs('--type', 'live'), config);
+
+      expect(error).toBeUndefined();
+      expect(latest.isDone()).toBe(true);
+      expect(live.isDone()).toBe(true);
+      expect(outputLines(stdout)[0]).toBe('2026-10-28 12:00:01.000:  from latest');
+      expect(answered.messages).toEqual([]);
+      expect(onWire).toEqual([]);
+    } finally {
+      restoreStdin();
+    }
+  });
+
+  it('T94: exits 2 when the environment has no deployment, and opens no stream', async () => {
+    ownedProject();
+    hub().get(DEPLOYMENTS).query({ limit: '1', skip: '0' }).reply(200, { ...listFixture, deployments: [] });
+    const live = liveStream(SESSION_ENDED_FRAME);
+
+    const { error } = await runCommand(getArgs('--type', 'live'), config);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe('No deployments found in this environment.');
+    expect(live.isDone()).toBe(false);
+  });
+
+  it('T49: exits 2 for a deployment that is not in this environment with --type live and opens no stream', async () => {
+    ownedProject();
+    hub().get(DEPLOYMENT_PATH).reply(404, notFoundFixture);
+    const live = liveStream(SESSION_ENDED_FRAME);
 
     const { error } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID, '--type', 'live'), config);
 
     expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toBe('--type live is not available yet');
-    expect(verify.isDone()).toBe(false);
+    expect(live.isDone()).toBe(false);
+  });
+
+  it('T80: exits 1 once on a refused open, in the CLI wording, without a reconnect', async () => {
+    ownedProject();
+    deploymentGet('LIVE');
+    const live = liveRoute().reply(404, { errors: [{ code: 'launch.DEPLOYMENT.NOT_FOUND', message: 'raw words' }] });
+
+    const { error, stdout } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID, '--type', 'live'), config);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.message).toBe('No deployment found with that UID.');
+    expect(live.isDone()).toBe(true);
+    expect(stdout).toBe('');
     expect(onWire).toEqual([]);
+  });
+
+  it('T81: exits 1 with the session wording when a BASIC session is refused on the stream', async () => {
+    ownedProject();
+    deploymentGet('LIVE');
+    const live = liveRoute().reply(401, { errors: [{ code: 'launch.AUTH.UNAUTHORIZED', message: 'no' }] });
+
+    const { error } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID, '--type', 'live'), config);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.message).toBe('Your session has timed out. Run csdx auth:login to continue.');
+    expect(live.isDone()).toBe(true);
+  });
+
+  it('T89: reconnects after a clean end of stream and after a reset socket, then ends on the server limit', async () => {
+    ownedProject();
+    deploymentGet('LIVE');
+    liveStream(logFrame('one'));
+    liveRoute().replyWithError({ code: 'ECONNRESET', message: 'socket hang up' });
+    const last = liveStream(`${logFrame('two', 'later')}${SESSION_ENDED_FRAME}`);
+
+    const { error, stdout } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID, '--type', 'live'), config);
+
+    expect(error).toBeUndefined();
+    expect(last.isDone()).toBe(true);
+    expect(outputLines(stdout)).toEqual(['2026-10-28 12:00:01.000:  one', 'two', SESSION_ENDED_LINE]);
+  });
+
+  it('T90: exits 1 after three consecutive failures with three opens and the CLI wording', async () => {
+    ownedProject();
+    deploymentGet('LIVE');
+    const sleeps: number[] = [];
+    jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => ({
+      ...realWatchTiming(),
+      sleep: async (ms: number) => void sleeps.push(ms),
+    }));
+    const attempts = liveRoute().times(3).replyWithError({ code: 'ECONNRESET', message: 'socket hang up' });
+
+    const { error } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID, '--type', 'live'), config);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.message).toBe(
+      'Lost the connection to the live server logs after 3 attempts. Check your network connection and run the command again.',
+    );
+    expect(attempts.isDone()).toBe(true);
+    expect(sleeps).toEqual([1000, 2000]);
+    expect(onWire).toEqual([]);
+  });
+
+  it('T91: prints the lost-stream error red on a terminal while the log text printed before it stays uncoloured', async () => {
+    const restoreStdout = stdoutReportingTTY(true);
+    jest.spyOn(cliux, 'loaderV2').mockReturnValue(undefined as never);
+
+    try {
+      ownedProject();
+      deploymentGet('LIVE');
+      liveStream(logFrame('plain words'));
+      liveRoute().times(2).replyWithError({ code: 'ECONNRESET', message: 'socket hang up' });
+
+      const { error, stdout, stderr } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID, '--type', 'live'), config, {
+        stripAnsi: false,
+      });
+
+      expect(error?.oclif?.exit).toBe(1);
+      expect(stderr).toContain(`${ESCAPE}[31m`);
+      expect(stderr).toContain('Lost the connection to the live server logs after 3 attempts.');
+      expect(stdout).toContain('plain words');
+      expect(stdout).not.toContain(`${ESCAPE}[31m`);
+    } finally {
+      restoreStdout();
+    }
+  });
+
+  it.each([
+    [true, `${ESCAPE}[33mStopped following the logs.${ESCAPE}[39m`],
+    [false, 'Stopped following the logs.'],
+  ])('T92: Ctrl-C on a live stream (terminal=%s) prints the stop line, exits 3 and leaves nothing behind', async (tty, stopLine) => {
+    jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => realWatchTiming());
+    const restoreStdout = stdoutReportingTTY(tty);
+    jest.spyOn(cliux, 'loaderV2').mockReturnValue(undefined as never);
+    const listenersBefore = process.listenerCount('SIGINT');
+    const timers = trackTimers(EVENT_STREAM_IDLE_TIMEOUT_MS);
+    const events: string[] = [];
+
+    try {
+      ownedProject();
+      deploymentGet('LIVE');
+      liveRoute().reply(200, function () {
+        (this as unknown as { req: NodeJS.EventEmitter }).req.once('close', () => events.push('request destroyed'));
+        const source = new Readable({ read: () => undefined });
+        source.push(logFrame('only line'));
+        setTimeout(() => process.emit('SIGINT'), 50);
+        return source;
+      }, { 'content-type': 'text/event-stream' });
+
+      const { error, stdout, stderr } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID, '--type', 'live'), config, {
+        stripAnsi: false,
+      });
+
+      expect(error?.oclif?.exit).toBe(3);
+      expect(stdout).toContain(stopLine);
+      expect(stdout).toContain('only line');
+      expect(stderr).not.toContain('error');
+      expect(error?.message).not.toContain('Error');
+      expect(events).toEqual(['request destroyed']);
+      expect(onWire).toEqual([]);
+      expect(process.listenerCount('SIGINT')).toBe(listenersBefore);
+      expect(timers.created()).toBeGreaterThan(0);
+      expect(timers.pending()).toBe(0);
+    } finally {
+      restoreStdout();
+    }
+  });
+
+  it('T93: Ctrl-C while the command waits to reconnect cancels the wait and opens nothing more', async () => {
+    jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => realWatchTiming());
+    const listenersBefore = process.listenerCount('SIGINT');
+    const timers = trackTimers(1000);
+    ownedProject();
+    deploymentGet('LIVE');
+    liveRoute().reply(200, () => {
+      setTimeout(() => process.emit('SIGINT'), 50);
+      return '';
+    }, { 'content-type': 'text/event-stream' });
+    const second = liveStream(SESSION_ENDED_FRAME);
+
+    const { error, stdout } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID, '--type', 'live'), config);
+
+    expect(error?.oclif?.exit).toBe(3);
+    expect(outputLines(stdout)).toEqual(['Stopped following the logs.']);
+    expect(second.isDone()).toBe(false);
+    expect(process.listenerCount('SIGINT')).toBe(listenersBefore);
+    expect(timers.created()).toBe(1);
+    expect(timers.pending()).toBe(0);
   });
 
   it.each([

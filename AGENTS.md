@@ -132,7 +132,8 @@ src/
   core/         the command framework: LaunchCommand, the resolver engine, errors,
                 exit codes, the core flag catalog (coreFlags), region derivation, the
                 .cs-launch.json store, and the output primitives
-  transport/    RestApiClient, the retry policy, auth strategies, proxy detection,
+  transport/    RestApiClient, EventStreamClient (SSE, event-stream.ts), the one request-header
+                builder both share, the retry policy, auth strategies, proxy detection,
                 and LaunchApiError / LaunchNetworkError - no CLI wording lives here
   projects/     one resource: repository, value object, domain service, presenter,
                 error wording, prompt adapter, and the flags it contributes
@@ -161,6 +162,9 @@ src/
   git/          the internal git-namespace / repository / branch lookups
   organizations/ the --org flag, its organization picker, and the lookup behind it,
                 which reads the Contentstack Management API rather than Launch
+  logs/         logs:get: the server-log window parser and repository, the live log API over SSE, and
+                the LiveLogFollower that reconnects it; the build-log follow is deployments'. It
+                reaches deployments only
   cache/        the CDN cache purge behind launch:cache:purge: CacheApi, the --path / --tags / --hosts
                 inputs and their normalisation, and the success lines
   functions/    the cloud-function runtime and the serve flags, treated as a resource
@@ -488,7 +492,7 @@ promoting these to `src/core/catalog.ts` now.
 | 0 | none - oclif exits 0 implicitly | the command did what it was asked to do |
 | 1 | `EXIT_RUNTIME` | a runtime failure - `LaunchApiError`, `LaunchNetworkError`, `UnauthenticatedError`, anything oclif handles |
 | 2 | `EXIT_USAGE` | a usage error - `UsageError`, `MissingInputError`, a failing cross-flag rule |
-| 3 | `EXIT_CANCELLED` | the user declined a confirmation, chose nothing at a picker (`CancelledError`) or pressed Ctrl-C while the CLI was following a deployment's logs (`logs:get`) |
+| 3 | `EXIT_CANCELLED` | the user declined a confirmation, chose nothing at a picker (`CancelledError`) or pressed Ctrl-C while the CLI was following a deployment's logs or a live log stream (`logs:get`) |
 
 `launch:functions:serve` is deliberately a plain oclif `Command` rather than a
 `LaunchCommand`, because it talks to no API and needs no auth gate, and it is **outside**
@@ -698,6 +702,19 @@ already aborted when the loop would sleep ends it at once rather than sleeping t
 `sleep` takes the signal as its second argument and clears its timer on abort, so no timer outlives an interrupt.
 `onInterrupt(listener)` in `src/core/interruptible-ux.ts` is the one way to hear Ctrl-C around such a wait; like
 `cancelOnInterrupt` it detaches in a microtask after the signal, so it is still attached while `signal-exit` looks.
+
+**The live stream is not the watcher.** `logs:get --type live` reads server-sent events, so it sits beside the
+polling loop: `EventStreamClient` (`src/transport/event-stream.ts`) is a `node:http`/`node:https` GET (nock can
+intercept it; it goes through `proxyRouteFor`) sending `Accept: text/event-stream` - without it the logs service cuts the
+request after 14 s. It has an idle timeout (`EVENT_STREAM_IDLE_TIMEOUT_MS`, 30 s) that any received bytes, heartbeats
+included, reset, instead of the 60 s request timeout. A 2xx is open; anything else is parsed with `parseErrorEnvelope`
+and never retried, except that one 401 gets one `auth.refresh()` and one more request. `LiveLogFollower`
+(`src/logs/live-log.follower.ts`) treats a clean end of stream and a retryable `LaunchNetworkError` as a drop and
+reconnects after `RetryPolicy.delayFor(n)`; `DEPLOYMENT_MAX_POLL_ERRORS` consecutive drops end it with a
+`LaunchNetworkError`, and a connection that delivered any frame starts the count again. `event: session-ended` is the
+server's own 5-minute cap: it exits 0 and is never followed by a reconnect. Ctrl-C aborts the same `AbortSignal` the
+sleep and the socket listen to, exit 3. The header builder, `buildRequestHeaders` in `rest-client.ts`, is the only place
+`X-CS-CLI`, `x-cs-api-version`, the auth headers and the org/project scope headers are assembled.
 
 **Writing a test for it: the fake clock must advance.** `now()` and `sleep()` are injected and both
 are required, not optional with defaults. A fake `now: () => 0` with a `sleep` that does nothing
