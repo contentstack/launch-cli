@@ -11,7 +11,6 @@ const SCOPE = { org: 'org1', project: 'proj1', environment: 'env1' };
 const BLOG: CachePath = { path: '/blog', isPrefix: false, typed: '/blog' };
 const CRITERIA = ['--path', '--tags', '--hosts'];
 const ONE_OF = `Pass exactly one of ${CRITERIA.join(', ')}`;
-const TASK_LINE = '→ CDN cache revalidation task initiated.';
 
 interface Harness {
   resolved?: Record<string, unknown>;
@@ -75,7 +74,7 @@ function commandUnderTest(harness: Harness) {
 }
 
 describe('launch:cache:purge', () => {
-  it('reads the environment, then purges the path and says what was purged in the environment named', async () => {
+  it('reads the environment, then purges the path and says what was purged on one line', async () => {
     const { command, lines, calls, got, purged } = commandUnderTest({
       resolved: { path: { path: '/blog', isPrefix: true, typed: '/blog/*' } },
     });
@@ -85,10 +84,7 @@ describe('launch:cache:purge', () => {
     expect(calls).toEqual(['get', 'purge']);
     expect(got).toEqual([SCOPE]);
     expect(purged).toEqual([{ ...SCOPE, criterion: { cachePath: { path: '/blog', isPrefix: true } } }]);
-    expect(lines).toEqual([
-      '✔ Cache purge initiated for path /blog/* (prefix match) in environment "production".',
-      TASK_LINE,
-    ]);
+    expect(lines).toEqual(['✔ Cache purge initiated for /blog.']);
   });
 
   it('purges tags as cacheTags', async () => {
@@ -97,7 +93,7 @@ describe('launch:cache:purge', () => {
     await command.run();
 
     expect(purged).toEqual([{ ...SCOPE, criterion: { cacheTags: ['a', 'b'] } }]);
-    expect(lines[0]).toBe('✔ Cache purge initiated for tags a, b in environment "production".');
+    expect(lines[0]).toBe('✔ Cache purge initiated for tags: a, b.');
   });
 
   it('purges hosts as hostnames', async () => {
@@ -106,10 +102,10 @@ describe('launch:cache:purge', () => {
     await command.run();
 
     expect(purged).toEqual([{ ...SCOPE, criterion: { hostnames: ['example.com'] } }]);
-    expect(lines[0]).toBe('✔ Cache purge initiated for hosts example.com in environment "production".');
+    expect(lines[0]).toBe('✔ Cache purge initiated for 1 domain.');
   });
 
-  it('prints the same two lines whatever the success body says', async () => {
+  it('prints the same one line whatever the success body says', async () => {
     const empty = commandUnderTest({ purgeResult: {} });
     const other = commandUnderTest({ purgeResult: { message: 'something else' } });
 
@@ -117,10 +113,7 @@ describe('launch:cache:purge', () => {
     await other.command.run();
 
     expect(empty.lines).toEqual(other.lines);
-    expect(empty.lines).toEqual([
-      '✔ Cache purge initiated for path /blog (exact match) in environment "production".',
-      TASK_LINE,
-    ]);
+    expect(empty.lines).toEqual(['✔ Cache purge initiated for /blog.']);
   });
 
   it('colours the success line only when stdout is a terminal', async () => {
@@ -138,12 +131,12 @@ describe('launch:cache:purge', () => {
     ['has no name', { uid: 'env1' }],
     ['has an empty name', { uid: 'env1', name: '' }],
     ['has a blank name', { uid: 'env1', name: '   ' }],
-  ])('falls back to the --env value as typed when the environment %s', async (_label, environment) => {
+  ])('prints the same line when the environment %s', async (_label, environment) => {
     const { command, lines } = commandUnderTest({ resolved: { env: 'env1' }, environment });
 
     await command.run();
 
-    expect(lines[0]).toBe('✔ Cache purge initiated for path /blog (exact match) in environment "env1".');
+    expect(lines).toEqual(['✔ Cache purge initiated for /blog.']);
     expect(lines.join('')).not.toContain('undefined');
   });
 

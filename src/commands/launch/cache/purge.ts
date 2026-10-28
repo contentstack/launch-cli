@@ -4,7 +4,6 @@ import { flagsFor, inputs } from '../../../core/inputs';
 import { UsageError } from '../../../core/errors';
 import { LaunchCommand } from '../../../core/launch-command';
 import { exactlyOneOf } from '../../../core/rules';
-import { isAbsent } from '../../../core/values';
 import { LaunchApiError } from '../../../transport/errors';
 
 const purgeInputs = inputs({
@@ -37,7 +36,7 @@ export default class CachePurge extends LaunchCommand<typeof purgeInputs> {
     const scope = { org, project, environment: env };
     const target = { path, tags, hosts };
 
-    const environment = await this.services.api.environments.get(scope).catch((error: unknown) => {
+    await this.services.api.environments.get(scope).catch((error: unknown) => {
       if (error instanceof LaunchApiError && error.status === 404) {
         throw new UsageError(`No environment with UID "${env}" found in this project.`);
       }
@@ -47,9 +46,7 @@ export default class CachePurge extends LaunchCommand<typeof purgeInputs> {
 
     await this.services.api.cache.purge({ ...scope, criterion: criterionOf(target) });
 
-    const name = environment.name !== undefined && !isAbsent(environment.name) ? environment.name : env;
-
-    for (const line of purgeInitiatedLines(target, name, this.services.outputIsTTY === true)) {
+    for (const line of purgeInitiatedLines(target, this.services.outputIsTTY === true)) {
       this.ux.print(line);
     }
   }
