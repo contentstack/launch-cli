@@ -292,7 +292,7 @@ describe('DeploymentsApi', () => {
   ])('words an invalid deployment uid refused with %s in the CLI own words', (_name, errors) => {
     const failure = new LaunchApiError(400, errors, DEPLOYMENT_ERROR_MESSAGES);
 
-    expect(failure.message).toBe('That is not a valid deployment UID. A deployment UID is 24 hexadecimal characters.');
+    expect(failure.message).toBe('The deployment UID is invalid. Provide a 24-character hexadecimal deployment UID.');
     expect(failure.message).not.toContain('12 bytes');
     expect(failure.message).not.toBe('raw');
   });

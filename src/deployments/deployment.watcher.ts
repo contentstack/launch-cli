@@ -3,10 +3,7 @@ import type { UxLike } from '../core/prompt';
 import { RetryPolicy } from '../transport/retry-policy';
 import { LogTail } from './deployment.log-tail';
 import { classifyStatus, normalizeStatus } from './deployment.status';
-import {
-  deploymentLogLine,
-  deploymentLogsUnavailableLine,
-} from './deployment.presenter';
+import { deploymentLogLine } from './deployment.presenter';
 import type { Deployment, DeploymentLog } from './types';
 
 export const DEPLOYMENT_POLL_DELAY_MS = 2000;
@@ -91,13 +88,20 @@ function sleepUnlessStopped(deps: DeploymentWatchDeps, ms: number): Promise<void
   });
 }
 
+async function freshLogs(deps: DeploymentWatchDeps, tail: LogTail): Promise<DeploymentLog[]> {
+  try {
+    return tail.fresh(await deps.logs(tail.since()));
+  } catch {
+    return [];
+  }
+}
+
 async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
   const backoff = new RetryPolicy({ retryDelayMs: deps.pollDelayMs });
   const deadline = deps.now() + deps.timeoutMs;
   let attempt = 0;
   let consecutiveErrors = 0;
   const tail = new LogTail();
-  let logsFailureReported = false;
 
   for (;;) {
     deps.stop?.throwIfAborted();
@@ -124,18 +128,7 @@ async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
     const kind = classifyStatus(deployment.status);
     const terminal = kind === 'success' || kind === 'failure';
 
-    let logs: DeploymentLog[] = [];
-
-    try {
-      logs = tail.fresh(await deps.logs(tail.since()));
-    } catch (error) {
-      if (!logsFailureReported) {
-        deps.ux.print(deploymentLogsUnavailableLine(error));
-        logsFailureReported = true;
-      }
-    }
-
-    for (const log of logs) {
+    for (const log of await freshLogs(deps, tail)) {
       deps.ux.print(deploymentLogLine(log, deps.outputIsTTY, process.stdout.columns));
     }
 

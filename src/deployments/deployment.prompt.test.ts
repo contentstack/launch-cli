@@ -58,7 +58,7 @@ describe('promptForDeployment', () => {
       {
         type: 'list',
         name: 'value',
-        message: 'Choose a deployment to roll back to',
+        message: 'Choose a deployment for rollback',
         choices: [
           { name: `${UID_A}  DEPLOYING  9fceb02`, value: UID_A },
           { name: `${UID_C}  QUEUED`, value: UID_C },
@@ -82,7 +82,7 @@ describe('promptForDeployment', () => {
       { name: `${UID_A}  DEPLOYING  9fceb02`, value: UID_A },
       { name: `${UID_C}  QUEUED`, value: UID_C },
     ]);
-    expect((asked[0] as { message: string }).message).toBe('Choose a deployment to cancel');
+    expect((asked[0] as { message: string }).message).toBe('Choose a deployment for cancellation');
   });
 
   it('leaves out a deployment the server marks not cancellable, and keeps one that does not say', async () => {
@@ -114,7 +114,7 @@ describe('promptForDeployment', () => {
     const failure = await promptForDeployment(d, SCOPE, IN_FLIGHT_DEPLOYMENTS).catch((error: Error) => error);
 
     expect(failure).toBeInstanceOf(UsageError);
-    expect((failure as Error).message).toBe('No deployments in progress that can be cancelled.');
+    expect((failure as Error).message).toBe('No in-progress deployments are available for cancellation.');
     expect(asked).toEqual([]);
   });
 
@@ -184,7 +184,7 @@ describe('promptForDeployment', () => {
 
     expect(failure).toBeInstanceOf(UsageError);
     expect((failure as UsageError).exitCode).toBe(2);
-    expect((failure as Error).message).toBe('No deployments found that can be rolled back.');
+    expect((failure as Error).message).toBe('No deployments are available for rollback.');
     expect(asked).toEqual([]);
   });
 
@@ -202,7 +202,7 @@ describe('promptForDeployment', () => {
 
     expect(failure).toBeInstanceOf(UsageError);
     expect((failure as UsageError).exitCode).toBe(2);
-    expect((failure as Error).message).toBe('No deployments in progress that can be cancelled.');
+    expect((failure as Error).message).toBe('No in-progress deployments are available for cancellation.');
     expect(asked).toEqual([]);
   });
 

@@ -13,13 +13,13 @@ export const IN_FLIGHT_DEPLOYMENTS = 'in-flight';
 
 const SHORT_COMMIT_LENGTH = 7;
 
-const NO_DEPLOYMENTS = 'No deployments found that can be rolled back.';
+const NO_DEPLOYMENTS = 'No deployments are available for rollback.';
 
-const NO_IN_FLIGHT_DEPLOYMENTS = 'No deployments in progress that can be cancelled.';
+const NO_IN_FLIGHT_DEPLOYMENTS = 'No in-progress deployments are available for cancellation.';
 
 const QUESTIONS: Record<string, string> = {
-  [ALL_DEPLOYMENTS]: 'Choose a deployment to roll back to',
-  [IN_FLIGHT_DEPLOYMENTS]: 'Choose a deployment to cancel',
+  [ALL_DEPLOYMENTS]: 'Choose a deployment for rollback',
+  [IN_FLIGHT_DEPLOYMENTS]: 'Choose a deployment for cancellation',
 };
 
 function when(deployment: IdentifiedDeployment): string | undefined {

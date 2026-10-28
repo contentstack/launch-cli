@@ -148,7 +148,7 @@ describe('project archive', () => {
 
     expect(() => archiveDirectory(missing)).toThrow(UsageError);
     expect(() => archiveDirectory(missing)).toThrow(
-      `No local project directory at "${missing}". Pass --data-dir with the folder you want to upload.`,
+      `No files to upload were found in "${missing}". Pass your project folder with --data-dir.`,
     );
   });
 
@@ -161,9 +161,33 @@ describe('project archive', () => {
     expect(() => archiveDirectory(root)).toThrow(NoUploadDirectoryError);
   });
 
+  it('words a missing path, a file in place of a folder and an empty folder the same way', () => {
+    file('index.html');
+    const message = (folder: string): string => {
+      try {
+        archiveDirectory(folder);
+        return 'no error';
+      } catch (error) {
+        return (error as Error).message.replace(folder, '<dir>');
+      }
+    };
+    const empty = join(root, 'empty');
+    mkdirSync(empty);
+
+    expect(message(join(root, 'no-such-folder'))).toBe(
+      'No files to upload were found in "<dir>". Pass your project folder with --data-dir.',
+    );
+    expect(message(join(root, 'index.html'))).toBe(
+      'No files to upload were found in "<dir>". Pass your project folder with --data-dir.',
+    );
+    expect(message(empty)).toBe(
+      'No files to upload were found in "<dir>". Pass your project folder with --data-dir.',
+    );
+  });
+
   it('refuses an empty directory rather than uploading an empty archive', () => {
     expect(() => archiveDirectory(root)).toThrow(UsageError);
-    expect(() => archiveDirectory(root)).toThrow('Nothing to upload');
+    expect(() => archiveDirectory(root)).toThrow(`No files to upload were found in "${root}".`);
   });
 
   it('refuses a directory that holds nothing but excluded paths', () => {
@@ -172,8 +196,7 @@ describe('project archive', () => {
     file('.cs-launch.json', '{}');
 
     expect(() => archiveDirectory(root)).toThrow(
-      `Nothing to upload from "${root}" once ${UPLOAD_EXCLUDED_NAMES.join(', ')} are excluded. ` +
-        'Pass --data-dir with the folder you want to upload.',
+      `No files to upload were found in "${root}". Pass your project folder with --data-dir.`,
     );
   });
 
@@ -196,7 +219,7 @@ describe('project archive', () => {
     expect(failure).toBeInstanceOf(UsageError);
     expect((failure as UsageError).exitCode).toBe(2);
     expect((failure as UsageError).message).toContain('secret.txt');
-    expect((failure as UsageError).message).toContain('could not be read');
+    expect((failure as UsageError).message).toContain('cannot be read');
   });
 
   it('refuses with a usage error naming a directory it could not list', () => {
@@ -218,7 +241,7 @@ describe('project archive', () => {
 
     expect(failure).toBeInstanceOf(UsageError);
     expect((failure as UsageError).message).toContain('locked');
-    expect((failure as UsageError).message).toContain('could not be read');
+    expect((failure as UsageError).message).toContain('cannot be read');
   });
 
   it('names every path the story requires it to exclude', () => {

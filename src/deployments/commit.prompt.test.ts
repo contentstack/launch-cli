@@ -63,7 +63,7 @@ describe('promptForCommit', () => {
 
     expect(failure).toBeInstanceOf(UsageError);
     expect((failure as UsageError).exitCode).toBe(2);
-    expect((failure as Error).message).toContain('--commit <sha>');
+    expect((failure as Error).message).toBe('No commits are available to choose from. Pass --commit <sha> instead.');
     expect(payloads).toEqual([]);
   });
 
@@ -83,7 +83,9 @@ describe('promptForCommit', () => {
     const failure = await promptForCommit(deps, SCOPE).catch((error: Error) => error);
 
     expect(failure).toBeInstanceOf(UsageError);
-    expect((failure as Error).message).toContain('--commit <sha>');
+    expect((failure as Error).message).toBe(
+      'Choosing a commit needs an interactive terminal. Pass --commit <sha> instead.',
+    );
     expect(scopes).toEqual([]);
     expect(payloads).toEqual([]);
   });

@@ -2,7 +2,7 @@ import { stripVTControlCharacters } from 'node:util';
 
 import type { TableColumn } from '../core/render';
 import { styled } from '../core/style';
-import { isAbsent, messageOf, withoutControlCharacters } from '../core/values';
+import { isAbsent, withoutControlCharacters } from '../core/values';
 import type { Deployment, DeploymentLog } from './types';
 
 const GUTTER = '  ';
@@ -136,15 +136,9 @@ export function deploymentLogLine(log: DeploymentLog, outputIsTTY: boolean, colu
     .join('\n');
 }
 
-export function deploymentLogsUnavailableLine(error: unknown): string {
-  const reason = messageOf(error);
-
-  return `  ! Could not read the deployment logs (${reason}). Still waiting on the deployment.`;
-}
-
 export interface FirstDeploymentFailure {
-  created: string;
-  plural: boolean;
+  created?: string;
+  plural?: boolean;
   org: string;
   project: string;
   status: string;
@@ -154,52 +148,66 @@ export interface FirstDeploymentFailure {
   timedOut?: boolean;
 }
 
+function createdSentence(failure: FirstDeploymentFailure): string {
+  if (failure.created === undefined) {
+    return '';
+  }
+
+  return ` ${failure.created} ${failure.plural === true ? 'were' : 'was'} created.`;
+}
+
 export function firstDeploymentFailureMessage(failure: FirstDeploymentFailure): string {
   const scope = `--org ${failure.org} --project ${failure.project}`;
   const environment = failure.environmentUid === undefined ? '' : ` --env ${failure.environmentUid}`;
   const deployment = failure.deploymentUid === undefined ? '' : ` --deployment ${failure.deploymentUid}`;
-  const were = failure.plural ? 'were' : 'was';
+  const subject = failure.deploymentUid === undefined ? 'The deployment' : `Deployment "${failure.deploymentUid}"`;
+  const created = createdSentence(failure);
 
-  if (failure.timedOut === true) {
+  if (failure.deploymentUid === undefined && failure.reason === undefined && failure.timedOut !== true) {
     return (
-      `The deployment was still ${failure.status} when the CLI stopped waiting for it; it may still finish. ` +
-      `${failure.created} ${were} created. Do not start another deployment yet: ` +
-      `run csdx launch:deployments:get ${scope}${environment}${deployment} to see how it ends, ` +
-      `or csdx launch:logs:get ${scope}${environment}${deployment} to follow it.`
+      `No deployment was found to follow.${created} ` +
+      `Run csdx launch:deployments:list ${scope}${environment} to check.`
     );
   }
 
-  const opening =
-    failure.reason === undefined
-      ? `The deployment did not succeed; its last status was ${failure.status}. `
-      : `The deployment could not be followed to completion: ${failure.reason} `;
+  if (failure.timedOut === true) {
+    return (
+      `${subject} was still ${failure.status} when the CLI stopped waiting.${created} ` +
+      `Run csdx launch:deployments:get ${scope}${environment}${deployment} to check its status.`
+    );
+  }
+
+  if (failure.reason !== undefined) {
+    return (
+      `${subject} could not be followed to completion: ${failure.reason}${created} ` +
+      `Run csdx launch:deployments:get ${scope}${environment}${deployment} to check its status.`
+    );
+  }
 
   return (
-    opening +
-    `${failure.created} ${were} created and ${failure.plural ? 'have' : 'has'} not been rolled back. ` +
-    `Run csdx launch:deployments:create ${scope}${environment} to try the deployment again, ` +
-    `or csdx launch:logs:get ${scope}${environment}${deployment} to see why it did not succeed.`
+    `${subject} ended with status ${failure.status}.${created} ` +
+    `Run csdx launch:logs:get ${scope}${environment}${deployment} to see the cause.`
   );
 }
 
 export function deploymentRollbackQuestion(uid: string): string {
-  return `Roll back this environment to deployment "${uid}"?`;
+  return `Are you sure you want to roll back this environment to deployment "${uid}"?`;
 }
 
 export function deploymentCancelQuestion(uid: string): string {
-  return `Cancel deployment "${uid}"? This cannot be undone.`;
+  return `Are you sure you want to cancel deployment "${uid}"?`;
 }
 
 export function rolledBackLine(uid: string, outputIsTTY: boolean): string {
-  return styled(`\u2714 Rolled back to deployment "${uid}"`, 'green', outputIsTTY);
+  return styled(`\u2714 Environment rolled back to deployment "${uid}" successfully.`, 'green', outputIsTTY);
 }
 
 export function deploymentCancelledLine(uid: string, outputIsTTY: boolean): string {
-  return styled(`\u2714 Deployment "${uid}" cancelled.`, 'green', outputIsTTY);
+  return styled(`\u2714 Deployment "${uid}" cancelled successfully.`, 'green', outputIsTTY);
 }
 
 export function deploymentNotRolledBackLine(outputIsTTY: boolean): string {
-  return styled('Deployment not rolled back.', 'yellow', outputIsTTY);
+  return styled('Environment not rolled back.', 'yellow', outputIsTTY);
 }
 
 export function deploymentNotCancelledLine(outputIsTTY: boolean): string {

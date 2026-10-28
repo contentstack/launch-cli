@@ -644,7 +644,8 @@ CLI-wide one; the scan-limit error each raises carries its own wording.
 
 **The deployment commands (CL-7170).** `deployments:list`, `:get`, `:create`, `:rollback` and `:cancel`.
 
-- `--deployment` is a 24-hex uid, validated in its resolution spec (`UsageError`, exit 2, nothing sent), so `get`,
+- `--deployment` is a 24-hex uid, validated while parsing (`FlagValueError`, exit 2, nothing sent; `LaunchCommand.init`
+  rethrows it as a plain `UsageError` so oclif's `Parsing --deployment` prefix never reaches the user), so `get`,
   `rollback` and `cancel` share it. It depends on `--org`, `--project` and `--env`. `get` leaves it optional and
   defaults to the latest deployment; `rollback` and `cancel` declare `picker` on the input (`all`, or `in-flight`
   for `cancel`), which is the only case where the spec's `promptWhen` lets the picker run (`promptForDeployment`,
@@ -714,9 +715,8 @@ parseable timestamp printed: with a `timestamp` the service returns what came st
 ascending order, and without one it returns the newest page in **descending** order, so never let the
 cursor drop the query. The poll that sees the terminal status still reads the logs once more before
 returning, so the last lines of a build are never lost. The logs are auxiliary: a
-failed read prints one `  ! Could not read the deployment logs (...)` notice for the whole wait, is
-retried from the same cursor on the next poll, and never changes the outcome - the status poll alone
-decides that.
+failed read prints nothing, is retried from the same cursor on the next poll, and never changes the
+outcome - the status poll alone decides that.
 
 **Writing a test for it: the fake clock must advance.** `now()` and `sleep()` are injected and both
 are required, not optional with defaults. A fake `now: () => 0` with a `sleep` that does nothing
@@ -830,12 +830,11 @@ project and `--config`.
 **Deployment failure is a partial success, and the wording says so.** The project and environment are
 real and are **not** rolled back. Everything after `POST /projects` - finding the first environment,
 finding its first deployment, and the wait itself - goes through the same wording when it fails, so a
-502 from a lookup still tells the user what exists. `deploymentFailureMessage` names the status, the project and
-environment that survived, and both follow-up commands with their scope already filled in -
-`deployments:create` to retry and `logs:get` to inspect. It exits **1**, not 2: nothing about the
-invocation was wrong. A wait that runs out is worded differently: the deployment may still finish, so
-the message says not to start another one and names `deployments:get` and `logs:get` instead of
-`deployments:create`.
+502 from a lookup still tells the user what exists. `firstDeploymentFailureMessage` is the one builder:
+it names the deployment and its status, says what was created (when something was) and ends with one
+command - `logs:get` for a failed deployment, `deployments:get` for a wait that ran out or could not be
+followed, `deployments:list` when no deployment was found - with its scope already filled in. It exits
+**1**, not 2: nothing about the invocation was wrong.
 
 **The FileUpload archive.** `src/uploads/upload.archive.ts` owns the exclusion list
 (`node_modules`, `.git`, `.env`, `.env.local`, `.next`, `logs`, `.vscode`, `.cs-launch.json`) and

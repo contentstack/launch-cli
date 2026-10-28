@@ -32,7 +32,7 @@ const CONFIG: Record<string, unknown> = {
 };
 
 const DEPLOYMENTS = `/manage/projects/${PROJECT_UID}/environments/${ENV_UID}/deployments`;
-const QUESTION = `Roll back this environment to deployment "${DEPLOYMENT_UID}"?`;
+const QUESTION = `Are you sure you want to roll back this environment to deployment "${DEPLOYMENT_UID}"?`;
 const POST_PENDING = `POST ${LAUNCH_HUB_URL}:443${DEPLOYMENTS}/rollback`;
 
 let config: Interfaces.Config;
@@ -137,7 +137,7 @@ describe('integration: launch:deployments:rollback on the wire', () => {
     expect(order).toEqual(['lookup', 'rollback']);
     expect(rollback.isDone()).toBe(true);
     expect(prompts.messages).toEqual([]);
-    expect(stdout).toBe(`✔ Rolled back to deployment "${DEPLOYMENT_UID}"\n`);
+    expect(stdout).toBe(`✔ Environment rolled back to deployment "${DEPLOYMENT_UID}" successfully.\n`);
     expect(onWire).toEqual([]);
   });
 
@@ -180,7 +180,7 @@ describe('integration: launch:deployments:rollback on the wire', () => {
       const { error, stdout } = await runCommand(args('--deployment', DEPLOYMENT_UID), config);
 
       expect(error?.oclif?.exit).toBe(3);
-      expect(stdout).toBe('Deployment not rolled back.\n');
+      expect(stdout).toBe('Environment not rolled back.\n');
       expect(inquired).toEqual([{ type: 'confirm', name: 'confirm', message: QUESTION, default: false }]);
       expect(onWire).toEqual([]);
       expect(found.isDone()).toBe(true);
@@ -232,7 +232,7 @@ describe('integration: launch:deployments:rollback on the wire', () => {
     expect(prompts.messages).toEqual([QUESTION]);
     expect(found.isDone()).toBe(true);
     expect(rollback.isDone()).toBe(true);
-    expect(stdout).toBe(`✔ Rolled back to deployment "${DEPLOYMENT_UID}"\n`);
+    expect(stdout).toBe(`✔ Environment rolled back to deployment "${DEPLOYMENT_UID}" successfully.\n`);
     expect(onWire).toEqual([]);
   });
 
@@ -266,8 +266,8 @@ describe('integration: launch:deployments:rollback on the wire', () => {
   });
 
   it.each([
-    ['launch.DEPLOYMENT.ROLLBACK_NOT_ELIGIBLE', 409, 'That deployment cannot be rolled back to. Only a deployment that went live earlier is eligible.'],
-    ['launch.DEPLOYMENT.NO_LIVE_DEPLOYMENT_FOUND', 409, 'This environment has no live deployment to roll back from.'],
+    ['launch.DEPLOYMENT.ROLLBACK_NOT_ELIGIBLE', 409, 'This deployment is not eligible for rollback. Choose a deployment that was live earlier.'],
+    ['launch.DEPLOYMENT.NO_LIVE_DEPLOYMENT_FOUND', 409, 'This environment has no live deployment, so a rollback is not possible.'],
   ])('exits 1 with readable wording when the rollback is refused with %s', async (code, status, message) => {
     lookup();
     hub()
@@ -286,13 +286,13 @@ describe('integration: launch:deployments:rollback on the wire', () => {
     projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
     const found = hub().get(`${DEPLOYMENTS}/${OLDER_UID}`).reply(200, { deployment: { uid: OLDER_UID, status: 'FAILED' } });
     const rollback = hub().post(`${DEPLOYMENTS}/rollback`, { deployment: OLDER_UID }).reply(200, {});
-    const question = `Roll back this environment to deployment "${OLDER_UID}"?`;
-    const prompts = answerPrompts({ 'Choose a deployment to roll back to': OLDER_UID, [question]: true });
+    const question = `Are you sure you want to roll back this environment to deployment "${OLDER_UID}"?`;
+    const prompts = answerPrompts({ 'Choose a deployment for rollback': OLDER_UID, [question]: true });
 
     const { error, stdout } = await onTerminal(() => runCommand(args(), config));
 
     expect(error).toBeUndefined();
-    expect(prompts.messages).toEqual(['Choose a deployment to roll back to', question]);
+    expect(prompts.messages).toEqual(['Choose a deployment for rollback', question]);
     expect(prompts.payloads[0]).toMatchObject({
       type: 'list',
       choices: [
@@ -304,7 +304,7 @@ describe('integration: launch:deployments:rollback on the wire', () => {
     expect(listed.isDone()).toBe(true);
     expect(found.isDone()).toBe(true);
     expect(rollback.isDone()).toBe(true);
-    expect(stdout).toBe(`✔ Rolled back to deployment "${OLDER_UID}"\n`);
+    expect(stdout).toBe(`✔ Environment rolled back to deployment "${OLDER_UID}" successfully.\n`);
     expect(onWire).toEqual([]);
   });
 
@@ -329,7 +329,7 @@ describe('integration: launch:deployments:rollback on the wire', () => {
     const { error } = await onTerminal(() => runCommand(args(), config));
 
     expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toBe('No deployments found that can be rolled back.');
+    expect(error?.message).toBe('No deployments are available for rollback.');
     expect(prompts.messages).toEqual([]);
     expect(onWire).toEqual([]);
   });
@@ -337,13 +337,13 @@ describe('integration: launch:deployments:rollback on the wire', () => {
   it('exits 3 and sends nothing further when Ctrl-C is pressed at the deployment picker', async () => {
     listing();
     const rollback = hub().post(`${DEPLOYMENTS}/rollback`).reply(200, {});
-    const prompts = answerPrompts({ 'Choose a deployment to roll back to': CTRL_C });
+    const prompts = answerPrompts({ 'Choose a deployment for rollback': CTRL_C });
 
     const { error } = await onTerminal(() => runCommand(args(), config));
 
     expect(error?.oclif?.exit).toBe(3);
     expect(error?.message).toBe('Cancelled. Nothing was changed.');
-    expect(prompts.messages).toEqual(['Choose a deployment to roll back to']);
+    expect(prompts.messages).toEqual(['Choose a deployment for rollback']);
     expect(rollback.isDone()).toBe(false);
     expect(onWire).toEqual([]);
     expect(process.listenerCount('SIGINT')).toBe(0);
@@ -377,7 +377,7 @@ describe('integration: launch:deployments:rollback on the wire', () => {
       const { error } = await onTerminal(() => runCommand(args('--deployment', value, '--yes'), config));
 
       expect(error?.oclif?.exit).toBe(2);
-      expect(error?.message).toContain(`--deployment must be a deployment UID (24 hexadecimal characters); "${value}" is not.`);
+      expect(error?.message).toBe(`Invalid --deployment value "${value}". Provide a 24-character hexadecimal deployment UID.`);
       expect(prompts.messages).toEqual([]);
       expect(found.isDone()).toBe(false);
       expect(rollback.isDone()).toBe(false);

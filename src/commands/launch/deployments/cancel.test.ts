@@ -4,7 +4,7 @@ import { LaunchApiError } from '../../../transport/errors';
 import DeploymentsCancel from './cancel';
 
 const UID = 'd1e2f3a4b5c6d7e8f9012345';
-const QUESTION = `Cancel deployment "${UID}"? This cannot be undone.`;
+const QUESTION = `Are you sure you want to cancel deployment "${UID}"?`;
 const SCOPE = { org: 'org1', project: 'proj1', environment: 'env1', deployment: UID };
 
 interface Harness {
@@ -78,7 +78,7 @@ describe('launch:deployments:cancel', () => {
     expect(calls).toEqual(['get', 'cancel']);
     expect(got).toEqual([SCOPE]);
     expect(cancelled).toEqual([SCOPE]);
-    expect(lines).toEqual([`✔ Deployment "${UID}" cancelled.`]);
+    expect(lines).toEqual([`✔ Deployment "${UID}" cancelled successfully.`]);
   });
 
   it('skips the prompt when --yes was passed and colours the success line when stdout is a terminal', async () => {
@@ -88,7 +88,7 @@ describe('launch:deployments:cancel', () => {
 
     expect(inquired).toEqual([]);
     expect(calls).toEqual(['get', 'cancel']);
-    expect(lines).toEqual([`\u001b[32m✔ Deployment "${UID}" cancelled.\u001b[39m`]);
+    expect(lines).toEqual([`\u001b[32m✔ Deployment "${UID}" cancelled successfully.\u001b[39m`]);
   });
 
   it('says it was not cancelled and exits 3 without sending the cancel when the user declines', async () => {

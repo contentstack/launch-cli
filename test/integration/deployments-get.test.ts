@@ -199,7 +199,8 @@ describe('integration: launch:deployments:get on the wire', () => {
       const { error, stdout } = await runCommand(getArgs('--deployment', value), config);
 
       expect(error?.oclif?.exit).toBe(2);
-      expect(error?.message).toContain(`--deployment must be a deployment UID (24 hexadecimal characters); "${value}" is not.`);
+      expect(error?.message).toBe(`Invalid --deployment value "${value}". Provide a 24-character hexadecimal deployment UID.`);
+      expect(error?.message).not.toContain('Parsing');
       expect(error?.message).not.toContain('12 bytes');
       expect(stdout).toBe('');
       expect(found.isDone()).toBe(false);
@@ -217,7 +218,7 @@ describe('integration: launch:deployments:get on the wire', () => {
     const { error } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID), config);
 
     expect(error?.oclif?.exit).toBe(1);
-    expect(error?.message).toBe('That is not a valid deployment UID. A deployment UID is 24 hexadecimal characters.');
+    expect(error?.message).toBe('The deployment UID is invalid. Provide a 24-character hexadecimal deployment UID.');
   });
 
   it('keeps a multi-line commit message to its first line so the table keeps its shape', async () => {

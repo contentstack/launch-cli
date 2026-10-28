@@ -4,7 +4,7 @@ import { LaunchApiError } from '../../../transport/errors';
 import DeploymentsRollback from './rollback';
 
 const UID = 'd1e2f3a4b5c6d7e8f9012345';
-const QUESTION = `Roll back this environment to deployment "${UID}"?`;
+const QUESTION = `Are you sure you want to roll back this environment to deployment "${UID}"?`;
 
 interface Harness {
   answer?: boolean;
@@ -90,7 +90,7 @@ describe('launch:deployments:rollback', () => {
     expect(rolledBack).toEqual([
       { org: 'org1', project: 'proj1', environment: 'env1', deployment: UID, reason: 'bad release' },
     ]);
-    expect(lines).toEqual([`✔ Rolled back to deployment "${UID}"`]);
+    expect(lines).toEqual([`✔ Environment rolled back to deployment "${UID}" successfully.`]);
   });
 
   it('skips the prompt when --yes was passed and colours the success line when stdout is a terminal', async () => {
@@ -100,7 +100,7 @@ describe('launch:deployments:rollback', () => {
 
     expect(inquired).toEqual([]);
     expect(calls).toEqual(['get', 'rollback']);
-    expect(lines).toEqual([`\u001b[32m✔ Rolled back to deployment "${UID}"\u001b[39m`]);
+    expect(lines).toEqual([`\u001b[32m✔ Environment rolled back to deployment "${UID}" successfully.\u001b[39m`]);
   });
 
   it('hands an absent reason to the api as undefined', async () => {
@@ -119,7 +119,7 @@ describe('launch:deployments:rollback', () => {
     expect(error.oclif?.exit).toBe(3);
     expect(calls).toEqual(['get']);
     expect(rolledBack).toEqual([]);
-    expect(lines).toEqual(['Deployment not rolled back.']);
+    expect(lines).toEqual(['Environment not rolled back.']);
   });
 
   it('exits 2 naming --yes without sending the rollback when there is no terminal', async () => {

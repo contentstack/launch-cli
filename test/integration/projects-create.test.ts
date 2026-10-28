@@ -382,13 +382,12 @@ describe('integration: launch:projects:create on the wire', () => {
     const { error } = await runCommand(gitFlags(), config);
 
     expect(error?.oclif?.exit).toBe(1);
-    expect(error?.message).toContain('its last status was FAILED');
+    expect(error?.message).toContain('ended with status FAILED.');
     expect(error?.message).toContain(`The project "My Site" (${PROJECT_UID})`);
-    expect(error?.message).toContain('have not been rolled back');
+    expect(error?.message).toContain('were created.');
     expect(error?.message).toContain(
-      `Run csdx launch:deployments:create --org ${ORG_UID} --project ${PROJECT_UID} --env ${ENVIRONMENT_UID}`,
+      `Run csdx launch:logs:get --org ${ORG_UID} --project ${PROJECT_UID} --env ${ENVIRONMENT_UID}`,
     );
-    expect(error?.message).toContain(`csdx launch:logs:get --org ${ORG_UID} --project ${PROJECT_UID}`);
     expect(error?.message).toContain(`--deployment ${DEPLOYMENT_UID}`);
     expect(onWire).toEqual([]);
   });

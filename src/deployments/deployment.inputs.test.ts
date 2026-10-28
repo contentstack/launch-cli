@@ -174,7 +174,7 @@ describe('deployment inputs', () => {
     expect(failure).toBeInstanceOf(UsageError);
     expect((failure as UsageError).exitCode).toBe(2);
     expect((failure as Error).message).toContain(
-      `--deployment must be a deployment UID (24 hexadecimal characters); "${value}" is not.`,
+      `Invalid --deployment value "${value}". Provide a 24-character hexadecimal deployment UID.`,
     );
   });
 
@@ -204,7 +204,7 @@ describe('deployment flag at parse time', () => {
     expect(refusal).toBeInstanceOf(UsageError);
     expect(refusal.exitCode).toBe(2);
     expect(refusal.message).toContain(
-      '--deployment must be a deployment UID (24 hexadecimal characters); "not-a-uid" is not.',
+      'Invalid --deployment value "not-a-uid". Provide a 24-character hexadecimal deployment UID.',
     );
   });
 

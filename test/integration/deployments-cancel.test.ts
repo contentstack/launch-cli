@@ -32,13 +32,13 @@ const CONFIG: Record<string, unknown> = {
 };
 
 const DEPLOYMENTS = `/manage/projects/${PROJECT_UID}/environments/${ENV_UID}/deployments`;
-const QUESTION = `Cancel deployment "${DEPLOYMENT_UID}"? This cannot be undone.`;
+const QUESTION = `Are you sure you want to cancel deployment "${DEPLOYMENT_UID}"?`;
 const CANCEL_PATH = `${DEPLOYMENTS}/${DEPLOYMENT_UID}/cancel`;
 const POST_PENDING = `POST ${LAUNCH_HUB_URL}:443${CANCEL_PATH}`;
 const BODYLESS = { badheaders: ['content-type'] };
 const RAW_REFUSAL = 'This deployment has progressed beyond the point where it can be cancelled.';
 const CANCEL_WORDING =
-  'This deployment can no longer be cancelled because it is already past the point where cancelling is possible.';
+  'The deployment can no longer be cancelled because it has progressed too far.';
 
 let config: Interfaces.Config;
 let onWire: string[];
@@ -155,7 +155,7 @@ describe('integration: launch:deployments:cancel on the wire', () => {
     expect(bodies).toEqual(['""']);
     expect(headers[0]['content-type']).toBeUndefined();
     expect(prompts.messages).toEqual([]);
-    expect(stdout).toBe(`✔ Deployment "${DEPLOYMENT_UID}" cancelled.\n`);
+    expect(stdout).toBe(`✔ Deployment "${DEPLOYMENT_UID}" cancelled successfully.\n`);
     expect(onWire).toEqual([]);
   });
 
@@ -238,7 +238,7 @@ describe('integration: launch:deployments:cancel on the wire', () => {
     expect(error).toBeUndefined();
     expect(prompts.messages).toEqual([QUESTION]);
     expect(cancel.isDone()).toBe(true);
-    expect(stdout).toBe(`✔ Deployment "${DEPLOYMENT_UID}" cancelled.\n`);
+    expect(stdout).toBe(`✔ Deployment "${DEPLOYMENT_UID}" cancelled successfully.\n`);
     expect(onWire).toEqual([]);
   });
 
@@ -295,13 +295,13 @@ describe('integration: launch:deployments:cancel on the wire', () => {
       .get(`${DEPLOYMENTS}/${QUEUED_UID}`)
       .reply(200, { deployment: { uid: QUEUED_UID, status: 'QUEUED' } });
     const cancel = cancelScope().post(`${DEPLOYMENTS}/${QUEUED_UID}/cancel`).reply(200, {});
-    const question = `Cancel deployment "${QUEUED_UID}"? This cannot be undone.`;
-    const prompts = answerPrompts({ 'Choose a deployment to cancel': QUEUED_UID, [question]: true });
+    const question = `Are you sure you want to cancel deployment "${QUEUED_UID}"?`;
+    const prompts = answerPrompts({ 'Choose a deployment for cancellation': QUEUED_UID, [question]: true });
 
     const { error, stdout } = await onTerminal(() => runCommand(args(), config));
 
     expect(error).toBeUndefined();
-    expect(prompts.messages).toEqual(['Choose a deployment to cancel', question]);
+    expect(prompts.messages).toEqual(['Choose a deployment for cancellation', question]);
     expect(prompts.payloads[0]).toMatchObject({
       type: 'list',
       choices: [
@@ -312,7 +312,7 @@ describe('integration: launch:deployments:cancel on the wire', () => {
     expect(listed.isDone()).toBe(true);
     expect(found.isDone()).toBe(true);
     expect(cancel.isDone()).toBe(true);
-    expect(stdout).toBe(`✔ Deployment "${QUEUED_UID}" cancelled.\n`);
+    expect(stdout).toBe(`✔ Deployment "${QUEUED_UID}" cancelled successfully.\n`);
     expect(onWire).toEqual([]);
   });
 
@@ -343,7 +343,7 @@ describe('integration: launch:deployments:cancel on the wire', () => {
     const { error } = await onTerminal(() => runCommand(args(), config));
 
     expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toBe('No deployments in progress that can be cancelled.');
+    expect(error?.message).toBe('No in-progress deployments are available for cancellation.');
     expect(prompts.messages).toEqual([]);
     expect(onWire).toEqual([]);
   });
@@ -360,8 +360,8 @@ describe('integration: launch:deployments:cancel on the wire', () => {
     hub().get(`${DEPLOYMENTS}/${QUEUED_UID}`).reply(200, { deployment: { uid: QUEUED_UID, status: 'QUEUED' } });
     cancelScope().post(`${DEPLOYMENTS}/${QUEUED_UID}/cancel`).reply(200, {});
     const prompts = answerPrompts({
-      'Choose a deployment to cancel': QUEUED_UID,
-      [`Cancel deployment "${QUEUED_UID}"? This cannot be undone.`]: true,
+      'Choose a deployment for cancellation': QUEUED_UID,
+      [`Are you sure you want to cancel deployment "${QUEUED_UID}"?`]: true,
     });
 
     const { error } = await onTerminal(() => runCommand(args(), config));
@@ -374,13 +374,13 @@ describe('integration: launch:deployments:cancel on the wire', () => {
   it('exits 3 and cancels nothing when Ctrl-C is pressed at the deployment picker', async () => {
     listing();
     const cancel = cancelScope().post(`${DEPLOYMENTS}/${RUNNING_UID}/cancel`).reply(200, {});
-    const prompts = answerPrompts({ 'Choose a deployment to cancel': CTRL_C });
+    const prompts = answerPrompts({ 'Choose a deployment for cancellation': CTRL_C });
 
     const { error } = await onTerminal(() => runCommand(args(), config));
 
     expect(error?.oclif?.exit).toBe(3);
     expect(error?.message).toBe('Cancelled. Nothing was changed.');
-    expect(prompts.messages).toEqual(['Choose a deployment to cancel']);
+    expect(prompts.messages).toEqual(['Choose a deployment for cancellation']);
     expect(cancel.isDone()).toBe(false);
     expect(onWire).toEqual([]);
     expect(process.listenerCount('SIGINT')).toBe(0);
@@ -408,7 +408,7 @@ describe('integration: launch:deployments:cancel on the wire', () => {
     const { error } = await runCommand(args('--deployment', '6accca6d34', '--yes'), config);
 
     expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toContain('--deployment must be a deployment UID (24 hexadecimal characters); "6accca6d34" is not.');
+    expect(error?.message).toBe('Invalid --deployment value "6accca6d34". Provide a 24-character hexadecimal deployment UID.');
     expect(found.isDone()).toBe(false);
     expect(onWire).toEqual([]);
   });

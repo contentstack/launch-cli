@@ -12,7 +12,6 @@ import {
   deploymentRollbackQuestion,
   rolledBackLine,
   deploymentDetailRows,
-  deploymentLogsUnavailableLine,
   deploymentVariablesSummary,
   deploymentUrlLine,
   deploymentUrlOf,
@@ -148,28 +147,27 @@ describe('deployment presenter', () => {
       '2026-09-25 10:00:03.000:  a message that is well past any narrow terminal',
     );
   });
-
-  it('names what failed when a log fetch rejects with something other than an Error', () => {
-    expect(deploymentLogsUnavailableLine('socket hang up')).toBe(
-      '  ! Could not read the deployment logs (socket hang up). Still waiting on the deployment.',
-    );
-  });
 });
 
 describe('firstDeploymentFailureMessage', () => {
   const ENVIRONMENT = { created: 'The environment "staging" (env9)', plural: false };
   const SCOPE = { org: 'org1', project: 'proj1', environmentUid: 'env9' };
 
-  it('names the status, what survived and both follow-up commands for a failed deployment', () => {
-    expect(firstDeploymentFailureMessage({ ...ENVIRONMENT, ...SCOPE, deploymentUid: 'dep1', status: 'FAILED' })).toBe(
-      'The deployment did not succeed; its last status was FAILED. ' +
-        'The environment "staging" (env9) was created and has not been rolled back. ' +
-        'Run csdx launch:deployments:create --org org1 --project proj1 --env env9 to try the deployment again, ' +
-        'or csdx launch:logs:get --org org1 --project proj1 --env env9 --deployment dep1 to see why it did not succeed.',
+  it('names the deployment, its status and the logs command for a failed deployment', () => {
+    expect(firstDeploymentFailureMessage({ ...SCOPE, deploymentUid: 'dep1', status: 'FAILED' })).toBe(
+      'Deployment "dep1" ended with status FAILED. ' +
+        'Run csdx launch:logs:get --org org1 --project proj1 --env env9 --deployment dep1 to see the cause.',
     );
   });
 
-  it('agrees the verbs with a plural survivor and leaves out the scope it does not know', () => {
+  it('adds what survived a failure, in the singular', () => {
+    expect(firstDeploymentFailureMessage({ ...ENVIRONMENT, ...SCOPE, deploymentUid: 'dep1', status: 'FAILED' })).toBe(
+      'Deployment "dep1" ended with status FAILED. The environment "staging" (env9) was created. ' +
+        'Run csdx launch:logs:get --org org1 --project proj1 --env env9 --deployment dep1 to see the cause.',
+    );
+  });
+
+  it('agrees the verb with a plural survivor and leaves out the scope it does not know', () => {
     expect(
       firstDeploymentFailureMessage({
         created: 'The project "site" (p1) and its environment "Default"',
@@ -181,24 +179,42 @@ describe('firstDeploymentFailureMessage', () => {
       }),
     ).toBe(
       'The deployment could not be followed to completion: Lookup refused. ' +
-        'The project "site" (p1) and its environment "Default" were created and have not been rolled back. ' +
-        'Run csdx launch:deployments:create --org org1 --project p1 to try the deployment again, ' +
-        'or csdx launch:logs:get --org org1 --project p1 to see why it did not succeed.',
+        'The project "site" (p1) and its environment "Default" were created. ' +
+        'Run csdx launch:deployments:get --org org1 --project p1 to check its status.',
+    );
+  });
+
+  it('words a deployment that could not be followed, with its uid', () => {
+    expect(firstDeploymentFailureMessage({ ...SCOPE, deploymentUid: 'dep1', status: 'NONE', reason: 'Request timed out.' })).toBe(
+      'Deployment "dep1" could not be followed to completion: Request timed out. ' +
+        'Run csdx launch:deployments:get --org org1 --project proj1 --env env9 --deployment dep1 to check its status.',
+    );
+  });
+
+  it('says no deployment was found when there is neither a uid nor a reason', () => {
+    expect(firstDeploymentFailureMessage({ ...ENVIRONMENT, ...SCOPE, status: 'NONE' })).toBe(
+      'No deployment was found to follow. The environment "staging" (env9) was created. ' +
+        'Run csdx launch:deployments:list --org org1 --project proj1 --env env9 to check.',
     );
   });
 
   it.each([
     [false, 'The environment "staging" (env9) was created.'],
     [true, 'The environment "staging" (env9) were created.'],
-  ])('words a wait that ran out as possibly still finishing (plural %p)', (plural, created) => {
+  ])('words a wait that ran out as still in progress (plural %p)', (plural, created) => {
     expect(
       firstDeploymentFailureMessage({ ...ENVIRONMENT, plural, ...SCOPE, deploymentUid: 'dep1', status: 'DEPLOYING', timedOut: true }),
     ).toBe(
-      'The deployment was still DEPLOYING when the CLI stopped waiting for it; it may still finish. ' +
-        `${created} Do not start another deployment yet: ` +
-        'run csdx launch:deployments:get --org org1 --project proj1 --env env9 --deployment dep1 to see how it ends, ' +
-        'or csdx launch:logs:get --org org1 --project proj1 --env env9 --deployment dep1 to follow it.',
+      'Deployment "dep1" was still DEPLOYING when the CLI stopped waiting. ' +
+        `${created} ` +
+        'Run csdx launch:deployments:get --org org1 --project proj1 --env env9 --deployment dep1 to check its status.',
     );
+  });
+
+  it('never mentions a rollback', () => {
+    const message = firstDeploymentFailureMessage({ ...ENVIRONMENT, ...SCOPE, deploymentUid: 'dep1', status: 'FAILED' });
+
+    expect(message).not.toMatch(/rolled back|roll back/i);
   });
 });
 
@@ -363,20 +379,20 @@ describe('deployment table presenter', () => {
 
 describe('rollback and cancel wording', () => {
   it('words the confirm questions with the deployment uid', () => {
-    expect(deploymentRollbackQuestion(UID)).toBe(`Roll back this environment to deployment "${UID}"?`);
-    expect(deploymentCancelQuestion(UID)).toBe(`Cancel deployment "${UID}"? This cannot be undone.`);
+    expect(deploymentRollbackQuestion(UID)).toBe(`Are you sure you want to roll back this environment to deployment "${UID}"?`);
+    expect(deploymentCancelQuestion(UID)).toBe(`Are you sure you want to cancel deployment "${UID}"?`);
   });
 
   it('prints the success lines in green on a terminal and as exact plain text otherwise', () => {
-    expect(rolledBackLine(UID, true)).toBe(`\u001b[32m✔ Rolled back to deployment "${UID}"\u001b[39m`);
-    expect(rolledBackLine(UID, false)).toBe(`✔ Rolled back to deployment "${UID}"`);
-    expect(deploymentCancelledLine(UID, true)).toBe(`\u001b[32m✔ Deployment "${UID}" cancelled.\u001b[39m`);
-    expect(deploymentCancelledLine(UID, false)).toBe(`✔ Deployment "${UID}" cancelled.`);
+    expect(rolledBackLine(UID, true)).toBe(`\u001b[32m✔ Environment rolled back to deployment "${UID}" successfully.\u001b[39m`);
+    expect(rolledBackLine(UID, false)).toBe(`✔ Environment rolled back to deployment "${UID}" successfully.`);
+    expect(deploymentCancelledLine(UID, true)).toBe(`\u001b[32m✔ Deployment "${UID}" cancelled successfully.\u001b[39m`);
+    expect(deploymentCancelledLine(UID, false)).toBe(`✔ Deployment "${UID}" cancelled successfully.`);
   });
 
   it('prints the decline lines in yellow on a terminal and plain otherwise', () => {
-    expect(deploymentNotRolledBackLine(true)).toBe('\u001b[33mDeployment not rolled back.\u001b[39m');
-    expect(deploymentNotRolledBackLine(false)).toBe('Deployment not rolled back.');
+    expect(deploymentNotRolledBackLine(true)).toBe('\u001b[33mEnvironment not rolled back.\u001b[39m');
+    expect(deploymentNotRolledBackLine(false)).toBe('Environment not rolled back.');
     expect(deploymentNotCancelledLine(true)).toBe('\u001b[33mDeployment not cancelled.\u001b[39m');
     expect(deploymentNotCancelledLine(false)).toBe('Deployment not cancelled.');
   });

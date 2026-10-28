@@ -441,7 +441,7 @@ describe('deployment log streaming', () => {
     expect(DEPLOYMENT_LOGS_FROM).toBe('1970-01-01T00:00:00.000Z');
   });
 
-  it('reports a failing log fetch once, keeps waiting on the deployment and resumes the logs where it left off', async () => {
+  it('prints nothing for a failing log fetch, keeps waiting on the deployment and resumes the logs where it left off', async () => {
     const { deps, lines, since } = streamingHarness(
       ['DEPLOYING', 'DEPLOYING', 'DEPLOYING', 'LIVE'],
       [
@@ -456,7 +456,6 @@ describe('deployment log streaming', () => {
 
     expect(outcome).toEqual(expect.objectContaining({ kind: 'success', status: 'LIVE' }));
     expect(lines).toEqual([
-      '  ! Could not read the deployment logs (Bad gateway). Still waiting on the deployment.',
       '2026-09-25 10:00:05.000:  Build complete',
     ]);
     expect(since).toEqual([

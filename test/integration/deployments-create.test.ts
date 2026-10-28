@@ -309,9 +309,9 @@ describe('integration: launch:deployments:create on the wire', () => {
     const { error } = await runCommand(createArgs('--data-dir', missingDir), config);
 
     expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toContain(missingDir);
-    expect(error?.message).toContain('--last-upload');
-    expect(error?.message).toContain('--data-dir');
+    expect(error?.message).toBe(
+      `No files to upload were found in "${missingDir}". Pass your project folder with --data-dir.`,
+    );
     expect(create.scope.isDone()).toBe(false);
     expect(signed.scope.isDone()).toBe(false);
     expect(onWire).toEqual([]);
@@ -417,14 +417,14 @@ describe('integration: launch:deployments:create on the wire', () => {
         ],
       });
     followUp(['LIVE']);
-    const prompts = answerPrompts({ 'Choose a commit to deploy': second });
+    const prompts = answerPrompts({ 'Choose a commit for deployment': second });
 
     const { error } = await onTerminal(() => runCommand(createArgs('--commit', '--data-dir', dataDir), config));
 
     expect(error).toBeUndefined();
     expect(commits.isDone()).toBe(true);
     expect(asked).toEqual({ limit: '15' });
-    expect(prompts.messages).toEqual(['Choose a commit to deploy']);
+    expect(prompts.messages).toEqual(['Choose a commit for deployment']);
     expect(prompts.payloads[0]).toMatchObject({
       type: 'list',
       choices: [
@@ -468,7 +468,7 @@ describe('integration: launch:deployments:create on the wire', () => {
       .get(COMMITS)
       .query(true)
       .reply(200, { commits: [{ sha: COMMIT, shortSha: COMMIT.slice(0, 7), message: 'm' }] });
-    answerPrompts({ 'Choose a commit to deploy': CTRL_C });
+    answerPrompts({ 'Choose a commit for deployment': CTRL_C });
 
     const { error } = await onTerminal(() => runCommand(createArgs('--commit', '--data-dir', dataDir), config));
 
@@ -593,7 +593,7 @@ describe('integration: launch:deployments:create on the wire', () => {
       const { error } = await runCommand(createArgs('--data-dir', dataDir), config);
 
       expect(error?.oclif?.exit).toBe(1);
-      expect(error?.message).toBe('The Launch API could not start a deployment.');
+      expect(error?.message).toBe('The deployment could not be started. Try again later.');
       expect(create.scope.isDone()).toBe(true);
       expect(poll.every((scope) => !scope.isDone())).toBe(true);
       expect(onWire).toEqual([]);
@@ -627,7 +627,7 @@ describe('integration: launch:deployments:create on the wire', () => {
       const { error } = await runCommand(createArgs('--data-dir', tiny), config);
 
       expect(error?.oclif?.exit).toBe(2);
-      expect(error?.message).toContain('under the');
+      expect(error?.message).toContain('below the');
       expect(signed.scope.isDone()).toBe(false);
       expect(create.scope.isDone()).toBe(false);
       expect(onWire).toEqual([]);
@@ -664,7 +664,7 @@ describe('integration: launch:deployments:create on the wire', () => {
       const { error, stderr } = await runCommand(createArgs('--data-dir', missingDir), config, { stripAnsi: false });
 
       expect(error?.oclif?.exit).toBe(2);
-      expect(stderr).toContain('\u001b[31merror: no project directory found at');
+      expect(stderr).toContain('\u001b[31merror: No files to upload were found in');
     } finally {
       restoreOut();
     }
@@ -679,7 +679,7 @@ describe('integration: launch:deployments:create on the wire', () => {
       const { error, stderr } = await runCommand(createArgs('--data-dir', missingDir), config, { stripAnsi: false });
 
       expect(error?.oclif?.exit).toBe(2);
-      expect(stderr).toContain('error: no project directory found at');
+      expect(stderr).toContain('error: No files to upload were found in');
       expect(stderr).not.toContain('\u001b');
     } finally {
       restoreIn();

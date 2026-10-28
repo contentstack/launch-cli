@@ -12,7 +12,10 @@ interface ListedCommit {
   message?: string;
 }
 
-const NEEDS_COMMIT = '--commit needs a commit hash to deploy here. Pass --commit <sha>.';
+const NO_TERMINAL = 'Choosing a commit needs an interactive terminal. Pass --commit <sha> instead.';
+
+const NO_COMMITS = 'No commits are available to choose from. Pass --commit <sha> instead.';
+
 export function commitChoice(commit: ListedCommit & { sha: string }): Choice {
   const short = commit.shortSha?.trim() ? commit.shortSha : commit.sha.slice(0, SHORT_SHA_LENGTH);
   const subject = (commit.message ?? '').split('\n')[0].trim();
@@ -22,7 +25,7 @@ export function commitChoice(commit: ListedCommit & { sha: string }): Choice {
 
 export async function promptForCommit(deps: ServiceContext, scope: DeploymentScope): Promise<string> {
   if (!deps.isTTY) {
-    throw new UsageError(NEEDS_COMMIT);
+    throw new UsageError(NO_TERMINAL);
   }
 
   const commits = await deps.api.environments.commits(scope);
@@ -31,8 +34,8 @@ export async function promptForCommit(deps: ServiceContext, scope: DeploymentSco
   );
 
   if (usable.length === 0) {
-    throw new UsageError(NEEDS_COMMIT);
+    throw new UsageError(NO_COMMITS);
   }
 
-  return askOption(deps.ux, 'Choose a commit to deploy', usable.map(commitChoice));
+  return askOption(deps.ux, 'Choose a commit for deployment', usable.map(commitChoice));
 }

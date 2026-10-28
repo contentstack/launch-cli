@@ -1,6 +1,6 @@
 import { Flags } from '@contentstack/cli-utilities';
 
-import { UsageError } from '../core/errors';
+import { FlagValueError, UsageError } from '../core/errors';
 import type { ResolutionSpec } from '../core/resolution';
 import { UID_PATTERN } from '../core/resource-ref';
 import { promptForDeployment } from './deployment.prompt';
@@ -69,7 +69,7 @@ function deploymentUidOf(value: string): string {
   const uid = value.trim();
 
   if (!UID_PATTERN.test(uid)) {
-    throw new UsageError(`--deployment must be a deployment UID (24 hexadecimal characters); "${uid}" is not.`);
+    throw new FlagValueError(`Invalid --deployment value "${uid}". Provide a 24-character hexadecimal deployment UID.`);
   }
 
   return uid;
