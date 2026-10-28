@@ -1,9 +1,11 @@
 import { criterionOf } from '../../../cache/cache.inputs';
 import { purgeInitiatedLines } from '../../../cache/cache.presenter';
 import { flagsFor, inputs } from '../../../core/inputs';
+import { UsageError } from '../../../core/errors';
 import { LaunchCommand } from '../../../core/launch-command';
 import { exactlyOneOf } from '../../../core/rules';
 import { isAbsent } from '../../../core/values';
+import { LaunchApiError } from '../../../transport/errors';
 
 const purgeInputs = inputs({
   org: { required: true },
@@ -35,7 +37,13 @@ export default class CachePurge extends LaunchCommand<typeof purgeInputs> {
     const scope = { org, project, environment: env };
     const target = { path, tags, hosts };
 
-    const environment = await this.services.api.environments.get(scope);
+    const environment = await this.services.api.environments.get(scope).catch((error: unknown) => {
+      if (error instanceof LaunchApiError && error.status === 404) {
+        throw new UsageError(`No environment with UID "${env}" found in this project.`);
+      }
+
+      throw error;
+    });
 
     await this.services.api.cache.purge({ ...scope, criterion: criterionOf(target) });
 

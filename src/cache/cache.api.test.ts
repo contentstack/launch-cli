@@ -1,6 +1,9 @@
 import type { RestApiClient, RestRequest } from '../transport/rest-client';
+import { LaunchApiError } from '../transport/errors';
 import { CacheApi } from './cache.api';
 import { CACHE_ERROR_MESSAGES } from './cache.errors';
+
+const QUOTA_CODE = 'launch.ORGANIZATION.REVALIDATE_RATE_LIMIT_EXCEEDED';
 
 function fakeRestClient(failure?: Error) {
   const requests: RestRequest[] = [];
@@ -19,6 +22,10 @@ function fakeRestClient(failure?: Error) {
   } as unknown as RestApiClient;
 
   return { client, requests, messages };
+}
+
+function purgeTags(client: RestApiClient): Promise<void> {
+  return new CacheApi(client).purge({ org: 'o', project: 'p', environment: 'e', criterion: { cacheTags: ['a'] } });
 }
 
 describe('CacheApi', () => {
@@ -40,6 +47,7 @@ describe('CacheApi', () => {
         orgUid: 'org1',
         projectUid: 'proj1',
         body: { cacheTags: ['a'] },
+        noRetryCodes: [QUOTA_CODE],
       },
     ]);
     expect(messages[0]).toBe(CACHE_ERROR_MESSAGES);
@@ -52,5 +60,15 @@ describe('CacheApi', () => {
     await expect(
       new CacheApi(client).purge({ org: 'o', project: 'p', environment: 'e', criterion: { hostnames: ['x'] } }),
     ).rejects.toBe(failure);
+  });
+
+  it('rewords a 403 whatever its code as needing permission to update the environment', async () => {
+    const { client } = fakeRestClient(new LaunchApiError(403, [{ code: 'launch.FORBIDDEN' }]));
+
+    const error = await purgeTags(client).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(LaunchApiError);
+    expect(error).toMatchObject({ status: 403, exitCode: 1 });
+    expect((error as Error).message).toBe('Purging the CDN cache needs permission to update the environment.');
   });
 });

@@ -52,7 +52,17 @@ export class RetryPolicy {
     return attemptsMade < this.maxRetries && this.isRetryableTransportError(error, method);
   }
 
-  shouldRetry(status: number, method: HttpMethod, attemptsMade: number): boolean {
+  shouldRetry(
+    status: number,
+    method: HttpMethod,
+    attemptsMade: number,
+    answeredCodes: readonly string[] = [],
+    noRetryCodes: readonly string[] = [],
+  ): boolean {
+    if (answeredCodes.some((code) => noRetryCodes.includes(code))) {
+      return false;
+    }
+
     return attemptsMade < this.maxRetries && this.isRetryableStatus(status, method);
   }
 

@@ -132,6 +132,7 @@ describe('EnvironmentsApi', () => {
         projectUid: PROJECT,
       },
     ]);
+    expect(requests[0]).not.toHaveProperty('noRetryCodes');
     expect(messages[0]).toBe(ENVIRONMENT_ERROR_MESSAGES);
   });
 

@@ -42,6 +42,16 @@ describe('RetryPolicy', () => {
     expect(policy.retryDelayMs).toBe(value ?? DEFAULT_RETRY_DELAY_MS);
   });
 
+  it.each(ALL_METHODS)('refuses to retry a %s whose answered code is in the opt-out list', (method) => {
+    const policy = new RetryPolicy();
+
+    expect(policy.shouldRetry(429, method, 0, ['launch.A'], ['launch.A'])).toBe(false);
+    expect(policy.shouldRetry(429, method, 0, ['launch.A'], ['launch.B'])).toBe(true);
+    expect(policy.shouldRetry(429, method, 0, [], ['launch.A'])).toBe(true);
+    expect(policy.shouldRetry(429, method, 0, ['launch.A'], [])).toBe(true);
+    expect(policy.shouldRetry(429, method, 0)).toBe(true);
+  });
+
   it.each(ALL_METHODS)('treats a 429 on %s as retryable whatever the method', (method) => {
     expect(new RetryPolicy().isRetryableStatus(429, method)).toBe(true);
   });

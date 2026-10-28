@@ -16,6 +16,7 @@ export interface RestRequest {
   body?: unknown;
   orgUid?: string;
   projectUid?: string;
+  noRetryCodes?: string[];
 }
 
 export interface HttpResponse {
@@ -85,6 +86,16 @@ function isAuthChallenge(status: number, data: unknown): boolean {
   return typeof errorMessage === 'string' && errorMessage.includes(EXPIRED_TOKEN_MESSAGE);
 }
 
+function answeredCodes(response: HttpResponse, req: RestRequest): string[] {
+  if (req.noRetryCodes === undefined) {
+    return [];
+  }
+
+  return parseErrorEnvelope(response.status, response.data).errors.flatMap((entry) =>
+    entry.code === undefined ? [] : [entry.code],
+  );
+}
+
 export class RestApiClient {
   constructor(private readonly options: RestApiClientOptions) {}
 
@@ -119,7 +130,7 @@ export class RestApiClient {
         continue;
       }
 
-      if (policy.shouldRetry(response.status, req.method, attempt)) {
+      if (policy.shouldRetry(response.status, req.method, attempt, answeredCodes(response, req), req.noRetryCodes)) {
         attempt += 1;
         await sleep(policy.delayFor(attempt, retryAfterMs(response.headers)));
         continue;

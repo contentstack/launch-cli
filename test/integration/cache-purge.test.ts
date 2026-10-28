@@ -12,6 +12,7 @@ import { projectOwnership } from '../support/project-ownership';
 
 import getFixture from '../fixtures/environment-get.json';
 import listFixture from '../fixtures/environments-list.json';
+import notFoundFixture from '../fixtures/environment-not-found.json';
 
 const LAUNCH_HUB_URL = 'https://launch-api.integration.test';
 const ORG_UID = 'blt4d9e2a7c1f6b3085';
@@ -19,7 +20,11 @@ const PROJECT_UID = randomBytes(12).toString('hex');
 const ENV_UID = randomBytes(12).toString('hex');
 const ENV_PATH = `/manage/projects/${PROJECT_UID}/environments/${ENV_UID}`;
 const PURGE_PATH = `${ENV_PATH}/revalidate-cdn-cache`;
+const FOREIGN_ENV_UID = randomBytes(12).toString('hex');
+const OTHER_ORG_UID = randomBytes(9).toString('hex');
 const DATA_DIR = tmpdir();
+const QUOTA_CODE = 'launch.ORGANIZATION.REVALIDATE_RATE_LIMIT_EXCEEDED';
+const QUOTA_MESSAGE = 'This organization has reached its daily CDN cache purge limit. The limit resets at 00:00 UTC.';
 const CRITERIA = ['--path', '--tags', '--hosts'];
 const ONE_OF = `Pass exactly one of ${CRITERIA.join(', ')}`;
 const TASK_LINE = '→ CDN cache revalidation task initiated.';
@@ -242,5 +247,105 @@ describe('integration: launch:cache:purge on the wire', () => {
     expect(error?.message).toBe('--tags must name at least one value; "," names none.');
     expect([lookup.isDone(), purge.isDone()]).toEqual([false, false]);
     expect(onWire).toEqual([]);
+  });
+
+  it('stops on the quota 429 after one POST, words it, and exits 1', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
+    nock(LAUNCH_HUB_URL).matchHeader('x-project-uid', PROJECT_UID).get(ENV_PATH).reply(200, getFixture);
+    let posts = 0;
+    nock(LAUNCH_HUB_URL)
+      .post(PURGE_PATH)
+      .times(4)
+      .reply(() => {
+        posts += 1;
+        return [429, { errors: [{ code: QUOTA_CODE, message: 'Rate limit exceeded' }], status: 429 }];
+      });
+
+    const { error, stderr } = await runCommand(purgeArgs('--env', ENV_UID, '--path', '/blog'), config);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.message).toBe(QUOTA_MESSAGE);
+    expect(posts).toBe(1);
+    expect(stderr).not.toContain('\u001b');
+    expect(onWire).toEqual([]);
+  });
+
+  it('prints the quota wording alone on stderr, with no escape codes off a terminal', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
+    nock(LAUNCH_HUB_URL).matchHeader('x-project-uid', PROJECT_UID).get(ENV_PATH).reply(200, getFixture);
+    nock(LAUNCH_HUB_URL)
+      .post(PURGE_PATH)
+      .reply(429, { errors: [{ code: QUOTA_CODE, message: 'Rate limit exceeded' }], status: 429 });
+
+    const { error, stderr } = await runCommand(purgeArgs('--env', ENV_UID, '--path', '/blog'), config);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(stderr).toBe(`error: ${QUOTA_MESSAGE}\n`);
+  });
+
+  it('exits 1 with the permission wording on a 403 and sends the POST once', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
+    nock(LAUNCH_HUB_URL).matchHeader('x-project-uid', PROJECT_UID).get(ENV_PATH).reply(200, getFixture);
+    let posts = 0;
+    nock(LAUNCH_HUB_URL)
+      .post(PURGE_PATH)
+      .times(2)
+      .reply(() => {
+        posts += 1;
+        return [403, { errors: [{ code: 'launch.FORBIDDEN', message: 'Forbidden' }], status: 403 }];
+      });
+
+    const { error } = await runCommand(purgeArgs('--env', ENV_UID, '--tags', 'a'), config);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.message).toBe('Purging the CDN cache needs permission to update the environment.');
+    expect(posts).toBe(1);
+    expect(onWire).toEqual([]);
+  });
+
+  it('exits 2 with the not-found wording for an environment uid from another project, and sends no POST', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
+    const lookup = nock(LAUNCH_HUB_URL)
+      .get(`/manage/projects/${PROJECT_UID}/environments/${FOREIGN_ENV_UID}`)
+      .reply(404, notFoundFixture);
+    const purge = nock(LAUNCH_HUB_URL).post(`/manage/projects/${PROJECT_UID}/environments/${FOREIGN_ENV_UID}/revalidate-cdn-cache`).reply(200, INITIATED);
+
+    const { error } = await runCommand(purgeArgs('--env', FOREIGN_ENV_UID, '--path', '/blog'), config);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe(`No environment with UID "${FOREIGN_ENV_UID}" found in this project.`);
+    expect([lookup.isDone(), purge.isDone()]).toEqual([true, false]);
+    expect(onWire).toEqual([]);
+  });
+
+  it('exits 2 with the not-found wording for an environment name the project does not have, before any lookup or POST', async () => {
+    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
+    const scan = nock(LAUNCH_HUB_URL)
+      .get(`/manage/projects/${PROJECT_UID}/environments`)
+      .query({ limit: '100', skip: '0' })
+      .reply(200, SCANNED);
+    const { lookup, purge } = lookupAndPurge({});
+
+    const { error } = await runCommand(purgeArgs('--env', 'staging-eu', '--path', '/blog'), config);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe('No environment named "staging-eu" found in this project.');
+    expect(scan.isDone()).toBe(true);
+    expect([lookup.isDone(), purge.isDone()]).toEqual([false, false]);
+  });
+
+  it('exits 2 with the not-found wording when the project belongs to another organization, before any environment request', async () => {
+    const ownership = projectOwnership(LAUNCH_HUB_URL, OTHER_ORG_UID, PROJECT_UID);
+    const { lookup, purge } = lookupAndPurge({});
+
+    const { error } = await runCommand(
+      ['launch:cache:purge', '--org', OTHER_ORG_UID, '--project', PROJECT_UID, '--data-dir', DATA_DIR, '--env', ENV_UID, '--path', '/blog'],
+      config,
+    );
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe(`No project with UID "${PROJECT_UID}" found in this organization.`);
+    expect(ownership.isDone()).toBe(true);
+    expect([lookup.isDone(), purge.isDone()]).toEqual([false, false]);
   });
 });

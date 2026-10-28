@@ -1,4 +1,9 @@
+import { randomBytes } from 'node:crypto';
+
 import type { CachePath } from '../../../cache/types';
+import { EXIT_RUNTIME, EXIT_USAGE } from '../../../core/constants';
+import { UsageError } from '../../../core/errors';
+import { LaunchApiError } from '../../../transport/errors';
 import type { UxLike } from '../../../core/prompt';
 import Purge from './purge';
 
@@ -149,6 +154,32 @@ describe('launch:cache:purge', () => {
     await expect(command.run()).rejects.toBe(failure);
     expect(calls).toEqual(['get']);
     expect(lines).toEqual([]);
+  });
+
+  it('reports an environment the lookup cannot find as a usage error naming its uid, and never purges', async () => {
+    const uid = randomBytes(12).toString('hex');
+    const { command, lines, calls } = commandUnderTest({
+      resolved: { env: uid },
+      getFails: new LaunchApiError(404, [{ code: 'launch.ENVIRONMENT.NOT_FOUND', message: 'Environment not found.' }]),
+    });
+
+    const error = await command.run().catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(UsageError);
+    expect((error as UsageError).exitCode).toBe(EXIT_USAGE);
+    expect((error as UsageError).message).toBe(`No environment with UID "${uid}" found in this project.`);
+    expect(calls).toEqual(['get']);
+    expect(lines).toEqual([]);
+  });
+
+  it('rethrows any other failed environment lookup unchanged, without purging', async () => {
+    const failure = new LaunchApiError(500, [{ code: 'launch.INTERNAL', message: 'boom' }]);
+    const { command, calls } = commandUnderTest({ getFails: failure });
+
+    await expect(command.run()).rejects.toBe(failure);
+    expect(failure.exitCode).toBe(EXIT_RUNTIME);
+    expect(failure.message).toBe('boom');
+    expect(calls).toEqual(['get']);
   });
 
   it('propagates a failed purge rather than reporting a success', async () => {
