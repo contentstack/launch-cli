@@ -20,6 +20,11 @@ export interface GetDeploymentParams extends DeploymentScope {
   deployment: string;
 }
 
+export interface CreateDeploymentParams extends DeploymentScope {
+  commitHash?: string;
+  uploadUid?: string;
+}
+
 export class DeploymentsApi {
   constructor(private readonly client: RestApiClient) {}
 
@@ -58,6 +63,33 @@ export class DeploymentsApi {
     });
 
     return unwrap<Deployment>(response, 'deployment', 'deployment response');
+  }
+
+  async create(params: CreateDeploymentParams): Promise<IdentifiedDeployment> {
+    const body: { environment: string; commitHash?: string; uploadUid?: string } = { environment: params.environment };
+
+    if (params.commitHash !== undefined) {
+      body.commitHash = params.commitHash;
+    }
+
+    if (params.uploadUid !== undefined) {
+      body.uploadUid = params.uploadUid;
+    }
+
+    const response = await this.request<DeploymentResponse>({
+      method: 'POST',
+      path: DeploymentsApi.base(params),
+      orgUid: params.org,
+      projectUid: params.project,
+      body,
+    });
+    const deployment = unwrap<Deployment>(response, 'deployment', 'deployment response');
+
+    if (!hasUid(deployment)) {
+      throw malformed('The Launch API returned a deployment without a deployment uid.');
+    }
+
+    return deployment;
   }
 
   async latest(params: DeploymentScope): Promise<IdentifiedDeployment | undefined> {

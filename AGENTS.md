@@ -151,8 +151,9 @@ src/
                 each name the other in the layering allow-list
   deployments/  the deployment repository, the status classification, the
                 wait/stream loop and LogTail that projects:create, deployments:create
-                and logs:get all drive, and the DeploymentFollower that watches one
-                deployment and announces its live URL
+                and logs:get all drive, the DeploymentFollower that watches one
+                deployment and announces its live URL, and the DeploymentCreator behind
+                deployments:create. It reaches uploads, for a FileUpload create
   uploads/      zipping a folder, the signed upload URL, and the transfer behind every
                 FileUpload source (FolderUploader). The UploadScope picks the endpoint:
                 { org } for a new project, { org, project } for a new environment,

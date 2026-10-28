@@ -4,6 +4,7 @@ import { lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { UsageError } from '../core/errors';
+import { NoUploadDirectoryError } from './upload.errors';
 
 export const UPLOAD_EXCLUDED_NAMES: readonly string[] = [
   'node_modules',
@@ -96,7 +97,7 @@ export function archiveDirectory(root: string, excludedFiles: readonly string[] 
   const stats = directoryStats(root);
 
   if (stats === undefined || !stats.isDirectory()) {
-    throw new UsageError(
+    throw new NoUploadDirectoryError(
       `No local project directory at "${root}". Pass --data-dir with the folder you want to upload.`,
     );
   }
@@ -111,7 +112,7 @@ export function archiveDirectory(root: string, excludedFiles: readonly string[] 
   const entries = [...found.files.keys()].sort();
 
   if (entries.length === 0) {
-    throw new UsageError(
+    throw new NoUploadDirectoryError(
       `Nothing to upload from "${root}" once ${UPLOAD_EXCLUDED_NAMES.join(', ')} are excluded. ` +
         'Pass --data-dir with the folder you want to upload.',
     );

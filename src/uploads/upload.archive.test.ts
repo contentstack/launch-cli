@@ -5,6 +5,7 @@ import { join } from 'node:path';
 
 import { UsageError } from '../core/errors';
 import { UPLOAD_EXCLUDED_NAMES, archiveDirectory, isExcludedName } from './upload.archive';
+import { NoUploadDirectoryError } from './upload.errors';
 
 let root: string;
 
@@ -149,6 +150,15 @@ describe('project archive', () => {
     expect(() => archiveDirectory(missing)).toThrow(
       `No local project directory at "${missing}". Pass --data-dir with the folder you want to upload.`,
     );
+  });
+
+  it('marks a missing path, a file in place of a folder and an empty folder as having no uploadable directory', () => {
+    file('index.html');
+
+    expect(() => archiveDirectory(join(root, 'no-such-folder'))).toThrow(NoUploadDirectoryError);
+    expect(() => archiveDirectory(join(root, 'index.html'))).toThrow(NoUploadDirectoryError);
+    rmSync(join(root, 'index.html'));
+    expect(() => archiveDirectory(root)).toThrow(NoUploadDirectoryError);
   });
 
   it('refuses an empty directory rather than uploading an empty archive', () => {

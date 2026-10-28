@@ -2,7 +2,7 @@ fileignoreconfig:
 - filename: src/core/failure.test.ts
   checksum: 242d43885d1e3ef46edf1e347899a90549ebf95ec6827426746852f7a6dfc418
 - filename: test/integration/retired-commands.test.ts
-  checksum: 29cf490fe6d469d85371dd25f0a85908d2176c2ef0111f98e107903d024407eb
+  checksum: 45750f28fbfafeb4dc06f6f3e25371ff74e764e1c03d066a9e2a2941ccb6346c
 - filename: test/integration/manage-base-path.test.ts
   checksum: 79eb9ad420ea47d5bee8045d812c45b010bbeeafcaf5f85d11653140b0cd0db1
 - filename: src/transport/rest-client.ts
@@ -228,7 +228,7 @@ fileignoreconfig:
     - "a project name passed on argv to the project resolver"
     - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
 - filename: AGENTS.md
-  checksum: 2a47698f4c9e0f3576b0ccd5fd1852b144ee3729d4e1e38c828c0d77d042e3fd
+  checksum: 7dfeca32920074bbd374b41f014f27d4675a19781a92ca8ec630786f6a6a0d63
   allowed_patterns:
     - "Do not add an exemption to a guard to make a new file pass"
     - "passes its own error wording to `client.request\\(req, MESSAGES\\)`"
@@ -252,7 +252,7 @@ fileignoreconfig:
 - filename: src/git/local-repository.ts
   checksum: b9091ed135dfebdf590a5412bbfba2b2f96d4a177cf944a20909b93405268e9f
 - filename: test/guards/layering.test.ts
-  checksum: f8d2a8cab01feca56c55bc17fb1bced4cf76575d87b19aaee9b73bab595e52a1
+  checksum: 888178e556906ce153e2686eb82bbc2aeb624a3a1f97a62ac9051ba95e1fe4cd
 - filename: src/commands/launch/projects/create.test.ts
   checksum: 9c40b4b6ed4f7d678ecb921a71f5af7284cd685c1337f47144456ae43a38b1ad
 - filename: src/commands/launch/projects/delete.test.ts
@@ -304,7 +304,7 @@ fileignoreconfig:
 - filename: test/credential-guard.setup.ts
   checksum: 519ccbeb0552fdb1d5f27308c56477c0258ee6cc0adec8f618e8e5bc047cbf6d
 - filename: src/environments/types.ts
-  checksum: 8f57348764a69aeb7c2351faf3a5c80fda483a1a1f009e126ff71a9679d92457
+  checksum: 6c054295075e51e9ce0f4514ebdc86a48bb74db9932a2baaa9f9158e9c14c6e8
 - filename: src/commands/launch/env/get.test.ts
   checksum: 6e739ef12bc0d887e652e23ee54d9fac30dd6a3505cf464cdaefc0e696cf3e51
 - filename: test/integration/environments-delete.test.ts
@@ -324,7 +324,7 @@ fileignoreconfig:
 - filename: src/commands/launch/env/update.test.ts
   checksum: 2da219594e7bdd589adc0eff9ff035252a75aaa51dfa20514b18fd3266d7b752
 - filename: README.md
-  checksum: 07adfa52c80f1cf40fe4ba39c8332063713d8abff22d038359681ae89a0304de
+  checksum: c2f28523ed02d81f8228f7e19dd44654adaa7bc9b7120d88bd82e5d7063218cf
   allowed_patterns:
     - "password-protection"
     - "-p, --password"
@@ -418,7 +418,7 @@ fileignoreconfig:
 - filename: test/integration/deployments-list.test.ts
   checksum: c661f0bd3682ea5b0bfeed782a7c5d03ed75bd86aa1c283bb4b2bda1325bab00
 - filename: src/deployments/deployment.inputs.test.ts
-  checksum: 94044301e647755e3ec9b686ab6c2cb473bc958a80ef1723c0c2c760bccdfa5f
+  checksum: 118ad82fbd7562365b75b5bdc11c65485dde86f713b1f8f40a88dd3516a29f98
 - filename: test/fixtures/deployment-get.json
   checksum: acae8ee5ba96a2aafcf43e0b35b3bd22df78bb9ddbe3bad5e7f86c537316721a
 - filename: src/commands/launch/deployments/get.test.ts
@@ -427,4 +427,16 @@ fileignoreconfig:
   checksum: e493cd51e7c65bbf5b4f71704478b7a669bca4342efc865a1363bc508fe6f9f0
 - filename: src/deployments/deployment.presenter.test.ts
   checksum: c25521f1db09a0e4ed3cce2b7350660da17d4551a1165e0629b611a3ab8acd53
+- filename: test/integration/deployments-create.test.ts
+  checksum: 43bfebbfbc892f0fed6de4b1539c902e1f8c1a3d4878dbd884469455090dfdcd
+- filename: src/deployments/deployment.watcher.test.ts
+  checksum: 8143bd6ac5b3d69ec2517718a80f6ec044e3ca8ea6a7b4a02554eb848ffe1064
+- filename: src/deployments/deployment.create.ts
+  checksum: ca64f3b29a68c4a2755a88a141e2cd9dbd6fa851a2776876d78c40f3168492e3
+- filename: src/commands/launch/deployments/create.test.ts
+  checksum: 50c3f35c7246b49f6ebf5e48a9a9646ccbcb563c0c0e042fd38917e2f98cbba3
+- filename: src/deployments/deployment.create.test.ts
+  checksum: 2b0e481b6fb349bca249daee5ac1450a2942e55a4e0b0eed3c11a9b0a44bc39c
+- filename: src/deployments/deployments.api.test.ts
+  checksum: fcdd4f9604e12d49b1e0f8d205c3d8b48f3022037cb172daeeb913f0bb826e15
 version: "1.0"

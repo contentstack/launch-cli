@@ -1,5 +1,5 @@
 import { EXIT_RUNTIME } from '../core/constants';
-import { LaunchError } from '../core/errors';
+import { LaunchError, UsageError } from '../core/errors';
 import type { ErrorMessages } from '../transport/errors';
 
 export class UploadFailedError extends LaunchError {
@@ -8,6 +8,13 @@ export class UploadFailedError extends LaunchError {
   constructor(message: string) {
     super(message);
     this.name = 'UploadFailedError';
+  }
+}
+
+export class NoUploadDirectoryError extends UsageError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NoUploadDirectoryError';
   }
 }
 

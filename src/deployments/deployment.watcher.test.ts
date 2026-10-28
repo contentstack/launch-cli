@@ -627,3 +627,96 @@ describe('deployment log streaming', () => {
   );
 });
 
+describe('deployment wait loop stopped from outside', () => {
+  function stoppable(statuses: string[]) {
+    const events: string[] = [];
+    const controller = new AbortController();
+    let polls = 0;
+    let release: () => void = () => undefined;
+
+    const deps = {
+      poll: async (): Promise<Deployment> => {
+        const status = statuses[Math.min(polls, statuses.length - 1)];
+        polls += 1;
+        events.push(`poll ${status}`);
+        return { uid: UID, status };
+      },
+      logs: async (): Promise<DeploymentLog[]> => [],
+      loader: {
+        start: (message: string) => events.push(`start ${message}`),
+        stop: () => events.push('stop'),
+      },
+      ux: { print: (message: string) => events.push(`print ${message}`), inquire: async () => undefined as never },
+      outputIsTTY: false,
+      sleep: (ms: number) =>
+        new Promise<void>((resolve) => {
+          events.push(`sleep ${ms}`);
+          release = resolve;
+        }),
+      now: () => 0,
+      pollDelayMs: 1000,
+      maxBackoffSteps: 3,
+      timeoutMs: 60_000,
+      stop: controller.signal,
+    };
+
+    return { deps, events, controller, polls: () => polls, release: () => release() };
+  }
+
+  it('abandons the sleep, stops the loader and rejects with the stop reason when stopped between polls', async () => {
+    const { deps, events, controller, polls } = stoppable(['DEPLOYING']);
+    const reason = new Error('interrupted');
+
+    const waiting = watchDeployment(deps).catch((error: Error) => error);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    controller.abort(reason);
+
+    expect(await waiting).toBe(reason);
+    expect(polls()).toBe(1);
+    expect(events).toEqual(['poll DEPLOYING', `start ${DEPLOYMENT_LOADER_MESSAGE}`, 'sleep 1000', 'stop']);
+  });
+
+  it('does not poll at all when it is already stopped', async () => {
+    const { deps, events, controller, polls } = stoppable(['LIVE']);
+    const reason = new Error('already interrupted');
+    controller.abort(reason);
+
+    await expect(watchDeployment(deps)).rejects.toBe(reason);
+    expect(polls()).toBe(0);
+    expect(events).toEqual(['stop']);
+  });
+
+  it('stops waiting between failing polls too, rather than retrying once it was told to stop', async () => {
+    const { deps, events, controller } = stoppable(['DEPLOYING']);
+    const reason = new Error('interrupted during retry');
+    const blip = new Error('502 Bad Gateway');
+    const failing = { ...deps, poll: async (): Promise<Deployment> => Promise.reject(blip) };
+
+    const waiting = watchDeployment(failing).catch((error: Error) => error);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    controller.abort(reason);
+
+    expect(await waiting).toBe(reason);
+    expect(events).toEqual(['sleep 1000', 'stop']);
+  });
+
+  it('carries on normally when the sleep ends before any stop and ignores a stop that arrives after the end', async () => {
+    const { deps, controller, polls, release } = stoppable(['DEPLOYING', 'LIVE']);
+
+    const waiting = watchDeployment(deps);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    release();
+    const outcome = await waiting;
+    controller.abort(new Error('too late'));
+
+    expect(outcome.kind).toBe('success');
+    expect(polls()).toBe(2);
+  });
+
+  it('passes a failing sleep through unchanged', async () => {
+    const { deps } = stoppable(['DEPLOYING']);
+    const broken = new Error('clock failed');
+
+    await expect(watchDeployment({ ...deps, sleep: () => Promise.reject(broken) })).rejects.toBe(broken);
+  });
+});

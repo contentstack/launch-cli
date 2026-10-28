@@ -1,4 +1,4 @@
-import { EXIT_RUNTIME } from '../core/constants';
+import { EXIT_CANCELLED, EXIT_RUNTIME } from '../core/constants';
 import { LaunchError } from '../core/errors';
 import type { ErrorMessages } from '../transport/errors';
 
@@ -14,5 +14,14 @@ export class DeploymentUnsuccessfulError extends LaunchError {
   constructor(message: string) {
     super(message);
     this.name = 'DeploymentUnsuccessfulError';
+  }
+}
+
+export class DeploymentWaitInterruptedError extends LaunchError {
+  readonly exitCode = EXIT_CANCELLED;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'DeploymentWaitInterruptedError';
   }
 }

@@ -46,6 +46,7 @@ with exit code 2 and name their V2 replacements. `launch:functions:serve` is liv
 * [`csdx launch`](#csdx-launch)
 * [`csdx launch:cache:purge`](#csdx-launchcachepurge)
 * [`csdx launch:deployments`](#csdx-launchdeployments)
+* [`csdx launch:deployments:create`](#csdx-launchdeploymentscreate)
 * [`csdx launch:deployments:get`](#csdx-launchdeploymentsget)
 * [`csdx launch:deployments:list`](#csdx-launchdeploymentslist)
 * [`csdx launch:env:create`](#csdx-launchenvcreate)
@@ -150,6 +151,39 @@ DESCRIPTION
 ```
 
 _See code: [src/commands/launch/deployments/index.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/deployments/index.ts)_
+
+## `csdx launch:deployments:create`
+
+Deploy a Launch environment: the branch tip or a chosen commit on a GitHub project, the project directory or the last uploaded bundle on a FileUpload project
+
+```
+USAGE
+  $ csdx launch:deployments:create [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--commit
+    <value> | --last-upload]
+
+FLAGS
+  -c, --config=<value>    Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>  Current working directory
+      --commit=<value>    GitHub projects: deploy this commit. Pass --commit with no value to pick one from the recent
+                          commits
+      --env=<value>       Environment name or UID
+      --last-upload       FileUpload projects: redeploy the last uploaded bundle without uploading a new one
+      --org=<value>       Organization UID
+      --project=<value>   Project name or UID
+
+DESCRIPTION
+  Deploy a Launch environment: the branch tip or a chosen commit on a GitHub project, the project directory or the last
+  uploaded bundle on a FileUpload project
+
+EXAMPLES
+  $ csdx launch:deployments:create --org <org-uid> --project <name-or-uid> --env <name-or-uid>
+
+  $ csdx launch:deployments:create --org <org-uid> --project <name-or-uid> --env <name-or-uid> --commit <sha>
+
+  $ csdx launch:deployments:create --org <org-uid> --project <name-or-uid> --env <name-or-uid> --last-upload
+```
+
+_See code: [src/commands/launch/deployments/create.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/deployments/create.ts)_
 
 ## `csdx launch:deployments:get`
 

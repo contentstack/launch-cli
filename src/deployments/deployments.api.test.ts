@@ -129,6 +129,57 @@ describe('DeploymentsApi', () => {
     await expect(new DeploymentsApi(client).latest(SCOPE)).resolves.toBeUndefined();
   });
 
+  it.each([
+    ['the branch tip', {}, { environment: ENVIRONMENT }],
+    ['a commit', { commitHash: 'abc123' }, { environment: ENVIRONMENT, commitHash: 'abc123' }],
+    ['an upload', { uploadUid: 'up-1' }, { environment: ENVIRONMENT, uploadUid: 'up-1' }],
+  ])('creates %s with a POST of exactly the given body, scoped to the org and project, and returns the new uid', async (_label, extra, body) => {
+    const created = { uid: DEPLOYMENT, status: 'QUEUED' };
+    const { client, requests, messages } = fakeRestClient({ deployment: created });
+
+    const result = await new DeploymentsApi(client).create({ ...SCOPE, ...extra });
+
+    expect(result).toBe(created);
+    expect(requests).toEqual([{ method: 'POST', path: BASE, orgUid: ORG, projectUid: PROJECT, body }]);
+    expect(messages[0]).toBe(DEPLOYMENT_ERROR_MESSAGES);
+  });
+
+  it('leaves commitHash and uploadUid out of the body when they are undefined', async () => {
+    const { client, requests } = fakeRestClient({ deployment: { uid: DEPLOYMENT } });
+
+    await new DeploymentsApi(client).create({ ...SCOPE, commitHash: undefined, uploadUid: undefined });
+
+    expect(Object.keys(requests[0].body as object)).toEqual(['environment']);
+  });
+
+  it.each([[undefined], [null], [''], ['  ']])(
+    'raises a malformed-response error when the created deployment has uid %p',
+    async (uid) => {
+      const { client } = fakeRestClient({ deployment: { uid, status: 'QUEUED' } });
+
+      const failure = await new DeploymentsApi(client).create(SCOPE).catch((error: Error) => error);
+
+      expect(failure).toBeInstanceOf(LaunchApiError);
+      expect((failure as Error).message).toBe('The Launch API returned a deployment without a deployment uid.');
+    },
+  );
+
+  it('raises a malformed-response error when the create response has no deployment', async () => {
+    const { client } = fakeRestClient({ uid: DEPLOYMENT });
+
+    const failure = await new DeploymentsApi(client).create(SCOPE).catch((error: Error) => error);
+
+    expect(failure).toBeInstanceOf(LaunchApiError);
+    expect((failure as Error).message).toBe('The Launch API returned a deployment response without a deployment.');
+  });
+
+  it('propagates a rejected create unchanged', async () => {
+    const rejection = new LaunchApiError(500, [{ code: 'launch.DEPLOYMENT.CREATE_FAILED', message: 'x' }]);
+    const client = { request: async () => Promise.reject(rejection) } as unknown as RestApiClient;
+
+    await expect(new DeploymentsApi(client).create(SCOPE)).rejects.toBe(rejection);
+  });
+
   it('carries exit code 1 on an unsuccessful deployment', () => {
     const error = new DeploymentUnsuccessfulError('Deployment FAILED.');
 

@@ -25,12 +25,13 @@ export class DeploymentFollower {
     private readonly timing: WatchTiming,
   ) {}
 
-  watch(scope: DeploymentScope): Promise<DeploymentOutcome> {
+  watch(scope: DeploymentScope, stop?: AbortSignal): Promise<DeploymentOutcome> {
     return watchDeployment({
       ...this.timing,
       ux: this.services.ux,
       outputIsTTY: this.services.outputIsTTY === true,
       loader: this.loader(),
+      stop,
       logs: (after) => this.services.api.deploymentLogs.after({ ...scope, timestamp: after }),
       poll: () => this.services.api.deployments.get(scope),
     });

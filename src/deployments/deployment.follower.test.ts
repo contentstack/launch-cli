@@ -58,6 +58,19 @@ describe('DeploymentFollower.watch', () => {
   });
 });
 
+describe('DeploymentFollower.watch stopped from outside', () => {
+  it('hands the stop signal to the wait loop so an already stopped wait never polls', async () => {
+    const { follower, polled, logged } = harness();
+    const reason = new Error('interrupted');
+    const controller = new AbortController();
+    controller.abort(reason);
+
+    await expect(follower.watch(SCOPE, controller.signal)).rejects.toBe(reason);
+    expect(polled).toEqual([]);
+    expect(logged).toEqual([]);
+  });
+});
+
 describe('DeploymentFollower.announceLive', () => {
   it('prints the deployment url, then opens it once the site has had time to come up', async () => {
     const { follower, timeline } = harness();

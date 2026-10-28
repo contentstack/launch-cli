@@ -1,11 +1,12 @@
 import { MAX_PAGES } from '../core/constants';
 import { scanPages } from '../core/paging';
 import { UsageError } from '../core/errors';
-import { assertPage, hasUid, malformed, unwrap } from '../transport/envelope';
+import { assertArray, assertPage, hasUid, malformed, unwrap } from '../transport/envelope';
 import { LaunchApiError } from '../transport/errors';
 import type { RestApiClient, RestRequest } from '../transport/rest-client';
 import { DUPLICATE_NAME_CODE, ENVIRONMENT_ERROR_MESSAGES } from './environment.errors';
 import type {
+  Commit,
   CreateEnvironmentInput,
   Environment,
   EnvironmentUpdate,
@@ -23,6 +24,7 @@ export interface ListEnvironmentsParams {
 }
 
 export const ENVIRONMENT_SCAN_PAGE_SIZE = 100;
+export const COMMIT_PICKER_LIMIT = 15;
 
 export interface PageEnvironmentsParams {
   org: string;
@@ -153,6 +155,20 @@ export class EnvironmentsApi {
       orgUid: params.org,
       projectUid: params.project,
     });
+  }
+
+  async commits(params: EnvironmentParams): Promise<Commit[]> {
+    const response = await this.request<{ commits: Commit[] }>({
+      method: 'GET',
+      path: `/projects/${params.project}/environments/${params.environment}/commits`,
+      orgUid: params.org,
+      projectUid: params.project,
+      query: { limit: COMMIT_PICKER_LIMIT },
+    });
+
+    assertArray(response, 'commits', 'commit list');
+
+    return response.commits;
   }
 
   async first(params: { org: string; project: string }): Promise<IdentifiedEnvironment | undefined> {

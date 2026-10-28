@@ -155,6 +155,7 @@
       "launch": "LNCH",
       "launch:cache:purge": "LNCH-CCH-PRG",
       "launch:deployments": "LNCH-DPLMNT",
+      "launch:deployments:create": "LNCH-DPLMNT-CRT",
       "launch:deployments:get": "LNCH-DPLMNT-GET",
       "launch:deployments:list": "LNCH-DPLMNT-LS",
       "launch:environments": "LNCH-ENV",

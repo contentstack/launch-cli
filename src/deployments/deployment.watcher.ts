@@ -29,6 +29,7 @@ export interface DeploymentWatchDeps extends WatchTiming {
   ux: UxLike;
   loader: Loader;
   outputIsTTY: boolean;
+  stop?: AbortSignal;
 }
 
 export type DeploymentOutcomeKind = 'success' | 'failure' | 'timed-out';
@@ -66,6 +67,30 @@ export async function watchDeployment(deps: DeploymentWatchDeps): Promise<Deploy
   }
 }
 
+function sleepUnlessStopped(deps: DeploymentWatchDeps, ms: number): Promise<void> {
+  const { stop } = deps;
+
+  if (stop === undefined) {
+    return deps.sleep(ms);
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    const abandon = (): void => reject(stop.reason);
+
+    stop.addEventListener('abort', abandon, { once: true });
+    deps.sleep(ms).then(
+      () => {
+        stop.removeEventListener('abort', abandon);
+        resolve();
+      },
+      (error: unknown) => {
+        stop.removeEventListener('abort', abandon);
+        reject(error);
+      },
+    );
+  });
+}
+
 async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
   const backoff = new RetryPolicy({ retryDelayMs: deps.pollDelayMs });
   const deadline = deps.now() + deps.timeoutMs;
@@ -75,6 +100,8 @@ async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
   let logsFailureReported = false;
 
   for (;;) {
+    deps.stop?.throwIfAborted();
+
     let deployment: Deployment;
 
     try {
@@ -89,7 +116,7 @@ async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
         throw error;
       }
 
-      await deps.sleep(retryIn);
+      await sleepUnlessStopped(deps, retryIn);
       continue;
     }
 
@@ -124,6 +151,6 @@ async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
     }
 
     deps.loader.start(DEPLOYMENT_LOADER_MESSAGE);
-    await deps.sleep(delay);
+    await sleepUnlessStopped(deps, delay);
   }
 }
