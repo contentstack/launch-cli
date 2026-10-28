@@ -778,6 +778,40 @@ describe('integration: launch:logs:get on the wire', () => {
     expect(onWire).toEqual([]);
   });
 
+  it('T88: ends the command at the server-limit frame although the stream stays open with heartbeats and more frames', async () => {
+    jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => realWatchTiming());
+    const listenersBefore = process.listenerCount('SIGINT');
+    const timers = trackTimers(EVENT_STREAM_IDLE_TIMEOUT_MS);
+    const events: string[] = [];
+    let beats: NodeJS.Timeout | undefined;
+
+    try {
+      ownedProject();
+      deploymentGet('LIVE');
+      const live = liveRoute().reply(200, function () {
+        (this as unknown as { req: NodeJS.EventEmitter }).req.once('close', () => events.push('request destroyed'));
+        const source = new Readable({ read: () => undefined });
+        source.push(`${logFrame('before the end')}${SESSION_ENDED_FRAME}${logFrame('after the end')}`);
+        beats = setInterval(() => source.push(`: beat\n\n${logFrame('late line')}`), 10);
+        return source;
+      }, { 'content-type': 'text/event-stream' });
+      const second = liveStream(SESSION_ENDED_FRAME);
+
+      const { error, stdout } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID, '--type', 'live'), config);
+
+      expect(error).toBeUndefined();
+      expect(live.isDone()).toBe(true);
+      expect(second.isDone()).toBe(false);
+      expect(outputLines(stdout)).toEqual(['2026-10-28 12:00:01.000:  before the end', SESSION_ENDED_LINE]);
+      expect(events).toEqual(['request destroyed']);
+      expect(process.listenerCount('SIGINT')).toBe(listenersBefore);
+      expect(timers.pending()).toBe(0);
+      expect(onWire).toEqual([]);
+    } finally {
+      clearInterval(beats);
+    }
+  });
+
   it('T86: prints the dimmed session line once on a terminal, with the time of the session end', async () => {
     const restoreStdout = stdoutReportingTTY(true);
     jest.spyOn(cliux, 'loaderV2').mockReturnValue(undefined as never);

@@ -43,6 +43,7 @@ export class LiveLogFollower {
   private printed = 0;
   private sessionShown = false;
   private ended = false;
+  private connection = new AbortController();
 
   constructor(
     private readonly services: ServiceContext,
@@ -71,6 +72,16 @@ export class LiveLogFollower {
 
       this.loader.start(LIVE_LOADER_MESSAGE);
 
+      const connection = new AbortController();
+      const relay = (): void => connection.abort(stop.reason);
+
+      this.connection = connection;
+      stop.addEventListener('abort', relay, { once: true });
+
+      if (stop.aborted) {
+        relay();
+      }
+
       try {
         await this.services.api.liveLogs.open(
           scope,
@@ -80,14 +91,16 @@ export class LiveLogFollower {
               this.onFrame(frame);
             },
           },
-          stop,
+          connection.signal,
         );
       } catch (error) {
-        if (!isTransient(error)) {
+        if (!this.ended && !isTransient(error)) {
           throw error;
         }
 
         lastFailure = error;
+      } finally {
+        stop.removeEventListener('abort', relay);
       }
 
       if (this.ended) {
@@ -105,6 +118,10 @@ export class LiveLogFollower {
   }
 
   private onFrame(frame: StreamFrame): void {
+    if (this.ended) {
+      return;
+    }
+
     if (frame.event === 'session') {
       this.announceSession(frame.data);
       return;
@@ -142,6 +159,7 @@ export class LiveLogFollower {
 
   private finish(): void {
     this.ended = true;
+    this.connection.abort();
     this.loader.stop();
     this.services.ux.print(liveSessionEndedLine());
 

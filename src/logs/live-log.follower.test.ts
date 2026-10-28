@@ -47,6 +47,11 @@ const dropped = (): LaunchNetworkError => new LaunchNetworkError('socket closed'
 function untilAborted(): Attempt {
   return (_handlers, signal) =>
     new Promise<void>((_resolve, reject) => {
+      if (signal.aborted) {
+        reject(signal.reason);
+        return;
+      }
+
       signal.addEventListener('abort', () => reject(signal.reason), { once: true });
     });
 }
@@ -383,7 +388,10 @@ describe('LiveLogFollower', () => {
     run.stop.abort(reason);
 
     expect(await outcome).toBe(reason);
-    expect(run.signals).toEqual([run.stop.signal]);
+    expect(run.signals).toHaveLength(1);
+    expect(run.signals[0]).not.toBe(run.stop.signal);
+    expect(run.signals[0].aborted).toBe(true);
+    expect(run.signals[0].reason).toBe(reason);
     expect(run.events[run.events.length - 1]).toBe('stop');
   });
 
@@ -405,5 +413,66 @@ describe('LiveLogFollower', () => {
     expect(run.opens()).toBe(1);
     expect(run.delays).toEqual([700]);
     expect(run.events[run.events.length - 1]).toBe('stop');
+  });
+
+  it('T88: aborts the connection at the end line and ignores every frame after it', async () => {
+    const attempt: Attempt = async (handlers, signal) => {
+      handlers.onFrame(log('before'));
+      handlers.onFrame(ENDED);
+      handlers.onFrame(log('after'));
+      handlers.onFrame(HEARTBEAT);
+      handlers.onFrame(ENDED);
+      handlers.onFrame(SESSION);
+      await untilAborted()(handlers, signal);
+    };
+    const run = harness([attempt, delivering([log('reconnected')])], { outputIsTTY: true });
+
+    await run.follow();
+
+    expect(run.opens()).toBe(1);
+    expect(run.signals[0].aborted).toBe(true);
+    expect(run.stop.signal.aborted).toBe(false);
+    expect(run.lines).toHaveLength(2);
+    expect(run.lines[1]).toContain('The live session ended (server limit).');
+    expect(run.delays).toEqual([]);
+    expect(run.events[run.events.length - 1]).toBe('stop');
+  });
+
+  it('T88: prints the end line once when the connection ends in a failure after the end frame', async () => {
+    const attempt: Attempt = async (handlers) => {
+      handlers.onFrame(ENDED);
+      throw dropped();
+    };
+    const run = harness([attempt]);
+
+    await run.follow();
+
+    expect(run.opens()).toBe(1);
+    expect(run.lines.filter((line) => line.startsWith('The live session ended'))).toHaveLength(1);
+    expect(run.delays).toEqual([]);
+  });
+
+  it('T88: removes its listener from the stop signal after every connection', async () => {
+    const run = harness([failing(dropped()), delivering([ENDED])]);
+    const added = jest.spyOn(run.stop.signal, 'addEventListener');
+    const removed = jest.spyOn(run.stop.signal, 'removeEventListener');
+
+    await run.follow().catch(() => undefined);
+
+    const listeners = added.mock.calls.filter(([type]) => type === 'abort').map(([, listener]) => listener);
+    expect(listeners.length).toBeGreaterThanOrEqual(2);
+    listeners.forEach((listener) => expect(removed).toHaveBeenCalledWith('abort', listener));
+  });
+
+  it('T92: a stop that was already aborted reaches the connection signal at once', async () => {
+    const reason = new Error('Stopped following the logs.');
+    const run = harness([untilAborted()]);
+    run.stop.abort(reason);
+
+    const error = await run.follow().catch((caught: unknown) => caught);
+
+    expect(error).toBe(reason);
+    expect(run.signals[0].aborted).toBe(true);
+    expect(run.signals[0].reason).toBe(reason);
   });
 });
