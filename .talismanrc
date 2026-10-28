@@ -1,8 +1,8 @@
 fileignoreconfig:
 - filename: test/integration/logs-get.test.ts
-  checksum: e9970c9c7e3adcb0521e28faae852dc9baa7bf455bff87a635f35e1375f923c3
+  checksum: 64ab2aa1650e0a16d51f933b3f6c0662d6c4215d6597a73aa017e4bb816e8835
 - filename: src/commands/launch/logs/get.test.ts
-  checksum: 725a9e30b0782f63a14b7b12125dbdfb3bc3220f4124b9b4fab9d1123040100d
+  checksum: 5ee3d8ba6b014b3a9ac558a750a9a58782bb679d32d30b621e41f977dcc98a0a
 - filename: src/core/failure.test.ts
   checksum: 242d43885d1e3ef46edf1e347899a90549ebf95ec6827426746852f7a6dfc418
 - filename: test/integration/retired-commands.test.ts
@@ -10,9 +10,9 @@ fileignoreconfig:
 - filename: test/integration/manage-base-path.test.ts
   checksum: 79eb9ad420ea47d5bee8045d812c45b010bbeeafcaf5f85d11653140b0cd0db1
 - filename: src/transport/rest-client.ts
-  checksum: 755aabbc8ee7a2440d4b696e0c502b612c6a60c50fea38db6537d46849521b41
+  checksum: 3e44b756be0647422309cb14137bc18f5707cd42de6dd638abd2e0b625fda894
 - filename: src/transport/rest-client.test.ts
-  checksum: 02981226eef6131634d0903fc04fa73a5fb8cac82213f00f49d5f66950d75f8e
+  checksum: 8f08eb868bb8d608a0d31800c103f7b257f8f414d0fdc6b06ef4ab62acfffd85
 - filename: src/transport/cma-client.ts
   checksum: 87b8399a9b84ea60fe322802c2e5270772858ba85ac33c436941fe7cf40afc38
 - filename: src/transport/auth-strategy.test.ts
@@ -22,7 +22,7 @@ fileignoreconfig:
 - filename: src/projects/projects.api.ts
   checksum: 59818dd541577d99c12c50c0c6ef4846ef2db614ab6183cb6dd7b71710931eb1
 - filename: src/core/service-context.test.ts
-  checksum: 7bc4f6ca3ec8a960f84fb4c07453a287bb2bb0ccc7e06c5805a7f56df160024a
+  checksum: 495972ae75e7ef1b62632c8d099fc589b023976a17d77caaebb049d974edd1bc
 - filename: src/core/rules.test.ts
   checksum: 2dbc873f3e635a72b1b566311c04252d2a2c25142570006523415c81a91c7a6a
 - filename: src/core/inputs.test.ts
@@ -232,7 +232,7 @@ fileignoreconfig:
     - "a project name passed on argv to the project resolver"
     - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
 - filename: AGENTS.md
-  checksum: d6b5a1836dd0b46e819d787597ed14d16d6d6b0ab43641a333733e86078ac16e
+  checksum: 43c2a8c17f250dddaf387d7601719f57adce6f818e8cdcb9e8a00b1da598a598
   allowed_patterns:
     - "Do not add an exemption to a guard to make a new file pass"
     - "passes its own error wording to `client.request\\(req, MESSAGES\\)`"
