@@ -16,6 +16,24 @@ export function holdEventLoop(): Release {
   return () => clearInterval(timer);
 }
 
+export function onInterrupt(listener: () => void, signals: InterruptSource = process): Release {
+  let attached = true;
+  const release = (): void => {
+    if (attached) {
+      attached = false;
+      signals.removeListener('SIGINT', handle);
+    }
+  };
+  const handle = (): void => {
+    queueMicrotask(release);
+    listener();
+  };
+
+  signals.on('SIGINT', handle);
+
+  return release;
+}
+
 export interface InterruptOptions {
   signals?: InterruptSource;
   hold?: () => Release;

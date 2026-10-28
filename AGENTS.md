@@ -488,7 +488,7 @@ promoting these to `src/core/catalog.ts` now.
 | 0 | none - oclif exits 0 implicitly | the command did what it was asked to do |
 | 1 | `EXIT_RUNTIME` | a runtime failure - `LaunchApiError`, `LaunchNetworkError`, `UnauthenticatedError`, anything oclif handles |
 | 2 | `EXIT_USAGE` | a usage error - `UsageError`, `MissingInputError`, a failing cross-flag rule |
-| 3 | `EXIT_CANCELLED` | the user declined a confirmation or chose nothing at a picker (`CancelledError`) |
+| 3 | `EXIT_CANCELLED` | the user declined a confirmation, chose nothing at a picker (`CancelledError`) or pressed Ctrl-C while the CLI was following a deployment's logs (`logs:get`) |
 
 `launch:functions:serve` is deliberately a plain oclif `Command` rather than a
 `LaunchCommand`, because it talks to no API and needs no auth gate, and it is **outside**
@@ -687,6 +687,17 @@ returning, so the last lines of a build are never lost. The logs are auxiliary: 
 failed read prints one `  ! Could not read the deployment logs (...)` notice for the whole wait, is
 retried from the same cursor on the next poll, and never changes the outcome - the status poll alone
 decides that.
+
+**The terminal poll drains the logs.** A poll that sees a terminal status does not read the logs once: it keeps
+reading from the advancing `tail.since()` until `tail.fresh` returns nothing new, at most `MAX_PAGES` reads, so a
+build that wrote more than one page after the last in-flight poll is never cut short. An in-flight poll still makes
+exactly one read. A read that fails mid-drain prints the one unavailable notice, ends the drain and never changes the
+outcome. `stop` (an `AbortSignal` on `DeploymentWatchDeps`, `DeploymentFollower.watch(scope, stop)`) ends the wait
+with `stop.reason` wherever it is noticed: before a poll, after one, during the drain, and at the sleep - a signal
+already aborted when the loop would sleep ends it at once rather than sleeping the full delay, and the default
+`sleep` takes the signal as its second argument and clears its timer on abort, so no timer outlives an interrupt.
+`onInterrupt(listener)` in `src/core/interruptible-ux.ts` is the one way to hear Ctrl-C around such a wait; like
+`cancelOnInterrupt` it detaches in a microtask after the signal, so it is still attached while `signal-exit` looks.
 
 **Writing a test for it: the fake clock must advance.** `now()` and `sleep()` are injected and both
 are required, not optional with defaults. A fake `now: () => 0` with a `sleep` that does nothing

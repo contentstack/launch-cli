@@ -197,11 +197,24 @@ function stubFollowUp(status: string, deploymentLogs: unknown[] = []): nock.Scop
       deployment: { uid: DEPLOYMENT_UID, deploymentNumber: 1, status, deploymentUrl: 'my-site.example.test' },
     });
 
-  return hub()
-    .get(`/logs/projects/${PROJECT_UID}/environments/${ENVIRONMENT_UID}/deployments/${DEPLOYMENT_UID}/logs/deployment-logs`)
+  const logsPath = `/logs/projects/${PROJECT_UID}/environments/${ENVIRONMENT_UID}/deployments/${DEPLOYMENT_UID}/logs/deployment-logs`;
+  const first = hub()
+    .get(logsPath)
     .matchHeader('x-project-uid', PROJECT_UID)
     .query({ timestamp: '1970-01-01T00:00:00.000Z' })
     .reply(200, { deploymentLogs });
+
+  const last = (deploymentLogs.at(-1) as { timestamp?: string } | undefined)?.timestamp;
+
+  if (last !== undefined) {
+    hub()
+      .get(logsPath)
+      .matchHeader('x-project-uid', PROJECT_UID)
+      .query({ timestamp: new Date(Date.parse(last) - 1).toISOString() })
+      .reply(200, { deploymentLogs: [] });
+  }
+
+  return first;
 }
 
 function withoutFlags(args: string[], ...names: string[]): string[] {
