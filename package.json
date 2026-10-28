@@ -73,6 +73,9 @@
       "launch:env": {
         "description": "Manage the environments of a Launch project"
       },
+      "launch:cache": {
+        "description": "Purge the CDN cache of a Launch environment"
+      },
       "launch:variables": {
         "description": "List, set and remove the environment variables of a Launch environment"
       },
@@ -145,6 +148,7 @@
   "csdxConfig": {
     "shortCommandName": {
       "launch": "LNCH",
+      "launch:cache:purge": "LNCH-CCH-PRG",
       "launch:deployments": "LNCH-DPLMNT",
       "launch:environments": "LNCH-ENV",
       "launch:env:create": "LNCH-ENV-CRT",

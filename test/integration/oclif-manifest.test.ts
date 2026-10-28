@@ -44,6 +44,14 @@ describe('integration: the oclif manifest in package.json', () => {
     expect(manifest.oclif.topics?.['launch:env']?.description).toBe('Manage the environments of a Launch project');
   });
 
+  it('describes the launch:cache subtopic apart from the purge command it holds', async () => {
+    const description = manifest.oclif.topics?.['launch:cache']?.description;
+    const { default: Purge } = await import('../../src/commands/launch/cache/purge');
+
+    expect(description).toBeTruthy();
+    expect(description).not.toBe(Purge.description);
+  });
+
   it('declares a description for every topic it declares', () => {
     const topics = manifest.oclif.topics ?? {};
 

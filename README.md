@@ -44,6 +44,7 @@ with exit code 2 and name their V2 replacements. `launch:functions:serve` is liv
 <!-- commands -->
 * [`csdx help [COMMAND]`](#csdx-help-command)
 * [`csdx launch`](#csdx-launch)
+* [`csdx launch:cache:purge`](#csdx-launchcachepurge)
 * [`csdx launch:deployments`](#csdx-launchdeployments)
 * [`csdx launch:env:create`](#csdx-launchenvcreate)
 * [`csdx launch:env:delete`](#csdx-launchenvdelete)
@@ -98,6 +99,41 @@ DESCRIPTION
 ```
 
 _See code: [src/commands/launch/index.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/index.ts)_
+
+## `csdx launch:cache:purge`
+
+Purge an environment's CDN cache by path, cache tags or hostnames
+
+```
+USAGE
+  $ csdx launch:cache:purge [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--path
+    <value>] [--tags <value>] [--hosts <value>]
+
+FLAGS
+  -c, --config=<value>    Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>  Current working directory
+      --env=<value>       Environment name or UID
+      --hosts=<value>     Comma-separated hostnames to purge
+      --org=<value>       Organization UID
+      --path=<value>      Path to purge, for example /blog. End it with /* to purge everything beneath it, or pass /*
+                          for the whole site
+      --project=<value>   Project name or UID
+      --tags=<value>      Comma-separated cache tags to purge
+
+DESCRIPTION
+  Purge an environment's CDN cache by path, cache tags or hostnames
+
+EXAMPLES
+  $ csdx launch:cache:purge --org <org-uid> --project <name-or-uid> --env <name-or-uid> --path /blog
+
+  $ csdx launch:cache:purge --org <org-uid> --project <name-or-uid> --env <name-or-uid> --path "/blog/*"
+
+  $ csdx launch:cache:purge --org <org-uid> --project <name-or-uid> --env <name-or-uid> --tags header,footer
+
+  $ csdx launch:cache:purge --org <org-uid> --project <name-or-uid> --env <name-or-uid> --hosts www.example.com
+```
+
+_See code: [src/commands/launch/cache/purge.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/cache/purge.ts)_
 
 ## `csdx launch:deployments`
 

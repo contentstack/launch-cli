@@ -4,6 +4,7 @@ import { DeploymentsApi } from './deployments/deployments.api';
 import { DeploymentLogsApi } from './deployments/deployment-logs.api';
 import { EnvironmentsApi } from './environments/environments.api';
 import { UploadsApi } from './uploads/uploads.api';
+import { CacheApi } from './cache/cache.api';
 import { GitApi } from './git/git.api';
 import { ProjectsApi } from './projects/projects.api';
 import type { UxLike } from './core/prompt';
@@ -185,6 +186,7 @@ describe('the api surface', () => {
     const api = buildApi(client, UNUSED_CMA, {} as never);
 
     expect(Object.keys(api).sort()).toEqual([
+      'cache',
       'deploymentLogs',
       'deployments',
       'environments',
@@ -202,6 +204,7 @@ describe('the api surface', () => {
     expect(api.deployments).toBeInstanceOf(DeploymentsApi);
     expect(api.git).toBeInstanceOf(GitApi);
     expect(api.uploads).toBeInstanceOf(UploadsApi);
+    expect(api.cache).toBeInstanceOf(CacheApi);
   });
 
   it('sends deployment log reads through the logs client and nothing else through it', async () => {
