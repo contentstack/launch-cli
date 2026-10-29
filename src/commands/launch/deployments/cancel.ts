@@ -6,7 +6,8 @@ import {
   deploymentCancelledLine,
   deploymentNotCancelledLine,
 } from '../../../deployments/deployment.presenter';
-import { IN_FLIGHT_DEPLOYMENTS } from '../../../deployments/deployment.prompt';
+import { IN_FLIGHT_DEPLOYMENTS, isCancellable } from '../../../deployments/deployment.prompt';
+import { cancelNotAllowedError } from '../../../deployments/deployment.errors';
 import { fetchDeployment } from '../../../deployments/deployment.resolver';
 
 const cancelInputs = inputs({
@@ -36,7 +37,11 @@ export default class DeploymentsCancel extends LaunchCommand<typeof cancelInputs
     const scope = { org, project, environment, deployment };
     const outputIsTTY = this.services.outputIsTTY === true;
 
-    await fetchDeployment(this.services.api.deployments, scope);
+    const found = await fetchDeployment(this.services.api.deployments, scope);
+
+    if (!isCancellable(found)) {
+      throw cancelNotAllowedError(deployment);
+    }
 
     if (!(await this.confirm(deploymentCancelQuestion(deployment)))) {
       this.ux.print(deploymentNotCancelledLine(outputIsTTY));

@@ -71,6 +71,10 @@ function sleepUnlessStopped(deps: DeploymentWatchDeps, ms: number): Promise<void
     return deps.sleep(ms);
   }
 
+  if (stop.aborted) {
+    return Promise.reject(stop.reason);
+  }
+
   return new Promise<void>((resolve, reject) => {
     const abandon = (): void => reject(stop.reason);
 
@@ -123,6 +127,8 @@ async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
       await sleepUnlessStopped(deps, retryIn);
       continue;
     }
+
+    deps.stop?.throwIfAborted();
 
     const status = normalizeStatus(deployment.status);
     const kind = classifyStatus(deployment.status);

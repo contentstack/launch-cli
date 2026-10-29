@@ -3,6 +3,7 @@ import { stripVTControlCharacters } from 'node:util';
 import type { TableColumn } from '../core/render';
 import { styled } from '../core/style';
 import { isAbsent, withoutControlCharacters } from '../core/values';
+import type { DeploymentScope } from './deployments.api';
 import type { Deployment, DeploymentLog } from './types';
 
 const GUTTER = '  ';
@@ -284,15 +285,18 @@ export const DEPLOYMENT_DETAIL_COLUMNS: TableColumn<DeploymentDetailRow>[] = [
 
 export const DEPLOYMENT_VALUE_COLUMN = 1;
 
-export function deploymentVariablesSummary(deployment: Deployment): string {
+export function deploymentVariablesSummary(deployment: Deployment, scope: DeploymentScope): string {
   const count = Array.isArray(deployment.environmentVariables) ? deployment.environmentVariables.length : 0;
 
-  return `${count} (list them with csdx launch:variables:list)`;
+  const flags = `--org ${scope.org} --project ${scope.project} --env ${scope.environment}`;
+
+  return `${count} (list them with csdx launch:variables:list ${flags})`;
 }
 
 export function deploymentDetailRows(
   deployment: Deployment,
   showGit: boolean,
+  scope: DeploymentScope,
 ): DeploymentDetailRow[] {
   const gitRows: DeploymentDetailRow[] = [
     { field: 'BRANCH', value: text(deployment.gitBranch) },
@@ -304,7 +308,7 @@ export function deploymentDetailRows(
     { field: 'STATUS', value: text(deployment.status) },
     ...(showGit ? gitRows : []),
     { field: 'URL', value: text(deploymentUrlOf(deployment)) },
-    { field: 'ENVIRONMENT VARIABLES', value: deploymentVariablesSummary(deployment) },
+    { field: 'ENVIRONMENT VARIABLES', value: deploymentVariablesSummary(deployment, scope) },
     { field: 'CREATED AT', value: text(deployment.createdAt) },
     { field: 'UPDATED AT', value: text(deployment.updatedAt) },
   ];

@@ -699,6 +699,95 @@ describe('deployment wait loop stopped from outside', () => {
     expect(events).toEqual(['sleep 1000', 'stop']);
   });
 
+  it.each([
+    ['the normal delay', 'DEPLOYING', undefined],
+    ['the error backoff', undefined, new Error('502 Bad Gateway')],
+  ])(
+    'rejects with the stop reason without sleeping when the stop lands while the poll is in flight (%s)',
+    async (_label, status, failure) => {
+      jest.useFakeTimers();
+
+      try {
+        const { deps, events, controller } = stoppable(['DEPLOYING']);
+        const reason = new Error('interrupted during the poll');
+        const slept: number[] = [];
+        const aborting = {
+          ...deps,
+          poll: async (): Promise<Deployment> => {
+            events.push('poll');
+            controller.abort(reason);
+
+            if (failure) {
+              throw failure;
+            }
+
+            return { uid: UID, status };
+          },
+          sleep: (ms: number) =>
+            new Promise<void>((resolve) => {
+              slept.push(ms);
+              setTimeout(resolve, ms);
+            }),
+        };
+
+        await expect(watchDeployment(aborting)).rejects.toBe(reason);
+        expect(slept).toEqual([]);
+        expect(events).toEqual(['poll', 'stop']);
+        expect(jest.getTimerCount()).toBe(0);
+      } finally {
+        jest.useRealTimers();
+      }
+    },
+  );
+
+  it('rejects with the stop reason without sleeping when the stop lands while the logs are being read', async () => {
+    jest.useFakeTimers();
+
+    try {
+      const { deps, events, controller } = stoppable(['DEPLOYING']);
+      const reason = new Error('interrupted during the logs read');
+      const slept: number[] = [];
+      const aborting = {
+        ...deps,
+        logs: async (): Promise<DeploymentLog[]> => {
+          controller.abort(reason);
+          return [];
+        },
+        sleep: (ms: number) =>
+          new Promise<void>((resolve) => {
+            slept.push(ms);
+            setTimeout(resolve, ms);
+          }),
+      };
+
+      await expect(watchDeployment(aborting)).rejects.toBe(reason);
+      expect(slept).toEqual([]);
+      expect(events).toEqual(['poll DEPLOYING', `start ${DEPLOYMENT_LOADER_MESSAGE}`, 'stop']);
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('rejects with the stop reason instead of reporting a terminal status that arrived after the stop', async () => {
+    const { deps, events, controller } = stoppable(['LIVE']);
+    const reason = new Error('interrupted during the final poll');
+    const aborting = {
+      ...deps,
+      poll: async (): Promise<Deployment> => {
+        controller.abort(reason);
+        return { uid: UID, status: 'LIVE' };
+      },
+      logs: async (): Promise<DeploymentLog[]> => {
+        events.push('logs');
+        return [];
+      },
+    };
+
+    await expect(watchDeployment(aborting)).rejects.toBe(reason);
+    expect(events).toEqual(['stop']);
+  });
+
   it('carries on normally when the sleep ends before any stop and ignores a stop that arrives after the end', async () => {
     const { deps, controller, polls, release } = stoppable(['DEPLOYING', 'LIVE']);
 

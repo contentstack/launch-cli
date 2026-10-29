@@ -77,7 +77,7 @@
         "description": "Purge the CDN cache of a Launch environment"
       },
       "launch:deployments": {
-        "description": "List and inspect the deployments of a Launch environment"
+        "description": "Create, inspect, roll back and cancel the deployments of a Launch environment"
       },
       "launch:site": {
         "description": "Open the live site of a Launch environment"

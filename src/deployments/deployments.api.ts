@@ -7,7 +7,7 @@ import {
   CANCEL_NOT_ALLOWED_RAW_MESSAGE,
   DEPLOYMENT_ERROR_MESSAGES,
   DEPLOYMENT_NOT_FOUND_CODE,
-  cancelNotAllowedMessage,
+  cancelNotAllowedError,
 } from './deployment.errors';
 import type { Deployment, DeploymentResponse, DeploymentsPage, IdentifiedDeployment } from './types';
 
@@ -157,10 +157,7 @@ export class DeploymentsApi {
       });
     } catch (error) {
       if (isCancelNotAllowed(error)) {
-        throw new LaunchApiError(
-          error.status,
-          [{ code: CANCEL_NOT_ALLOWED_CODE, message: cancelNotAllowedMessage(params.deployment) }],
-        );
+        throw cancelNotAllowedError(params.deployment, error.status);
       }
 
       throw error;

@@ -2,6 +2,7 @@ import { UsageError } from '../core/errors';
 import type { Choice } from '../core/prompt';
 import { askOption } from '../core/prompt';
 import type { ServiceContext } from '../core/service-context';
+import { withoutControlCharacters } from '../core/values';
 import type { DeploymentScope } from './deployments.api';
 
 const SHORT_SHA_LENGTH = 7;
@@ -17,8 +18,9 @@ const NO_TERMINAL = 'Choosing a commit needs an interactive terminal. Pass --com
 const NO_COMMITS = 'No commits are available to choose from. Pass --commit <sha> instead.';
 
 export function commitChoice(commit: ListedCommit & { sha: string }): Choice {
-  const short = commit.shortSha?.trim() ? commit.shortSha : commit.sha.slice(0, SHORT_SHA_LENGTH);
-  const subject = (commit.message ?? '').split('\n')[0].trim();
+  const listed = withoutControlCharacters(commit.shortSha ?? '').trim();
+  const short = listed === '' ? withoutControlCharacters(commit.sha.slice(0, SHORT_SHA_LENGTH)).trim() : listed;
+  const subject = withoutControlCharacters((commit.message ?? '').split(/\r\n|[\n\r]/)[0]).trim();
 
   return { name: subject === '' ? short : `${short}  ${subject}`, value: commit.sha };
 }

@@ -1,5 +1,6 @@
 import { UsageError } from '../../../core/errors';
 import type { UxLike } from '../../../core/prompt';
+import { cancelNotAllowedMessage } from '../../../deployments/deployment.errors';
 import { LaunchApiError } from '../../../transport/errors';
 import DeploymentsCancel from './cancel';
 
@@ -13,6 +14,7 @@ interface Harness {
   outputIsTTY?: boolean;
   yes?: boolean;
   getFails?: Error;
+  found?: Record<string, unknown>;
   cancelFails?: Error;
 }
 
@@ -50,7 +52,7 @@ function commandUnderTest(harness: Harness) {
               throw harness.getFails;
             }
 
-            return { uid: UID };
+            return harness.found ?? { uid: UID, status: 'DEPLOYING' };
           },
           cancel: async (params: unknown) => {
             calls.push('cancel');
@@ -139,6 +141,39 @@ describe('launch:deployments:cancel', () => {
     expect(calls).toEqual(['get']);
     expect(inquired).toEqual([]);
     expect(lines).toEqual([]);
+  });
+
+  it.each([
+    ['a finished deployment', { uid: UID, status: 'LIVE' }],
+    ['a failed deployment', { uid: UID, status: 'FAILED' }],
+    ['a deployment with no status', { uid: UID }],
+    ['an in-flight deployment the service marks as not cancellable', { uid: UID, status: 'DEPLOYING', isCancellable: false }],
+  ])('refuses %s with the cancel-not-allowed error before asking or posting', async (_label, found) => {
+    const { command, lines, inquired, calls, cancelled } = commandUnderTest({ answer: true, yes: true, found });
+
+    const error = (await command.run().catch((thrown: unknown) => thrown)) as LaunchApiError;
+
+    expect(error).toBeInstanceOf(LaunchApiError);
+    expect(error.exitCode).toBe(1);
+    expect(error.message).toBe(cancelNotAllowedMessage(UID));
+    expect(inquired).toEqual([]);
+    expect(calls).toEqual(['get']);
+    expect(cancelled).toEqual([]);
+    expect(lines).toEqual([]);
+  });
+
+  it.each([
+    ['an absent isCancellable', { uid: UID, status: 'QUEUED' }],
+    ['isCancellable true', { uid: UID, status: 'DEPLOYING', isCancellable: true }],
+    ['a null isCancellable', { uid: UID, status: 'DEPLOYING', isCancellable: null }],
+  ])('goes on to ask and cancel an in-flight deployment with %s', async (_label, found) => {
+    const { command, inquired, calls, cancelled } = commandUnderTest({ answer: true, found });
+
+    await command.run();
+
+    expect(inquired).toHaveLength(1);
+    expect(calls).toEqual(['get', 'cancel']);
+    expect(cancelled).toEqual([SCOPE]);
   });
 
   it('propagates a failure from the cancel rather than reporting a success', async () => {

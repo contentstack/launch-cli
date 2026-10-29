@@ -19,6 +19,8 @@ import {
 } from './deployment.presenter';
 
 const UID = randomBytes(12).toString('hex');
+const HINT_SCOPE = '--org org1 --project proj1 --env env1';
+const SCOPE = { org: 'org1', project: 'proj1', environment: 'env1' };
 
 const ESCAPE = '\u001b';
 const GREEN = '\u001b[38;2;34;139;34m';
@@ -233,17 +235,17 @@ function cellsOf(deployment: object, header: string): string {
 describe('deployment table presenter', () => {
   it.each(STATUSES)('writes the status %s verbatim in the list cell and the get row', (status) => {
     expect(cellsOf({ uid: UID, status }, 'STATUS')).toBe(status);
-    expect(rowOf(deploymentDetailRows({ uid: UID, status }, true), 'STATUS')).toBe(status);
+    expect(rowOf(deploymentDetailRows({ uid: UID, status }, true, SCOPE), 'STATUS')).toBe(status);
   });
 
   it.each([[undefined], [null], [''], ['   ']])('shows a dash for a status of %p', (status) => {
     expect(cellsOf({ uid: UID, status }, 'STATUS')).toBe('-');
-    expect(rowOf(deploymentDetailRows({ uid: UID, status } as never, true), 'STATUS')).toBe('-');
+    expect(rowOf(deploymentDetailRows({ uid: UID, status } as never, true, SCOPE), 'STATUS')).toBe('-');
   });
 
   it('labels the id DEPLOYMENT UID in the list and the get view, never a bare UID', () => {
     const headers = deploymentColumns(true).map((column) => column.header);
-    const fields = deploymentDetailRows({ uid: UID }, true).map((row) => row.field);
+    const fields = deploymentDetailRows({ uid: UID }, true, SCOPE).map((row) => row.field);
 
     expect(headers[0]).toBe('DEPLOYMENT UID');
     expect(fields[0]).toBe('DEPLOYMENT UID');
@@ -254,8 +256,8 @@ describe('deployment table presenter', () => {
     const deployment = { uid: UID, gitBranch: 'main', commitHash: 'abcdef0123456789', commitMessage: 'Ship it' };
     const gitHeaders = deploymentColumns(true).map((column) => column.header);
     const plainHeaders = deploymentColumns(false).map((column) => column.header);
-    const gitRows = deploymentDetailRows(deployment, true);
-    const plainRows = deploymentDetailRows(deployment, false);
+    const gitRows = deploymentDetailRows(deployment, true, SCOPE);
+    const plainRows = deploymentDetailRows(deployment, false, SCOPE);
 
     expect(gitHeaders).toEqual(['DEPLOYMENT UID', 'STATUS', 'COMMIT', 'UPDATED', 'BRANCH']);
     expect(plainHeaders).toEqual(['DEPLOYMENT UID', 'STATUS', 'UPDATED']);
@@ -282,10 +284,10 @@ describe('deployment table presenter', () => {
       environmentVariables: keys.map((key, index) => ({ key, value: values[index] })),
     };
 
-    const rows = deploymentDetailRows(deployment, true);
+    const rows = deploymentDetailRows(deployment, true, SCOPE);
     const shown = JSON.stringify(rows);
 
-    expect(rowOf(rows, 'ENVIRONMENT VARIABLES')).toBe('3 (list them with csdx launch:variables:list)');
+    expect(rowOf(rows, 'ENVIRONMENT VARIABLES')).toBe(`3 (list them with csdx launch:variables:list ${HINT_SCOPE})`);
     for (const secret of [...keys, ...values]) {
       expect(shown).not.toContain(secret);
     }
@@ -294,12 +296,12 @@ describe('deployment table presenter', () => {
   it.each([[null], [[]], [undefined]])('counts %p environment variables as 0 without throwing', (variables) => {
     const deployment = { uid: UID, environmentVariables: variables } as never;
 
-    expect(deploymentVariablesSummary(deployment)).toBe('0 (list them with csdx launch:variables:list)');
-    expect(() => deploymentDetailRows(deployment, true)).not.toThrow();
+    expect(deploymentVariablesSummary(deployment, SCOPE)).toBe(`0 (list them with csdx launch:variables:list ${HINT_SCOPE})`);
+    expect(() => deploymentDetailRows(deployment, true, SCOPE)).not.toThrow();
   });
 
   it('shows no build logs row, because the API has no build logs field and the logs command is not a deployment view', () => {
-    const fields = deploymentDetailRows({ uid: 'dep9' }, true).map((row) => row.field);
+    const fields = deploymentDetailRows({ uid: 'dep9' }, true, SCOPE).map((row) => row.field);
 
     expect(fields).toEqual([
       'DEPLOYMENT UID',
@@ -312,7 +314,7 @@ describe('deployment table presenter', () => {
       'CREATED AT',
       'UPDATED AT',
     ]);
-    expect(JSON.stringify(deploymentDetailRows({ uid: 'dep9' }, true))).not.toContain('launch:logs:get');
+    expect(JSON.stringify(deploymentDetailRows({ uid: 'dep9' }, true, SCOPE))).not.toContain('launch:logs:get');
   });
 
   it.each([
@@ -323,7 +325,7 @@ describe('deployment table presenter', () => {
     ['only whitespace', ' \n\t\n ', '-'],
     ['an empty message', '', '-'],
   ])('shows only the first line of a commit message holding %s', (_label, message, expected) => {
-    const rows = deploymentDetailRows({ uid: UID, commitMessage: message }, true);
+    const rows = deploymentDetailRows({ uid: UID, commitMessage: message }, true, SCOPE);
 
     expect(rowOf(rows, 'COMMIT MESSAGE')).toBe(expected);
   });
@@ -332,14 +334,14 @@ describe('deployment table presenter', () => {
     const exact = 'x'.repeat(72);
     const over = 'x'.repeat(73);
 
-    expect(rowOf(deploymentDetailRows({ uid: UID, commitMessage: exact }, true), 'COMMIT MESSAGE')).toBe(exact);
-    expect(rowOf(deploymentDetailRows({ uid: UID, commitMessage: over }, true), 'COMMIT MESSAGE')).toBe(
+    expect(rowOf(deploymentDetailRows({ uid: UID, commitMessage: exact }, true, SCOPE), 'COMMIT MESSAGE')).toBe(exact);
+    expect(rowOf(deploymentDetailRows({ uid: UID, commitMessage: over }, true, SCOPE), 'COMMIT MESSAGE')).toBe(
       `${'x'.repeat(71)}\u2026`,
     );
   });
 
   it('shows a dash for a field made only of control characters', () => {
-    expect(rowOf(deploymentDetailRows({ uid: UID, gitBranch: '\u0007\u001b[31m' }, true), 'BRANCH')).toBe('-');
+    expect(rowOf(deploymentDetailRows({ uid: UID, gitBranch: '\u0007\u001b[31m' }, true, SCOPE), 'BRANCH')).toBe('-');
   });
 
   it('never lets a control character or a line break into any cell of the list or the get view', () => {
@@ -356,7 +358,7 @@ describe('deployment table presenter', () => {
     };
     const cells = [
       ...deploymentColumns(true).map((column) => column.value(deployment)),
-      ...deploymentDetailRows(deployment, true).flatMap((row) => [row.field, row.value]),
+      ...deploymentDetailRows(deployment, true, SCOPE).flatMap((row) => [row.field, row.value]),
     ];
 
     for (const cell of cells) {
@@ -365,14 +367,14 @@ describe('deployment table presenter', () => {
   });
 
   it('falls back to a dash for every absent field and prefers the deployment url over the preview url', () => {
-    const rows = deploymentDetailRows({ uid: UID }, true);
+    const rows = deploymentDetailRows({ uid: UID }, true, SCOPE);
 
     for (const field of ['BRANCH', 'COMMIT', 'COMMIT MESSAGE', 'URL', 'CREATED AT', 'UPDATED AT']) {
       expect(rowOf(rows, field)).toBe('-');
     }
 
     expect(
-      rowOf(deploymentDetailRows({ uid: UID, deploymentUrl: 'a.example.test', previewUrl: 'b.example.test' }, true), 'URL'),
+      rowOf(deploymentDetailRows({ uid: UID, deploymentUrl: 'a.example.test', previewUrl: 'b.example.test' }, true, SCOPE), 'URL'),
     ).toBe('https://a.example.test');
   });
 });

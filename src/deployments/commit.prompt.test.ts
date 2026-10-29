@@ -110,4 +110,24 @@ describe('promptForCommit', () => {
     expect(commitChoice({ sha, message: '' })).toEqual({ name: sha.slice(0, 7), value: sha });
     expect(commitChoice({ sha, shortSha: '  ', message: 'x' })).toEqual({ name: `${sha.slice(0, 7)}  x`, value: sha });
   });
+
+  it.each([
+    ['a colour sequence', 'fix \u001b[31mred\u001b[0m', 'abc1234  fix red'],
+    ['an OSC title sequence', 'x\u001b]0;pwned\u0007y', 'abc1234  xy'],
+    ['a lone carriage return', 'first\rsecond', 'abc1234  first'],
+    ['a carriage return and line feed', 'first\r\nsecond', 'abc1234  first'],
+    ['a leading carriage return', '\rhidden', 'abc1234'],
+    ['a tab and a bell', 'a\tb\u0007c', 'abc1234  a b c'],
+  ])('never lets %s in a commit message reach the label', (_label, message, expected) => {
+    const sha = randomBytes(20).toString('hex');
+
+    expect(commitChoice({ sha, shortSha: 'abc1234', message })).toEqual({ name: expected, value: sha });
+  });
+
+  it('strips control characters from the short hash too and falls back when nothing is left', () => {
+    const sha = randomBytes(20).toString('hex');
+
+    expect(commitChoice({ sha, shortSha: 'ab\u001b[31mc12\u001b[0m', message: 'm' }).name).toBe('abc12  m');
+    expect(commitChoice({ sha, shortSha: '\u0007', message: '' }).name).toBe(sha.slice(0, 7));
+  });
 });

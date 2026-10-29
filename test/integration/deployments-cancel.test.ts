@@ -97,10 +97,12 @@ function listing(page: unknown = LISTED): nock.Scope {
   return hub().get(DEPLOYMENTS).query({ limit: 100, skip: 0 }).reply(200, page as nock.Body);
 }
 
-function lookup(): nock.Scope {
+const IN_FLIGHT_FIXTURE = { deployment: { ...getFixture.deployment, status: 'DEPLOYING' } };
+
+function lookup(body: unknown = IN_FLIGHT_FIXTURE): nock.Scope {
   projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
 
-  return hub().get(`${DEPLOYMENTS}/${DEPLOYMENT_UID}`).reply(200, getFixture);
+  return hub().get(`${DEPLOYMENTS}/${DEPLOYMENT_UID}`).reply(200, body as nock.Body);
 }
 
 describe('integration: launch:deployments:cancel on the wire', () => {
@@ -274,6 +276,25 @@ describe('integration: launch:deployments:cancel on the wire', () => {
     expect(error?.oclif?.exit).toBe(1);
     expect(error?.message).toBe(CANCEL_WORDING);
     expect(cancel.isDone()).toBe(true);
+    expect(onWire).toEqual([]);
+  });
+
+  it.each([
+    ['a finished deployment', getFixture],
+    ['a deployment the service marks as not cancellable', { deployment: { ...IN_FLIGHT_FIXTURE.deployment, isCancellable: false } }],
+  ])('asks nothing and posts nothing for %s, exiting 1 with the cancel wording', async (_name, body) => {
+    const found = lookup(body);
+    const cancel = cancelScope().post(CANCEL_PATH).reply(200, {});
+    const prompts = answerPrompts({});
+
+    const { error } = await onTerminal(() => runCommand(args('--deployment', DEPLOYMENT_UID), config));
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.message).toBe(CANCEL_WORDING);
+    expect(prompts.messages).toEqual([]);
+    expect(found.isDone()).toBe(true);
+    expect(cancel.isDone()).toBe(false);
+    expect(nock.pendingMocks()).toEqual([POST_PENDING]);
     expect(onWire).toEqual([]);
   });
 

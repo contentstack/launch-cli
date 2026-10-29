@@ -107,7 +107,9 @@ describe('launch:deployments:get', () => {
     expect(valueOf(lines, 'COMMIT')).toBe('abcdef0123456789');
     expect(valueOf(lines, 'COMMIT MESSAGE')).toBe('Ship it');
     expect(valueOf(lines, 'URL')).toBe('https://site.example.test');
-    expect(valueOf(lines, 'ENVIRONMENT VARIABLES')).toContain('1 (list them with');
+    expect(valueOf(lines, 'ENVIRONMENT VARIABLES')).toBe(
+      '1 (list them with csdx launch:variables:list --org org1 --project proj1 --env env1)',
+    );
     expect(lines.join('\n')).not.toContain('BUILD LOGS');
     expect(lines.join('\n')).not.toContain('launch:logs:get');
   });

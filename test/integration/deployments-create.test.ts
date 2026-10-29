@@ -301,7 +301,7 @@ describe('integration: launch:deployments:create on the wire', () => {
     expect(onWire).toEqual([]);
   });
 
-  it('T27: refuses a missing project directory with exit 2, naming the path, --last-upload and --data-dir, and sends nothing', async () => {
+  it('T27: refuses a missing project directory with exit 2, naming the path and --data-dir, and sends nothing', async () => {
     fileProject();
     const create = captureCreate();
     const signed = signedUpload();

@@ -1,5 +1,6 @@
 import { EXIT_CANCELLED, EXIT_RUNTIME } from '../core/constants';
 import { LaunchError } from '../core/errors';
+import { LaunchApiError } from '../transport/errors';
 import type { ErrorMessages } from '../transport/errors';
 
 export const DEPLOYMENT_NOT_FOUND_CODE = 'launch.DEPLOYMENT.NOT_FOUND';
@@ -19,6 +20,10 @@ export const CANCEL_NOT_ALLOWED_RAW_MESSAGE =
 
 export function cancelNotAllowedMessage(deployment: string): string {
   return `Deployment "${deployment}" cannot be cancelled because it is no longer in progress.`;
+}
+
+export function cancelNotAllowedError(deployment: string, status = 400): LaunchApiError {
+  return new LaunchApiError(status, [{ code: CANCEL_NOT_ALLOWED_CODE, message: cancelNotAllowedMessage(deployment) }]);
 }
 
 export const DEPLOYMENT_ERROR_MESSAGES: ErrorMessages = {

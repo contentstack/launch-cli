@@ -250,4 +250,17 @@ describe('promptForDeployment', () => {
       `${UID_A}  LIVE  later`,
     );
   });
+
+  it('never lets a control character in the status, the commit or the timestamp reach the label', () => {
+    expect(deploymentChoice({ uid: UID_A, status: 'LI\u001b[31mVE\u001b[0m\r', commitHash: 'abc\u001b]0;x\u0007def0123' }).name).toBe(
+      `${UID_A}  LIVE  abcdef0`,
+    );
+    expect(deploymentChoice({ uid: UID_A, status: '\u0007', createdAt: '2026\r\n05\u001b[2J' }).name).toBe(
+      `${UID_A}  -  2026 05`,
+    );
+    expect(deploymentChoice({ uid: UID_A, status: 'LIVE', createdAt: '\u0007', updatedAt: 'later' }).name).toBe(
+      `${UID_A}  LIVE  later`,
+    );
+    expect(deploymentChoice({ uid: UID_A, status: 'LIVE', createdAt: '\u0007' }).name).toBe(`${UID_A}  LIVE`);
+  });
 });

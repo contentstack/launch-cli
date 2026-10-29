@@ -2,10 +2,11 @@ import { PICKER_PAGE_SIZE } from '../core/constants';
 import { UsageError } from '../core/errors';
 import type { Choice, PromptDeps } from '../core/prompt';
 import { askOption, noteTruncation } from '../core/prompt';
+import { withoutControlCharacters } from '../core/values';
 import { hasUid } from '../transport/envelope';
 import { classifyStatus } from './deployment.status';
 import type { DeploymentScope } from './deployments.api';
-import type { IdentifiedDeployment } from './types';
+import type { Deployment, IdentifiedDeployment } from './types';
 
 export const ALL_DEPLOYMENTS = 'all';
 
@@ -22,17 +23,21 @@ const QUESTIONS: Record<string, string> = {
   [IN_FLIGHT_DEPLOYMENTS]: 'Choose a deployment for cancellation',
 };
 
+function printable(value: string | undefined): string {
+  return withoutControlCharacters(value ?? '').trim();
+}
+
 function when(deployment: IdentifiedDeployment): string | undefined {
-  const commit = deployment.commitHash?.trim();
+  const commit = printable(deployment.commitHash);
 
   if (commit) {
     return commit.slice(0, SHORT_COMMIT_LENGTH);
   }
 
-  return deployment.createdAt?.trim() || deployment.updatedAt?.trim() || undefined;
+  return printable(deployment.createdAt) || printable(deployment.updatedAt) || undefined;
 }
 
-function isCancellable(deployment: IdentifiedDeployment): boolean {
+export function isCancellable(deployment: Pick<Deployment, 'status' | 'isCancellable'>): boolean {
   return classifyStatus(deployment.status) === 'in-flight' && deployment.isCancellable !== false;
 }
 
@@ -43,7 +48,7 @@ function withoutCurrent(deployments: IdentifiedDeployment[]): IdentifiedDeployme
 }
 
 export function deploymentChoice(deployment: IdentifiedDeployment): Choice {
-  const status = deployment.status?.trim() || '-';
+  const status = printable(deployment.status) || '-';
   const detail = when(deployment);
 
   const parts = [deployment.uid, status, detail].filter((part) => part !== undefined);
