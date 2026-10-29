@@ -87,7 +87,7 @@ fileignoreconfig:
     - "'SECRET=hunter2'"
     - "formFieldKey"
 - filename: test/integration/projects-create.test.ts
-  checksum: bb5d8f4e2c89c16e989be71dbd92d7644739f4422230b367c67098c8782e7194
+  checksum: e37d9a0fdce75f942836f621a2e281cb9b448cd583673ebcacb075de3faaf187
 - filename: test/fixtures/README.md
   checksum: d801c84c8b7d7f38f967573e9a3a70da4405b7cbcbf10d2a6e5be3d65fb3daa1
   allowed_patterns:
@@ -229,7 +229,7 @@ fileignoreconfig:
     - "a project name passed on argv to the project resolver"
     - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
 - filename: AGENTS.md
-  checksum: 6a0d8256e6e6a961a49bcdcec07bb81b63251d49233f7f4120d8e972bf025b4d
+  checksum: 89b7e72236e7218326eb3c9c3176c5ab36d58e79a9bf845f422fe28d98c144a1
   allowed_patterns:
     - "Do not add an exemption to a guard to make a new file pass"
     - "passes its own error wording to `client.request\\(req, MESSAGES\\)`"
@@ -427,9 +427,9 @@ fileignoreconfig:
 - filename: src/commands/launch/deployments/list.test.ts
   checksum: e493cd51e7c65bbf5b4f71704478b7a669bca4342efc865a1363bc508fe6f9f0
 - filename: src/deployments/deployment.presenter.test.ts
-  checksum: 7f5f164747c978fe6a61463200e2ef26e1513f48b08e2ca6214431fcdd2b3570
+  checksum: 75f32da80083d5a0a5e27702569bce7aafd50307003f9b46720df41fa13d2098
 - filename: test/integration/deployments-create.test.ts
-  checksum: 77f0b45a82063d2e7056d6ed3eecf3384299fe251c2fae9c7866d4eee619ff98
+  checksum: 5f19d2a44b6374b181cf94a9551d42facd878791d89e395d2c108c57c9b1af3c
 - filename: src/deployments/deployment.watcher.test.ts
   checksum: 963a3028fee9f66f812bb4521b33652ef1b02d5833f1296d743ef9100c5ed133
 - filename: src/deployments/deployment.create.ts
@@ -441,13 +441,13 @@ fileignoreconfig:
 - filename: test/integration/deployments-rollback.test.ts
   checksum: b4d71ee5ef3a7b23da9124ec6dcc3486402a8ba176798fac7ebfa8c7a9abc0ef
 - filename: test/integration/deployments-cancel.test.ts
-  checksum: 5b41365886cb379277f7c0cb15e58cc8b81b49e203f218509d4b210f10f8bdb6
+  checksum: 09949de1f5d0f147cca9e62f0caf3e1a74ec24e49886e06fda983eab67bcd90e
 - filename: src/commands/launch/deployments/cancel.test.ts
   checksum: fb47245011cea6c4e035269ab69f90317694918385771ea34da568f939e8882b
 - filename: src/commands/launch/deployments/rollback.test.ts
   checksum: ed3a86f1538c644ef8e3e1c829f07035a201b927c7beab4cf200f27fb333a02b
 - filename: src/deployments/deployments.api.test.ts
-  checksum: 1d0156a94477351919ccd2ec6f534c9a9ec47dc19fc72c9d705704b877b7460a
+  checksum: b27d91317c17f1754d5853c68f4968e63dc2b3579eab26b4c772cf3cd3efbdd0
 - filename: src/deployments/deployment.prompt.test.ts
   checksum: 3b007e9ba732bb35d74e93d0422efdb9ea7a2ce649e1d2434aaafa22dc29fabd
 - filename: test/integration/deployments-request-bodies.test.ts

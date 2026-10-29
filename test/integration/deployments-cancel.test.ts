@@ -37,8 +37,7 @@ const CANCEL_PATH = `${DEPLOYMENTS}/${DEPLOYMENT_UID}/cancel`;
 const POST_PENDING = `POST ${LAUNCH_HUB_URL}:443${CANCEL_PATH}`;
 const BODYLESS = { badheaders: ['content-type'] };
 const RAW_REFUSAL = 'This deployment has progressed beyond the point where it can be cancelled.';
-const CANCEL_WORDING =
-  'The deployment can no longer be cancelled because it has progressed too far.';
+const CANCEL_WORDING = `Deployment "${DEPLOYMENT_UID}" cannot be cancelled because it is no longer in progress.`;
 
 let config: Interfaces.Config;
 let onWire: string[];

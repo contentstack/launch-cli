@@ -327,7 +327,7 @@ describe('integration: launch:projects:create on the wire', () => {
     });
     expect(stdout).toContain('info: GitHub connection identified!\n');
     expect(stdout).toContain('info: New project created successfully\n');
-    expect(stdout).toContain('Deployment URL https://my-site.example.test\n');
+    expect(stdout).toContain('Deployment URL: https://my-site.example.test\n');
     expect(stdout).not.toContain('Deployment #1 is');
     expect(open).toHaveBeenCalledWith('https://my-site.example.test');
     expect(slept[slept.length - 1]).toBe(6000);
@@ -369,7 +369,7 @@ describe('integration: launch:projects:create on the wire', () => {
     const first = lines.indexOf('2026-09-25 10:00:00.123:  Installing dependencies...');
     expect(first).toBeGreaterThan(-1);
     expect(lines[first + 1]).toBe('2026-09-25 10:00:09.000:  Deployed successfully');
-    expect(lines[first + 2]).toBe('Deployment URL https://my-site.example.test');
+    expect(lines[first + 2]).toBe('Deployment URL: https://my-site.example.test');
     expect(stdout).not.toContain('Could not read the deployment logs');
     expect(onWire).toEqual([]);
   });

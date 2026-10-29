@@ -271,6 +271,15 @@ describe('DeploymentsApi', () => {
   });
 
   it.each([
+    ['launch.DEPLOYMENT.CREATE_FAILED', 'The deployment could not be started. Please try again or contact support.'],
+    ['launch.DEPLOYMENT.ROLLBACK_FAILED', 'The rollback could not be completed. Please try again or contact support.'],
+  ])('words %s with the approved sentence', (code, sentence) => {
+    const failure = new LaunchApiError(500, [{ code, message: 'raw' }], DEPLOYMENT_ERROR_MESSAGES);
+
+    expect(failure.message).toBe(sentence);
+  });
+
+  it.each([
     ['launch.DEPLOYMENT.ROLLBACK_NOT_ELIGIBLE', 409],
     ['launch.DEPLOYMENT.NO_LIVE_DEPLOYMENT_FOUND', 409],
     ['launch.DEPLOYMENT.NOT_FOUND', 404],
@@ -342,7 +351,7 @@ describe('DeploymentsApi', () => {
     expect(failure.exitCode).toBe(1);
     expect(failure.status).toBe(400);
     expect(failure.code).toBe('launch.DEPLOYMENT.CANCEL_NOT_ALLOWED');
-    expect(failure.message).toBe(DEPLOYMENT_ERROR_MESSAGES['launch.DEPLOYMENT.CANCEL_NOT_ALLOWED']);
+    expect(failure.message).toBe(`Deployment "${DEPLOYMENT}" cannot be cancelled because it is no longer in progress.`);
     expect(failure.message).not.toBe(CANCEL_NOT_ALLOWED_RAW_MESSAGE);
   });
 

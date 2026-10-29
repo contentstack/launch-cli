@@ -540,7 +540,7 @@ describe('integration: launch:deployments:create on the wire', () => {
 
     expect(error).toBeUndefined();
     expect(stdout.split('Installing dependencies').length - 1).toBe(1);
-    expect(stdout).toContain('Deployment URL https://my-site.example.test');
+    expect(stdout).toContain('Deployment URL: https://my-site.example.test');
     expect(nock.pendingMocks()).toEqual([]);
     expect(onWire).toEqual([]);
   });
@@ -593,7 +593,7 @@ describe('integration: launch:deployments:create on the wire', () => {
       const { error } = await runCommand(createArgs('--data-dir', dataDir), config);
 
       expect(error?.oclif?.exit).toBe(1);
-      expect(error?.message).toBe('The deployment could not be started. Try again later.');
+      expect(error?.message).toBe('The deployment could not be started. Please try again or contact support.');
       expect(create.scope.isDone()).toBe(true);
       expect(poll.every((scope) => !scope.isDone())).toBe(true);
       expect(onWire).toEqual([]);

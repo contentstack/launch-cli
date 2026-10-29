@@ -78,7 +78,7 @@ describe('DeploymentFollower.announceLive', () => {
     await follower.announceLive({ uid: 'd1', deploymentUrl: 'site.example.test' });
 
     expect(timeline).toEqual([
-      'print Deployment URL https://site.example.test',
+      'print Deployment URL: https://site.example.test',
       `sleep ${SITE_OPEN_DELAY_MS}`,
       'open https://site.example.test',
     ]);
@@ -89,7 +89,7 @@ describe('DeploymentFollower.announceLive', () => {
 
     await follower.announceLive({ uid: 'd1' }, [{}, { url: 'custom.example.test' }, { url: 'other.example.test' }]);
 
-    expect(timeline).toEqual(['print Deployment URL https://custom.example.test']);
+    expect(timeline).toEqual(['print Deployment URL: https://custom.example.test']);
   });
 
   it('announces the preview url, with a scheme, when the deployment url is empty and a domain also exists', async () => {
@@ -100,7 +100,7 @@ describe('DeploymentFollower.announceLive', () => {
     ]);
 
     expect(timeline).toEqual([
-      'print Deployment URL https://preview.example.test',
+      'print Deployment URL: https://preview.example.test',
       `sleep ${SITE_OPEN_DELAY_MS}`,
       'open https://preview.example.test',
     ]);
@@ -119,6 +119,6 @@ describe('DeploymentFollower.announceLive', () => {
 
     await follower.announceLive({ uid: 'd1', deploymentUrl: 'https://site.example.test' });
 
-    expect(timeline).toEqual(['print Deployment URL https://site.example.test']);
+    expect(timeline).toEqual(['print Deployment URL: https://site.example.test']);
   });
 });

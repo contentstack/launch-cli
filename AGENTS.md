@@ -705,7 +705,7 @@ shade, and in green when stdout is a terminal (`styled` in `src/core/style.ts`, 
 redirected output stays free of escape codes). Once `POST /projects` succeeds, before the config file is
 written or anything is watched, create prints V1's green `info: New project created successfully`
 (`projectCreatedLine`); a failed create never prints it. On success create then prints V1's
-`Deployment URL <url>` line - label bold, url blue on a terminal - before the project summary,
+`Deployment URL: <url>` line - label bold, url blue on a terminal - before the project summary,
 waits `SITE_OPEN_DELAY_MS` (six seconds, V1's wait, because a site opened the moment it reports
 live can still answer "site not reachable") and opens that url in the browser, terminal or not, as V1
 did. The wait goes through the injected `sleep`, so it is awaited and the browser opens before the

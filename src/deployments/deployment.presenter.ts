@@ -29,7 +29,7 @@ export function deploymentUrlOf(deployment: Deployment): string | undefined {
 }
 
 export function deploymentUrlLine(url: string, outputIsTTY: boolean): string {
-  return `${styled('Deployment URL', 'bold', outputIsTTY)} ${styled(url, 'cyan', outputIsTTY)}`;
+  return `${styled('Deployment URL:', 'bold', outputIsTTY)} ${styled(url, 'cyan', outputIsTTY)}`;
 }
 
 export function colouredLogMessage(message: string): string {

@@ -7,6 +7,7 @@ import {
   CANCEL_NOT_ALLOWED_RAW_MESSAGE,
   DEPLOYMENT_ERROR_MESSAGES,
   DEPLOYMENT_NOT_FOUND_CODE,
+  cancelNotAllowedMessage,
 } from './deployment.errors';
 import type { Deployment, DeploymentResponse, DeploymentsPage, IdentifiedDeployment } from './types';
 
@@ -41,9 +42,11 @@ export interface RollbackDeploymentParams extends DeploymentScope {
 function isCancelNotAllowed(error: unknown): error is LaunchApiError {
   return (
     error instanceof LaunchApiError &&
-    error.status === 400 &&
     error.errors.some(
-      (entry) => entry.code === CANCEL_NOT_ALLOWED_RAW_MESSAGE || entry.message === CANCEL_NOT_ALLOWED_RAW_MESSAGE,
+      (entry) =>
+        entry.code === CANCEL_NOT_ALLOWED_CODE ||
+        (error.status === 400 &&
+          (entry.code === CANCEL_NOT_ALLOWED_RAW_MESSAGE || entry.message === CANCEL_NOT_ALLOWED_RAW_MESSAGE)),
     )
   );
 }
@@ -156,8 +159,7 @@ export class DeploymentsApi {
       if (isCancelNotAllowed(error)) {
         throw new LaunchApiError(
           error.status,
-          [{ code: CANCEL_NOT_ALLOWED_CODE, message: CANCEL_NOT_ALLOWED_RAW_MESSAGE }],
-          DEPLOYMENT_ERROR_MESSAGES,
+          [{ code: CANCEL_NOT_ALLOWED_CODE, message: cancelNotAllowedMessage(params.deployment) }],
         );
       }
 

@@ -17,15 +17,15 @@ export const CANCEL_NOT_ALLOWED_CODE = 'launch.DEPLOYMENT.CANCEL_NOT_ALLOWED';
 export const CANCEL_NOT_ALLOWED_RAW_MESSAGE =
   'This deployment has progressed beyond the point where it can be cancelled.';
 
-const CANCEL_NOT_ALLOWED_MESSAGE = 'The deployment can no longer be cancelled because it has progressed too far.';
+export function cancelNotAllowedMessage(deployment: string): string {
+  return `Deployment "${deployment}" cannot be cancelled because it is no longer in progress.`;
+}
 
 export const DEPLOYMENT_ERROR_MESSAGES: ErrorMessages = {
   [DEPLOYMENT_NOT_FOUND_CODE]: 'No deployment found with that UID.',
   [INVALID_DEPLOYMENT_UID_CODE]: INVALID_DEPLOYMENT_UID_MESSAGE,
   [INVALID_DEPLOYMENT_UID_RAW_MESSAGE]: INVALID_DEPLOYMENT_UID_MESSAGE,
-  'launch.DEPLOYMENT.CREATE_FAILED': 'The deployment could not be started. Try again later.',
-  [CANCEL_NOT_ALLOWED_CODE]: CANCEL_NOT_ALLOWED_MESSAGE,
-  [CANCEL_NOT_ALLOWED_RAW_MESSAGE]: CANCEL_NOT_ALLOWED_MESSAGE,
+  'launch.DEPLOYMENT.CREATE_FAILED': 'The deployment could not be started. Please try again or contact support.',
   'launch.DEPLOYMENT.ROLLBACK_NOT_ELIGIBLE':
     'This deployment is not eligible for rollback. Choose a deployment that was live earlier.',
   'launch.DEPLOYMENT.NO_LIVE_DEPLOYMENT_FOUND':
@@ -34,7 +34,7 @@ export const DEPLOYMENT_ERROR_MESSAGES: ErrorMessages = {
     'The status of this deployment does not allow a rollback. Choose a deployment that was live earlier.',
   'launch.DEPLOYMENT.ROLLBACK_TO_CURRENT_DEPLOYMENT':
     'This deployment is already live in this environment. Choose a different deployment for rollback.',
-  'launch.DEPLOYMENT.ROLLBACK_FAILED': 'The rollback could not be completed. Try again later.',
+  'launch.DEPLOYMENT.ROLLBACK_FAILED': 'The rollback could not be completed. Please try again or contact support.',
   'launch.ENVIRONMENT.NOT_FOUND': 'No environment found with that UID.',
 };
 

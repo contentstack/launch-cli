@@ -425,7 +425,7 @@ describe('ProjectCreator on the GitHub path', () => {
         gitProviderMetadata: { gitProvider: 'GitHub' },
       },
     });
-    expect(printed).toEqual([CONNECTION_IDENTIFIED, repositoryFound(), PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
+    expect(printed).toEqual([CONNECTION_IDENTIFIED, repositoryFound(), PROJECT_CREATED, 'Deployment URL: https://my-site.example.test']);
   });
 
   it('sends the project description and the two toggles only when they were supplied', async () => {
@@ -767,7 +767,7 @@ describe('ProjectCreator on the GitHub path', () => {
     await creator.create(gitRequest());
 
     expect(printed).not.toContain(CONNECTION_IDENTIFIED);
-    expect(printed).toEqual([repositoryFound(), PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
+    expect(printed).toEqual([repositoryFound(), PROJECT_CREATED, 'Deployment URL: https://my-site.example.test']);
     expect(gitCalls[0]).toEqual({ org: ORG, provider: 'GitHub', namespace: 'my-org', search: 'my-repo', limit: 100, skip: 0 });
     expect(created).toHaveLength(1);
   });
@@ -1470,13 +1470,13 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed).toEqual([CONNECTION_IDENTIFIED, repositoryFound(), PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
+    expect(printed).toEqual([CONNECTION_IDENTIFIED, repositoryFound(), PROJECT_CREATED, 'Deployment URL: https://my-site.example.test']);
   });
 
   it.each([
-    [true, false, 'Deployment URL https://my-site.example.test'],
-    [false, true, '\u001b[1mDeployment URL\u001b[22m \u001b[36mhttps://my-site.example.test\u001b[39m'],
-    [false, undefined, 'Deployment URL https://my-site.example.test'],
+    [true, false, 'Deployment URL: https://my-site.example.test'],
+    [false, true, '\u001b[1mDeployment URL:\u001b[22m \u001b[36mhttps://my-site.example.test\u001b[39m'],
+    [false, undefined, 'Deployment URL: https://my-site.example.test'],
   ])(
     'styles the deployment url by where the output goes, not by stdin (stdin terminal: %s, output terminal: %s)',
     async (isTTY, outputIsTTY, line) => {
@@ -1493,7 +1493,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed).toContain('Deployment URL https://my-site.example.test');
+    expect(printed).toContain('Deployment URL: https://my-site.example.test');
   });
 
   it('exits 1 on a failed deployment, saying what survived and how to retry and inspect it', async () => {
@@ -1535,7 +1535,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed).toContain('Deployment URL https://my-site.example.test');
+    expect(printed).toContain('Deployment URL: https://my-site.example.test');
   });
 
   it('waits for the first environment to appear rather than calling an empty page a failure', async () => {
@@ -1545,7 +1545,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed).toContain('Deployment URL https://my-site.example.test');
+    expect(printed).toContain('Deployment URL: https://my-site.example.test');
   });
 
   it('exits 1 disclosing the project when looking up its first environment failed', async () => {
@@ -1624,7 +1624,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed).toContain('Deployment URL https://domain.example.test');
+    expect(printed).toContain('Deployment URL: https://domain.example.test');
   });
 
   it('reports no url at all when neither the deployment nor the environment has one', async () => {
@@ -1651,7 +1651,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
     expect(SITE_OPEN_DELAY_MS).toBe(6000);
     expect(opened).toEqual(['https://my-site.example.test']);
     expect(timeline.slice(-3)).toEqual([
-      'print Deployment URL https://my-site.example.test',
+      'print Deployment URL: https://my-site.example.test',
       'sleep 6000',
       'open https://my-site.example.test',
     ]);
@@ -1697,7 +1697,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed).toEqual([CONNECTION_IDENTIFIED, repositoryFound(), PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
+    expect(printed).toEqual([CONNECTION_IDENTIFIED, repositoryFound(), PROJECT_CREATED, 'Deployment URL: https://my-site.example.test']);
     expect(timeline).not.toContain(`sleep ${SITE_OPEN_DELAY_MS}`);
   });
 

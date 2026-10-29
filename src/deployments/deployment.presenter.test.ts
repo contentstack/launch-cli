@@ -26,8 +26,8 @@ const RESET = '\u001b[0m';
 
 describe('deployment presenter', () => {
   it.each([
-    [true, '\u001b[1mDeployment URL\u001b[22m \u001b[36mhttps://site.example.test\u001b[39m'],
-    [false, 'Deployment URL https://site.example.test'],
+    [true, '\u001b[1mDeployment URL:\u001b[22m \u001b[36mhttps://site.example.test\u001b[39m'],
+    [false, 'Deployment URL: https://site.example.test'],
   ])('labels the deployment url in bold and the url in cyan only on a terminal (terminal: %s)', (outputIsTTY, line) => {
     expect(deploymentUrlLine('https://site.example.test', outputIsTTY)).toBe(line);
   });
