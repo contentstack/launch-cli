@@ -223,6 +223,23 @@ const environmentsQuery: DocumentNode = gql`
   }
 `;
 
+const environmentSecretsQuery: DocumentNode = gql`
+  query EnvironmentSecrets {
+    Environments {
+      edges {
+        node {
+          uid
+          name
+          secrets {
+            key
+            updatedAt
+          }
+        }
+      }
+    }
+  }
+`;
+
 export {
   projectsQuery,
   branchesQuery,
@@ -237,5 +254,6 @@ export {
   serverlessLogsQuery,
   latestLiveDeploymentQuery,
   environmentsQuery,
+  environmentSecretsQuery,
   rollbackSettingsQuery,
 };

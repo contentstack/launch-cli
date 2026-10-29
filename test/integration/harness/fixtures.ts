@@ -50,6 +50,29 @@ export const environmentsResponse = (nodes: Record<string, any>[] = [environment
   },
 });
 
+export const SECRET_KEY = 'API_TOKEN';
+
+export const secretNode = (overrides: Record<string, any> = {}) => ({
+  __typename: 'EnvironmentSecret',
+  key: SECRET_KEY,
+  updatedAt: '2026-01-01T00:00:00.000Z',
+  ...overrides,
+});
+
+export const environmentSecretsResponse = (secrets: Record<string, any>[] = [secretNode()]) => ({
+  data: {
+    Environments: {
+      __typename: 'EnvironmentConnection',
+      edges: [
+        {
+          __typename: 'EnvironmentEdge',
+          node: { __typename: 'Environment', uid: ENVIRONMENT_UID, name: ENVIRONMENT_NAME, secrets },
+        },
+      ],
+    },
+  },
+});
+
 export const projectsResponse = (
   projects: { uid: string; name: string }[] = [{ uid: PROJECT_UID, name: PROJECT_NAME }],
 ) => ({
