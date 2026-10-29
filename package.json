@@ -1,6 +1,6 @@
 {
   "name": "@contentstack/cli-launch",
-  "version": "1.11.3",
+  "version": "1.11.4",
   "description": "Launch related operations",
   "author": "Contentstack CLI",
   "bin": {
@@ -35,7 +35,7 @@
     "chalk": "^4.1.2",
     "cross-fetch": "^4.1.0",
     "dotenv": "^16.4.7",
-    "express": "^4.22.0",
+    "express": "^4.22.3",
     "form-data": "4.0.6",
     "graphql": "^16.9.0",
     "ini": "^3.0.1",
@@ -107,7 +107,8 @@
     "prepare": "husky"
   },
   "overrides": {
-    "qs": "^6.16.1",
+    "qs": "~6.16.2",
+    "follow-redirects": "^1.16.2",
     "tty-table": {
       "csv": "^6.6.4"
     },
