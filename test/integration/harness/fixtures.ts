@@ -81,6 +81,10 @@ export const refreshEnvironmentSecretResponse = (key = SECRET_KEY) => ({
   data: { refreshEnvironmentSecret: secretNode({ key }) },
 });
 
+export const deleteEnvironmentSecretResponse = () => ({
+  data: { deleteEnvironmentSecret: true },
+});
+
 export const secretsApiErrorResponse = (status: number, code?: string, message = 'Request failed') => ({
   errors: [{ message, extensions: { exception: { status, ...(code ? { name: code } : {}) } } }],
 });

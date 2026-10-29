@@ -103,10 +103,17 @@ const refreshEnvironmentSecretMutation: DocumentNode = gql`
   }
 `;
 
+const deleteEnvironmentSecretMutation: DocumentNode = gql`
+  mutation DeleteEnvironmentSecret($environmentUid: String!, $key: String!) {
+    deleteEnvironmentSecret(environmentUid: $environmentUid, key: $key)
+  }
+`;
+
 export {
   importProjectMutation,
   addEnvironmentSecretMutation,
   refreshEnvironmentSecretMutation,
+  deleteEnvironmentSecretMutation,
   createDeploymentMutation,
   rollbackDeploymentMutation,
   createSignedUploadUrlMutation,
