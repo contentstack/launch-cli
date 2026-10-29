@@ -34,11 +34,11 @@ fileignoreconfig:
 - filename: test/integration/harness/launch-api.ts
   checksum: a4549b87c896744422e71ab5395a1d6d2dfa372678d2488aecc4247ee9738f87
 - filename: test/integration/harness/session.ts
-  checksum: 74dc637304710b1df882bea6a1c52b8779f1bd416dbeeab93a9026c68edb3f9e
+  checksum: 49000399e4150155dbdccccc8a97e2cda429035062c41e69c30a5f904e5a361c
 - filename: test/integration/specs/launch-github.test.ts
   checksum: 4ea1ae16627383530d7590374ba2b37fde87b5c111cc6c38c5125456aa9b51c8
 - filename: test/integration/harness/fixtures.ts
-  checksum: 41f961e91f8628a6ca3ffda5c8172c6f89f5f97d9d9b9a9c3689916760872e82
+  checksum: 97a6a6b9c83c1d53ace7175961d7654b4523a3a446bb5a5716f97897fdc895c4
 - filename: src/base-command.ts
   checksum: db8bc45f6d8aa3daebae621920c8618b6e23d1a20984dee0749d91bfa5c1530c
 - filename: test/unit/base-command.test.ts
@@ -51,4 +51,16 @@ fileignoreconfig:
   checksum: 2cb79446bb06c785a2c1a349195e7d90c6a5c5bf4a14be995b970f6fb2b2ccd9
 - filename: src/commands/launch/secrets/list.test.ts
   checksum: a5113cbf747b711af916751e37912f50660bc307683a2237eac4f767d5157ce6
+- filename: src/graphql/mutation.ts
+  checksum: b2b64d708700428354cc9863710e3aa2bdaee073e63e11cb1755ca46a2a961d6
+- filename: src/util/secrets.ts
+  checksum: 0558c6fd1e876704613fa5f4d2eb8a3c1985b4d7f8539d1d3cb47ec2ca8caae0
+- filename: src/commands/launch/secrets/set.ts
+  checksum: a850e49f4a1a87e34721d94432934f72971ba6f9c151ae8b50a0dc6985095d6f
+- filename: src/util/secrets.test.ts
+  checksum: 08a359719861f1a249fe3ccfac282c48a678e0b2a8ceb7f795e2676acb697c24
+- filename: test/integration/specs/secrets-set.test.ts
+  checksum: 931fca7aae520cd3b5a63e1c4ba64e4df78fbd121d5f256ba5977703d6fa9b5e
+- filename: src/commands/launch/secrets/set.test.ts
+  checksum: 822408f4669aadf22d91d859b8c09789c123b03e7490e285c8b274ef551186d8
 version: "1.0"

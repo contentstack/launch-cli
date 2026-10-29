@@ -5,4 +5,5 @@ import LogPolling  from './logs-polling-utilities';
 export * from './log';
 export * from './common-utility';
 export * from './create-git-meta';
+export * from './secrets';
 export { Logger, GraphqlApiClient, LogPolling };

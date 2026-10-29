@@ -73,6 +73,18 @@ export const environmentSecretsResponse = (secrets: Record<string, any>[] = [sec
   },
 });
 
+export const addEnvironmentSecretResponse = (key = SECRET_KEY) => ({
+  data: { addEnvironmentSecret: secretNode({ key }) },
+});
+
+export const refreshEnvironmentSecretResponse = (key = SECRET_KEY) => ({
+  data: { refreshEnvironmentSecret: secretNode({ key }) },
+});
+
+export const secretsApiErrorResponse = (status: number, code?: string, message = 'Request failed') => ({
+  errors: [{ message, extensions: { exception: { status, ...(code ? { name: code } : {}) } } }],
+});
+
 export const projectsResponse = (
   projects: { uid: string; name: string }[] = [{ uid: PROJECT_UID, name: PROJECT_NAME }],
 ) => ({

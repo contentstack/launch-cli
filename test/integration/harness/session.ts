@@ -8,6 +8,7 @@ import { GitRepo, GitRepoOptions } from './git-repo';
 import { LaunchApiMock } from './launch-api';
 import { cma } from './cma';
 import { prompts } from './prompts';
+import { stdin } from './stdin';
 
 const CMA_HOST = 'api.contentstack.io';
 
@@ -77,6 +78,7 @@ export class Session {
   async stop(): Promise<void> {
     try {
       prompts.restore();
+      stdin.restore();
       prompts.reset();
       cma.reset();
       this.api.reset();
