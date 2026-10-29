@@ -58,7 +58,7 @@ describe('launch:secrets:list', () => {
     const result = await runCommand(ListSecrets, flags());
 
     expect(result.exitCode).toBe(1);
-    expect(result.output).toContain('You do not have permission to list the secrets of this environment.');
+    expect(result.output).toContain('You do not have permission to manage the secrets of this environment.');
     expect(result.output).not.toContain('raw-policy-detail');
     expect(result.output).not.toContain('Forbidden resource');
     session.api.assertNoUnhandledOperations();

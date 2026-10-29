@@ -61,4 +61,4 @@ export const formatSecretsError = (error: any, { key, value }: SecretsErrorConte
   return redactValue(message, value);
 };
 
-export const redactFlagValues = (text: string): string => text.replace(/(--[\w-]+)=\S+/g, '$1');
+export const redactFlagValues = (text: string): string => text.replace(/(?<![\w-])(-{1,2}[\w-]+)=.*/g, '$1');

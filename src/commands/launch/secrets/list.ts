@@ -5,7 +5,7 @@ import { FlagInput, Flags, cliux as ux } from '@contentstack/cli-utilities';
 
 import { BaseCommand } from '../../../base-command';
 import { environmentSecretsQuery } from '../../../graphql';
-import { Logger, selectOrg, selectProject } from '../../../util';
+import { Logger, selectOrg, selectProject, formatSecretsError } from '../../../util';
 
 export default class ListSecrets extends BaseCommand<typeof ListSecrets> {
   static description = 'List the secrets of an environment (keys only, values are never shown)';
@@ -75,11 +75,8 @@ export default class ListSecrets extends BaseCommand<typeof ListSecrets> {
       .query({ query: environmentSecretsQuery })
       .then(({ data: { Environments } }) => map(Environments.edges, 'node'))
       .catch((error) => {
-        if (error?.graphQLErrors?.[0]?.extensions?.exception?.status === 403) {
-          this.log('You do not have permission to list the secrets of this environment.', 'error');
-          process.exit(1);
-        }
-        throw error;
+        this.log(formatSecretsError(error), 'error');
+        process.exit(1);
       });
 
     if (!this.flags.environment) {

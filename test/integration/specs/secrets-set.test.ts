@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 
@@ -55,6 +55,41 @@ describe('launch:secrets:set', () => {
       secret: { key: fixtures.SECRET_KEY, value },
     });
     expect(result.output).not.toContain(value);
+  });
+
+  it('fails without any prompt or mutation when the value is piped and --environment is missing', async () => {
+    const value = randomUUID();
+    stdin.pipe(`${value}\n`);
+    prompts.script([]);
+    const args = [...session.baseArgs, '--org', fixtures.ORG.uid, '--project', fixtures.PROJECT_UID];
+
+    const result = await runCommand(SetSecret, [...args, '--key', fixtures.SECRET_KEY, '--yes']);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain('--org, --project and --environment are required when the value is piped');
+    expect(result.output).not.toContain(value);
+    expect(session.api.operationSequence()).toEqual([]);
+    session.api.assertNoUnhandledOperations();
+    prompts.assertScriptFullyConsumed();
+  });
+
+  it('fails without any prompt or mutation when the value is piped and a branch would have to be chosen', async () => {
+    const value = randomUUID();
+    writeFileSync(
+      session.launchConfigPath,
+      JSON.stringify({ main: { uid: fixtures.PROJECT_UID }, develop: { uid: fixtures.PROJECT_UID } }),
+    );
+    stdin.pipe(`${value}\n`);
+    prompts.script([]);
+
+    const result = await runCommand(SetSecret, [...scope(), '--key', fixtures.SECRET_KEY, '--yes']);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain('Multiple branches are configured; pass --branch when the value is piped');
+    expect(result.output).not.toContain(value);
+    expect(session.api.operationSequence()).toEqual([]);
+    session.api.assertNoUnhandledOperations();
+    prompts.assertScriptFullyConsumed();
   });
 
   it('refreshes an existing secret after a masked prompt and a confirmation in a terminal', async () => {

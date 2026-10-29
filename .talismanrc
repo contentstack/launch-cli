@@ -48,19 +48,19 @@ fileignoreconfig:
 - filename: test/integration/specs/secrets-list.test.ts
   checksum: d4cdd09fe16a876f7457bdf9bbaa83511624c12a0c7a967abc5f26a678696629
 - filename: src/commands/launch/secrets/list.ts
-  checksum: 2cb79446bb06c785a2c1a349195e7d90c6a5c5bf4a14be995b970f6fb2b2ccd9
+  checksum: e33958ccf580f32e6869690f1409ab40bb429f699623dc0a009a62e9e6f204d7
 - filename: src/commands/launch/secrets/list.test.ts
-  checksum: a5113cbf747b711af916751e37912f50660bc307683a2237eac4f767d5157ce6
+  checksum: 2405b5f40b03d5ed888466bedb4444cba244f0565785ac9b3a0ab4d0876d4567
 - filename: src/graphql/mutation.ts
   checksum: 97bd5e5e73e9ed3d661d417a10de35e22b4924bd0002177cee375ee66545ede8
 - filename: src/util/secrets.ts
   checksum: 0558c6fd1e876704613fa5f4d2eb8a3c1985b4d7f8539d1d3cb47ec2ca8caae0
 - filename: src/commands/launch/secrets/set.ts
-  checksum: a850e49f4a1a87e34721d94432934f72971ba6f9c151ae8b50a0dc6985095d6f
+  checksum: 04374d713f871999adc0d6ea3916951c3fd93a8067e4a045420ae00fdde448c6
 - filename: src/util/secrets.test.ts
   checksum: 08a359719861f1a249fe3ccfac282c48a678e0b2a8ceb7f795e2676acb697c24
 - filename: test/integration/specs/secrets-set.test.ts
-  checksum: 931fca7aae520cd3b5a63e1c4ba64e4df78fbd121d5f256ba5977703d6fa9b5e
+  checksum: 0729bef6ec4b7a5c579ced56c0dfb3da32b9d29b9779a934b8bb1e2690d6f601
 - filename: src/commands/launch/secrets/set.test.ts
   checksum: 822408f4669aadf22d91d859b8c09789c123b03e7490e285c8b274ef551186d8
 - filename: src/commands/launch/secrets/unset.ts

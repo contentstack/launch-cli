@@ -119,6 +119,22 @@ describe('secrets util', () => {
     expect(message).toBe('Nonexistent flag: --value\nSee more help with --help');
   });
 
+  it('removes a spaced value of an equals-style flag up to the end of the line', () => {
+    const value = `${randomUUID()} ${randomUUID()}`;
+
+    const message = redactFlagValues(`Nonexistent flag: --value=${value}\nSee more help with --help`);
+
+    expect(message).toBe('Nonexistent flag: --value\nSee more help with --help');
+  });
+
+  it('removes the value of a short equals-style flag', () => {
+    const value = `${randomUUID()} ${randomUUID()}`;
+
+    const message = redactFlagValues(`Nonexistent flag: -v=${value}`);
+
+    expect(message).toBe('Nonexistent flag: -v');
+  });
+
   it('leaves a message without flag values unchanged', () => {
     expect(redactFlagValues('Missing required flag key')).toBe('Missing required flag key');
   });
