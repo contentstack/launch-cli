@@ -5,13 +5,23 @@ import { ApolloClient, ObservableQuery } from '@apollo/client/core';
 import { Ora } from 'ora';
 
 import { LogPollingInput, ConfigType } from '../types';
-import { deploymentQuery, deploymentLogsQuery, serverlessLogsQuery } from '../graphql';
+import {
+  deploymentQuery,
+  deploymentLogsQuery,
+  deploymentLogsV2Query,
+  serverlessLogsQuery,
+} from '../graphql';
 import { setTimeout as sleep } from 'timers/promises';
 import { isNotDevelopment } from './apollo-client';
 
 const requireApolloDeprecation = createRequire(__filename);
 
 export default class LogPolling {
+  private static readonly DEPLOYMENT_LOGS_PAGE_SIZE = 5_000;
+
+  private static readonly V2_UNSUPPORTED_PATTERN =
+    /cannot query field ["'`]?getDeploymentLogsV2|unknown type ["'`]?DeploymentLogsV2QueryInput/i;
+
   private config: ConfigType;
   private $event!: EventEmitter;
   private apolloLogsClient!: ApolloClient<any>;
@@ -20,6 +30,8 @@ export default class LogPolling {
   public startTime!: number;
   public endTime!: number;
   public loader!: Ora | void;
+  private deploymentLogsCursor: string | null = null;
+  private deploymentLogsV1FallbackStarted = false;
 
   constructor(params: LogPollingInput) {
     const { apolloLogsClient, apolloManageClient, config, $event } = params;
@@ -162,6 +174,63 @@ export default class LogPolling {
     const logsWatchQuery = this.withDeprecationsDisabled(() => {
       return this.apolloLogsClient.watchQuery({
         fetchPolicy: 'network-only',
+        query: deploymentLogsV2Query,
+        variables: {
+          query: this.deploymentLogsV2Variables(),
+        },
+        pollInterval: this.config.pollingInterval,
+        errorPolicy: 'all',
+      });
+    });
+    this.subscribeDeploymentLogsV2(logsWatchQuery);
+  }
+
+  /**
+   * @method deploymentLogsV2Variables - build the getDeploymentLogsV2 query input
+   *
+   * @return {*}  {Record<string, unknown>}
+   * @memberof LogPolling
+   */
+  private deploymentLogsV2Variables(): Record<string, unknown> {
+    return {
+      deploymentUid: this.config.deployment,
+      limit: LogPolling.DEPLOYMENT_LOGS_PAGE_SIZE,
+      sortDirection: this.deploymentLogsCursor ? 'asc' : 'desc',
+      ...(this.deploymentLogsCursor ? { cursor: this.deploymentLogsCursor } : {}),
+    };
+  }
+
+  /**
+   * @method isUnsupportedQueryError - detect a logs service with no getDeploymentLogsV2
+   *
+   * @return {*}  {boolean}
+   * @memberof LogPolling
+   */
+  private isUnsupportedQueryError(error: any, errors?: readonly any[] | null): boolean {
+    const messages: string[] = [];
+    if (error?.message) messages.push(error.message);
+    for (const graphQLError of error?.graphQLErrors ?? []) {
+      if (graphQLError?.message) messages.push(graphQLError.message);
+    }
+    for (const graphQLError of errors ?? []) {
+      if (graphQLError?.message) messages.push(graphQLError.message);
+    }
+    return messages.some((message) => LogPolling.V2_UNSUPPORTED_PATTERN.test(message));
+  }
+
+  /**
+   * @method fallBackToDeploymentLogsV1 - re-poll through the legacy getLogs query
+   *
+   * @return {*}  {void}
+   * @memberof LogPolling
+   */
+  private fallBackToDeploymentLogsV1(): void {
+    if (this.deploymentLogsV1FallbackStarted) return;
+    this.deploymentLogsV1FallbackStarted = true;
+
+    const logsWatchQuery = this.withDeprecationsDisabled(() => {
+      return this.apolloLogsClient.watchQuery({
+        fetchPolicy: 'network-only',
         query: deploymentLogsQuery,
         variables: {
           deploymentUid: this.config.deployment,
@@ -171,6 +240,91 @@ export default class LogPolling {
       });
     });
     this.subscribeDeploymentLogs(logsWatchQuery);
+  }
+
+  /**
+   * @method subscribeDeploymentLogsV2 - subscribe cursor-paged deployment logs
+   *
+   * @return {*}  {void}
+   * @memberof LogPolling
+   */
+  subscribeDeploymentLogsV2(
+    logsWatchQuery: ObservableQuery<
+      any,
+      {
+        query: Record<string, unknown>;
+      }
+    >,
+  ): void {
+    logsWatchQuery.subscribe(async({ data, errors, error }) => {
+      if(!this.loader){
+        this.loader = cliux.loaderV2('Loading deployment logs...');
+      }
+      if (this.isUnsupportedQueryError(error, errors)) {
+        logsWatchQuery.stopPolling();
+        this.fallBackToDeploymentLogsV1();
+        return;
+      }
+      if (error) {
+        this.loader=cliux.loaderV2('done', this.loader);
+        this.$event.emit('deployment-logs', {
+          message: error?.message,
+          msgType: 'error',
+        });
+        this.$event.emit('deployment-logs', {
+          message: 'DONE',
+          msgType: 'debug',
+        });
+        logsWatchQuery.stopPolling();
+      }
+      if (errors?.length && data === null) {
+        this.loader=cliux.loaderV2('done', this.loader);
+        this.$event.emit('deployment-logs', {
+          message: errors,
+          msgType: 'error',
+        });
+        this.$event.emit('deployment-logs', {
+          message: 'DONE',
+          msgType: 'debug',
+        });
+        logsWatchQuery.stopPolling();
+      }
+      if (this.deploymentStatus) {
+        const page = data?.getDeploymentLogsV2;
+        const logsData = page?.logs;
+        const hasNewer = page?.pageInfo?.hasNewer === true;
+        let advanced = false;
+
+        if (logsData?.length) {
+          this.loader=cliux.loaderV2('done', this.loader);
+          this.$event.emit('deployment-logs', {
+            message: logsData,
+            msgType: 'info',
+          });
+
+          const nextCursor = page?.pageInfo?.newestCursor;
+          if (nextCursor && nextCursor !== this.deploymentLogsCursor) {
+            this.deploymentLogsCursor = nextCursor;
+            advanced = true;
+            logsWatchQuery.setVariables({
+              query: this.deploymentLogsV2Variables(),
+            } as any);
+          }
+        }
+
+        if (this.config.deploymentStatus.includes(this.deploymentStatus) && !(hasNewer && advanced)) {
+          await sleep(1_000);
+          logsWatchQuery.stopPolling();
+          this.$event.emit('deployment-logs', {
+            message: 'DONE',
+            msgType: 'debug',
+          });
+          if(this.loader){
+            this.loader=cliux.loaderV2('done', this.loader);
+          }
+        }
+      }
+    });
   }
 
   /**
