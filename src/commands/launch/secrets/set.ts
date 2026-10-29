@@ -178,7 +178,7 @@ export default class SetSecret extends BaseCommand<typeof SetSecret> {
     await this.apolloClient
       .mutate({
         mutation: exists ? refreshEnvironmentSecretMutation : addEnvironmentSecretMutation,
-        variables: { environmentUid: environment.uid, secret: { key, value } },
+        variables: { environment: { uid: environment.uid }, secret: { key, value } },
       })
       .catch((error) => {
         this.log(formatSecretsError(error, { key, value }), 'error');

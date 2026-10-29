@@ -25,9 +25,23 @@ const environmentsResponse = (name = 'Default') => ({
   data: { Environments: { edges: [{ node: { uid: ENVIRONMENT_UID, name, secrets: [] } }] } },
 });
 
-const apiError = (status: number, name?: string) => ({
+const NOT_FOUND_CODE = 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS.KEY.NOT_FOUND';
+
+const apiError = (status: number) => ({
   message: 'Request failed',
-  graphQLErrors: [{ message: 'Request failed', extensions: { exception: { status, ...(name ? { name } : {}) } } }],
+  graphQLErrors: [{ message: 'Request failed', extensions: { exception: { status } } }],
+});
+
+const notFoundError = () => ({
+  message: 'Bad request',
+  graphQLErrors: [
+    {
+      message: 'Bad request',
+      extensions: {
+        exception: { status: 400, messages: [NOT_FOUND_CODE], errorObject: { secret: [{ code: NOT_FOUND_CODE }] } },
+      },
+    },
+  ],
 });
 
 const buildCommand = (
@@ -64,11 +78,11 @@ describe('UnsetSecret Command', () => {
     expect(mutate).toHaveBeenCalledTimes(2);
     expect(mutate).toHaveBeenNthCalledWith(1, {
       mutation: deleteEnvironmentSecretMutation,
-      variables: { environmentUid: ENVIRONMENT_UID, key: 'API_TOKEN' },
+      variables: { environment: { uid: ENVIRONMENT_UID }, secret: { key: 'API_TOKEN' } },
     });
     expect(mutate).toHaveBeenNthCalledWith(2, {
       mutation: deleteEnvironmentSecretMutation,
-      variables: { environmentUid: ENVIRONMENT_UID, key: 'DB_PASSWORD' },
+      variables: { environment: { uid: ENVIRONMENT_UID }, secret: { key: 'DB_PASSWORD' } },
     });
     expect(cliux.inquire).not.toHaveBeenCalled();
     expect((cmd as any).log).toHaveBeenCalledWith(expect.stringContaining('API_TOKEN'));
@@ -86,7 +100,10 @@ describe('UnsetSecret Command', () => {
     expect(question.type).toBe('confirm');
     expect(question.message).toContain('API_TOKEN');
     expect(mutate).toHaveBeenCalledTimes(1);
-    expect(mutate.mock.calls[0][0].variables).toEqual({ environmentUid: ENVIRONMENT_UID, key: 'API_TOKEN' });
+    expect(mutate.mock.calls[0][0].variables).toEqual({
+      environment: { uid: ENVIRONMENT_UID },
+      secret: { key: 'API_TOKEN' },
+    });
     expect(exitMock).not.toHaveBeenCalled();
   });
 
@@ -113,7 +130,7 @@ describe('UnsetSecret Command', () => {
   it('keeps deleting the remaining keys after one fails and exits 1 at the end', async () => {
     const mutate = jest
       .fn()
-      .mockRejectedValueOnce(apiError(404, 'ENVIRONMENT_SECRET_NOT_FOUND'))
+      .mockRejectedValueOnce(notFoundError())
       .mockResolvedValueOnce({ data: { deleteEnvironmentSecret: true } });
     const { cmd } = buildCommand({ key: ['MISSING_KEY', 'API_TOKEN'], yes: true }, mutate);
 

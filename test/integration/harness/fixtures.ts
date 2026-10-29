@@ -85,8 +85,25 @@ export const deleteEnvironmentSecretResponse = () => ({
   data: { deleteEnvironmentSecret: true },
 });
 
-export const secretsApiErrorResponse = (status: number, code?: string, message = 'Request failed') => ({
-  errors: [{ message, extensions: { exception: { status, ...(code ? { name: code } : {}) } } }],
+export const SECRET_ERROR_CODES = {
+  keyConflict: 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS.KEY.CONFLICT',
+  notFound: 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS.KEY.NOT_FOUND',
+  multiline: 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS.VALUE.MULTILINE',
+};
+
+export const secretsFormErrorResponse = (code: string, key = 'secret') => ({
+  errors: [
+    {
+      message: 'Bad request',
+      extensions: {
+        exception: { errorObject: { [key]: [{ code }] }, key, message: 'Bad request', messages: [code], status: 400 },
+      },
+    },
+  ],
+});
+
+export const secretsApiErrorResponse = (status: number, message = 'Request failed') => ({
+  errors: [{ message, extensions: { exception: { status } } }],
 });
 
 export const projectsResponse = (

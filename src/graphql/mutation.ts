@@ -86,8 +86,8 @@ const rollbackDeploymentMutation: DocumentNode = gql`
 `;
 
 const addEnvironmentSecretMutation: DocumentNode = gql`
-  mutation AddEnvironmentSecret($environmentUid: String!, $secret: EnvironmentSecretInput!) {
-    addEnvironmentSecret(environmentUid: $environmentUid, secret: $secret) {
+  mutation AddEnvironmentSecret($environment: EnvironmentInput!, $secret: EnvironmentSecretInput!) {
+    addEnvironmentSecret(environment: $environment, secret: $secret) {
       key
       updatedAt
     }
@@ -95,8 +95,8 @@ const addEnvironmentSecretMutation: DocumentNode = gql`
 `;
 
 const refreshEnvironmentSecretMutation: DocumentNode = gql`
-  mutation RefreshEnvironmentSecret($environmentUid: String!, $secret: EnvironmentSecretInput!) {
-    refreshEnvironmentSecret(environmentUid: $environmentUid, secret: $secret) {
+  mutation RefreshEnvironmentSecret($environment: EnvironmentInput!, $secret: EnvironmentSecretInput!) {
+    refreshEnvironmentSecret(environment: $environment, secret: $secret) {
       key
       updatedAt
     }
@@ -104,8 +104,8 @@ const refreshEnvironmentSecretMutation: DocumentNode = gql`
 `;
 
 const deleteEnvironmentSecretMutation: DocumentNode = gql`
-  mutation DeleteEnvironmentSecret($environmentUid: String!, $key: String!) {
-    deleteEnvironmentSecret(environmentUid: $environmentUid, key: $key)
+  mutation DeleteEnvironmentSecret($environment: EnvironmentInput!, $secret: EnvironmentSecretKeyInput!) {
+    deleteEnvironmentSecret(environment: $environment, secret: $secret)
   }
 `;
 

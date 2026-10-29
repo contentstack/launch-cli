@@ -32,9 +32,24 @@ const environmentsResponse = (secrets: Record<string, any>[] = [], name = 'Defau
   data: { Environments: { edges: [{ node: { uid: ENVIRONMENT_UID, name, secrets } }] } },
 });
 
-const apiError = (status: number, name?: string) => ({
+const SECRET_CODES = {
+  conflict: 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS.KEY.CONFLICT',
+  multiline: 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS.VALUE.MULTILINE',
+};
+
+const apiError = (status: number) => ({
   message: 'Request failed',
-  graphQLErrors: [{ message: 'Request failed', extensions: { exception: { status, ...(name ? { name } : {}) } } }],
+  graphQLErrors: [{ message: 'Request failed', extensions: { exception: { status } } }],
+});
+
+const formError = (code: string) => ({
+  message: 'Bad request',
+  graphQLErrors: [
+    {
+      message: 'Bad request',
+      extensions: { exception: { status: 400, messages: [code], errorObject: { secret: [{ code }] } } },
+    },
+  ],
 });
 
 const originalStdin = Object.getOwnPropertyDescriptor(process, 'stdin') as PropertyDescriptor;
@@ -84,7 +99,7 @@ describe('SetSecret Command', () => {
     expect(mutate).toHaveBeenCalledTimes(1);
     expect(mutate).toHaveBeenCalledWith({
       mutation: addEnvironmentSecretMutation,
-      variables: { environmentUid: ENVIRONMENT_UID, secret: { key: 'API_TOKEN', value } },
+      variables: { environment: { uid: ENVIRONMENT_UID }, secret: { key: 'API_TOKEN', value } },
     });
     expect(cliux.inquire).not.toHaveBeenCalled();
     expect(exitMock).not.toHaveBeenCalled();
@@ -126,7 +141,7 @@ describe('SetSecret Command', () => {
 
     expect(mutate).toHaveBeenCalledTimes(1);
     expect(mutate.mock.calls[0][0].mutation).toBe(refreshEnvironmentSecretMutation);
-    expect(mutate.mock.calls[0][0].variables.environmentUid).toBe(ENVIRONMENT_UID);
+    expect(mutate.mock.calls[0][0].variables.environment).toEqual({ uid: ENVIRONMENT_UID });
   });
 
   it('aborts without a mutation or an error exit when the confirmation is declined', async () => {
@@ -201,7 +216,7 @@ describe('SetSecret Command', () => {
 
   it('shows the multi-line message and leaks no value fragment when the API rejects a multi-line value', async () => {
     stubStdin(false, ['line1\nline2']);
-    const mutate = jest.fn().mockRejectedValue(apiError(400, 'ENVIRONMENT_SECRET_VALUE_MULTILINE'));
+    const mutate = jest.fn().mockRejectedValue(formError(SECRET_CODES.multiline));
     const { cmd } = buildCommand({ yes: true }, { mutate });
 
     await expect((cmd as any).setSecret()).rejects.toThrow('process.exit:1');
@@ -211,9 +226,9 @@ describe('SetSecret Command', () => {
     expect(allOutput((cmd as any).log, cliux.print as jest.Mock)).not.toContain('line1');
   });
 
-  it('reports the key conflict message when the API answers 409', async () => {
+  it('reports the key conflict message when the API reports a key conflict', async () => {
     stubStdin(false, [randomUUID()]);
-    const mutate = jest.fn().mockRejectedValue(apiError(409, 'ENVIRONMENT_SECRET_KEY_CONFLICT'));
+    const mutate = jest.fn().mockRejectedValue(formError(SECRET_CODES.conflict));
     const { cmd } = buildCommand({ yes: true }, { mutate });
 
     await expect((cmd as any).setSecret()).rejects.toThrow('process.exit:1');

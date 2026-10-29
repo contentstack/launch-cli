@@ -90,7 +90,7 @@ describe('ListSecrets Command', () => {
     expect(cliux.table).not.toHaveBeenCalled();
   });
 
-  it.each([[404], [400]])('shows the formatted message and exits 1 when the secrets query fails with %i', async (status) => {
+  it.each([[404], [400]])('shows the server message and exits 1 when the secrets query fails with %i', async (status) => {
     const raw = randomUUID();
     const query = jest.fn().mockRejectedValue({
       message: raw,
@@ -100,9 +100,8 @@ describe('ListSecrets Command', () => {
 
     await expect((cmd as any).listSecrets()).rejects.toThrow('process.exit:1');
 
-    const expected = status === 404 ? 'was not found' : 'invalid key or value';
+    const expected = status === 400 ? 'invalid key or value' : raw;
     expect((cmd as any).log).toHaveBeenCalledWith(expect.stringContaining(expected), 'error');
-    expect(JSON.stringify((cmd as any).log.mock.calls)).not.toContain(raw);
     expect(exitMock).toHaveBeenCalledWith(1);
     expect(cliux.table).not.toHaveBeenCalled();
   });

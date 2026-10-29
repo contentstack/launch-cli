@@ -16,6 +16,17 @@ export const clientExposedWarning = (key: string): string =>
   `Warning: ${key} starts with a client-exposed prefix, so its value is inlined into client JavaScript ` +
   'at build time and is visible to anyone who loads your site.';
 
+const ERROR_CODES = {
+  keyConflict: 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS.KEY.CONFLICT',
+  notFound: 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS.KEY.NOT_FOUND',
+  multiline: 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS.VALUE.MULTILINE',
+  concurrentUpdate: 'launch.ENVIRONMENT.ENVIRONMENT_VARIABLES.CONCURRENT_UPDATE',
+  keyEmpty: 'launch.ENVIRONMENT.ENVIRONMENT_VARIABLES.KEY.NOT_EMPTY',
+  keyTooLong: 'launch.ENVIRONMENT.ENVIRONMENT_VARIABLES.KEY.TOO_LONG',
+  valueEmpty: 'launch.ENVIRONMENT.ENVIRONMENT_VARIABLES.VALUE.NOT_EMPTY',
+  valueTooLong: 'launch.ENVIRONMENT.ENVIRONMENT_VARIABLES.VALUE.TOO_LONG',
+};
+
 type SecretsErrorContext = { key?: string; value?: string };
 
 const stringify = (item: unknown): string => {
@@ -44,13 +55,14 @@ export const formatSecretsError = (error: any, { key, value }: SecretsErrorConte
   const keyName = key ?? 'the secret';
 
   const known: [boolean, string][] = [
-    [hasCode('ENVIRONMENT_SECRET_KEY_CONFLICT'), `The key ${keyName} is already used by a variable or secret.`],
-    [
-      hasCode('ENVIRONMENT_VARIABLES_CONCURRENT_UPDATE'),
-      'The environment was changed by a concurrent update. Please retry.',
-    ],
-    [hasCode('ENVIRONMENT_SECRET_VALUE_MULTILINE'), 'Invalid value: multi-line values are not supported.'],
-    [hasCode('ENVIRONMENT_SECRET_NOT_FOUND') || status === 404, `The secret ${keyName} was not found.`],
+    [hasCode(ERROR_CODES.keyConflict), `The key ${keyName} is already used by a variable or secret.`],
+    [hasCode(ERROR_CODES.concurrentUpdate), 'The environment was changed by a concurrent update. Please retry.'],
+    [hasCode(ERROR_CODES.multiline), 'Invalid value: multi-line values are not supported.'],
+    [hasCode(ERROR_CODES.notFound), `The secret ${keyName} was not found.`],
+    [hasCode(ERROR_CODES.keyEmpty), 'Invalid key: the key cannot be empty.'],
+    [hasCode(ERROR_CODES.keyTooLong), 'Invalid key: the key is too long (maximum 10000 characters).'],
+    [hasCode(ERROR_CODES.valueEmpty), 'Invalid value: the value cannot be empty.'],
+    [hasCode(ERROR_CODES.valueTooLong), 'Invalid value: the value is too long (maximum 10000 characters).'],
     [status === 403, 'You do not have permission to manage the secrets of this environment.'],
     [status === 400, 'The API rejected the request: invalid key or value.'],
   ];

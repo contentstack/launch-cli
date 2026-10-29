@@ -51,7 +51,7 @@ describe('launch:secrets:set', () => {
     prompts.assertScriptFullyConsumed();
     expect(session.api.operationSequence()).toEqual(['Projects', 'EnvironmentSecrets', 'AddEnvironmentSecret']);
     expect(session.api.variablesOf('AddEnvironmentSecret')).toEqual({
-      environmentUid: fixtures.ENVIRONMENT_UID,
+      environment: { uid: fixtures.ENVIRONMENT_UID },
       secret: { key: fixtures.SECRET_KEY, value },
     });
     expect(result.output).not.toContain(value);
@@ -111,7 +111,10 @@ describe('launch:secrets:set', () => {
     session.api.assertNoUnhandledOperations();
     prompts.assertScriptFullyConsumed();
     expect(session.api.operationSequence()).toEqual(['Projects', 'EnvironmentSecrets', 'RefreshEnvironmentSecret']);
-    expect(session.api.variablesOf('RefreshEnvironmentSecret').secret).toEqual({ key: fixtures.SECRET_KEY, value });
+    expect(session.api.variablesOf('RefreshEnvironmentSecret')).toEqual({
+      environment: { uid: fixtures.ENVIRONMENT_UID },
+      secret: { key: fixtures.SECRET_KEY, value },
+    });
     expect(result.output).not.toContain(value);
   });
 
@@ -158,11 +161,11 @@ describe('launch:secrets:set', () => {
     expect(session.api.calls('RefreshEnvironmentSecret')).toHaveLength(0);
   });
 
-  it('shows the key conflict message and exits 1 when the API answers 409', async () => {
+  it('shows the key conflict message and exits 1 when the API reports a key conflict', async () => {
     session.api
       .on('Projects', fixtures.projectsResponse())
       .on('EnvironmentSecrets', fixtures.environmentSecretsResponse([]))
-      .on('AddEnvironmentSecret', fixtures.secretsApiErrorResponse(409, 'ENVIRONMENT_SECRET_KEY_CONFLICT'));
+      .on('AddEnvironmentSecret', fixtures.secretsFormErrorResponse(fixtures.SECRET_ERROR_CODES.keyConflict));
     stdin.pipe(randomUUID());
     prompts.script([]);
 
@@ -182,7 +185,7 @@ describe('launch:secrets:set', () => {
       .on('AddEnvironmentSecret', (_variables, callIndex) =>
         callIndex === 0
           ? fixtures.addEnvironmentSecretResponse()
-          : fixtures.secretsApiErrorResponse(400, undefined, `Invalid value ${value}`),
+          : fixtures.secretsApiErrorResponse(400, `Invalid value ${value}`),
       );
     prompts.script([]);
 

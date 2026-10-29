@@ -8,8 +8,31 @@ import {
   redactFlagValues,
 } from './secrets';
 
-const apiError = (status: number, code?: string, message = 'Request failed') => ({
-  graphQLErrors: [{ message, extensions: { exception: { status, ...(code ? { name: code } : {}) } } }],
+const CODES = {
+  conflict: 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS.KEY.CONFLICT',
+  notFound: 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS.KEY.NOT_FOUND',
+  multiline: 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS.VALUE.MULTILINE',
+  concurrent: 'launch.ENVIRONMENT.ENVIRONMENT_VARIABLES.CONCURRENT_UPDATE',
+  keyEmpty: 'launch.ENVIRONMENT.ENVIRONMENT_VARIABLES.KEY.NOT_EMPTY',
+  keyTooLong: 'launch.ENVIRONMENT.ENVIRONMENT_VARIABLES.KEY.TOO_LONG',
+  valueEmpty: 'launch.ENVIRONMENT.ENVIRONMENT_VARIABLES.VALUE.NOT_EMPTY',
+  valueTooLong: 'launch.ENVIRONMENT.ENVIRONMENT_VARIABLES.VALUE.TOO_LONG',
+};
+
+const formError = (code: string, key = 'secret') => ({
+  message: 'Bad request',
+  graphQLErrors: [
+    {
+      message: 'Bad request',
+      extensions: {
+        exception: { status: 400, messages: [code], errorObject: { [key]: [{ code }] } },
+      },
+    },
+  ],
+});
+
+const apiError = (status: number, message = 'Request failed') => ({
+  graphQLErrors: [{ message, extensions: { exception: { status } } }],
   message,
 });
 
@@ -34,12 +57,16 @@ describe('secrets util', () => {
   });
 
   it.each([
-    ['409 key conflict', apiError(409, 'ENVIRONMENT_SECRET_KEY_CONFLICT'), 'already used by a variable or secret'],
-    ['409 concurrent update', apiError(409, 'ENVIRONMENT_VARIABLES_CONCURRENT_UPDATE'), 'concurrent update'],
-    ['400 multiline', apiError(400, 'ENVIRONMENT_SECRET_VALUE_MULTILINE'), 'multi-line values are not supported'],
-    ['400 invalid', apiError(400), 'invalid key or value'],
+    ['key conflict', formError(CODES.conflict), 'already used by a variable or secret'],
+    ['concurrent update', formError(CODES.concurrent, 'environmentVariables'), 'concurrent update'],
+    ['multiline', formError(CODES.multiline), 'multi-line values are not supported'],
+    ['not found', formError(CODES.notFound), 'DB_URL was not found'],
+    ['empty key', formError(CODES.keyEmpty), 'key cannot be empty'],
+    ['too long key', formError(CODES.keyTooLong), 'key is too long'],
+    ['empty value', formError(CODES.valueEmpty), 'value cannot be empty'],
+    ['too long value', formError(CODES.valueTooLong), 'value is too long'],
+    ['plain 400 validation', apiError(400), 'invalid key or value'],
     ['403', apiError(403), 'do not have permission'],
-    ['404 not found', apiError(404, 'ENVIRONMENT_SECRET_NOT_FOUND'), 'DB_URL was not found'],
   ])('formats a %s API error as a clear message', (_label, error, expected) => {
     const message = formatSecretsError(error, { key: 'DB_URL' });
 
@@ -48,12 +75,16 @@ describe('secrets util', () => {
 
   it('produces distinct messages for each known error', () => {
     const errors = [
-      apiError(409, 'ENVIRONMENT_SECRET_KEY_CONFLICT'),
-      apiError(409, 'ENVIRONMENT_VARIABLES_CONCURRENT_UPDATE'),
-      apiError(400, 'ENVIRONMENT_SECRET_VALUE_MULTILINE'),
+      formError(CODES.conflict),
+      formError(CODES.concurrent),
+      formError(CODES.multiline),
+      formError(CODES.notFound),
+      formError(CODES.keyEmpty),
+      formError(CODES.keyTooLong),
+      formError(CODES.valueEmpty),
+      formError(CODES.valueTooLong),
       apiError(400),
       apiError(403),
-      apiError(404, 'ENVIRONMENT_SECRET_NOT_FOUND'),
     ];
 
     const messages = errors.map((error) => formatSecretsError(error, { key: 'DB_URL' }));
@@ -62,12 +93,12 @@ describe('secrets util', () => {
     messages.forEach((message) => expect(message.length).toBeGreaterThan(0));
   });
 
-  it('finds a namespaced code in the error object', () => {
+  it('finds a code in the error object only', () => {
     const error = {
       graphQLErrors: [
         {
-          message: 'Conflict',
-          extensions: { exception: { status: 409, errorObject: { code: 'launch.ENVIRONMENT_SECRET_KEY_CONFLICT' } } },
+          message: 'Bad request',
+          extensions: { exception: { status: 400, errorObject: { secret: [{ code: CODES.conflict }] } } },
         },
       ],
     };
@@ -80,7 +111,7 @@ describe('secrets util', () => {
   it('finds a code in the exception messages', () => {
     const error = {
       graphQLErrors: [
-        { message: 'Bad', extensions: { exception: { status: 400, messages: ['ENVIRONMENT_SECRET_VALUE_MULTILINE'] } } },
+        { message: 'Bad', extensions: { exception: { status: 400, messages: [CODES.multiline] } } },
       ],
     };
 
@@ -90,7 +121,7 @@ describe('secrets util', () => {
   });
 
   it('finds a code in the top level error message', () => {
-    const error = { message: 'ENVIRONMENT_SECRET_NOT_FOUND', graphQLErrors: [] };
+    const error = { message: CODES.notFound, graphQLErrors: [] };
 
     const message = formatSecretsError(error, { key: 'DB_URL' });
 
@@ -98,7 +129,7 @@ describe('secrets util', () => {
   });
 
   it('falls back to the server message for an unknown error', () => {
-    const message = formatSecretsError(apiError(500, 'SOMETHING_ELSE', 'Server exploded'), { key: 'DB_URL' });
+    const message = formatSecretsError(apiError(500, 'Server exploded'), { key: 'DB_URL' });
 
     expect(message).toBe('Server exploded');
   });
@@ -106,7 +137,7 @@ describe('secrets util', () => {
   it('never includes the secret value in the message', () => {
     const value = randomUUID();
 
-    const message = formatSecretsError(apiError(500, undefined, `bad value ${value}`), { key: 'DB_URL', value });
+    const message = formatSecretsError(apiError(500, `bad value ${value}`), { key: 'DB_URL', value });
 
     expect(message).not.toContain(value);
   });

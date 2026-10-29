@@ -82,7 +82,7 @@ export default class UnsetSecret extends BaseCommand<typeof UnsetSecret> {
       try {
         await this.apolloClient.mutate({
           mutation: deleteEnvironmentSecretMutation,
-          variables: { environmentUid: environment.uid, key },
+          variables: { environment: { uid: environment.uid }, secret: { key } },
         });
         this.log(`Secret ${key} deleted from environment ${environment.name}.`);
       } catch (error) {

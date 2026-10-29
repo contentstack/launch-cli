@@ -39,16 +39,16 @@ describe('launch:secrets:unset', () => {
     prompts.assertScriptFullyConsumed();
     expect(session.api.operationSequence()).toEqual(['Projects', 'EnvironmentSecrets', 'DeleteEnvironmentSecret']);
     expect(session.api.calls('DeleteEnvironmentSecret').map((call) => call.variables)).toEqual([
-      { environmentUid: fixtures.ENVIRONMENT_UID, key: 'API_TOKEN' },
-      { environmentUid: fixtures.ENVIRONMENT_UID, key: 'DB_PASSWORD' },
+      { environment: { uid: fixtures.ENVIRONMENT_UID }, secret: { key: 'API_TOKEN' } },
+      { environment: { uid: fixtures.ENVIRONMENT_UID }, secret: { key: 'DB_PASSWORD' } },
     ]);
   });
 
-  it('shows a not-found message naming the key and exits 1 when the API answers 404', async () => {
+  it('shows a not-found message naming the key and exits 1 when the API reports the secret missing', async () => {
     session.api
       .on('Projects', fixtures.projectsResponse())
       .on('EnvironmentSecrets', fixtures.environmentSecretsResponse())
-      .on('DeleteEnvironmentSecret', fixtures.secretsApiErrorResponse(404, 'ENVIRONMENT_SECRET_NOT_FOUND'));
+      .on('DeleteEnvironmentSecret', fixtures.secretsFormErrorResponse(fixtures.SECRET_ERROR_CODES.notFound));
     stdin.tty();
     prompts.script([]);
 
