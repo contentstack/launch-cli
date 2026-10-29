@@ -29,6 +29,8 @@ const secretsResponse = (secrets: Record<string, any>[], name = 'Default') => ({
   },
 });
 
+const originalStdin = Object.getOwnPropertyDescriptor(process, 'stdin') as PropertyDescriptor;
+
 const buildCommand = (flags: Record<string, any>, query: jest.Mock) => {
   const cmd = new ListSecrets([], {} as any);
   (cmd as any).flags = flags;
@@ -48,6 +50,7 @@ describe('ListSecrets Command', () => {
   });
 
   afterEach(() => {
+    Object.defineProperty(process, 'stdin', originalStdin);
     jest.clearAllMocks();
   });
 
@@ -90,7 +93,7 @@ describe('ListSecrets Command', () => {
     expect(cliux.table).not.toHaveBeenCalled();
   });
 
-  it.each([[404], [400]])('shows the server message and exits 1 when the secrets query fails with %i', async (status) => {
+  it.each([[404], [400]])('shows the read-context message and exits 1 when the secrets query fails with %i', async (status) => {
     const raw = randomUUID();
     const query = jest.fn().mockRejectedValue({
       message: raw,
@@ -100,7 +103,7 @@ describe('ListSecrets Command', () => {
 
     await expect((cmd as any).listSecrets()).rejects.toThrow('process.exit:1');
 
-    const expected = status === 400 ? 'invalid key or value' : raw;
+    const expected = status === 400 ? 'The API rejected the request.' : 'The project or environment was not found.';
     expect((cmd as any).log).toHaveBeenCalledWith(expect.stringContaining(expected), 'error');
     expect(exitMock).toHaveBeenCalledWith(1);
     expect(cliux.table).not.toHaveBeenCalled();
@@ -140,6 +143,7 @@ describe('ListSecrets Command', () => {
   });
 
   it('prompts for the environment when --environment is not given', async () => {
+    Object.defineProperty(process, 'stdin', { value: { isTTY: true }, configurable: true });
     const query = jest.fn().mockResolvedValue(secretsResponse([{ key: 'API_TOKEN', updatedAt: '2026-01-01T00:00:00.000Z' }]));
     (cliux.inquire as jest.Mock).mockResolvedValue('Default');
     const cmd = buildCommand({}, query);

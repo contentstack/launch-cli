@@ -151,7 +151,7 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
    * @return {*}  {Promise<void>}
    * @memberof BaseCommand
    */
-  async getConfig(): Promise<void> {
+  async getConfig(options: { interactive?: boolean } = {}): Promise<void> {
     if (this.sharedConfig.config && existsSync(this.sharedConfig.config)) {
       const config: Record<string, any> = JSON.parse(readFileSync(this.sharedConfig.config, 'utf-8'));
       const configKeys = keys(config);
@@ -160,7 +160,7 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
       if (this.flags.branch && includes(configKeys, this.flags.branch)) {
         this.sharedConfig.currentConfig = config[this.flags.branch];
       } else if (configKeys?.length > 1) {
-        await this.handleBranchSelection(config, configKeys);
+        await this.handleBranchSelection(config, configKeys, options.interactive !== false);
       } else {
         // By default there is only one configuration ("project"), set it as the default
         this.sharedConfig.currentConfig = config[configKeys[0]];
@@ -172,11 +172,20 @@ export abstract class BaseCommand<T extends typeof Command> extends Command {
     }
   }
 
-  private async handleBranchSelection(config: Record<string, any>, configKeys: string[]): Promise<void> {
+  private async handleBranchSelection(
+    config: Record<string, any>,
+    configKeys: string[],
+    interactive = true,
+  ): Promise<void> {
     // Filter out the "project" key from the branch choices
     const branchChoices = configKeys.filter((key) => key !== 'project');
 
     // If there are multiple keys (branches), excluding "project", prompt user to choose
+    if (branchChoices.length > 1 && !interactive) {
+      this.log('Multiple branches are configured; pass --branch to choose one.', 'error');
+      process.exit(1);
+    }
+
     if (branchChoices.length > 1) {
       this.sharedConfig.currentConfig = await ux
         .inquire({

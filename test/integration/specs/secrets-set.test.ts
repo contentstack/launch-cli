@@ -85,7 +85,7 @@ describe('launch:secrets:set', () => {
     const result = await runCommand(SetSecret, [...scope(), '--key', fixtures.SECRET_KEY, '--yes']);
 
     expect(result.exitCode).toBe(1);
-    expect(result.output).toContain('Multiple branches are configured; pass --branch when the value is piped');
+    expect(result.output).toContain('Multiple branches are configured; pass --branch to choose one.');
     expect(result.output).not.toContain(value);
     expect(session.api.operationSequence()).toEqual([]);
     session.api.assertNoUnhandledOperations();
@@ -127,10 +127,77 @@ describe('launch:secrets:set', () => {
     const result = await runCommand(SetSecret, [...scope(), '--key', fixtures.SECRET_KEY, '--value', value]);
 
     expect(result.exitCode).not.toBe(0);
-    expect(result.output).toContain('Nonexistent flag: --value');
+    expect(result.output).toContain('Invalid arguments');
     expect(result.output).not.toContain(value);
     expect(session.api.calls('AddEnvironmentSecret')).toHaveLength(0);
     expect(session.api.calls('RefreshEnvironmentSecret')).toHaveLength(0);
+  });
+
+  it.each([
+    ['a positional argument', (value: string) => [value]],
+    ['a short flag glued to the value', (value: string) => [`-v${value}`]],
+  ])('never echoes the value when it is given as %s', async (_label, extra) => {
+    const value = randomUUID();
+    session.api.on('Projects', fixtures.projectsResponse());
+    stdin.tty();
+    prompts.script([]);
+
+    const result = await runCommand(SetSecret, [...scope(), '--key', fixtures.SECRET_KEY, ...extra(value)]);
+
+    expect(result.exitCode).not.toBe(0);
+    expect(result.output).not.toContain(value);
+    expect(result.error?.message ?? '').not.toContain(value);
+    expect(result.error?.stack ?? '').not.toContain(value);
+    expect(session.api.calls('AddEnvironmentSecret')).toHaveLength(0);
+  });
+
+  it('fails without any prompt or mutation when the value is piped and --org matches no organization', async () => {
+    const value = randomUUID();
+    stdin.pipe(`${value}\n`);
+    prompts.script([]);
+    const args = [...session.baseArgs, '--org', 'WRONG', '--project', fixtures.PROJECT_UID, '-e', fixtures.ENVIRONMENT_NAME];
+
+    const result = await runCommand(SetSecret, [...args, '--key', fixtures.SECRET_KEY, '--yes']);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain('Organization UID not found!');
+    expect(result.output).not.toContain(value);
+    expect(session.api.operationSequence()).toEqual([]);
+    prompts.assertScriptFullyConsumed();
+  });
+
+  it('fails without any prompt or mutation when the value is piped and --project matches no project', async () => {
+    const value = randomUUID();
+    session.api.on('Projects', fixtures.projectsResponse());
+    stdin.pipe(`${value}\n`);
+    prompts.script([]);
+    const args = [...session.baseArgs, '--org', fixtures.ORG.uid, '--project', 'WRONG', '-e', fixtures.ENVIRONMENT_NAME];
+
+    const result = await runCommand(SetSecret, [...args, '--key', fixtures.SECRET_KEY, '--yes']);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain('Project not found!');
+    expect(result.output).not.toContain(value);
+    expect(session.api.operationSequence()).toEqual(['Projects']);
+    prompts.assertScriptFullyConsumed();
+  });
+
+  it('writes to the project named by --project instead of the one stored in .cs-launch.json', async () => {
+    const value = randomUUID();
+    writeFileSync(session.launchConfigPath, JSON.stringify(fixtures.existingProjectConfigFile()));
+    session.api
+      .on('Projects', fixtures.projectsResponse([{ uid: 'other-project-uid', name: 'Other project' }]))
+      .on('EnvironmentSecrets', fixtures.environmentSecretsResponse([]))
+      .on('AddEnvironmentSecret', fixtures.addEnvironmentSecretResponse());
+    stdin.pipe(`${value}\n`);
+    prompts.script([]);
+    const args = [...session.baseArgs, '--org', fixtures.ORG.uid, '--project', 'other-project-uid', '-e', fixtures.ENVIRONMENT_NAME];
+
+    const result = await runCommand(SetSecret, [...args, '--key', fixtures.SECRET_KEY, '--yes']);
+
+    expect(result.exitCode).toBe(0);
+    expect(session.api.headersOf('AddEnvironmentSecret')['x-project-uid']).toBe('other-project-uid');
+    prompts.assertScriptFullyConsumed();
   });
 
   it('redacts the value when --value is passed with an equals sign', async () => {

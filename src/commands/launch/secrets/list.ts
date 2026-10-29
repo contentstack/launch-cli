@@ -1,13 +1,10 @@
 import map from 'lodash/map';
-import find from 'lodash/find';
 import isEmpty from 'lodash/isEmpty';
-import { FlagInput, Flags, cliux as ux } from '@contentstack/cli-utilities';
+import { FlagInput, cliux as ux } from '@contentstack/cli-utilities';
 
-import { BaseCommand } from '../../../base-command';
-import { environmentSecretsQuery } from '../../../graphql';
-import { Logger, selectOrg, selectProject, formatSecretsError } from '../../../util';
+import { SecretsBaseCommand, secretsScopeFlags } from '../../../base-secrets-command';
 
-export default class ListSecrets extends BaseCommand<typeof ListSecrets> {
+export default class ListSecrets extends SecretsBaseCommand<typeof ListSecrets> {
   static description = 'List the secrets of an environment (keys only, values are never shown)';
 
   static examples = [
@@ -16,43 +13,11 @@ export default class ListSecrets extends BaseCommand<typeof ListSecrets> {
       '--environment=<environment name or UID>',
   ];
 
-  static flags: FlagInput = {
-    org: Flags.string({
-      description: '[Optional] Provide the organization UID',
-    }),
-    project: Flags.string({
-      description: '[Optional] Provide the project UID',
-    }),
-    environment: Flags.string({
-      char: 'e',
-      description: 'Environment name or UID',
-    }),
-  };
+  static flags: FlagInput = { ...secretsScopeFlags };
 
   async run(): Promise<void> {
-    this.logger = new Logger(this.sharedConfig);
-    this.log = this.logger.log.bind(this.logger);
-
-    await this.getConfig();
-    await this.prepareApiClients();
-
-    if (!this.sharedConfig.currentConfig?.uid) {
-      await selectOrg({
-        log: this.log,
-        flags: this.flags,
-        config: this.sharedConfig,
-        managementSdk: this.managementSdk,
-      });
-      await this.prepareApiClients();
-      await selectProject({
-        log: this.log,
-        flags: this.flags,
-        config: this.sharedConfig,
-        apolloClient: this.apolloClient,
-      });
-      await this.prepareApiClients();
-    }
-
+    this.initLogger();
+    await this.setupScope();
     await this.listSecrets();
   }
 
@@ -68,38 +33,5 @@ export default class ListSecrets extends BaseCommand<typeof ListSecrets> {
       [{ value: 'KEY' }, { value: 'UPDATED' }],
       map(environment.secrets, ({ key, updatedAt }) => ({ KEY: key, UPDATED: updatedAt })),
     );
-  }
-
-  async resolveEnvironment(): Promise<any> {
-    const environments = await this.apolloClient
-      .query({ query: environmentSecretsQuery })
-      .then(({ data: { Environments } }) => map(Environments.edges, 'node'))
-      .catch((error) => {
-        this.log(formatSecretsError(error), 'error');
-        process.exit(1);
-      });
-
-    if (!this.flags.environment) {
-      return ux
-        .inquire({
-          type: 'search-list',
-          name: 'Environment',
-          choices: map(environments, (row) => ({ name: row.name, value: row.name })),
-          message: 'Choose an environment',
-        })
-        .then((name: any) => find(environments, { name }) as Record<string, any>);
-    }
-
-    const environment = find(
-      environments,
-      ({ uid, name }) => uid === this.flags.environment || name === this.flags.environment,
-    );
-
-    if (isEmpty(environment)) {
-      this.log('Environment(s) not found!', 'error');
-      process.exit(1);
-    }
-
-    return environment;
   }
 }

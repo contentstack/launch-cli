@@ -73,6 +73,22 @@ describe('secrets util', () => {
     expect(message).toContain(expected);
   });
 
+  it.each([
+    [404, 'The project or environment was not found.'],
+    [400, 'The API rejected the request.'],
+  ])('uses read-context wording without a key for a %i on a read operation', (status, expected) => {
+    const message = formatSecretsError(apiError(status), { operation: 'read' });
+
+    expect(message).toBe(expected);
+    expect(message).not.toContain('the secret');
+  });
+
+  it('keeps the key-specific wording for a write operation', () => {
+    const message = formatSecretsError(formError(CODES.notFound), { key: 'DB_URL', operation: 'write' });
+
+    expect(message).toBe('The secret DB_URL was not found.');
+  });
+
   it('produces distinct messages for each known error', () => {
     const errors = [
       formError(CODES.conflict),

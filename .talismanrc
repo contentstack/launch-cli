@@ -40,7 +40,7 @@ fileignoreconfig:
 - filename: test/integration/harness/fixtures.ts
   checksum: e22bc8ab6f0c266b1f53700bd3611a934f7469b1995bf451cad2115f86ca4b3e
 - filename: src/base-command.ts
-  checksum: db8bc45f6d8aa3daebae621920c8618b6e23d1a20984dee0749d91bfa5c1530c
+  checksum: 3f7bcb2dff516aa166c7e721d3d60bf1b14db4bb1fc22a339ed21afba4d86a13
 - filename: test/unit/base-command.test.ts
   checksum: 4612c2a41c9d5a7af887f77842feee0a6f6a28ba95a094282b5e9aa20dba6c8c
 - filename: src/graphql/queries.ts
@@ -48,27 +48,31 @@ fileignoreconfig:
 - filename: test/integration/specs/secrets-list.test.ts
   checksum: d4cdd09fe16a876f7457bdf9bbaa83511624c12a0c7a967abc5f26a678696629
 - filename: src/commands/launch/secrets/list.ts
-  checksum: e33958ccf580f32e6869690f1409ab40bb429f699623dc0a009a62e9e6f204d7
+  checksum: da14a738f37a9610ab9dec7978de81cbb778ed0da9e73c4df4806c6e3c4c00cf
 - filename: src/commands/launch/secrets/list.test.ts
-  checksum: 1569c7d0feeb55ab1425bf0f8f22aa8550030560dbda83d017de34f09bcff3f2
+  checksum: af09c894e3c21b061078a614f599e642b3db11e6f2145cb588e14e2476ff612a
 - filename: src/graphql/mutation.ts
   checksum: c420996deea097d6125ccd9648d0b87806bf7edeb4eda5604a068eee3e669542
 - filename: src/util/secrets.ts
-  checksum: caf8a13cd8147e8a50667fc7b84a5db073f41e130b6d5996d6a57e3dc0b2bc1c
+  checksum: 9ccc5fdb18cb3c4ea637d6834c5b91e860c374abd01d808d002b3862d2f0c67a
 - filename: src/commands/launch/secrets/set.ts
-  checksum: 30814bd285d9fe4b9a21206f0c2d2fc530447a5cb276ba152265885ca1a36e56
+  checksum: 80b805d6f746b6cfbef06690f4219fe7b810d58755dcc4fd3042092922b497b6
 - filename: src/util/secrets.test.ts
-  checksum: 608f9187faf1cd312860ca3c15e324bc3d74d492d571194f5062f327dd2be2c4
+  checksum: acadbf4e3b1a62d2ebd81f203bdb673c314d1534a7598d95d675a27905c7c8cb
 - filename: test/integration/specs/secrets-set.test.ts
-  checksum: ed46f1b15a450e07ed6da7ce0474fa3b404a4d687113d06de7a40c49283d377d
+  checksum: 0975c0277d2643273d61d2f194ff7e1599f79f21fe4372367746f0fbd5b14d4b
 - filename: src/commands/launch/secrets/set.test.ts
   checksum: 2953250cb9353eaa298a30e480badf5b12a6e8a9851355e3a9055e7a1bbaa98f
 - filename: src/commands/launch/secrets/unset.ts
-  checksum: 1260b3ee447042bfdc0ec2bafbeeeca0d65e966fc1ffd30c1acb38bf4392229a
+  checksum: 3c7d81a01ccfbd32fd2060ed88ef14fba525fded736604b4302c68ca9bc2d966
 - filename: src/commands/launch/secrets/unset.test.ts
   checksum: 89449d31e20184f2f32619f75bca546c088f8f75e3a0e9e7c1735fc4cec1882f
 - filename: test/integration/specs/secrets-unset.test.ts
-  checksum: 840417baf15d5f8b2437fd77b48996b85fcc81677fc820dd67b9959787efff8d
+  checksum: 363d8fbfb996395eb89c355b623a337143d5049f99bf20bf45c8c076eeefe06e
 - filename: src/graphql/secrets-mutations.test.ts
   checksum: e812adf5638b6f55bd4986abc7cedd6707895191dc409e8cfe5de3dc87e5b338
+- filename: src/base-secrets-command.ts
+  checksum: 21b5c6d1d69c1dc72979b53fa706eda50874536b32c1549879ea83b38f54d375
+- filename: src/base-secrets-command.test.ts
+  checksum: 71613e5e8abe20656130e85de53539ebbaa16c23cd050c4b1fac5fda676c8dd1
 version: "1.0"

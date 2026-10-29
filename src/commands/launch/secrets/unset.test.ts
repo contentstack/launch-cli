@@ -44,6 +44,12 @@ const notFoundError = () => ({
   ],
 });
 
+const originalStdin = Object.getOwnPropertyDescriptor(process, 'stdin') as PropertyDescriptor;
+
+const stubStdin = (isTTY: boolean) => {
+  Object.defineProperty(process, 'stdin', { value: { isTTY }, configurable: true });
+};
+
 const buildCommand = (
   flags: Record<string, any>,
   mutate: jest.Mock = jest.fn().mockResolvedValue({ data: { deleteEnvironmentSecret: true } }),
@@ -67,6 +73,7 @@ describe('UnsetSecret Command', () => {
   });
 
   afterEach(() => {
+    Object.defineProperty(process, 'stdin', originalStdin);
     jest.clearAllMocks();
   });
 
@@ -90,7 +97,20 @@ describe('UnsetSecret Command', () => {
     expect(exitMock).not.toHaveBeenCalled();
   });
 
+  it('fails fast without a prompt or mutation when --yes is missing and not running in a terminal', async () => {
+    stubStdin(false);
+    const { cmd, mutate } = buildCommand({});
+
+    await expect((cmd as any).unsetSecrets()).rejects.toThrow('process.exit:1');
+
+    expect((cmd as any).log).toHaveBeenCalledWith('use --yes when not running in a terminal', 'error');
+    expect(cliux.inquire).not.toHaveBeenCalled();
+    expect(mutate).not.toHaveBeenCalled();
+    expect(exitMock).toHaveBeenCalledWith(1);
+  });
+
   it('asks for confirmation and deletes the key when it is accepted', async () => {
+    stubStdin(true);
     (cliux.inquire as jest.Mock).mockResolvedValueOnce(true);
     const { cmd, mutate } = buildCommand({});
 
@@ -108,6 +128,7 @@ describe('UnsetSecret Command', () => {
   });
 
   it('aborts without a mutation or an error exit when the confirmation is declined', async () => {
+    stubStdin(true);
     (cliux.inquire as jest.Mock).mockResolvedValueOnce(false);
     const { cmd, mutate } = buildCommand({ key: ['API_TOKEN', 'DB_PASSWORD'] });
 

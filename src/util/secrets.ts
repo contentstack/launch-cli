@@ -27,7 +27,7 @@ const ERROR_CODES = {
   valueTooLong: 'launch.ENVIRONMENT.ENVIRONMENT_VARIABLES.VALUE.TOO_LONG',
 };
 
-type SecretsErrorContext = { key?: string; value?: string };
+type SecretsErrorContext = { key?: string; value?: string; operation?: 'read' | 'write' };
 
 const stringify = (item: unknown): string => {
   try {
@@ -43,7 +43,10 @@ const redactValue = (text: string, value?: string): string => {
   return fragments.reduce((redacted, fragment) => split(redacted, fragment).join('[redacted]'), text);
 };
 
-export const formatSecretsError = (error: any, { key, value }: SecretsErrorContext = {}): string => {
+export const formatSecretsError = (
+  error: any,
+  { key, value, operation = 'write' }: SecretsErrorContext = {},
+): string => {
   const graphQLError = error?.graphQLErrors?.[0];
   const exception = graphQLError?.extensions?.exception;
   const status = exception?.status ?? graphQLError?.extensions?.status ?? error?.networkError?.statusCode;
@@ -64,6 +67,8 @@ export const formatSecretsError = (error: any, { key, value }: SecretsErrorConte
     [hasCode(ERROR_CODES.valueEmpty), 'Invalid value: the value cannot be empty.'],
     [hasCode(ERROR_CODES.valueTooLong), 'Invalid value: the value is too long (maximum 10000 characters).'],
     [status === 403, 'You do not have permission to manage the secrets of this environment.'],
+    [operation === 'read' && status === 404, 'The project or environment was not found.'],
+    [operation === 'read' && status === 400, 'The API rejected the request.'],
     [status === 400, 'The API rejected the request: invalid key or value.'],
   ];
 
