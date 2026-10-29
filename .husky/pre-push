@@ -1,1 +1,1 @@
-npm run test
+sh .husky/secrets-scan.sh pre-push "$@" && npm run test

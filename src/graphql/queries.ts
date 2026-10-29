@@ -139,6 +139,24 @@ const deploymentLogsQuery: DocumentNode = gql`
   }
 `;
 
+
+const deploymentLogsV2Query: DocumentNode = gql`
+  query GetDeploymentLogsV2($query: DeploymentLogsV2QueryInput!) {
+    getDeploymentLogsV2(query: $query) {
+      logs {
+        deploymentUid
+        message
+        stage
+        timestamp
+      }
+      pageInfo {
+        hasNewer
+        newestCursor
+      }
+    }
+  }
+`;
+
 const serverlessLogsQuery: DocumentNode = gql`
   query GetServerlessLogsV2($query: QueryLogMessagesV2InputType!) {
     getServerlessLogsV2(query: $query) {
@@ -163,6 +181,15 @@ const latestLiveDeploymentQuery: DocumentNode = gql`
       commitHash
       commitMessage
       createdAt
+    }
+  }
+`;
+
+const rollbackSettingsQuery: DocumentNode = gql`
+  query RollbackSettings {
+    RollbackSettings {
+      isEnabled
+      retentionCount
     }
   }
 `;
@@ -206,7 +233,9 @@ export {
   cmsEnvironmentVariablesQuery,
   deploymentQuery,
   deploymentLogsQuery,
+  deploymentLogsV2Query,
   serverlessLogsQuery,
   latestLiveDeploymentQuery,
   environmentsQuery,
+  rollbackSettingsQuery,
 };

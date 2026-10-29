@@ -10,6 +10,7 @@ import {
   environmentsQuery,
   latestLiveDeploymentQuery,
   rollbackDeploymentMutation,
+  rollbackSettingsQuery,
 } from '../../graphql';
 import { Logger, selectOrg, selectProject } from '../../util';
 
@@ -88,7 +89,12 @@ export default class Rollback extends BaseCommand<typeof Rollback> {
     const eligibleSorted = this.getEligibleSortedDeployments(environment, currentLive?.uid);
 
     if (isEmpty(eligibleSorted)) {
-      this.log('No rollback-eligible deployments are available for this environment.', 'error');
+      const settings = await this.fetchRollbackSettings();
+      if (settings?.isEnabled === false) {
+        this.log('Instant rollback isn\'t available on your organization\'s plan.', 'error');
+      } else {
+        this.log('No rollback-eligible deployments are available for this environment.', 'error');
+      }
       process.exit(1);
     }
 
@@ -191,6 +197,18 @@ export default class Rollback extends BaseCommand<typeof Rollback> {
         variables: { query: { environment: environmentUid } },
       })
       .then(({ data }) => data?.latestLiveDeployment)
+      .catch(() => undefined);
+  }
+
+  /**
+   * @method fetchRollbackSettings - org-level entitlement; undefined on any fetch failure
+   *
+   * @memberof Rollback
+   */
+  async fetchRollbackSettings(): Promise<{ isEnabled: boolean; retentionCount: number } | undefined> {
+    return this.apolloClient
+      .query({ query: rollbackSettingsQuery })
+      .then(({ data }) => data?.RollbackSettings)
       .catch(() => undefined);
   }
 
