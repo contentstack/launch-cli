@@ -41,6 +41,10 @@ const getInputs = inputs({
 
 const { 'log-type': logTypeFlag, ...otherFlags } = flagsFor(getInputs);
 
+interface ServerResume {
+  cursor?: string;
+}
+
 interface LogScope {
   org: string;
   project: string;
@@ -88,8 +92,13 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
 
     if (type === 'server') {
       const window = parseLogWindow({ since: this.resolved.since, until: this.resolved.until }, () => Date.now());
+      const scope = await this.verifiedDeployment({ org, project, environment });
+      const resume: ServerResume = {};
 
-      await this.printServerLogs(await this.verifiedDeployment({ org, project, environment }), window);
+      await this.untilInterrupted(
+        (stop) => this.printServerLogs(scope, window, stop, resume),
+        () => (resume.cursor === undefined ? [] : [this.resumeLine(scope, window, resume.cursor)]),
+      );
       return;
     }
 
@@ -119,12 +128,20 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
     return { ...environmentScope, deployment: latest.uid };
   }
 
-  private async printServerLogs(scope: LogScope, window: LogWindow): Promise<void> {
+  private resumeLine(scope: LogScope, { startTime, endTime }: LogWindow, cursor: string): string {
+    return serverLogsResumeLine({ ...scope, startTime, endTime, search: this.resolved.search, cursor });
+  }
+
+  private async printServerLogs(
+    scope: LogScope,
+    window: LogWindow,
+    stop: AbortSignal,
+    resume: ServerResume,
+  ): Promise<void> {
     const outputIsTTY = this.services.outputIsTTY === true;
     const { startTime, endTime, clampedFrom } = window;
     const { search, cursor } = this.resolved;
     let printed = 0;
-    let resumeFrom: string | undefined;
 
     if (clampedFrom !== undefined) {
       this.ux.print(serverLogsRetentionLine(clampedFrom, outputIsTTY));
@@ -136,20 +153,27 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
         printed += 1;
       }
 
-      resumeFrom = nextCursorOf(page);
+      resume.cursor = nextCursorOf(page);
+
+      if (stop.aborted) {
+        throw stop.reason;
+      }
     }
 
     if (printed === 0) {
       this.ux.print(noServerLogsLine(startTime, endTime, outputIsTTY));
     }
 
-    if (resumeFrom !== undefined) {
+    if (resume.cursor !== undefined) {
       this.ux.print(serverLogsPageCapLine(outputIsTTY));
-      this.ux.print(serverLogsResumeLine({ ...scope, startTime, endTime, search, cursor: resumeFrom }));
+      this.ux.print(this.resumeLine(scope, window, resume.cursor));
     }
   }
 
-  private async untilInterrupted(follow: (stop: AbortSignal) => Promise<void>): Promise<void> {
+  private async untilInterrupted(
+    follow: (stop: AbortSignal) => Promise<void>,
+    afterStopped: () => string[] = () => [],
+  ): Promise<void> {
     const stop = new AbortController();
     const release = onInterrupt(() => stop.abort(new DeploymentWaitInterruptedError('Stopped following the logs.')));
 
@@ -158,6 +182,11 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
     } catch (error) {
       if (stop.signal.aborted && error === stop.signal.reason) {
         this.ux.print(stoppedFollowingLine(this.services.outputIsTTY === true));
+
+        for (const line of afterStopped()) {
+          this.ux.print(line);
+        }
+
         this.exit(EXIT_CANCELLED);
       }
 

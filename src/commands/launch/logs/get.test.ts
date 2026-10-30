@@ -450,14 +450,40 @@ describe('LogsGet', () => {
     expect(lines).toEqual([]);
   });
 
-  it('registers no interrupt listener and reads no deployment logs for --type server', async () => {
-    const listener = jest.spyOn(interruptible, 'onInterrupt');
+  it('stops the server walk on Ctrl-C after the page in hand, prints a resume command, exits 3 and releases', async () => {
+    const release = jest.fn();
+    let interrupt: () => void = () => undefined;
+    jest.spyOn(interruptible, 'onInterrupt').mockImplementation((listener) => {
+      interrupt = listener;
+      return release;
+    });
     const watch = jest.spyOn(DeploymentFollower.prototype, 'watch');
-    const { command } = commandUnderTest({ resolved: { 'log-type': 'server' } });
+    const { command, lines } = commandUnderTest({ resolved: { 'log-type': 'server', deployment: 'd9' } });
+    let requested = 0;
+    Object.assign((command as unknown as { services: { api: { serverLogs: object } } }).services.api.serverLogs, {
+      async *pages() {
+        requested = 1;
+        yield { logs: [{ message: 'one' }], pageInfo: { hasNewer: true, newestCursor: '[1,"a"]' } };
+        requested = 2;
+        interrupt();
+        yield { logs: [{ message: 'two' }], pageInfo: { hasNewer: true, newestCursor: '[2,"b"]' } };
+        requested = 3;
+        yield { logs: [{ message: 'three' }], pageInfo: { hasNewer: false } };
+      },
+    });
 
-    await command.run();
+    const running = command.run();
 
-    expect(listener).not.toHaveBeenCalled();
+    await expect(running).rejects.toMatchObject({ oclif: { exit: EXIT_CANCELLED } });
+    expect(requested).toBe(2);
+    expect(lines).toEqual([
+      'one',
+      'two',
+      'Stopped following the logs.',
+      'Resume with: csdx launch:logs:get --org org1 --project proj1 --env env1 --deployment d9 --type server ' +
+        `--since 2026-10-28T11:00:00.000Z --until 2026-10-28T12:00:00.000Z --cursor '[2,"b"]'`,
+    ]);
+    expect(release).toHaveBeenCalledTimes(1);
     expect(watch).not.toHaveBeenCalled();
   });
 });

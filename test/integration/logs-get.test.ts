@@ -727,10 +727,11 @@ describe('integration: launch:logs:get on the wire', () => {
     expect(stdout.split('\n')).toEqual(['', 'no time', '2026-10-28 11:00:00.000:', '2026-10-28 11:00:01.000:  epoch', '', '']);
   });
 
-  it('T59: a server run registers no SIGINT handler and starts no spinner', async () => {
+  it('T59: stops a server walk on Ctrl-C with a resume command and exit 3, no spinner, no listener left', async () => {
     const restoreStdout = stdoutReportingTTY(true);
     const loader = jest.spyOn(cliux, 'loaderV2');
     const baseline = process.listenerCount('SIGINT');
+    const firstCursor = `[${NOW - 1_800_000},"${DEPLOYMENT_UID}"]`;
     let during = -1;
 
     try {
@@ -739,16 +740,29 @@ describe('integration: launch:logs:get on the wire', () => {
       deploymentGet('LIVE');
       hub()
         .get(SERVER_LOGS)
-        .query(true)
+        .query({ startTime: String(NOW - 3_600_000), endTime: String(NOW), sortDirection: 'asc' })
         .reply(200, () => {
           during = process.listenerCount('SIGINT');
-          return { serverLogs: [{ timestamp: '2026-10-28T11:30:00.000Z', message: 'hi' }] };
+          setImmediate(() => process.emit('SIGINT'));
+          return {
+            serverLogs: [{ timestamp: '2026-10-28T11:30:00.000Z', message: 'hi' }],
+            pageInfo: { hasNewer: true, newestCursor: firstCursor },
+          };
         });
+      const second = hub().get(SERVER_LOGS).query(true).reply(200, { serverLogs: [], pageInfo: { hasNewer: false } });
 
-      const { error } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID, '--type', 'server'), config);
+      const { error, stdout } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID, '--type', 'server'), config);
 
-      expect(error).toBeUndefined();
-      expect(during).toBe(baseline);
+      expect(error?.oclif?.exit).toBe(3);
+      expect(outputLines(stdout)).toEqual([
+        expect.stringMatching(/^\d{2}:\d{2}:\d{2} {2}hi$/),
+        'Stopped following the logs.',
+        `Resume with: csdx launch:logs:get --org ${ORG_UID} --project ${PROJECT_UID} --env ${ENV_UID} ` +
+          `--deployment ${DEPLOYMENT_UID} --type server --since 2026-10-28T11:00:00.000Z ` +
+          `--until 2026-10-28T12:00:00.000Z --cursor '${firstCursor}'`,
+      ]);
+      expect(second.isDone()).toBe(false);
+      expect(during).toBe(baseline + 1);
       expect(process.listenerCount('SIGINT')).toBe(baseline);
       expect(loader).not.toHaveBeenCalled();
     } finally {
