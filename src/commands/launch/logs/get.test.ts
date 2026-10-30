@@ -76,12 +76,22 @@ describe('LogsGet', () => {
   });
 
   it('exposes the log type as --type and never as --log-type', () => {
-    expect(Object.keys(LogsGet.flags).sort()).toEqual(['deployment', 'env', 'org', 'project', 'since', 'type', 'until']);
+    expect(Object.keys(LogsGet.flags).sort()).toEqual([
+      'cursor',
+      'deployment',
+      'env',
+      'org',
+      'project',
+      'search',
+      'since',
+      'type',
+      'until',
+    ]);
     expect(LogsGet.flags.type).toBe(catalog['log-type']);
   });
 
-  it('declares the window rules and the log type input the rules read', () => {
-    expect(LogsGet.rules).toHaveLength(2);
+  it('declares the four server-only rules and the log type input the rules read', () => {
+    expect(LogsGet.rules).toHaveLength(4);
     expect(Object.keys(LogsGet.inputs)).toContain('log-type');
   });
 

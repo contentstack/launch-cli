@@ -6,10 +6,10 @@ import { resolveInputs, resolveInputsTraced } from '../core/resolve';
 import { projectTypeChoiceOf } from '../projects/project.inputs';
 import type { ApiSurface } from '../resources';
 import { catalog, resolution } from '../resources';
-import { logTypeOf, logsFlags, logsResolution, windowOnlyWithServer } from './logs.inputs';
+import { logTypeOf, logsFlags, logsResolution, onlyWithServer } from './logs.inputs';
 
-const logInputs = inputs({ 'log-type': {}, since: {}, until: {} });
-const rules = [windowOnlyWithServer('since'), windowOnlyWithServer('until')];
+const logInputs = inputs({ 'log-type': {}, since: {}, until: {}, search: {}, cursor: {} });
+const rules = [onlyWithServer('since'), onlyWithServer('until'), onlyWithServer('search'), onlyWithServer('cursor')];
 const prompts: unknown[] = [];
 const services = {
   api: {} as ApiSurface,
@@ -28,6 +28,10 @@ function resolve(parsed: Record<string, unknown>) {
   return resolveInputsTraced(logInputs, { parsed, projectConfig: {}, services, rules });
 }
 
+function resolveSearch(parsed: Record<string, unknown>) {
+  return resolveInputsTraced(inputs({ 'log-type': {}, search: {} }), { parsed, projectConfig: {}, services, rules: [] });
+}
+
 async function failureOf(parsed: Record<string, unknown>): Promise<UsageError> {
   return resolve(parsed).then(
     () => {
@@ -42,9 +46,16 @@ beforeEach(() => {
 });
 
 describe('logs inputs', () => {
-  it('shares the log type, since and until through the catalog without touching the project type flag', () => {
+  it('shares the log type, window, search and cursor through the catalog without touching the project type flag', () => {
     expect(Object.keys(logsFlags).sort()).toEqual(Object.keys(logsResolution).sort());
-    expect(Object.keys(logsFlags)).toHaveLength(3);
+    expect(Object.keys(logsFlags).sort()).toEqual(['cursor', 'log-type', 'search', 'since', 'until']);
+    expect(catalog.search).toBe(logsFlags.search);
+    expect(catalog.cursor).toBe(logsFlags.cursor);
+    expect(resolution.search).toBe(logsResolution.search);
+    expect(resolution.cursor).toBe(logsResolution.cursor);
+    expect(logsFlags.search.description).toContain('256 characters');
+    expect(logsFlags.search.required).toBeFalsy();
+    expect(logsFlags.cursor.required).toBeFalsy();
     expect(catalog['log-type']).toBe(logsFlags['log-type']);
     expect(catalog.since).toBe(logsFlags.since);
     expect(catalog.until).toBe(logsFlags.until);
@@ -130,14 +141,48 @@ describe('logs inputs', () => {
     expect(untilDefault.message).toBe('--until is only supported when --type is one of server; --type is deployment.');
   });
 
-  it('accepts since and until with the server type, and a blank one with any type', async () => {
-    const server = await resolve({ 'log-type': 'Server', since: ' 2h ', until: '1h' });
-    const blank = await resolve({ since: '   ', until: '' });
+  it('refuses --search and --cursor with the default and explicit deployment type and with live', async () => {
+    const searchDefault = await failureOf({ search: 'timeout' });
+    const searchLive = await failureOf({ 'log-type': 'live', search: 'timeout' });
+    const cursorDeployment = await failureOf({ 'log-type': 'deployment', cursor: '[1,"a"]' });
+
+    expect(searchDefault).toBeInstanceOf(UsageError);
+    expect(searchDefault.exitCode).toBe(2);
+    expect(searchDefault.message).toBe('--search is only supported when --type is one of server; --type is deployment.');
+    expect(searchLive.message).toBe('--search is only supported when --type is one of server; --type is live.');
+    expect(cursorDeployment.message).toBe('--cursor is only supported when --type is one of server; --type is deployment.');
+  });
+
+  it('accepts the server-only flags with the server type, and a blank one with any type', async () => {
+    const server = await resolve({ 'log-type': 'Server', since: ' 2h ', until: '1h', search: ' timeout ', cursor: ' [1,"a"] ' });
+    const blank = await resolve({ since: '   ', until: '', search: ' ', cursor: '' });
     const nulls = await resolve({ 'log-type': 'live', since: null, until: undefined });
 
-    expect(server.resolved).toEqual({ 'log-type': 'server', since: '2h', until: '1h' });
-    expect(blank.resolved).toEqual({ 'log-type': 'deployment', since: undefined, until: undefined });
+    expect(server.resolved).toEqual({ 'log-type': 'server', since: '2h', until: '1h', search: 'timeout', cursor: '[1,"a"]' });
+    expect(blank.resolved).toEqual({
+      'log-type': 'deployment',
+      since: undefined,
+      until: undefined,
+      search: undefined,
+      cursor: undefined,
+    });
     expect(nulls.resolved['log-type']).toBe('live');
+  });
+
+  it('accepts a search of exactly 256 characters and refuses 257 with a usage error naming --search', async () => {
+    const longest = 'a'.repeat(256);
+    const accepted = await resolveSearch({ 'log-type': 'server', search: ` ${longest} ` });
+    const failure = await resolveSearch({ 'log-type': 'server', search: `${longest}b` }).then(
+      () => {
+        throw new Error('resolution did not fail');
+      },
+      (error: UsageError) => error,
+    );
+
+    expect(accepted.resolved.search).toBe(longest);
+    expect(failure).toBeInstanceOf(UsageError);
+    expect(failure.exitCode).toBe(2);
+    expect(failure.message).toBe('--search must be 256 characters or fewer; that value is 257 characters.');
   });
 
   it('refuses a window flag when the log type is not an input of the command, rather than skipping the check', async () => {

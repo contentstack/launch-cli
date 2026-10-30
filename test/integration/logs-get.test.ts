@@ -1032,6 +1032,8 @@ describe('integration: launch:logs:get on the wire', () => {
   it.each([
     [['--since', '1h'], '--since is only supported when --type is one of server; --type is deployment.'],
     [['--until', '1h', '--type', 'live'], '--until is only supported when --type is one of server; --type is live.'],
+    [['--search', 'timeout'], '--search is only supported when --type is one of server; --type is deployment.'],
+    [['--cursor', '[1,"a"]', '--type', 'live'], '--cursor is only supported when --type is one of server; --type is live.'],
     [['--since', '12hr', '--until', '2026-10-28T10:00:00Z', '--type', 'server'], '--since and --until must both be relative (like 12hr) or both absolute (ISO 8601) timestamps.'],
     [['--since', '30m', '--until', '2h', '--type', 'server'], '--since must not be later than --until.'],
   ])('T61: exits 2 for %j with nothing read', async (flags, message) => {

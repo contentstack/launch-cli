@@ -11,7 +11,7 @@ import { DeploymentUnsuccessfulError, DeploymentWaitInterruptedError } from '../
 import { DeploymentFollower } from '../../../deployments/deployment.follower';
 import { fetchDeployment } from '../../../deployments/deployment.resolver';
 import { defaultWatchTiming } from '../../../deployments/deployment.watcher';
-import { LOG_TYPE_FLAG, windowOnlyWithServer } from '../../../logs/logs.inputs';
+import { LOG_TYPE_FLAG, onlyWithServer } from '../../../logs/logs.inputs';
 import {
   deploymentStatusLine,
   logsWaitTimedOutMessage,
@@ -34,6 +34,8 @@ const getInputs = inputs({
   'log-type': {},
   since: {},
   until: {},
+  search: {},
+  cursor: {},
 });
 
 const { 'log-type': logTypeFlag, ...otherFlags } = flagsFor(getInputs);
@@ -58,7 +60,12 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
 
   static flags = { ...otherFlags, [LOG_TYPE_FLAG]: logTypeFlag };
 
-  static rules = [windowOnlyWithServer('since'), windowOnlyWithServer('until')];
+  static rules = [
+    onlyWithServer('since'),
+    onlyWithServer('until'),
+    onlyWithServer('search'),
+    onlyWithServer('cursor'),
+  ];
 
   protected async parse<
     F extends Record<string, unknown>,
