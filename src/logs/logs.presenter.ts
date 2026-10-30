@@ -3,7 +3,7 @@ import { clockOf, deploymentLogLine } from '../deployments/deployment.presenter'
 import type { Deployment } from '../deployments/types';
 import { styled } from '../core/style';
 import { isRecord } from '../core/values';
-import { SERVER_LOGS_PAGE_CAP, type ServerLog } from './types';
+import type { ServerLog } from './types';
 
 const MS_PER_MINUTE = 60_000;
 
@@ -44,15 +44,6 @@ export function noDeploymentLogsLine(deployment: string, outputIsTTY: boolean): 
 
 export function noServerLogsLine(startTime: number, endTime: number, outputIsTTY: boolean): string {
   return styled(`No server logs found between ${isoOf(startTime)} and ${isoOf(endTime)}.`, 'yellow', outputIsTTY);
-}
-
-export function serverLogsCapLine(outputIsTTY: boolean): string {
-  return styled(
-    `Showing the newest ${SERVER_LOGS_PAGE_CAP} server log lines in this window. ` +
-      'Narrow --since/--until to see earlier ones.',
-    'yellow',
-    outputIsTTY,
-  );
 }
 
 export function serverLogsRetentionLine(clampedFrom: number, outputIsTTY: boolean): string {

@@ -8,7 +8,6 @@ import {
   noDeploymentLogsLine,
   noServerLogsLine,
   serverLogLine,
-  serverLogsCapLine,
   serverLogsRetentionLine,
   stoppedFollowingLine,
 } from './logs.presenter';
@@ -36,13 +35,6 @@ describe('logs presenter', () => {
     expect(noServerLogsLine(start, end, true)).toBe(
       yellow('No server logs found between 2026-10-28T09:00:00.000Z and 2026-10-28T10:00:00.500Z.'),
     );
-  });
-
-  it('words the 5000-line notice exactly', () => {
-    expect(serverLogsCapLine(false)).toBe(
-      'Showing the newest 5000 server log lines in this window. Narrow --since/--until to see earlier ones.',
-    );
-    expect(serverLogsCapLine(true)).toBe(yellow(serverLogsCapLine(false)));
   });
 
   it('words the 24 hour notice from the clamped start', () => {

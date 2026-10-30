@@ -98,8 +98,8 @@ function buildLogs(lines: unknown[]): nock.Scope {
 function serverLogs(window: { startTime: number; endTime: number }, entries: unknown[]): nock.Scope {
   return hub()
     .get(SERVER_LOGS)
-    .query({ startTime: String(window.startTime), endTime: String(window.endTime) })
-    .reply(200, { serverLogs: entries });
+    .query({ startTime: String(window.startTime), endTime: String(window.endTime), sortDirection: 'asc' })
+    .reply(200, { serverLogs: entries, pageInfo: { hasNewer: false } });
 }
 
 const SESSION_FRAME = 'event: session\ndata: {"expiresAt":"2026-10-28T12:05:00.000Z"}\n\n';
@@ -497,7 +497,7 @@ describe('integration: launch:logs:get on the wire', () => {
     deploymentGet('LIVE');
     const read = hub()
       .get(SERVER_LOGS)
-      .query({ startTime: String(startTime), endTime: String(endTime) })
+      .query({ startTime: String(startTime), endTime: String(endTime), sortDirection: 'asc' })
       .reply(200, {
         serverLogs: [
           { timestamp: '2026-10-28T09:15:00.123Z', message: 'GET /index 200', source: 'edge-fn-source' },
@@ -567,28 +567,40 @@ describe('integration: launch:logs:get on the wire', () => {
     ]);
   });
 
-  it.each([
-    [5000, true],
-    [4999, false],
-  ])('T54: with %i server lines the cap notice shows is %s', async (count, shows) => {
+  it('T54: walks two pages on the wire, carrying the newest cursor and the same window, and prints them in order', async () => {
     jest.spyOn(Date, 'now').mockReturnValue(NOW);
+    const window = { startTime: String(NOW - 3_600_000), endTime: String(NOW), sortDirection: 'asc', search: 'timeout' };
+    const firstCursor = `[${NOW - 1_800_000},"${DEPLOYMENT_UID}"]`;
     ownedProject();
     deploymentGet('LIVE');
-    serverLogs(
-      { startTime: NOW - 3_600_000, endTime: NOW },
-      Array.from({ length: count }, (_, index) => ({ timestamp: '2026-10-28T11:30:00.000Z', message: `line ${index}` })),
-    );
+    const first = hub()
+      .get(SERVER_LOGS)
+      .query(window)
+      .reply(200, {
+        serverLogs: [{ timestamp: '2026-10-28T11:30:00.000Z', message: 'upstream timeout one' }],
+        pageInfo: { hasOlder: null, hasNewer: true, oldestCursor: firstCursor, newestCursor: firstCursor },
+      });
+    const second = hub()
+      .get(SERVER_LOGS)
+      .query({ ...window, cursor: firstCursor })
+      .reply(200, {
+        serverLogs: [{ timestamp: '2026-10-28T11:45:00.000Z', message: 'upstream timeout two' }],
+        pageInfo: { hasOlder: null, hasNewer: false, oldestCursor: null, newestCursor: null },
+      });
 
-    const { error, stdout } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID, '--type', 'server'), config);
-    const lines = outputLines(stdout);
+    const { error, stdout } = await runCommand(
+      getArgs('--deployment', DEPLOYMENT_UID, '--type', 'server', '--search', ' timeout '),
+      config,
+    );
 
     expect(error).toBeUndefined();
-    expect(lines).toHaveLength(shows ? count + 1 : count);
-    expect(lines.at(-1)).toBe(
-      shows
-        ? 'Showing the newest 5000 server log lines in this window. Narrow --since/--until to see earlier ones.'
-        : `2026-10-28 11:30:00.000:  line ${count - 1}`,
-    );
+    expect(first.isDone()).toBe(true);
+    expect(second.isDone()).toBe(true);
+    expect(outputLines(stdout)).toEqual([
+      '2026-10-28 11:30:00.000:  upstream timeout one',
+      '2026-10-28 11:45:00.000:  upstream timeout two',
+    ]);
+    expect(onWire).toEqual([]);
   });
 
   it('T55: prints the 24 hour notice first for --since 2d and sends the user own start time', async () => {

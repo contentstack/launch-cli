@@ -18,13 +18,11 @@ import {
   noDeploymentLogsLine,
   noServerLogsLine,
   serverLogLine,
-  serverLogsCapLine,
   serverLogsRetentionLine,
   stoppedFollowingLine,
 } from '../../../logs/logs.presenter';
 import { LiveLogFollower } from '../../../logs/live-log.follower';
 import { parseLogWindow, type LogWindow } from '../../../logs/log-window';
-import { SERVER_LOGS_PAGE_CAP } from '../../../logs/types';
 
 const getInputs = inputs({
   org: { required: true },
@@ -121,23 +119,22 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
   private async printServerLogs(scope: LogScope, window: LogWindow): Promise<void> {
     const outputIsTTY = this.services.outputIsTTY === true;
     const { startTime, endTime, clampedFrom } = window;
-    const logs = await this.services.api.serverLogs.window({ ...scope, startTime, endTime });
+    const { search, cursor } = this.resolved;
+    let printed = 0;
 
     if (clampedFrom !== undefined) {
       this.ux.print(serverLogsRetentionLine(clampedFrom, outputIsTTY));
     }
 
-    if (logs.length === 0) {
+    for await (const page of this.services.api.serverLogs.pages({ ...scope, startTime, endTime, search, cursor })) {
+      for (const log of page.logs) {
+        this.ux.print(serverLogLine(log, outputIsTTY, process.stdout.columns));
+        printed += 1;
+      }
+    }
+
+    if (printed === 0) {
       this.ux.print(noServerLogsLine(startTime, endTime, outputIsTTY));
-      return;
-    }
-
-    for (const log of logs) {
-      this.ux.print(serverLogLine(log, outputIsTTY, process.stdout.columns));
-    }
-
-    if (logs.length === SERVER_LOGS_PAGE_CAP) {
-      this.ux.print(serverLogsCapLine(outputIsTTY));
     }
   }
 

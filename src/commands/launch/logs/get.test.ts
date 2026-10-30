@@ -19,6 +19,7 @@ interface Options {
   latest?: unknown;
   get?: () => Promise<unknown>;
   serverLogs?: unknown[];
+  serverPages?: unknown[];
   outputIsTTY?: boolean;
 }
 
@@ -32,7 +33,7 @@ function commandUnderTest(options: Options = {}) {
   };
   const latestCalls: unknown[] = [];
   const getCalls: unknown[] = [];
-  const windowCalls: unknown[] = [];
+  const walkCalls: unknown[] = [];
   const command = Object.create(LogsGet.prototype) as LogsGet;
 
   Object.assign(command, {
@@ -54,16 +55,16 @@ function commandUnderTest(options: Options = {}) {
           },
         },
         serverLogs: {
-          window: async (params: unknown) => {
-            windowCalls.push(params);
-            return options.serverLogs ?? [];
+          async *pages(params: unknown) {
+            walkCalls.push(params);
+            yield* options.serverPages ?? [{ logs: options.serverLogs ?? [], pageInfo: { hasNewer: false } }];
           },
         },
       },
     },
   });
 
-  return { command, lines, latestCalls, getCalls, windowCalls };
+  return { command, lines, latestCalls, getCalls, walkCalls };
 }
 
 function outcome(kind: DeploymentOutcome['kind'], status: string, deployment: object = {}): DeploymentOutcome {
@@ -100,7 +101,7 @@ describe('LogsGet', () => {
     jest.spyOn(interruptible, 'onInterrupt').mockReturnValue(release);
     const follow = jest.spyOn(LiveLogFollower.prototype, 'follow').mockResolvedValue(undefined);
     const watch = jest.spyOn(DeploymentFollower.prototype, 'watch');
-    const { command, latestCalls, getCalls, windowCalls } = commandUnderTest({ resolved: { 'log-type': 'live' } });
+    const { command, latestCalls, getCalls, walkCalls } = commandUnderTest({ resolved: { 'log-type': 'live' } });
 
     await command.run();
 
@@ -110,7 +111,7 @@ describe('LogsGet', () => {
     expect(follow.mock.calls[0][1].aborted).toBe(false);
     expect(latestCalls).toEqual([{ org: 'org1', project: 'proj1', environment: 'env1' }]);
     expect(getCalls).toEqual([]);
-    expect(windowCalls).toEqual([]);
+    expect(walkCalls).toEqual([]);
     expect(watch).not.toHaveBeenCalled();
     expect(release).toHaveBeenCalledTimes(1);
   });
@@ -162,15 +163,15 @@ describe('LogsGet', () => {
 
   it('refuses a missing latest deployment with exit 2 for both types', async () => {
     for (const type of ['deployment', 'server']) {
-      const { command, windowCalls } = commandUnderTest({ resolved: { 'log-type': type }, latest: undefined });
+      const { command, walkCalls } = commandUnderTest({ resolved: { 'log-type': type }, latest: undefined });
 
       await expect(command.run()).rejects.toThrow('No deployments found in this environment.');
-      expect(windowCalls).toEqual([]);
+      expect(walkCalls).toEqual([]);
     }
   });
 
   it('verifies a given deployment with a get and never asks for the latest', async () => {
-    const { command, latestCalls, getCalls, windowCalls } = commandUnderTest({
+    const { command, latestCalls, getCalls, walkCalls } = commandUnderTest({
       resolved: { 'log-type': 'server', deployment: 'd9' },
     });
 
@@ -178,7 +179,7 @@ describe('LogsGet', () => {
 
     expect(getCalls).toEqual([{ org: 'org1', project: 'proj1', environment: 'env1', deployment: 'd9' }]);
     expect(latestCalls).toEqual([]);
-    expect(windowCalls).toEqual([
+    expect(walkCalls).toEqual([
       {
         org: 'org1',
         project: 'proj1',
@@ -191,18 +192,18 @@ describe('LogsGet', () => {
   });
 
   it('reads the server logs of the latest deployment when none is given', async () => {
-    const { command, latestCalls, getCalls, windowCalls } = commandUnderTest({ resolved: { 'log-type': 'server' } });
+    const { command, latestCalls, getCalls, walkCalls } = commandUnderTest({ resolved: { 'log-type': 'server' } });
 
     await command.run();
 
     expect(latestCalls).toEqual([{ org: 'org1', project: 'proj1', environment: 'env1' }]);
     expect(getCalls).toEqual([]);
-    expect(windowCalls).toEqual([expect.objectContaining({ deployment: 'dLatest' })]);
+    expect(walkCalls).toEqual([expect.objectContaining({ deployment: 'dLatest' })]);
   });
 
   it('turns a not-found verification into the generic exit-2 wording and reads no logs', async () => {
     const missing = new LaunchApiError(404, [{ code: 'launch.DEPLOYMENT.NOT_FOUND', message: 'raw' }]);
-    const { command, windowCalls } = commandUnderTest({
+    const { command, walkCalls } = commandUnderTest({
       resolved: { 'log-type': 'server', deployment: 'd9' },
       get: async () => Promise.reject(missing),
     });
@@ -211,7 +212,7 @@ describe('LogsGet', () => {
 
     await expect(running).rejects.toThrow(UsageError);
     await expect(running).rejects.toThrow('No deployment with UID "d9" found in this environment.');
-    expect(windowCalls).toEqual([]);
+    expect(walkCalls).toEqual([]);
   });
 
   it('propagates a failed verification untouched', async () => {
@@ -221,8 +222,34 @@ describe('LogsGet', () => {
     await expect(command.run()).rejects.toBe(failure);
   });
 
-  it('prints the server lines and stays quiet about the cap at 4999 lines', async () => {
-    const serverLogs = Array.from({ length: 4999 }, (_, index) => ({
+  it('walks the server pages with the window, search and cursor and prints every line in order', async () => {
+    const { command, lines, walkCalls } = commandUnderTest({
+      resolved: { 'log-type': 'server', deployment: 'd9', search: 'timeout', cursor: '[1,"a"]' },
+      serverPages: [
+        { logs: [{ message: 'one' }, { message: 'two' }], pageInfo: { hasNewer: true, newestCursor: '[2,"b"]' } },
+        { logs: [{ message: 'three' }], pageInfo: { hasNewer: false, newestCursor: '[3,"c"]' } },
+      ],
+    });
+
+    await command.run();
+
+    expect(lines).toEqual(['one', 'two', 'three']);
+    expect(walkCalls).toEqual([
+      {
+        org: 'org1',
+        project: 'proj1',
+        environment: 'env1',
+        deployment: 'd9',
+        startTime: NOW - 3_600_000,
+        endTime: NOW,
+        search: 'timeout',
+        cursor: '[1,"a"]',
+      },
+    ]);
+  });
+
+  it('prints a full page of 5000 lines with no cap notice when the server reports nothing newer', async () => {
+    const serverLogs = Array.from({ length: 5000 }, (_, index) => ({
       timestamp: '2026-10-28T11:30:00.000Z',
       message: `line ${index}`,
     }));
@@ -230,26 +257,9 @@ describe('LogsGet', () => {
 
     await command.run();
 
-    expect(lines).toHaveLength(4999);
+    expect(lines).toHaveLength(5000);
     expect(lines[0]).toBe('2026-10-28 11:30:00.000:  line 0');
-    expect(lines.join('\n')).not.toContain('Showing the newest');
-  });
-
-  it('prints the cap notice last at exactly 5000 lines and not at 5001', async () => {
-    const entries = (count: number) =>
-      Array.from({ length: count }, (_, index) => ({ timestamp: '2026-10-28T11:30:00.000Z', message: `line ${index}` }));
-    const capped = commandUnderTest({ resolved: { 'log-type': 'server' }, serverLogs: entries(5000) });
-    const over = commandUnderTest({ resolved: { 'log-type': 'server' }, serverLogs: entries(5001) });
-
-    await capped.command.run();
-    await over.command.run();
-
-    expect(capped.lines).toHaveLength(5001);
-    expect(capped.lines.at(-1)).toBe(
-      'Showing the newest 5000 server log lines in this window. Narrow --since/--until to see earlier ones.',
-    );
-    expect(over.lines).toHaveLength(5001);
-    expect(over.lines.join('\n')).not.toContain('Showing the newest');
+    expect(lines.at(-1)).toBe('2026-10-28 11:30:00.000:  line 4999');
   });
 
   it('prints the empty server notice for the resolved window, yellow on a terminal', async () => {
@@ -264,7 +274,7 @@ describe('LogsGet', () => {
 
   it('prints the 24 hour notice before the lines and sends the window as the user gave it', async () => {
     const serverLogs = [{ timestamp: '2026-10-27T11:00:00.000Z', message: 'old' }];
-    const { command, lines, windowCalls } = commandUnderTest({
+    const { command, lines, walkCalls } = commandUnderTest({
       resolved: { 'log-type': 'server', since: '2d' },
       serverLogs,
     });
@@ -275,7 +285,7 @@ describe('LogsGet', () => {
       'Server logs are kept for 24 hours; showing from 2026-10-27T12:00:00.000Z.',
       '2026-10-27 11:00:00.000:  old',
     ]);
-    expect(windowCalls).toEqual([expect.objectContaining({ startTime: NOW - 172_800_000, endTime: NOW })]);
+    expect(walkCalls).toEqual([expect.objectContaining({ startTime: NOW - 172_800_000, endTime: NOW })]);
   });
 
   it('prints no notice for a window of exactly 24 hours', async () => {
@@ -290,17 +300,19 @@ describe('LogsGet', () => {
   });
 
   it('rejects a bad window before any read', async () => {
-    const { command, windowCalls } = commandUnderTest({ resolved: { 'log-type': 'server', since: 'yesterday' } });
+    const { command, walkCalls } = commandUnderTest({ resolved: { 'log-type': 'server', since: 'yesterday' } });
 
     await expect(command.run()).rejects.toThrow(UsageError);
-    expect(windowCalls).toEqual([]);
+    expect(walkCalls).toEqual([]);
   });
 
   it('propagates a failed server read', async () => {
     const failure = new LaunchApiError(500, [{ code: 'launch.UNKNOWN', message: 'boom' }]);
     const { command } = commandUnderTest({ resolved: { 'log-type': 'server' } });
     Object.assign((command as unknown as { services: { api: { serverLogs: object } } }).services.api.serverLogs, {
-      window: async () => Promise.reject(failure),
+      async *pages() {
+        yield await Promise.reject(failure);
+      },
     });
 
     await expect(command.run()).rejects.toBe(failure);
