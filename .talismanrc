@@ -429,27 +429,27 @@ fileignoreconfig:
 - filename: src/deployments/deployment.presenter.test.ts
   checksum: e393d6bb6ce3fd92920f5003603b161186085ea8939fae704e6f71bd9e1778bc
 - filename: test/integration/deployments-create.test.ts
-  checksum: 664d0837b7de8c87e15aae160f44e042f9104ec386455854286c484c77270d2d
+  checksum: fd367019e10b47121898440e4b3a54fb2041d6302bee2dea28a97ad58eb88ee9
 - filename: src/deployments/deployment.watcher.test.ts
-  checksum: e75536df92e8989013079a9437ba974d4cdc7422351d56dca0930f0c79ccded3
+  checksum: c2cdab908cba7d4e162d06f59a471f918c959eb9c220ebc3666f0c6299f141b2
 - filename: src/deployments/deployment.create.ts
   checksum: ca64f3b29a68c4a2755a88a141e2cd9dbd6fa851a2776876d78c40f3168492e3
 - filename: src/commands/launch/deployments/create.test.ts
   checksum: 50c3f35c7246b49f6ebf5e48a9a9646ccbcb563c0c0e042fd38917e2f98cbba3
 - filename: src/deployments/deployment.create.test.ts
-  checksum: f027e7d206ffd9164cd68d6b9e4fb442944738c7b7adf8aaa85a4d72c18c3c9d
+  checksum: 6545afa21a23b7e5de18ad8ff417f88a184577e7042713cfda90758ccbcd9869
 - filename: test/integration/deployments-rollback.test.ts
-  checksum: b4d71ee5ef3a7b23da9124ec6dcc3486402a8ba176798fac7ebfa8c7a9abc0ef
+  checksum: 08400c5435c84cd162fefc585f6c32cddfcaa8909d2369341748b421e7f12073
 - filename: test/integration/deployments-cancel.test.ts
   checksum: 02c012da974f1f9b8b851d7e00878fef50c1ba7e32b6acf72a309582c66aa5c2
 - filename: src/commands/launch/deployments/cancel.test.ts
   checksum: da8d09de7f03cfe67df75ebc1636b36feb6688cf85984c357fd5304852d126e5
 - filename: src/commands/launch/deployments/rollback.test.ts
-  checksum: ed3a86f1538c644ef8e3e1c829f07035a201b927c7beab4cf200f27fb333a02b
+  checksum: 5331e774d07387b1691c47168afa8d454bdee60d26ac9c6ed3f4640fc85ff8b8
 - filename: src/deployments/deployments.api.test.ts
   checksum: b27d91317c17f1754d5853c68f4968e63dc2b3579eab26b4c772cf3cd3efbdd0
 - filename: src/deployments/deployment.prompt.test.ts
-  checksum: 64be3c4db3e2741f44b4e7ceec3f96b7d5bf8f67f03341a6d20907909a10c199
+  checksum: 3367e53ce2f0284c14524da893e7f82ef613fcdac1e9689ac408709e7f7c153d
 - filename: test/integration/deployments-request-bodies.test.ts
   checksum: 37d518b1d7671dc1bb9edd147f381c63ddb22e8a413dd43c1c280fb583e83ad2
 - filename: src/cache/cache.inputs.test.ts
