@@ -70,13 +70,14 @@ describe('ServerLogsApi', () => {
     expect(messages[0]).toBe(LOGS_ERROR_MESSAGES);
   });
 
-  it('sends the search text and the cursor exactly as given and returns no page info when the server sends none', async () => {
+  it('sends the search text and the cursor exactly as given', async () => {
     const cursor = `[${Date.now()},"${randomBytes(6).toString('hex')}"]`;
-    const { client, requests } = fakeRestClient({ serverLogs: [] });
+    const pageInfo = { hasNewer: false, newestCursor: null };
+    const { client, requests } = fakeRestClient({ serverLogs: [], pageInfo });
 
     const result = await new ServerLogsApi(client).page({ ...WINDOW, search: 'upstream timeout', cursor });
 
-    expect(result).toEqual({ logs: [], pageInfo: undefined });
+    expect(result).toEqual({ logs: [], pageInfo });
     expect(requests[0].query).toEqual({
       startTime: 1_000,
       endTime: 2_000,
@@ -163,6 +164,21 @@ describe('ServerLogsApi', () => {
     await expect(walking).rejects.toBe(failure);
     expect(seen).toEqual([{ logs: first.serverLogs, pageInfo: first.pageInfo }]);
     expect(calls).toBe(2);
+  });
+
+  it.each([
+    [{ search: 'timeout' }],
+    [{ cursor: '[1,"a"]' }],
+  ])('refuses a page without page info for %j, since an older logs service ignores both', async (extra) => {
+    const { client } = fakeRestClient({ serverLogs: [{ message: 'unfiltered' }] });
+
+    const reading = new ServerLogsApi(client).page({ ...WINDOW, ...extra });
+
+    await expect(reading).rejects.toThrow(LaunchApiError);
+    await expect(reading).rejects.toThrow(
+      'The Launch API in this region does not support --search or --cursor for server logs yet. ' +
+        'Run the command without them.',
+    );
   });
 
   it.each([[{}], [{ serverLogs: null }], [{ serverLogs: {} }], [null], ['text']])(

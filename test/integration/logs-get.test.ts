@@ -733,6 +733,29 @@ describe('integration: launch:logs:get on the wire', () => {
     expect(onWire).toEqual([]);
   });
 
+  it('exits 1 without printing unfiltered logs when a logs service before CL-7180 ignores --search', async () => {
+    jest.spyOn(Date, 'now').mockReturnValue(NOW);
+    ownedProject();
+    deploymentGet('LIVE');
+    const read = hub()
+      .get(SERVER_LOGS)
+      .query({ startTime: String(NOW - 3_600_000), endTime: String(NOW), sortDirection: 'asc', search: 'timeout' })
+      .reply(200, { serverLogs: [{ timestamp: '2026-10-28T11:30:00.000Z', message: 'GET / 200' }] });
+
+    const { error, stdout } = await runCommand(
+      getArgs('--deployment', DEPLOYMENT_UID, '--type', 'server', '--search', 'timeout'),
+      config,
+    );
+
+    expect(read.isDone()).toBe(true);
+    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.message).toBe(
+      'The Launch API in this region does not support --search or --cursor for server logs yet. ' +
+        'Run the command without them.',
+    );
+    expect(stdout).toBe('');
+  });
+
   it('T58: prints a fallback for server entries missing their timestamp, message or everything', async () => {
     jest.spyOn(Date, 'now').mockReturnValue(NOW);
     ownedProject();

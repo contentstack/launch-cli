@@ -1,6 +1,7 @@
 import { MAX_PAGES } from '../core/constants';
 import { DeploymentsApi, type GetDeploymentParams } from '../deployments/deployments.api';
-import { assertArray } from '../transport/envelope';
+import { isRecord } from '../core/values';
+import { assertArray, malformed } from '../transport/envelope';
 import type { RestApiClient } from '../transport/rest-client';
 import { LOGS_ERROR_MESSAGES } from './logs.errors';
 import type { ServerLogsPage, ServerLogsResponse } from './types';
@@ -43,6 +44,13 @@ export class ServerLogsApi {
     );
 
     assertArray(response, 'serverLogs', 'server log page');
+
+    if ((params.search !== undefined || params.cursor !== undefined) && !isRecord(response.pageInfo)) {
+      throw malformed(
+        'The Launch API in this region does not support --search or --cursor for server logs yet. ' +
+          'Run the command without them.',
+      );
+    }
 
     return { logs: response.serverLogs, pageInfo: response.pageInfo };
   }
