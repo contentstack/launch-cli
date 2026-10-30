@@ -557,15 +557,17 @@ Read the build or server logs of a deployment of a Launch environment
 ```
 USAGE
   $ csdx launch:logs:get [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--deployment
-    <value>] [--since <value>] [--until <value>] [--type <value>]
+    <value>] [--since <value>] [--until <value>] [--search <value>] [--cursor <value>] [--type <value>]
 
 FLAGS
   -c, --config=<value>      Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>    Current working directory
+      --cursor=<value>      Server logs only: resume from the cursor printed by an earlier run
       --deployment=<value>  Deployment UID
       --env=<value>         Environment name or UID
       --org=<value>         Organization UID
       --project=<value>     Project name or UID
+      --search=<value>      Server logs only: show only lines containing this text, up to 256 characters
       --since=<value>       Server logs only: start of the window, relative (45s, 30m, 12hr, 2d) or an ISO 8601
                             timestamp with an offset. Defaults to one hour before --until
       --type=<value>        Kind of logs to read (deployment | server | live). Defaults to deployment
