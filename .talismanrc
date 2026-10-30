@@ -225,10 +225,11 @@ fileignoreconfig:
   allowed_patterns:
     - "FlagKey"
 - filename: src/resources.ts
+  checksum: 527cbaf7a41201c1b739f635b309c48d1bf5cff87d0643975ede990612ba6d51
   allowed_patterns:
     - "FlagKey"
 - filename: src/resources.test.ts
-  checksum: 05a4c54c69bfff1042fa0df038c46881830e3d7014777c87919c5c0739974f45
+  checksum: beb9cd5f1d8a0c73c15db7a82e5d5feb9b3418bb1d29dab5191eec947e91fa81
   allowed_patterns:
     - "a project name passed on argv to the project resolver"
     - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
@@ -257,7 +258,7 @@ fileignoreconfig:
 - filename: src/git/local-repository.ts
   checksum: b9091ed135dfebdf590a5412bbfba2b2f96d4a177cf944a20909b93405268e9f
 - filename: test/guards/layering.test.ts
-  checksum: fa3a7ee934a03ff88618d02722273ea913b0fc1728d177e86a71d9e69236aa71
+  checksum: 55893e6e919b1e462afc989110cb9360e38aa18d06de932587beaa9006042639
 - filename: src/commands/launch/projects/create.test.ts
   checksum: 9c40b4b6ed4f7d678ecb921a71f5af7284cd685c1337f47144456ae43a38b1ad
 - filename: src/commands/launch/projects/delete.test.ts
@@ -329,7 +330,7 @@ fileignoreconfig:
 - filename: src/commands/launch/env/update.test.ts
   checksum: 2da219594e7bdd589adc0eff9ff035252a75aaa51dfa20514b18fd3266d7b752
 - filename: README.md
-  checksum: 8f1e4d97fa7e97a4c6a3bdb6bbf3d0f4d3735c3dfc23579a4d0a7c6d725bc8e4
+  checksum: 1d35c98c09a5022143c5d621896192e48ed36856dfb47ba18a1b51efc1a56543
   allowed_patterns:
     - "password-protection"
     - "-p, --password"
@@ -464,4 +465,26 @@ fileignoreconfig:
   checksum: d811a8b35d640708a9d0e7b03d006fcae4718192adee94c47f625ce7662ea715
 - filename: src/deployments/commit.prompt.ts
   checksum: 6991eb373ee016ce44fc4f47044d559cfeefa1c411526d6fd88d77c568379041
+- filename: test/integration/secrets-list.test.ts
+  checksum: 206748f2339e5704f935e06b669bd20b01f5e91959427845ba63009fee1e6c19
+- filename: src/secrets/types.ts
+  checksum: 79c095a0ce9f6a570eef55b7a3ded23fb3d4e93f0191db77825ad3b27725c6c1
+- filename: src/secrets/secrets.api.ts
+  checksum: 48502e4ebadde4be30e8eda8d85dc3108bedaa5b175569d6de452aab138ebb14
+- filename: src/commands/launch/secrets/list.ts
+  checksum: 1e3210e4f8c2ea8f2a6060e284765d8b36729c9b566804b1262ee84341ce6765
+- filename: src/secrets/secrets.errors.ts
+  checksum: 5ceeb738bdde0b5a3338e898c1f174efdc066ca0930107c9c8410b00ca2f6286
+- filename: src/secrets/secrets.api.test.ts
+  checksum: 0cb961dda7c62ab63aa9b0965b6c3300fabbf32c1a97ac6099ca1e34cd9240e7
+- filename: src/secrets/secret.presenter.ts
+  checksum: 137e225c62c84206f2b09788c50ca82c6557e04ac2eedefef26d62b40b713e67
+- filename: src/secrets/secrets.errors.test.ts
+  checksum: 6358b0dc434acf364e203a8458dfde7d4759dac286f03703ca4a59a11ce9748c
+- filename: src/secrets/secret.presenter.test.ts
+  checksum: 92fafa522ea7ade4642091a9dbb438d33e225ebf3d8c2778d91b0a887bccb307
+- filename: src/commands/launch/secrets/list.test.ts
+  checksum: 109d1165d7ce16943b50955f60fd8a753a870115fdf5501fb2a5e4a1cf436eaa
+- filename: package.json
+  checksum: 879c0c1123387d249836c6fac7ba6cb583dd71d5de480e6e2ccf9f23b035345a
 version: "1.0"

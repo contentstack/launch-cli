@@ -19,6 +19,7 @@ const RESOURCE_EDGES: Record<string, string[]> = {
   uploads: [],
   stacks: [],
   variables: ['environments', 'stacks'],
+  secrets: ['environments'],
   cache: [],
   logs: ['deployments'],
   site: ['deployments', 'environments'],

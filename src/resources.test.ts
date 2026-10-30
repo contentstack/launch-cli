@@ -8,6 +8,7 @@ import { EnvironmentsApi } from './environments/environments.api';
 import { UploadsApi } from './uploads/uploads.api';
 import { CacheApi } from './cache/cache.api';
 import { GitApi } from './git/git.api';
+import { SecretsApi } from './secrets/secrets.api';
 import { ProjectsApi } from './projects/projects.api';
 import type { UxLike } from './core/prompt';
 import * as prompt from './projects/project.prompt';
@@ -202,6 +203,7 @@ describe('the api surface', () => {
       'liveLogs',
       'organizations',
       'projects',
+      'secrets',
       'serverLogs',
       'stacks',
       'uploads',
@@ -217,6 +219,7 @@ describe('the api surface', () => {
     expect(api.git).toBeInstanceOf(GitApi);
     expect(api.uploads).toBeInstanceOf(UploadsApi);
     expect(api.cache).toBeInstanceOf(CacheApi);
+    expect(api.secrets).toBeInstanceOf(SecretsApi);
   });
 
   it('sends deployment and server log reads through the logs client and nothing else through it', async () => {
@@ -245,6 +248,23 @@ describe('the api surface', () => {
       '/projects/p1/environments/e1/deployments/d1/logs/server-logs',
     ]);
     expect(sent.manage.map((req) => req.path)).toEqual(['/projects/p1/environments/e1/deployments/d1']);
+  });
+
+  it('reads secrets through the manage client and never through the logs client', async () => {
+    const sent = { manage: [] as RestRequest[], logs: [] as RestRequest[] };
+    const recording = (into: RestRequest[]) =>
+      ({
+        request: async (req: RestRequest) => {
+          into.push(req);
+          return { secrets: [], count: 0 };
+        },
+      }) as unknown as RestApiClient;
+    const api = buildApi(recording(sent.manage), UNUSED_CMA, recording(sent.logs), {} as never);
+
+    await api.secrets.list({ org: 'o1', project: 'p1', environment: 'e1' });
+
+    expect(sent.manage.map((req) => req.path)).toEqual(['/projects/p1/environments/e1/secrets']);
+    expect(sent.logs).toEqual([]);
   });
 
   it('T84: opens the live route through the stream client and not through either rest client', async () => {
