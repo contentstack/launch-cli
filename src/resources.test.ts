@@ -7,6 +7,7 @@ import { ServerLogsApi } from './logs/server-logs.api';
 import { EnvironmentsApi } from './environments/environments.api';
 import { UploadsApi } from './uploads/uploads.api';
 import { CacheApi } from './cache/cache.api';
+import { SecretsApi } from './secrets/secrets.api';
 import { GitApi } from './git/git.api';
 import { ProjectsApi } from './projects/projects.api';
 import type { UxLike } from './core/prompt';
@@ -202,6 +203,7 @@ describe('the api surface', () => {
       'liveLogs',
       'organizations',
       'projects',
+      'secrets',
       'serverLogs',
       'stacks',
       'uploads',
@@ -217,6 +219,7 @@ describe('the api surface', () => {
     expect(api.git).toBeInstanceOf(GitApi);
     expect(api.uploads).toBeInstanceOf(UploadsApi);
     expect(api.cache).toBeInstanceOf(CacheApi);
+    expect(api.secrets).toBeInstanceOf(SecretsApi);
   });
 
   it('sends deployment and server log reads through the logs client and nothing else through it', async () => {

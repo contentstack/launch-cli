@@ -85,6 +85,9 @@
       "launch:logs": {
         "description": "Read Launch deployment, server and live logs"
       },
+      "launch:secrets": {
+        "description": "List, set and remove the secrets of a Launch environment"
+      },
       "launch:variables": {
         "description": "List, set and remove the environment variables of a Launch environment"
       },
@@ -183,6 +186,7 @@
       "launch:projects:list": "LNCH-PRJ-LS",
       "launch:projects:update": "LNCH-PRJ-UPD",
       "launch:rollback": "LNCH-RLBK",
+      "launch:secrets:list": "LNCH-SEC-LS",
       "launch:site:open": "LNCH-SITE-OPN",
       "launch:variables:list": "LNCH-VAR-LS",
       "launch:variables:set": "LNCH-VAR-SET",

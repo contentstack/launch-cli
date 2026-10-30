@@ -22,6 +22,7 @@ import { OrganizationsApi } from './organizations/organizations.api';
 import { UploadsApi } from './uploads/uploads.api';
 import { StacksApi } from './stacks/stacks.api';
 import { VariablesApi } from './variables/variables.api';
+import { SecretsApi } from './secrets/secrets.api';
 import { CacheApi } from './cache/cache.api';
 import type { CmaSession } from './transport/cma-client';
 import type { EventStreamClient } from './transport/event-stream';
@@ -78,6 +79,7 @@ export interface ApiSurface {
   uploads: UploadsApi;
   stacks: StacksApi;
   variables: VariablesApi;
+  secrets: SecretsApi;
   cache: CacheApi;
 }
 
@@ -99,6 +101,7 @@ export function buildApi(
     uploads: new UploadsApi(client),
     stacks: new StacksApi(cma),
     variables: new VariablesApi(client),
+    secrets: new SecretsApi(client),
     cache: new CacheApi(client),
   };
 }

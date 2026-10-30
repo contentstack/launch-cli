@@ -225,6 +225,7 @@ fileignoreconfig:
   allowed_patterns:
     - "FlagKey"
 - filename: src/resources.ts
+  checksum: 491bcb5d0bcb24ff6f7146d51941e5f364010e7f638e441b603604af53b6d55d
   allowed_patterns:
     - "FlagKey"
 - filename: src/resources.test.ts
@@ -329,7 +330,7 @@ fileignoreconfig:
 - filename: src/commands/launch/env/update.test.ts
   checksum: 2da219594e7bdd589adc0eff9ff035252a75aaa51dfa20514b18fd3266d7b752
 - filename: README.md
-  checksum: 8f1e4d97fa7e97a4c6a3bdb6bbf3d0f4d3735c3dfc23579a4d0a7c6d725bc8e4
+  checksum: feece1f1f5a29902e0fc08fc0b294b1128c42fc46ab5ea37efbdde2e162a4eb7
   allowed_patterns:
     - "password-protection"
     - "-p, --password"
@@ -464,4 +465,22 @@ fileignoreconfig:
   checksum: d811a8b35d640708a9d0e7b03d006fcae4718192adee94c47f625ce7662ea715
 - filename: src/deployments/commit.prompt.ts
   checksum: 6991eb373ee016ce44fc4f47044d559cfeefa1c411526d6fd88d77c568379041
+- filename: test/integration/secrets-list.test.ts
+  checksum: dd9bea8e47b53feeda24a6d328947dfc3d11f79ef5a5c78bb1b3245761cebb13
+- filename: src/secrets/secrets.api.ts
+  checksum: b490601876ce1d2fe28b91536c335f8a8b4713e784b718d4b9731739a907531a
+- filename: src/secrets/secrets.presenter.ts
+  checksum: f395458a0858a7ad01831013f0327a20bfa3a7e0c239d0725141c6e5a8f29a10
+- filename: package.json
+  checksum: b025f6d4b75a67695b939e625ef06edfc5f32014a1d802e14c19705188b383ba
+- filename: src/commands/launch/secrets/list.ts
+  checksum: 000fec691dd7d82e3f957f4ec4a2b85e59cf59726280c39f4fde43241371cefa
+- filename: src/commands/launch/secrets/list.test.ts
+  checksum: 61ed1b9851aaeeea325cd06d81cef11d17435c87653d73f49f7c2794dbeda1da
+- filename: src/secrets/secrets.api.test.ts
+  checksum: c729f4ce0fad75bdc6a88019019ecd1bf3c50d2eddd3f1f9c331faaf25af07a8
+- filename: src/secrets/secrets.errors.ts
+  checksum: fa39fbaa0434045a9eb3b5bbbffa0960eab7655a7184f23558c51ff68238b1ca
+- filename: src/secrets/secrets.presenter.test.ts
+  checksum: 4b1e940cc470c3aa9c4e060944f7737dd212eef5da36f982a4cdd64230537164
 version: "1.0"
