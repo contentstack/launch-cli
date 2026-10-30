@@ -195,6 +195,13 @@ describe('launch:secrets:set', () => {
     expect(SecretsSet.strict).toBe(true);
   });
 
+  it('describes --key as a secret key, not an environment variable, and leaves the shared catalog wording alone', () => {
+    expect(SecretsSet.flags.key.description).toBe('Secret key');
+    expect(SecretsSet.flags.key.multiple).toBe(true);
+    expect(catalog.key.description).toBe('Environment variable key, repeatable');
+    expect(SecretsSet.flags.org).toBe(catalog.org);
+  });
+
   describe('catch', () => {
     function stderrLines(): string[] {
       const written: string[] = [];

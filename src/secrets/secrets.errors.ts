@@ -67,6 +67,15 @@ export class SecretInputTimeoutError extends LaunchError {
   }
 }
 
+export class SecretsNotRemovedError extends LaunchError {
+  readonly exitCode = EXIT_RUNTIME;
+
+  constructor(keys: string[], total: number) {
+    super(`${keys.length} of ${total} ${total === 1 ? 'secret was' : 'secrets were'} not removed: ${keys.join(', ')}.`);
+    this.name = 'SecretsNotRemovedError';
+  }
+}
+
 function withoutValue(text: string, value: string): string {
   return [value, value.trim()]
     .filter((form) => form !== '')

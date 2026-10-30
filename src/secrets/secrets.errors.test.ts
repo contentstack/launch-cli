@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { EXIT_RUNTIME } from '../core/constants';
 import { SessionExpiredError } from '../core/errors';
 import { LaunchApiError, LaunchNetworkError, parseErrorEnvelope } from '../transport/errors';
-import { SECRETS_ERROR_MESSAGES, SecretInputTimeoutError, asReadFailure, asWriteFailure } from './secrets.errors';
+import { SECRETS_ERROR_MESSAGES, SecretInputTimeoutError, SecretsNotRemovedError, asReadFailure, asWriteFailure } from './secrets.errors';
 
 const PREFIX = 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS';
 
@@ -234,5 +234,19 @@ describe('SecretInputTimeoutError', () => {
       'No value arrived on standard input within 30 seconds, so nothing was changed. ' +
         'Pipe the value in, for example: printf \'%s\' "$TOKEN" | csdx launch:secrets:set --key <KEY> --yes',
     );
+  });
+});
+
+describe('SecretsNotRemovedError', () => {
+  it.each([
+    [['A'], 1, '1 of 1 secret was not removed: A.'],
+    [['A', 'B'], 2, '2 of 2 secrets were not removed: A, B.'],
+    [['B'], 3, '1 of 3 secrets were not removed: B.'],
+  ])('names the keys that stayed and counts them against the request (%p of %i)', (keys, total, message) => {
+    const error = new SecretsNotRemovedError(keys, total);
+
+    expect(error.name).toBe('SecretsNotRemovedError');
+    expect(error.exitCode).toBe(EXIT_RUNTIME);
+    expect(error.message).toBe(message);
   });
 });

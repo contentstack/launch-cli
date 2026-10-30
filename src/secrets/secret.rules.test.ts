@@ -7,6 +7,7 @@ import { catalog } from '../resources';
 import {
   CLIENT_EXPOSED_PREFIXES,
   INVALID_ARGUMENTS_MESSAGE,
+  UNSET_INVALID_ARGUMENTS_MESSAGE,
   asSafeArgvFailure,
   clientExposedPrefix,
   clientExposedWarning,
@@ -125,5 +126,26 @@ describe('asSafeArgvFailure', () => {
 
   it('leaves a value that is not an error as it is', () => {
     expect(asSafeArgvFailure('text')).toBe('text');
+  });
+
+  it('words the replacement with the message it is given, never an argv token', async () => {
+    const raw = await realParseFailure([`--value=${secret}`]);
+
+    const safe = asSafeArgvFailure(raw, UNSET_INVALID_ARGUMENTS_MESSAGE) as UsageError;
+
+    expect(safe).toBeInstanceOf(UsageError);
+    expect(safe.exitCode).toBe(2);
+    expect(safe.message).toBe(UNSET_INVALID_ARGUMENTS_MESSAGE);
+    expect(safe.message).not.toContain(secret);
+  });
+});
+
+describe('UNSET_INVALID_ARGUMENTS_MESSAGE', () => {
+  it('names launch:secrets:unset and the flags it takes, and is not the set wording', () => {
+    expect(UNSET_INVALID_ARGUMENTS_MESSAGE).toBe(
+      'Invalid arguments. Run csdx launch:secrets:unset --help to see the accepted flags. ' +
+        'Pass each secret as --key <KEY>, not as a bare argument.',
+    );
+    expect(UNSET_INVALID_ARGUMENTS_MESSAGE).not.toBe(INVALID_ARGUMENTS_MESSAGE);
   });
 });

@@ -10,7 +10,10 @@ export interface SecretWriteResult {
   updatedAt: string | undefined;
 }
 
-export interface SecretWriteParams extends EnvironmentParams {
+export interface SecretKeyParams extends EnvironmentParams {
   key: string;
+}
+
+export interface SecretWriteParams extends SecretKeyParams {
   value: string;
 }

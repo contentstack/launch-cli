@@ -239,3 +239,49 @@ describe('SecretsApi.refresh', () => {
     await expect(new SecretsApi(client).refresh({ ...SCOPE, key: 'A', value })).rejects.toThrow('x ••••••');
   });
 });
+
+describe('SecretsApi.remove', () => {
+  it('DELETEs the encoded key path with the scope headers, no body and the secrets wording', async () => {
+    const { client, requests, messages } = fakeRestClient(async () => undefined);
+
+    await expect(new SecretsApi(client).remove({ ...SCOPE, key: 'A/B C' })).resolves.toBeUndefined();
+
+    expect(requests).toEqual([
+      {
+        method: 'DELETE',
+        path: `/projects/${PROJECT}/environments/${ENVIRONMENT}/secrets/A%2FB%20C`,
+        orgUid: ORG,
+        projectUid: PROJECT,
+      },
+    ]);
+    expect(requests[0]).not.toHaveProperty('body');
+    expect(messages).toEqual([SECRETS_ERROR_MESSAGES]);
+  });
+
+  it.each([
+    [404, 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS.KEY.NOT_FOUND', 'No secret with that key exists in this environment.'],
+    [404, 'launch.SOMETHING.ELSE', 'The project, the environment or the secret was not found.'],
+    [403, 'launch.RBAC.FORBIDDEN', 'You do not have permission to change the secrets of this environment.'],
+    [
+      409,
+      'launch.ENVIRONMENT.ENVIRONMENT_VARIABLES.CONCURRENT_UPDATE',
+      "Another change to this environment's variables and secrets landed at the same moment, so nothing was changed. Run the command again.",
+    ],
+  ])('words a %i with code %s in write context', async (status, code, message) => {
+    const { client } = fakeRestClient(async () => {
+      throw parseErrorEnvelope(status, { errors: [{ code, message: 'raw' }] }, SECRETS_ERROR_MESSAGES);
+    });
+
+    const failure = await new SecretsApi(client).remove({ ...SCOPE, key: 'A' }).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(LaunchApiError);
+    expect((failure as LaunchApiError).status).toBe(status);
+    expect((failure as LaunchApiError).message).toBe(message);
+  });
+
+  it('lets a plain failure propagate with its message untouched', async () => {
+    const { client } = fakeRestClient(async () => Promise.reject(new Error('socket closed')));
+
+    await expect(new SecretsApi(client).remove({ ...SCOPE, key: 'A' })).rejects.toThrow('socket closed');
+  });
+});

@@ -3,7 +3,7 @@ import type { EnvironmentParams } from '../environments/environments.api';
 import { assertArray } from '../transport/envelope';
 import type { RestApiClient, RestRequest } from '../transport/rest-client';
 import { SECRETS_ERROR_MESSAGES, asReadFailure, asWriteFailure } from './secrets.errors';
-import type { SecretSummary, SecretWriteParams, SecretWriteResult } from './types';
+import type { SecretKeyParams, SecretSummary, SecretWriteParams, SecretWriteResult } from './types';
 
 export * from './types';
 
@@ -73,5 +73,16 @@ export class SecretsApi {
     });
 
     return resultOf(response);
+  }
+
+  async remove({ org, project, environment, key }: SecretKeyParams): Promise<void> {
+    await this.request<unknown>({
+      method: 'DELETE',
+      path: secretsPath({ org, project, environment }, key),
+      orgUid: org,
+      projectUid: project,
+    }).catch((error: unknown) => {
+      throw asWriteFailure(error, '');
+    });
   }
 }

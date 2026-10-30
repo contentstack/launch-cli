@@ -2,6 +2,7 @@ import { EXIT_CANCELLED } from '../../../core/constants';
 import { flagsFor, inputs } from '../../../core/inputs';
 import { LaunchCommand } from '../../../core/launch-command';
 import { isAbsent } from '../../../core/values';
+import { catalog } from '../../../resources';
 import { styled } from '../../../core/style';
 import { asSafeArgvFailure, singleKeyError } from '../../../secrets/secret.rules';
 import { SecretSetter } from '../../../secrets/secret.set';
@@ -27,7 +28,10 @@ export default class SecretsSet extends LaunchCommand<typeof setInputs> {
 
   static inputs = setInputs;
 
-  static flags = flagsFor(setInputs);
+  static flags = {
+    ...flagsFor(setInputs),
+    key: { ...catalog.key, description: 'Secret key' },
+  };
 
   async run(): Promise<void> {
     const keys = (this.resolved.key ?? []).filter((key) => !isAbsent(key));

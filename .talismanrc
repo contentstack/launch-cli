@@ -330,7 +330,7 @@ fileignoreconfig:
 - filename: src/commands/launch/env/update.test.ts
   checksum: 2da219594e7bdd589adc0eff9ff035252a75aaa51dfa20514b18fd3266d7b752
 - filename: README.md
-  checksum: e32e3abd91db55327921d2bb94f11a542c1aab05289716902f3dfd79a923b371
+  checksum: 20f317d623537458342d10926c2442f5674fd26b8a023599fec4626a0d0ac5ba
   allowed_patterns:
     - "password-protection"
     - "-p, --password"
@@ -470,39 +470,49 @@ fileignoreconfig:
 - filename: src/secrets/types.ts
   checksum: 04837f0759638e4dff0363907bc7b02fb9c592d6d35b6b8a8c9fc2d6ce16269c
 - filename: src/secrets/secrets.api.ts
-  checksum: b5dec750e35799b6e2e4feddaee7e33d7b62aa05bd31e6319f68f60b3096579d
+  checksum: 10bd8617da8c877a44fbbc59847e404addb36d7e5619cf7b8ac8b8fb1ddb2017
 - filename: src/commands/launch/secrets/list.ts
   checksum: 1e3210e4f8c2ea8f2a6060e284765d8b36729c9b566804b1262ee84341ce6765
 - filename: src/secrets/secrets.errors.ts
-  checksum: 3adb6c2088226284b32bb7d7e52a9ee5b47a5d986c5d9211cc7ed747c9e82394
+  checksum: 22ce358cb1986030048f709267317c5afb3e4be5342cbab3136b2a16e90db003
 - filename: src/secrets/secrets.api.test.ts
-  checksum: f7b40d5d7673b7871e7b09e61d05a7a99092e8c00be41be313d7689103be4bc6
+  checksum: f8aafe69f89ae8bcfe5940a47cb6dbe24750b6bd05ff3b5838181f502d4e3e09
 - filename: src/secrets/secret.presenter.ts
   checksum: 137e225c62c84206f2b09788c50ca82c6557e04ac2eedefef26d62b40b713e67
 - filename: src/secrets/secrets.errors.test.ts
-  checksum: 1c7afe444068c91ce24c965ea46dd6af32fbc634d70c7d2abfd5bc4a09d3c1c0
+  checksum: a39419a758d6c3289a9836f08c0690557ba35a9dccb595ec0899e3b435a1c0d7
 - filename: src/secrets/secret.presenter.test.ts
   checksum: 92fafa522ea7ade4642091a9dbb438d33e225ebf3d8c2778d91b0a887bccb307
 - filename: src/commands/launch/secrets/list.test.ts
   checksum: 109d1165d7ce16943b50955f60fd8a753a870115fdf5501fb2a5e4a1cf436eaa
 - filename: package.json
-  checksum: 0c2e5c98e95db3e83dbacccccc1792f4257a7c88e28caf42de8c6ac81d27aa82
+  checksum: 4e16bc9e214c18ea8ee2bb7562e6a468249739afb1474aed7b101c4a81a30d03
 - filename: test/integration/secrets-set.test.ts
   checksum: 66559607e657f9826a6b821de7ed64ba4f7aa1d262a9fc3e90aecb73c5f074b5
 - filename: src/secrets/secret.rules.test.ts
-  checksum: 97e25e9b37d29d78313cf388ff1376ac99426dd6577a1d4e143e5c8b9bf7387c
+  checksum: dbf5a53ab09ba1333e4c4f5366987ce1347877ef5e8a6b0917476617cc270e72
 - filename: src/commands/launch/secrets/set.ts
-  checksum: 2551affb83fee822dc4dc6c43b1254aaa104845ba22e8c0ff7ebaa74c11fc136
+  checksum: c712a2256bdf43db062ed80c04d313f07d21f4308aa09c6a6b5ba9220a444ca8
 - filename: src/secrets/secret.rules.ts
-  checksum: d32aeba49ebbf5b006baf3ef63b0e6239d014011d10a191ecfde35634b1fce8d
+  checksum: 014a3f7968191995270694c6dfe02f46ccb8d3570e0d76a2721bdb614fe49b05
 - filename: src/secrets/secret.value.ts
   checksum: 0d4111f487c412eb93b4bd6a035edc6500018b0d7296e3ab59ca447b5039f962
 - filename: src/secrets/secret.set.ts
   checksum: e363a0a1e8e77cabd782568762183a8a98051c5e547ff05adf616fad6fc793ec
 - filename: src/commands/launch/secrets/set.test.ts
-  checksum: a92a2d5fc1bfcc8c3e1462f929c57e3fa7e45dd0e73ee71ecc4e6191db873601
+  checksum: 5288caf29722c4ef1bdcbd699b8720c94a0ede30f83c6c2fc89384e3d614093b
 - filename: src/secrets/secret.value.test.ts
   checksum: 917ef36ad034b4d19993db92eace4a92c4b8f05404933183768a9cc18ac90ac5
 - filename: src/secrets/secret.set.test.ts
   checksum: d86528e2dfb1f27e47aef9af4f4a98fbfc7c6f291e37d9eaf791c75ebed61b63
+- filename: test/integration/secrets-unset.test.ts
+  checksum: 455973bd7e8cee93eef12adfabe3a3e369fb3569c57a19422e95a082bc11b22d
+- filename: src/secrets/secret.unset.ts
+  checksum: ad7da4586cbe10ade51eae230fa528759da44c4a79b26cddf72e81857619609d
+- filename: src/commands/launch/secrets/unset.ts
+  checksum: 03817a6970a81632927e0caa4896bc643b73377b6fd027b778fa71e840c3ca1d
+- filename: src/secrets/secret.unset.test.ts
+  checksum: b1a72549d0c957a2f45370b0b6c513c6a644ad2c825ae779885dbd4894de1830
+- filename: src/commands/launch/secrets/unset.test.ts
+  checksum: a00e503cc66876fa1ef37eaab1a91e2e013af44d3add8ecd6fa08f269d550002
 version: "1.0"

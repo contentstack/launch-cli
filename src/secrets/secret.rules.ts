@@ -8,6 +8,10 @@ export const INVALID_ARGUMENTS_MESSAGE =
   'Invalid arguments. Run csdx launch:secrets:set --help to see the accepted flags. ' +
   'The value is never a flag or an argument: pipe it in or type it at the prompt.';
 
+export const UNSET_INVALID_ARGUMENTS_MESSAGE =
+  'Invalid arguments. Run csdx launch:secrets:unset --help to see the accepted flags. ' +
+  'Pass each secret as --key <KEY>, not as a bare argument.';
+
 export function clientExposedPrefix(key: string): string | undefined {
   return CLIENT_EXPOSED_PREFIXES.find((prefix) => key.startsWith(prefix));
 }
@@ -33,8 +37,8 @@ export function singleKeyError(count: number): UsageError {
   );
 }
 
-export function asSafeArgvFailure(error: unknown): unknown {
+export function asSafeArgvFailure(error: unknown, message: string = INVALID_ARGUMENTS_MESSAGE): unknown {
   const isParseFailure = error instanceof Errors.CLIError && Object.prototype.hasOwnProperty.call(error, 'parse');
 
-  return isParseFailure ? new UsageError(INVALID_ARGUMENTS_MESSAGE) : error;
+  return isParseFailure ? new UsageError(message) : error;
 }
