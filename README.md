@@ -70,6 +70,7 @@ with exit code 2 and name their V2 replacements. `launch:functions:serve` is liv
 * [`csdx launch:rollback`](#csdx-launchrollback)
 * [`csdx launch:secrets:list`](#csdx-launchsecretslist)
 * [`csdx launch:secrets:set`](#csdx-launchsecretsset)
+* [`csdx launch:secrets:unset`](#csdx-launchsecretsunset)
 * [`csdx launch:site:open`](#csdx-launchsiteopen)
 * [`csdx launch:variables:list`](#csdx-launchvariableslist)
 * [`csdx launch:variables:set`](#csdx-launchvariablesset)
@@ -796,15 +797,15 @@ Add a secret to an environment, or refresh it when the key already exists. The v
 
 ```
 USAGE
-  $ csdx launch:secrets:set --key <value>... [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>]
-    [-y]
+  $ csdx launch:secrets:set [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--key
+    <value>...] [-y]
 
 FLAGS
   -c, --config=<value>    Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>  Current working directory
   -y, --yes               Skip the confirmation prompt
       --env=<value>       Environment name or UID
-      --key=<value>...    (required) Environment variable key, repeatable
+      --key=<value>...    Environment variable key, repeatable
       --org=<value>       Organization UID
       --project=<value>   Project name or UID
 
@@ -819,6 +820,36 @@ EXAMPLES
 ```
 
 _See code: [src/commands/launch/secrets/set.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/secrets/set.ts)_
+
+## `csdx launch:secrets:unset`
+
+Remove secrets from an environment, after asking for confirmation. Repeat --key to remove several; the first failure stops the run and the keys already removed are listed
+
+```
+USAGE
+  $ csdx launch:secrets:unset [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--key
+    <value>...] [-y]
+
+FLAGS
+  -c, --config=<value>    Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>  Current working directory
+  -y, --yes               Skip the confirmation prompt
+      --env=<value>       Environment name or UID
+      --key=<value>...    Environment variable key, repeatable
+      --org=<value>       Organization UID
+      --project=<value>   Project name or UID
+
+DESCRIPTION
+  Remove secrets from an environment, after asking for confirmation. Repeat --key to remove several; the first failure
+  stops the run and the keys already removed are listed
+
+EXAMPLES
+  $ csdx launch:secrets:unset --org <org-uid> --project <name-or-uid> --env <name-or-uid> --key API_TOKEN
+
+  $ csdx launch:secrets:unset --org <org-uid> --project <name-or-uid> --env <name-or-uid> --key API_TOKEN --key DB_URL --yes
+```
+
+_See code: [src/commands/launch/secrets/unset.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/secrets/unset.ts)_
 
 ## `csdx launch:site:open`
 

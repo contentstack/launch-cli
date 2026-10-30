@@ -72,4 +72,16 @@ export class SecretsApi {
 
     return secretOf(response)[0] ?? {};
   }
+
+  async delete(params: SecretsParams, key: string): Promise<void> {
+    await this.request<unknown>(
+      {
+        method: 'DELETE',
+        path: `${secretsPath(params)}/${encodeURIComponent(key)}`,
+        orgUid: params.org,
+        projectUid: params.project,
+      },
+      secretKeyMessages(key),
+    );
+  }
 }

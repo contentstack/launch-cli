@@ -330,7 +330,7 @@ fileignoreconfig:
 - filename: src/commands/launch/env/update.test.ts
   checksum: 2da219594e7bdd589adc0eff9ff035252a75aaa51dfa20514b18fd3266d7b752
 - filename: README.md
-  checksum: 64778264c69e20d97e59ab6f90acc656fb944e1b37cf8adc04e9745428831996
+  checksum: 7dd83c3cc6c7dbd60f5fe1317ff762ccd8b5ab0d62009912ae890af036b5da23
   allowed_patterns:
     - "password-protection"
     - "-p, --password"
@@ -468,17 +468,17 @@ fileignoreconfig:
 - filename: test/integration/secrets-list.test.ts
   checksum: dd9bea8e47b53feeda24a6d328947dfc3d11f79ef5a5c78bb1b3245761cebb13
 - filename: src/secrets/secrets.api.ts
-  checksum: dde72f524817a6803dddeffba209354cc4b87a27e030154e03cc2276b00ffe70
+  checksum: 526a2571b04092cc17cf185ae4a72ae89b654fbd855a1993f57bdd8c75dcad1b
 - filename: src/secrets/secrets.presenter.ts
   checksum: f395458a0858a7ad01831013f0327a20bfa3a7e0c239d0725141c6e5a8f29a10
 - filename: package.json
-  checksum: f7d4888fb27df1a3fcbe155af38f412b8a44d21ad3195eeb0fe976c19346be3d
+  checksum: 0b379192f02930eddbcfedf5ee44560e901b500a9cec989c85d4ad2d999fe23d
 - filename: src/commands/launch/secrets/list.ts
   checksum: 000fec691dd7d82e3f957f4ec4a2b85e59cf59726280c39f4fde43241371cefa
 - filename: src/commands/launch/secrets/list.test.ts
   checksum: 61ed1b9851aaeeea325cd06d81cef11d17435c87653d73f49f7c2794dbeda1da
 - filename: src/secrets/secrets.api.test.ts
-  checksum: 1bf3c331ff2df44dc29aa3fd96909154b092869c1ddcf743c4dda5598873409d
+  checksum: 5b8bd33a74b92ec67e13525564b609b837903785598e19d35dcf5045cd7202c1
 - filename: src/secrets/secrets.errors.ts
   checksum: d3c18246c353f0f4feacbf9a55657c05e6f91aa1f1ecf52f65bd1529c7753c0b
 - filename: src/secrets/secrets.presenter.test.ts
@@ -507,4 +507,14 @@ fileignoreconfig:
   checksum: 3371b523f234175bc45f7e5f7a41ff2d492ada4da15abff200ec300e059e4f30
 - filename: test/integration/secrets-set.test.ts
   checksum: 132510384c8196bbff286292bc77a16e2fee687f0ec4d685a3bac728feb0f020
+- filename: src/secrets/secrets.unset.ts
+  checksum: 7d8edbbb92a5fed456b46aeb80e9f5771cdc94122943d5e4cce9e8646490607a
+- filename: src/secrets/secrets.unset.test.ts
+  checksum: 19b92b8ce558ce8a9781dd5d7aaa030e866121fd62bc299fc21d9db7d580bcc8
+- filename: src/commands/launch/secrets/unset.ts
+  checksum: 757c99b0a7205c2e9a47c47f264e7649181d60c41eb7cedab0e4999c71cbdd61
+- filename: src/commands/launch/secrets/unset.test.ts
+  checksum: 7d14875cfe1a20ef577c3c825c92b7d084acb207d5b435c35e9b521b3f55ee89
+- filename: test/integration/secrets-unset.test.ts
+  checksum: ee4c835c560ec86fbffff1f73a4b284ff89de962ae03554ffaae98417c700107
 version: "1.0"

@@ -220,3 +220,42 @@ describe('secrets api refresh', () => {
     expect(second).toBe(missing);
   });
 });
+
+describe('secrets api delete', () => {
+  it('deletes the secret named in the path under the scope headers, with the key wording and no body', async () => {
+    const { client, requests, messages } = fakeRestClient(undefined);
+
+    await new SecretsApi(client).delete(SCOPE, 'API_TOKEN');
+
+    expect(requests).toEqual([
+      { method: 'DELETE', path: `${LIST_PATH}/API_TOKEN`, orgUid: 'org1', projectUid: 'proj1' },
+    ]);
+    expect(messages).toEqual([secretKeyMessages('API_TOKEN')]);
+  });
+
+  it('encodes a key that is not path-safe', async () => {
+    const { client, requests } = fakeRestClient(undefined);
+
+    await new SecretsApi(client).delete(SCOPE, 'A/B ?');
+
+    expect(requests[0].path).toBe(`${LIST_PATH}/A%2FB%20%3F`);
+  });
+
+  it('rewords a 403 and passes a 404 that names the key through unchanged', async () => {
+    const missing = new LaunchApiError(
+      404,
+      [{ code: 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS.KEY.NOT_FOUND' }],
+      secretKeyMessages('GONE'),
+    );
+    const forbidden = new LaunchApiError(403, [{ code: 'launch.X', message: 'raw' }]);
+
+    const first = await new SecretsApi(failingRestClient(forbidden)).delete(SCOPE, 'GONE').catch((e: unknown) => e);
+    const second = await new SecretsApi(failingRestClient(missing)).delete(SCOPE, 'GONE').catch((e: unknown) => e);
+
+    expect((first as LaunchApiError).message).toBe(
+      'You do not have permission to manage the secrets of this environment.',
+    );
+    expect(second).toBe(missing);
+    expect((second as LaunchApiError).message).toBe('The secret GONE was not found in this environment.');
+  });
+});
