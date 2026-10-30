@@ -229,7 +229,7 @@ fileignoreconfig:
   allowed_patterns:
     - "FlagKey"
 - filename: src/resources.test.ts
-  checksum: 05a4c54c69bfff1042fa0df038c46881830e3d7014777c87919c5c0739974f45
+  checksum: b82772dc9691aa93b12766ecfe8eeb64c3adb1639e86ae3fc0a2321a5164c32f
   allowed_patterns:
     - "a project name passed on argv to the project resolver"
     - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
@@ -258,7 +258,7 @@ fileignoreconfig:
 - filename: src/git/local-repository.ts
   checksum: b9091ed135dfebdf590a5412bbfba2b2f96d4a177cf944a20909b93405268e9f
 - filename: test/guards/layering.test.ts
-  checksum: fa3a7ee934a03ff88618d02722273ea913b0fc1728d177e86a71d9e69236aa71
+  checksum: 3e27ec0322a9966750ce641410172553e2e96c2100db69927f07bac3f1023827
 - filename: src/commands/launch/projects/create.test.ts
   checksum: 9c40b4b6ed4f7d678ecb921a71f5af7284cd685c1337f47144456ae43a38b1ad
 - filename: src/commands/launch/projects/delete.test.ts
@@ -494,9 +494,9 @@ fileignoreconfig:
 - filename: src/secrets/secrets.exposure.ts
   checksum: b4b287be92004dfecf60dd586d9298b0345080c1f6085189470b692987b6fecd
 - filename: src/secrets/secrets.redact.test.ts
-  checksum: 38e5bcb49fc56c3ab7aeb107925806be54f26770a3d17b72fd99cbd70711baa4
+  checksum: 9a59750943e8217d14d98867793b7f1d1389cc159bb6e36cb8b52ab36e3a4669
 - filename: src/secrets/secrets.redact.ts
-  checksum: 9b3a512c54b38775b17eaac97ce980168a7e608746953c771abf955dfefa680d
+  checksum: 0b16cc9a526c56890a5cd77e2d247ecfae79aca32bd0efa9fae4eede9835ff51
 - filename: src/secrets/secrets.set.test.ts
   checksum: ef91bd478f158f993b961483ee9d6b683b3b725fc7f7b63c840680b64ce3df3d
 - filename: src/secrets/secrets.set.ts
