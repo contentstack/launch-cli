@@ -18,11 +18,14 @@ import {
   noDeploymentLogsLine,
   noServerLogsLine,
   serverLogLine,
+  serverLogsPageCapLine,
+  serverLogsResumeLine,
   serverLogsRetentionLine,
   stoppedFollowingLine,
 } from '../../../logs/logs.presenter';
 import { LiveLogFollower } from '../../../logs/live-log.follower';
 import { parseLogWindow, type LogWindow } from '../../../logs/log-window';
+import { nextCursorOf } from '../../../logs/server-logs.api';
 
 const getInputs = inputs({
   org: { required: true },
@@ -121,6 +124,7 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
     const { startTime, endTime, clampedFrom } = window;
     const { search, cursor } = this.resolved;
     let printed = 0;
+    let resumeFrom: string | undefined;
 
     if (clampedFrom !== undefined) {
       this.ux.print(serverLogsRetentionLine(clampedFrom, outputIsTTY));
@@ -131,10 +135,17 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
         this.ux.print(serverLogLine(log, outputIsTTY, process.stdout.columns));
         printed += 1;
       }
+
+      resumeFrom = nextCursorOf(page);
     }
 
     if (printed === 0) {
       this.ux.print(noServerLogsLine(startTime, endTime, outputIsTTY));
+    }
+
+    if (resumeFrom !== undefined) {
+      this.ux.print(serverLogsPageCapLine(outputIsTTY));
+      this.ux.print(serverLogsResumeLine({ ...scope, startTime, endTime, search, cursor: resumeFrom }));
     }
   }
 

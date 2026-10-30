@@ -14,6 +14,13 @@ export interface ServerLogsWindowParams extends GetDeploymentParams {
   cursor?: string;
 }
 
+export function nextCursorOf(page: ServerLogsPage): string | undefined {
+  const next = page.pageInfo?.newestCursor;
+  const hasNext = typeof next === 'string' && next.trim() !== '';
+
+  return page.pageInfo?.hasNewer === true && page.logs.length > 0 && hasNext ? next : undefined;
+}
+
 export class ServerLogsApi {
   constructor(private readonly client: RestApiClient) {}
 
@@ -48,14 +55,11 @@ export class ServerLogsApi {
 
       yield page;
 
-      const next = page.pageInfo?.newestCursor;
-      const hasNext = typeof next === 'string' && next.trim() !== '';
+      cursor = nextCursorOf(page);
 
-      if (page.pageInfo?.hasNewer !== true || page.logs.length === 0 || !hasNext) {
+      if (cursor === undefined) {
         return;
       }
-
-      cursor = next;
     }
   }
 }

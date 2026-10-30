@@ -248,6 +248,26 @@ describe('LogsGet', () => {
     ]);
   });
 
+  it('prints the cap notice and a resume command from the last newest cursor when the walk ends with more to read', async () => {
+    const { command, lines } = commandUnderTest({
+      resolved: { 'log-type': 'server', deployment: 'd9', search: 'time out', since: '2h' },
+      serverPages: [
+        { logs: [{ message: 'one' }], pageInfo: { hasNewer: true, newestCursor: '[1,"a"]' } },
+        { logs: [{ message: 'two' }], pageInfo: { hasNewer: true, newestCursor: '[2,"b"]' } },
+      ],
+    });
+
+    await command.run();
+
+    expect(lines).toEqual([
+      'one',
+      'two',
+      'Stopped after 100 pages of server logs; more remain in this window.',
+      'Resume with: csdx launch:logs:get --org org1 --project proj1 --env env1 --deployment d9 --type server ' +
+        `--since 2026-10-28T10:00:00.000Z --until 2026-10-28T12:00:00.000Z --search 'time out' --cursor '[2,"b"]'`,
+    ]);
+  });
+
   it('prints a full page of 5000 lines with no cap notice when the server reports nothing newer', async () => {
     const serverLogs = Array.from({ length: 5000 }, (_, index) => ({
       timestamp: '2026-10-28T11:30:00.000Z',

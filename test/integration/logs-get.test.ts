@@ -603,6 +603,41 @@ describe('integration: launch:logs:get on the wire', () => {
     expect(onWire).toEqual([]);
   });
 
+  it('stops a server that always has more after 100 requests and prints a resume command with an absolute window', async () => {
+    jest.spyOn(Date, 'now').mockReturnValue(NOW);
+    let reads = 0;
+    ownedProject();
+    deploymentGet('LIVE');
+    hub()
+      .get(SERVER_LOGS)
+      .query(true)
+      .times(101)
+      .reply(200, () => {
+        reads += 1;
+        const cursor = `[${NOW - 3_600_000 + reads},"${DEPLOYMENT_UID}"]`;
+        return {
+          serverLogs: [{ timestamp: NOW - 3_600_000 + reads, message: `line ${reads}` }],
+          pageInfo: { hasNewer: true, newestCursor: cursor },
+        };
+      });
+
+    const { error, stdout } = await runCommand(
+      getArgs('--deployment', DEPLOYMENT_UID, '--type', 'server', '--since', '1h'),
+      config,
+    );
+    const lines = outputLines(stdout);
+
+    expect(error).toBeUndefined();
+    expect(reads).toBe(100);
+    expect(lines).toHaveLength(102);
+    expect(lines.slice(-2)).toEqual([
+      'Stopped after 100 pages of server logs; more remain in this window.',
+      `Resume with: csdx launch:logs:get --org ${ORG_UID} --project ${PROJECT_UID} --env ${ENV_UID} ` +
+        `--deployment ${DEPLOYMENT_UID} --type server --since 2026-10-28T11:00:00.000Z ` +
+        `--until 2026-10-28T12:00:00.000Z --cursor '[${NOW - 3_600_000 + 100},"${DEPLOYMENT_UID}"]'`,
+    ]);
+  });
+
   it('T55: prints the 24 hour notice first for --since 2d and sends the user own start time', async () => {
     jest.spyOn(Date, 'now').mockReturnValue(NOW);
     ownedProject();
