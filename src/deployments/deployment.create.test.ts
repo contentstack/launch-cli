@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -275,7 +276,7 @@ describe('DeploymentCreator on a FileUpload project', () => {
     expect(printed).toEqual([]);
   });
 
-  it('refuses a missing project directory with the one genuine failure wording, naming the path and both ways out', async () => {
+  it('refuses a missing project directory naming the path and both ways out, --data-dir and --last-upload', async () => {
     const { creator, created, signedUrlCalls } = harness(FILE);
 
     const failure = await failureOf(creator.create(BASE));
@@ -283,9 +284,25 @@ describe('DeploymentCreator on a FileUpload project', () => {
     expect(failure).toBeInstanceOf(UsageError);
     expect((failure as LaunchError).exitCode).toBe(2);
     expect(failure.message).toBe(
-      `no project directory found at ${MISSING_DIR}. Use --last-upload to redeploy the last uploaded bundle, ` +
-        'or run from your project directory / pass --data-dir.',
+      `No files to upload were found in "${MISSING_DIR}". ` +
+        'Use --data-dir to point to your project folder, or --last-upload to redeploy the last upload.',
     );
+    expect(created).toEqual([]);
+    expect(signedUrlCalls).toEqual([]);
+  });
+});
+
+describe('DeploymentCreator on a FileUpload project whose archive is refused for another reason', () => {
+  it('keeps that error instead of rewording it as a missing directory', async () => {
+    const { creator, created, signedUrlCalls } = harness({ projectType: 'FILEUPLOAD' });
+    const dataDir = mkdtempSync(join(tmpdir(), 'launch-tiny-dir-'));
+    writeFileSync(join(dataDir, 'index.html'), 'x');
+
+    const failure = await failureOf(creator.create({ ...BASE, dataDir }));
+
+    expect(failure).toBeInstanceOf(UsageError);
+    expect(failure.message).not.toContain('No files to upload');
+    expect(failure.message).not.toContain('--last-upload');
     expect(created).toEqual([]);
     expect(signedUrlCalls).toEqual([]);
   });
@@ -313,8 +330,7 @@ describe('DeploymentCreator waiting for the outcome', () => {
 
       expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
       expect((failure as LaunchError).exitCode).toBe(1);
-      expect(failure.message).toContain(`its last status was ${status}`);
-      expect(failure.message).toContain(logsHint);
+      expect(failure.message).toBe(`Deployment "${DEPLOYMENT}" ended with status ${status}. Run ${logsHint} to see the cause.`);
       expect(announced).toEqual([]);
     },
   );
@@ -326,13 +342,14 @@ describe('DeploymentCreator waiting for the outcome', () => {
 
     expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
     expect((failure as LaunchError).exitCode).toBe(1);
-    expect(failure.message).toContain('still DEPLOYING');
-    expect(failure.message).toContain(getHint);
+    expect(failure.message).toBe(
+      `Deployment "${DEPLOYMENT}" was still DEPLOYING when the CLI stopped waiting. Run ${getHint} to check its status.`,
+    );
     expect(failure.message).not.toContain('deployments:create');
     expect(announced).toEqual([]);
   });
 
-  it('words a poll that gave up with the deployment it left running, naming the log command', async () => {
+  it('words a poll that gave up with the deployment it left running, naming the status command', async () => {
     const outage = new LaunchApiError(503, [{ code: 'x', message: 'Service unavailable.' }]);
     const { creator } = harness({
       watch: async () => {
@@ -343,9 +360,10 @@ describe('DeploymentCreator waiting for the outcome', () => {
     const failure = await failureOf(creator.create(BASE));
 
     expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
-    expect(failure.message).toContain('could not be followed to completion');
-    expect(failure.message).toContain(DEPLOYMENT);
-    expect(failure.message).toContain(logsHint);
+    expect(failure.message).toBe(
+      `Deployment "${DEPLOYMENT}" could not be followed to completion: Service unavailable. ` +
+        `Run ${getHint} to check its status.`,
+    );
   });
 
   const rejections = {
@@ -386,7 +404,7 @@ describe('DeploymentCreator interrupted with Ctrl-C while waiting', () => {
       });
   }
 
-  it('stops the wait, says the deployment keeps running and names deployments:get, sends no cancel, and exits 3', async () => {
+  it('stops the wait, says the deployment was not cancelled and names deployments:get, sends no cancel, and exits 3', async () => {
     const holder: { stop?: AbortSignal } = {};
     const { creator, signals, methods } = harness({ watch: waitingForever(holder) });
 
@@ -403,11 +421,10 @@ describe('DeploymentCreator interrupted with Ctrl-C while waiting', () => {
     expect(holder.stop?.aborted).toBe(true);
     expect(failure).toBeInstanceOf(DeploymentWaitInterruptedError);
     expect((failure as LaunchError).exitCode).toBe(3);
-    expect(failure.message).toContain(DEPLOYMENT);
-    expect(failure.message).toContain('keeps running');
-    expect(failure.message).toContain('not cancelled');
-    expect(failure.message).toContain(
-      `csdx launch:deployments:get --org ${ORG} --project ${PROJECT} --env ${ENVIRONMENT} --deployment ${DEPLOYMENT}`,
+    expect(failure.message).toBe(
+      `Stopped waiting. Deployment "${DEPLOYMENT}" was not cancelled and continues on Launch. ` +
+        `Check it with csdx launch:deployments:get --org ${ORG} --project ${PROJECT} --env ${ENVIRONMENT} ` +
+        `--deployment ${DEPLOYMENT}.`,
     );
     expect(methods).toEqual(['create']);
     expect(signals.listeners).toEqual([]);

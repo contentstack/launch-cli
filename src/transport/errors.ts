@@ -15,6 +15,29 @@ export function messageForCode(messages: ErrorMessages, code?: string): string |
   return code === undefined ? undefined : messages[code];
 }
 
+const GENERIC_REJECTION = 'bad request';
+
+const FIELDS_NAMED = 3;
+
+function isGeneric(message: string | undefined): boolean {
+  return message === undefined || message.trim() === '' || message.trim().toLowerCase() === GENERIC_REJECTION;
+}
+
+function rejectedFields(errors: ApiErrorEntry[]): string | undefined {
+  const [primary] = errors;
+
+  if (primary?.field === undefined || !isGeneric(primary.message)) {
+    return undefined;
+  }
+
+  const details = errors
+    .filter((entry) => entry.field !== undefined && entry.code !== undefined)
+    .slice(0, FIELDS_NAMED)
+    .map((entry) => `${entry.field}: ${isGeneric(entry.message) ? entry.code : entry.message}`);
+
+  return details.length === 0 ? undefined : `The Launch API rejected the request: ${details.join('; ')}`;
+}
+
 export class LaunchApiError extends LaunchError {
   readonly exitCode = EXIT_RUNTIME;
 
@@ -25,7 +48,10 @@ export class LaunchApiError extends LaunchError {
   constructor(status: number, errors: ApiErrorEntry[], messages: ErrorMessages = {}) {
     const [primary] = errors;
     super(
-      messageForCode(messages, primary?.code) ?? primary?.message ?? `Launch API request failed with status ${status}.`,
+      messageForCode(messages, primary?.code) ??
+        rejectedFields(errors) ??
+        primary?.message ??
+        `Launch API request failed with status ${status}.`,
     );
     this.name = 'LaunchApiError';
     this.status = status;

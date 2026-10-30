@@ -4,10 +4,7 @@ import type { UxLike } from '../core/prompt';
 import { RetryPolicy } from '../transport/retry-policy';
 import { LogTail } from './deployment.log-tail';
 import { classifyStatus, normalizeStatus } from './deployment.status';
-import {
-  deploymentLogLine,
-  deploymentLogsUnavailableLine,
-} from './deployment.presenter';
+import { deploymentLogLine } from './deployment.presenter';
 import type { Deployment, DeploymentLog } from './types';
 
 export const DEPLOYMENT_POLL_DELAY_MS = 2000;
@@ -31,6 +28,7 @@ export interface DeploymentWatchDeps extends WatchTiming {
   loader: Loader;
   outputIsTTY: boolean;
   stop?: AbortSignal;
+  until?(deployment: Deployment): boolean;
 }
 
 export type DeploymentOutcomeKind = 'success' | 'failure' | 'timed-out';
@@ -114,13 +112,24 @@ function sleepUnlessStopped(deps: DeploymentWatchDeps, ms: number): Promise<void
   });
 }
 
+async function freshLogs(deps: DeploymentWatchDeps, tail: LogTail): Promise<DeploymentLog[]> {
+  try {
+    return tail.fresh(await deps.logs(tail.since()));
+  } catch {
+    return [];
+  }
+}
+
+function untilKind(until: (deployment: Deployment) => boolean, deployment: Deployment): 'success' | 'in-flight' {
+  return until(deployment) ? 'success' : 'in-flight';
+}
+
 async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
   const backoff = new RetryPolicy({ retryDelayMs: deps.pollDelayMs });
   const deadline = deps.now() + deps.timeoutMs;
   let attempt = 0;
   let consecutiveErrors = 0;
   const tail = new LogTail();
-  let logsFailureReported = false;
 
   for (;;) {
     deps.stop?.throwIfAborted();
@@ -146,22 +155,11 @@ async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
     deps.stop?.throwIfAborted();
 
     const status = normalizeStatus(deployment.status);
-    const kind = classifyStatus(deployment.status);
+    const kind = deps.until === undefined ? classifyStatus(deployment.status) : untilKind(deps.until, deployment);
     const terminal = kind === 'success' || kind === 'failure';
 
     for (let page = 0; page < (terminal ? MAX_PAGES : 1); page += 1) {
-      let logs: DeploymentLog[];
-
-      try {
-        logs = tail.fresh(await deps.logs(tail.since()));
-      } catch (error) {
-        if (!logsFailureReported) {
-          deps.ux.print(deploymentLogsUnavailableLine(error));
-          logsFailureReported = true;
-        }
-
-        break;
-      }
+      const logs = await freshLogs(deps, tail);
 
       deps.stop?.throwIfAborted();
 

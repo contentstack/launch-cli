@@ -46,7 +46,7 @@ export default class DeploymentsGet extends LaunchCommand<typeof getInputs> {
     renderTable(
       this.ux,
       DEPLOYMENT_DETAIL_COLUMNS,
-      deploymentDetailRows(deployment, scope, project.projectType !== 'FILEUPLOAD'),
+      deploymentDetailRows(deployment, project.projectType !== 'FILEUPLOAD', scope),
       process.stdout.columns,
       DEPLOYMENT_VALUE_COLUMN,
       this.services.outputIsTTY,

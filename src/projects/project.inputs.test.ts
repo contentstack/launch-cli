@@ -139,7 +139,7 @@ describe('the --type flag', () => {
     };
 
     await expect(
-      projectResolution.type.prompt({ services: { api: {} as ApiSurface, ux, isTTY: true }, resolved: {} }),
+      projectResolution.type.prompt({ input: {}, services: { api: {} as ApiSurface, ux, isTTY: true }, resolved: {} }),
     ).resolves.toBe('GitHub');
     expect(asked).toEqual(['Choose a project type to proceed']);
   });

@@ -1,16 +1,23 @@
 import { DEPLOYMENT_WAIT_TIMEOUT_MS } from '../deployments/deployment.watcher';
-import {
-  clockOf,
-  deploymentLogLine,
-  deploymentLogsHint,
-  type DeploymentScopeLabels,
-} from '../deployments/deployment.presenter';
+import { clockOf, deploymentLogLine } from '../deployments/deployment.presenter';
 import type { Deployment } from '../deployments/types';
 import { styled } from '../core/style';
 import { isRecord } from '../core/values';
 import { SERVER_LOGS_PAGE_CAP, type ServerLog } from './types';
 
 const MS_PER_MINUTE = 60_000;
+
+interface DeploymentScopeLabels {
+  org: string;
+  project: string;
+  environment: string;
+}
+
+function deploymentLogsHint(scope: DeploymentScopeLabels, deploymentUid: string): string {
+  const flags = `--org ${scope.org} --project ${scope.project} --env ${scope.environment}`;
+
+  return `csdx launch:logs:get ${flags} --deployment ${deploymentUid}`;
+}
 
 function isoOf(time: number): string {
   return new Date(time).toISOString();

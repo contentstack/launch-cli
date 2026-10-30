@@ -58,6 +58,7 @@ file and line that broke its rule, and each was proven red by reintroducing its 
 | `test/guards/prompt-types.test.ts` | Every prompt call in `src` names a literal `type`, and every such type is registered with the real inquirer `cliux.inquire` uses once `LaunchCommand.init` has run. inquirer silently turns an unregistered type into a plain text box. | D1: `search-list` used, never registered |
 | `test/integration/transport-content-type.test.ts` | For every method in `HTTP_METHODS`, a bodyless request carries no content type and a request with a body carries `application/json`, asserted on the wire. `withoutDefaultContentType` suppresses the utility client's default, so a bodyless POST, PUT or PATCH (for example `deployments:cancel`) no longer goes out as `application/x-www-form-urlencoded`. Only `utility-http-client.ts` builds an `HttpClient` and only `rest-client.ts` sets the JSON type. | D5: every DELETE sent `Content-Type: application/json` |
 | `test/guards/tty-streams.test.ts` | `stdin.isTTY`, and the `isTTY` it becomes on the service context, are read only to decide whether the CLI may prompt (a read next to a prompt or a refusal to prompt) or on the plumbing lines that carry it there. Anything deciding what to draw reads `outputIsTTY` / `process.stdout.isTTY`. | D6: heartbeat drawn into a redirected file |
+| `test/integration/deployments-request-bodies.test.ts` | A deployments mutation puts on the wire only the fields the management service DTO declares - `{commitHash?, uploadUid?}` for a create, `{deployment, reason?}` for a rollback - and never `environment`, which is the URL path. The service validates with `whitelist` and `forbidNonWhitelisted`, so any other key is a bare 400. | Live harness: `deployments:create` and `:rollback` sent `{environment, ...}` and failed with `Bad request` |
 | `test/integration/retired-commands.test.ts` (named commands) | Every `launch:…` command named anywhere in `src` - a retirement message, a failure hint, an example - is either a registered command or on `PLANNED_COMMANDS` with the ticket that builds it, and a command drops off that list once it ships. | Review: retirement messages and hints pointed at commands the beta does not have |
 | `test/guards/prompt-funnel.test.ts` | Every prompt goes through `LaunchCommand`'s `ux`, built once as `cancelOnInterrupt(cliux)`, so Ctrl-C at any prompt exits 3. The wrapper stays attached to `SIGINT` until the signal has reached every listener (it detaches in a microtask): inquirer's `cli-cursor` loads `signal-exit`, which re-raises `SIGINT` - exit 130 - when it finds itself the only listener, so a `once` listener made every list and checkbox prompt exit 130 (`src/core/interruptible-ux.test.ts` pins it). No source calls `cliux.inquire` / `prompt` / `confirm` under any name, hands `cliux` on as a value, or imports a prompt library; `search-list.ts` may register a type but never prompt. | D2: Ctrl-C exited 130 |
 
@@ -165,8 +166,10 @@ src/
   logs/         logs:get: the server-log window parser and repository, the live log API over SSE, and
                 the LiveLogFollower that reconnects it; the build-log follow is deployments'. It
                 reaches deployments only
-  cache/        the CDN cache purge behind launch:cache:purge: CacheApi, the --path / --tags / --hosts
-                inputs and their normalisation, and the success lines
+  cache/        the CDN cache purge behind launch:cache:purge: CacheApi, the --path / --prefix / --tags / --hosts
+                inputs and their normalisation, the criterion prompt and the success lines
+  site/         the URL choice for an environment's live site (`siteUrlOf`, shared with the deployment follower),
+                the opening and not-found lines, behind launch:site:open
   functions/    the cloud-function runtime and the serve flags, treated as a resource
   resources.ts  the composition root: it assembles the catalog, the resolution table,
                 the dependency map and the api surface out of the resources
@@ -569,6 +572,17 @@ quota 429 is sent once and an ordinary 429 is sent `maxRetries + 1` times. `laun
 the purge whatever its code (`asPurgeFailure`), and a 404 from its environment read as the usage error `No
 environment with UID "<uid>" found in this project.` (exit 2), so a foreign environment is refused before any POST.
 
+`launch:cache:purge` takes `--path`, `--tags` or `--hosts`, and `--prefix` with `--path` (the flag form of ending the path
+in `/*`; `--prefix` without `--path` is `onlyWithFlag('prefix', 'path')`, exit 2 `--prefix is only used with --path.`).
+Two or three criteria are refused by `atMostOneOf` in the resolution chain. **None** supplied is not a rule: a rule
+runs in `init()`, before the command can read the environment's domains or prompt, so `run()` refuses it with the
+same `Pass exactly one of ...; none was supplied.` wording (`oneOfMessage`) when there is no terminal, before any
+request, and on a terminal asks `What do you want to purge?` (`promptForCriterion`, `src/cache/cache.prompt.ts`): Path
+(then the path, then `Purge everything under this path? (prefix match)`, default no, skipped for a typed `/*`), Cache
+tags (the `--tags` normaliser, no maximum) or Hostnames (a checkbox of the environment's own domains as bare hostnames,
+left out when it has none). The domains come from the environment `run()` reads first, so the prompt costs no request.
+`--prefix` alone never reaches the prompt. The success line is one `✔ Cache purge initiated for ...` line.
+
 A proxy URL shown in a diagnostic has its `user:…@` part removed first (`withoutCredentials`), and
 `https_proxy`/`http_proxy` are read as well as the uppercase names.
 
@@ -632,6 +646,23 @@ there is **no server-side maximum at all**.
 each repository builds on `scanPages`, because the page size is that repository's decision and not a
 CLI-wide one; the scan-limit error each raises carries its own wording.
 
+**The deployment commands (CL-7170).** `deployments:list`, `:get`, `:create`, `:rollback` and `:cancel`.
+
+- `--deployment` is a 24-hex uid, validated while parsing (`FlagValueError`, exit 2, nothing sent; `LaunchCommand.init`
+  rethrows it as a plain `UsageError` so oclif's `Parsing --deployment` prefix never reaches the user), so `get`,
+  `rollback` and `cancel` share it. It depends on `--org`, `--project` and `--env`. `get` leaves it optional and
+  defaults to the latest deployment; `rollback` and `cancel` declare `picker` on the input (`all`, or `in-flight`
+  for `cancel`), which is the only case where the spec's `promptWhen` lets the picker run (`promptForDeployment`,
+  `src/deployments/deployment.prompt.ts`), so a terminal gets a list of the environment's newest deployments and
+  anything else gets the exit-2 missing-value error. A supplied flag never prompts.
+- The service answers HTTP 200 `{ "deployment": null }` for a deployment that is not in the environment, so
+  `DeploymentsApi.get` words that as the same 404 `launch.DEPLOYMENT.NOT_FOUND` a missing one gets, and the commands
+  report the generic `No deployment with UID "<uid>" found in this environment.`
+- Request bodies carry no `environment`; see the guard table. A validation rejection the service sends keyed by
+  field with only the generic `Bad request` is worded by `LaunchApiError` from the field and its code.
+- Every table cell is stripped of control characters and line breaks by `renderTable`, and the presenter shows
+  only the first line of a commit message, truncated to 72 characters.
+
 **The deployment wait/stream loop.** `src/deployments/deployment.watcher.ts` polls a deployment to a
 terminal state and is the single place any command waits on one. `POST /projects` creates the
 project, its first environment **and** its first deployment, so `projects:create` is its first
@@ -678,7 +709,7 @@ shade, and in green when stdout is a terminal (`styled` in `src/core/style.ts`, 
 redirected output stays free of escape codes). Once `POST /projects` succeeds, before the config file is
 written or anything is watched, create prints V1's green `info: New project created successfully`
 (`projectCreatedLine`); a failed create never prints it. On success create then prints V1's
-`Deployment URL <url>` line - label bold, url blue on a terminal - before the project summary,
+`Deployment URL: <url>` line - label bold, url blue on a terminal - before the project summary,
 waits `SITE_OPEN_DELAY_MS` (six seconds, V1's wait, because a site opened the moment it reports
 live can still answer "site not reachable") and opens that url in the browser, terminal or not, as V1
 did. The wait goes through the injected `sleep`, so it is awaited and the browser opens before the
@@ -688,14 +719,13 @@ parseable timestamp printed: with a `timestamp` the service returns what came st
 ascending order, and without one it returns the newest page in **descending** order, so never let the
 cursor drop the query. The poll that sees the terminal status still reads the logs once more before
 returning, so the last lines of a build are never lost. The logs are auxiliary: a
-failed read prints one `  ! Could not read the deployment logs (...)` notice for the whole wait, is
-retried from the same cursor on the next poll, and never changes the outcome - the status poll alone
-decides that.
+failed read prints nothing, is retried from the same cursor on the next poll, and never changes the
+outcome - the status poll alone decides that.
 
 **The terminal poll drains the logs.** A poll that sees a terminal status does not read the logs once: it keeps
 reading from the advancing `tail.since()` until `tail.fresh` returns nothing new, at most `MAX_PAGES` reads, so a
 build that wrote more than one page after the last in-flight poll is never cut short. An in-flight poll still makes
-exactly one read. A read that fails mid-drain prints the one unavailable notice, ends the drain and never changes the
+exactly one read. A read that fails mid-drain prints nothing, ends the drain and never changes the
 outcome. `stop` (an `AbortSignal` on `DeploymentWatchDeps`, `DeploymentFollower.watch(scope, stop)`) ends the wait
 with `stop.reason` wherever it is noticed: before a poll, after one, during the drain, and at the sleep - a signal
 already aborted when the loop would sleep ends it at once rather than sleeping the full delay, and the default
@@ -828,12 +858,11 @@ project and `--config`.
 **Deployment failure is a partial success, and the wording says so.** The project and environment are
 real and are **not** rolled back. Everything after `POST /projects` - finding the first environment,
 finding its first deployment, and the wait itself - goes through the same wording when it fails, so a
-502 from a lookup still tells the user what exists. `deploymentFailureMessage` names the status, the project and
-environment that survived, and both follow-up commands with their scope already filled in -
-`deployments:create` to retry and `logs:get` to inspect. It exits **1**, not 2: nothing about the
-invocation was wrong. A wait that runs out is worded differently: the deployment may still finish, so
-the message says not to start another one and names `deployments:get` and `logs:get` instead of
-`deployments:create`.
+502 from a lookup still tells the user what exists. `firstDeploymentFailureMessage` is the one builder:
+it names the deployment and its status, says what was created (when something was) and ends with one
+command - `logs:get` for a failed deployment, `deployments:get` for a wait that ran out or could not be
+followed, `deployments:list` when no deployment was found - with its scope already filled in. It exits
+**1**, not 2: nothing about the invocation was wrong.
 
 **The FileUpload archive.** `src/uploads/upload.archive.ts` owns the exclusion list
 (`node_modules`, `.git`, `.env`, `.env.local`, `.next`, `logs`, `.vscode`, `.cs-launch.json`) and
@@ -862,7 +891,7 @@ checklist and nothing else; the create summary says `ready to set` because the e
 oclif's native `exclusive` / `relationships` on the flag definition, where it also shows in `--help` -
 and a simple range does too: `limit` and `skip` carry oclif's own `min`/`max` rather than being
 checked later. A rule that must read a *resolved* value (one that config, a prompt or a default may
-have supplied) belongs in `src/core/rules.ts` - there are three: `exactlyOneOf` (used by `cache:purge`), `atLeastOneOf` (no consumer yet;
+have supplied) belongs in `src/core/rules.ts` - there are five: `atMostOneOf` and `onlyWithFlag` (used by `cache:purge`), `exactlyOneOf` and `atLeastOneOf` (no consumer yet;
 see "Built ahead of use" below) and `onlyWithValueOf` (used by `projects:create`) - declared as a `static rules = [...]` array on the command. `resolveInputs` evaluates them after resolution,
 and a failing rule is a usage error (exit 2).
 
@@ -875,7 +904,7 @@ gate value `onlyWithValueOf` reads is a value, not a "was it supplied?" question
 wherever it came from. Write the next rule when a command needs it; a rule
 kept alive only by its own test proves nothing.
 
-**Built ahead of use.** Three pieces of production code have no caller yet, on purpose, each held
+**Built ahead of use.** Four pieces of production code have no caller yet, on purpose, each held
 for a named ticket whose shape it already fits. Nothing else in `src` is uncalled; add to this list
 rather than leave an orphan unexplained.
 
@@ -883,6 +912,7 @@ rather than leave an orphan unexplained.
 |---|---|---|
 | `DeploymentsApi.list` | CL-7170 (`deployments:*`) | a `DeploymentScope` plus paging -> `DeploymentsPage` |
 | `src/core/redact.ts` | CL-7169 (variables) | see below |
+| `exactlyOneOf` | the next command that requires one of several flags and cannot prompt for it - `cache:purge` now uses `atMostOneOf` because it asks on a terminal | "exactly one of these flags", judging what the user supplied; `oneOfMessage` is shared with `atMostOneOf` and `cache:purge`'s no-terminal refusal |
 | `atLeastOneOf` | no ticket yet - its caller, `projects:update`, now prompts for missing fields instead | "at least one of these flags" for the next command that must not prompt - and it judges what the user supplied, not defaults |
 
 **Redaction.** `src/core/redact.ts` (`REDACTED`, `redactedColumn`) has no caller yet; it is kept

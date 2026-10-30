@@ -68,6 +68,7 @@ with exit code 2 and name their V2 replacements. `launch:functions:serve` is liv
 * [`csdx launch:projects:list`](#csdx-launchprojectslist)
 * [`csdx launch:projects:update`](#csdx-launchprojectsupdate)
 * [`csdx launch:rollback`](#csdx-launchrollback)
+* [`csdx launch:site:open`](#csdx-launchsiteopen)
 * [`csdx launch:variables:list`](#csdx-launchvariableslist)
 * [`csdx launch:variables:set`](#csdx-launchvariablesset)
 * [`csdx launch:variables:unset`](#csdx-launchvariablesunset)
@@ -113,7 +114,7 @@ Purge an environment's CDN cache by path, cache tags or hostnames
 ```
 USAGE
   $ csdx launch:cache:purge [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--path
-    <value>] [--tags <value>] [--hosts <value>]
+    <value>] [--prefix] [--tags <value>] [--hosts <value>]
 
 FLAGS
   -c, --config=<value>    Path to the local '.cs-launch.json' file
@@ -123,6 +124,8 @@ FLAGS
       --org=<value>       Organization UID
       --path=<value>      Path to purge, for example /blog. End it with /* to purge everything beneath it, or pass /*
                           for the whole site
+      --prefix            With --path, purge everything beneath the path as well (a prefix match, like ending it with
+                          /*)
       --project=<value>   Project name or UID
       --tags=<value>      Comma-separated cache tags to purge
 
@@ -131,6 +134,8 @@ DESCRIPTION
 
 EXAMPLES
   $ csdx launch:cache:purge --org <org-uid> --project <name-or-uid> --env <name-or-uid> --path /blog
+
+  $ csdx launch:cache:purge --org <org-uid> --project <name-or-uid> --env <name-or-uid> --path /blog --prefix
 
   $ csdx launch:cache:purge --org <org-uid> --project <name-or-uid> --env <name-or-uid> --path "/blog/*"
 
@@ -758,6 +763,38 @@ DESCRIPTION
 ```
 
 _See code: [src/commands/launch/rollback.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/rollback.ts)_
+
+## `csdx launch:site:open`
+
+Open an environment's live site in your browser, or print its URL when there is no terminal. On a terminal, when the environment has more than one domain, you choose which one to open; --deployment opens that deployment's preview URL without asking.
+
+```
+USAGE
+  $ csdx launch:site:open [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--deployment
+    <value>]
+
+FLAGS
+  -c, --config=<value>      Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>    Current working directory
+      --deployment=<value>  Deployment UID
+      --env=<value>         Environment name or UID
+      --org=<value>         Organization UID
+      --project=<value>     Project name or UID
+
+DESCRIPTION
+  Open an environment's live site in your browser, or print its URL when there is no terminal. On a terminal, when the
+  environment has more than one domain, you choose which one to open; --deployment opens that deployment's preview URL
+  without asking.
+
+EXAMPLES
+  $ csdx launch:site:open --org <org-uid> --project <name-or-uid> --env <name-or-uid>
+
+  $ csdx launch:site:open --org <org-uid> --project <name-or-uid> --env <name-or-uid> --deployment <uid>
+
+  $ url=$(csdx launch:site:open --org <org-uid> --project <name-or-uid> --env <name-or-uid>)
+```
+
+_See code: [src/commands/launch/site/open.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/site/open.ts)_
 
 ## `csdx launch:variables:list`
 

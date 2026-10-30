@@ -8,7 +8,7 @@ import type { ProjectConfig } from './project-config';
 import { ProjectConfigStore, configSourceNotice } from './project-config';
 import type { RegionLike } from './region';
 import { resolveLaunchHubUrl } from './region';
-import { LaunchError, UsageError } from './errors';
+import { FlagValueError, LaunchError, UsageError } from './errors';
 import type { FlagKey } from '../resources';
 import { catalog, resolutionTable } from '../resources';
 import type { AnyInputs, Resolved } from './inputs';
@@ -123,6 +123,8 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
       flags: this.contract.flags,
       baseFlags: LaunchCommand.baseFlags,
       strict: true,
+    }).catch((error: unknown) => {
+      throw error instanceof FlagValueError ? new UsageError(error.detail) : error;
     });
 
     this.requireAuth();

@@ -5,6 +5,7 @@ import { catalog } from '../resources';
 
 export interface InputSpec {
   required?: boolean;
+  picker?: string;
 }
 
 export interface AnyInputs { readonly [key: string]: InputSpec }

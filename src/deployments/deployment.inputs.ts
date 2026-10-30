@@ -1,7 +1,9 @@
 import { Flags } from '@contentstack/cli-utilities';
 
-import { UsageError } from '../core/errors';
+import { FlagValueError, UsageError } from '../core/errors';
 import type { ResolutionSpec } from '../core/resolution';
+import { UID_PATTERN } from '../core/resource-ref';
+import { promptForDeployment } from './deployment.prompt';
 
 export const PICK_COMMIT = '\0pick-commit';
 
@@ -61,8 +63,23 @@ export function withBareCommit(argv: readonly string[]): string[] {
   return rewritten;
 }
 
+export const DEPLOYMENT_DEPENDENCIES = { deployment: ['org', 'project', 'env'] } as const;
+
+function deploymentUidOf(value: string): string {
+  const uid = value.trim();
+
+  if (!UID_PATTERN.test(uid)) {
+    throw new FlagValueError(`Invalid --deployment value "${uid}". Provide a 24-character hexadecimal deployment UID.`);
+  }
+
+  return uid;
+}
+
 export const deploymentFlags = {
-  deployment: Flags.string({ description: 'Deployment UID' }),
+  deployment: Flags.string({
+    description: 'Deployment UID',
+    parse: async (input) => (input.trim() === '' ? input : deploymentUidOf(input)),
+  }),
   commit: Flags.string({
     description:
       'GitHub projects: deploy this commit. Pass --commit with no value to pick one from the recent commits',
@@ -76,8 +93,16 @@ export const deploymentFlags = {
 
 export const deploymentResolution = {
   deployment: {
-    normalize: async (value) => value.trim(),
-  } satisfies ResolutionSpec<string>,
+    dependsOn: DEPLOYMENT_DEPENDENCIES.deployment,
+    promptWhen: (input) => input.picker !== undefined,
+    prompt: ({ input, services, resolved }) =>
+      promptForDeployment(
+        services,
+        { org: resolved.org, project: resolved.project, environment: resolved.env },
+        input.picker,
+      ),
+    normalize: async (value) => deploymentUidOf(value),
+  } satisfies ResolutionSpec<string, 'org' | 'project' | 'env'>,
   commit: {
     normalize: async (value) => {
       if (value === BLANK_COMMIT) {

@@ -1,22 +1,23 @@
 import type { Loader } from '../core/loader';
 import { silentLoader, terminalLoader } from '../core/loader';
 import type { ServiceContext } from '../core/service-context';
-import { deploymentUrlLine, deploymentUrlOf } from './deployment.presenter';
+import type { SiteDomain } from '../site/site.url';
+import { siteUrlOf } from '../site/site.url';
+import { deploymentUrlLine } from './deployment.presenter';
+import { normalizeStatus } from './deployment.status';
 import type { DeploymentOutcome, WatchTiming } from './deployment.watcher';
 import { watchDeployment } from './deployment.watcher';
 import type { Deployment } from './types';
 
 export const SITE_OPEN_DELAY_MS = 6000;
 
+const LIVE_STATUS = 'LIVE';
+
 export interface DeploymentScope {
   org: string;
   project: string;
   environment: string;
   deployment: string;
-}
-
-export interface SiteDomain {
-  url?: string;
 }
 
 export class DeploymentFollower {
@@ -37,8 +38,21 @@ export class DeploymentFollower {
     });
   }
 
+  waitUntilLive(scope: DeploymentScope, stop?: AbortSignal): Promise<DeploymentOutcome> {
+    return watchDeployment({
+      ...this.timing,
+      ux: this.services.ux,
+      outputIsTTY: this.services.outputIsTTY === true,
+      loader: silentLoader,
+      stop,
+      logs: async () => [],
+      poll: () => this.services.api.deployments.get(scope),
+      until: (deployment) => normalizeStatus(deployment.status) === LIVE_STATUS,
+    });
+  }
+
   async announceLive(deployment: Deployment, domains: readonly SiteDomain[] = []): Promise<void> {
-    const url = this.siteUrl(deployment, domains);
+    const url = siteUrlOf(deployment, domains);
 
     if (url === undefined) {
       return;
@@ -46,18 +60,6 @@ export class DeploymentFollower {
 
     this.services.ux.print(deploymentUrlLine(url, this.services.outputIsTTY === true));
     await this.openSite(url);
-  }
-
-  private siteUrl(deployment: Deployment, domains: readonly SiteDomain[]): string | undefined {
-    const fromDeployment = deploymentUrlOf(deployment);
-
-    if (fromDeployment !== undefined) {
-      return fromDeployment;
-    }
-
-    const domain = domains.find((entry) => Boolean(entry.url));
-
-    return domain === undefined ? undefined : deploymentUrlOf({ uid: deployment.uid, deploymentUrl: domain.url });
   }
 
   /**

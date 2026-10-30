@@ -9,7 +9,7 @@ import {
 } from './environments/environment.inputs';
 import { variableFlags, variableResolution } from './variables/variable.inputs';
 import { cacheFlags, cacheResolution } from './cache/cache.inputs';
-import { deploymentFlags, deploymentResolution } from './deployments/deployment.inputs';
+import { DEPLOYMENT_DEPENDENCIES, deploymentFlags, deploymentResolution } from './deployments/deployment.inputs';
 import { logsFlags, logsResolution } from './logs/logs.inputs';
 import { LiveLogsApi } from './logs/live-logs.api';
 import { ServerLogsApi } from './logs/server-logs.api';
@@ -56,9 +56,11 @@ export type Resolution = typeof resolution;
 
 export const resolutionTable: Record<FlagKey, AnyResolutionSpec> = resolution;
 
-export const DEPENDENCIES = { ...PROJECT_DEPENDENCIES, ...ENVIRONMENT_DEPENDENCIES } satisfies Partial<
-  Record<FlagKey, readonly FlagKey[]>
->;
+export const DEPENDENCIES = {
+  ...PROJECT_DEPENDENCIES,
+  ...ENVIRONMENT_DEPENDENCIES,
+  ...DEPLOYMENT_DEPENDENCIES,
+} satisfies Partial<Record<FlagKey, readonly FlagKey[]>>;
 
 export type DependenciesOf<K extends FlagKey> = K extends keyof typeof DEPENDENCIES
   ? (typeof DEPENDENCIES)[K][number]

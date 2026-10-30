@@ -13,7 +13,7 @@ const RESOURCE_EDGES: Record<string, string[]> = {
   projects: ['environments', 'deployments', 'git', 'uploads', 'variables'],
   functions: [],
   environments: ['deployments', 'git', 'uploads', 'variables'],
-  deployments: ['uploads'],
+  deployments: ['uploads', 'site'],
   git: [],
   organizations: [],
   uploads: [],
@@ -21,6 +21,7 @@ const RESOURCE_EDGES: Record<string, string[]> = {
   variables: ['environments', 'stacks'],
   cache: [],
   logs: ['deployments'],
+  site: ['deployments', 'environments'],
 };
 
 function sourceFilesIn(layer: string): string[] {

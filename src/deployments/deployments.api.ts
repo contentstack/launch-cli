@@ -1,10 +1,13 @@
 import { assertPage, hasUid, malformed, unwrap } from '../transport/envelope';
 import type { RestApiClient, RestRequest } from '../transport/rest-client';
+import { isRecord } from '../core/values';
 import { LaunchApiError } from '../transport/errors';
 import {
   CANCEL_NOT_ALLOWED_CODE,
   CANCEL_NOT_ALLOWED_RAW_MESSAGE,
   DEPLOYMENT_ERROR_MESSAGES,
+  DEPLOYMENT_NOT_FOUND_CODE,
+  cancelNotAllowedError,
 } from './deployment.errors';
 import type { Deployment, DeploymentResponse, DeploymentsPage, IdentifiedDeployment } from './types';
 
@@ -19,6 +22,7 @@ export interface DeploymentScope {
 export interface ListDeploymentsParams extends DeploymentScope {
   limit?: number;
   skip?: number;
+  rollbackEligible?: boolean;
 }
 
 export interface GetDeploymentParams extends DeploymentScope {
@@ -38,9 +42,11 @@ export interface RollbackDeploymentParams extends DeploymentScope {
 function isCancelNotAllowed(error: unknown): error is LaunchApiError {
   return (
     error instanceof LaunchApiError &&
-    error.status === 400 &&
     error.errors.some(
-      (entry) => entry.code === CANCEL_NOT_ALLOWED_RAW_MESSAGE || entry.message === CANCEL_NOT_ALLOWED_RAW_MESSAGE,
+      (entry) =>
+        entry.code === CANCEL_NOT_ALLOWED_CODE ||
+        (error.status === 400 &&
+          (entry.code === CANCEL_NOT_ALLOWED_RAW_MESSAGE || entry.message === CANCEL_NOT_ALLOWED_RAW_MESSAGE)),
     )
   );
 }
@@ -62,7 +68,11 @@ export class DeploymentsApi {
       path: DeploymentsApi.base(params),
       orgUid: params.org,
       projectUid: params.project,
-      query: { limit: params.limit, skip: params.skip },
+      query: {
+        limit: params.limit,
+        skip: params.skip,
+        ...(params.rollbackEligible === true ? { rollbackEligible: 'true' } : {}),
+      },
     });
 
     assertPage(response, 'deployments', 'deployment list');
@@ -82,11 +92,19 @@ export class DeploymentsApi {
       projectUid: params.project,
     });
 
+    if (isRecord(response) && response.deployment === null) {
+      throw new LaunchApiError(
+        404,
+        [{ code: DEPLOYMENT_NOT_FOUND_CODE, message: 'Deployment not found.' }],
+        DEPLOYMENT_ERROR_MESSAGES,
+      );
+    }
+
     return unwrap<Deployment>(response, 'deployment', 'deployment response');
   }
 
   async create(params: CreateDeploymentParams): Promise<IdentifiedDeployment> {
-    const body: { environment: string; commitHash?: string; uploadUid?: string } = { environment: params.environment };
+    const body: { commitHash?: string; uploadUid?: string } = {};
 
     if (params.commitHash !== undefined) {
       body.commitHash = params.commitHash;
@@ -113,10 +131,7 @@ export class DeploymentsApi {
   }
 
   async rollback(params: RollbackDeploymentParams): Promise<void> {
-    const body: { deployment: string; environment: string; reason?: string } = {
-      deployment: params.deployment,
-      environment: params.environment,
-    };
+    const body: { deployment: string; reason?: string } = { deployment: params.deployment };
     const reason = params.reason?.trim();
 
     if (reason !== undefined && reason !== '') {
@@ -142,11 +157,7 @@ export class DeploymentsApi {
       });
     } catch (error) {
       if (isCancelNotAllowed(error)) {
-        throw new LaunchApiError(
-          error.status,
-          [{ code: CANCEL_NOT_ALLOWED_CODE, message: CANCEL_NOT_ALLOWED_RAW_MESSAGE }],
-          DEPLOYMENT_ERROR_MESSAGES,
-        );
+        throw cancelNotAllowedError(params.deployment, error.status);
       }
 
       throw error;

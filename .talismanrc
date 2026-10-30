@@ -6,7 +6,7 @@ fileignoreconfig:
 - filename: src/core/failure.test.ts
   checksum: 242d43885d1e3ef46edf1e347899a90549ebf95ec6827426746852f7a6dfc418
 - filename: test/integration/retired-commands.test.ts
-  checksum: 91937f1da2822919d4ecdaa25324d67473b7b289e986ec0ff6999480ea0d3f70
+  checksum: 4f1a3d7b6b6684986f720a44dcd4d4c014a64dd15c41d41d0266afb0ebe828c0
 - filename: test/integration/manage-base-path.test.ts
   checksum: 79eb9ad420ea47d5bee8045d812c45b010bbeeafcaf5f85d11653140b0cd0db1
 - filename: src/transport/rest-client.ts
@@ -24,7 +24,7 @@ fileignoreconfig:
 - filename: src/core/service-context.test.ts
   checksum: 495972ae75e7ef1b62632c8d099fc589b023976a17d77caaebb049d974edd1bc
 - filename: src/core/rules.test.ts
-  checksum: 2dbc873f3e635a72b1b566311c04252d2a2c25142570006523415c81a91c7a6a
+  checksum: addfdcffa45491accbc861f28cc2f17528a7e9d77d4c852b302a75cd68d7bdee
 - filename: src/core/inputs.test.ts
   checksum: c5b4be7a0aa2f0878153f062e1500b2bdbd53bdd2d84bb7c13c731db3c3699c4
 - filename: .github/workflows/secrets-scan.yml
@@ -91,7 +91,7 @@ fileignoreconfig:
     - "'SECRET=hunter2'"
     - "formFieldKey"
 - filename: test/integration/projects-create.test.ts
-  checksum: c0048672753c6c796d4135aa2df448a390ea9534dd028473c6faf4ee89a949a6
+  checksum: e37d9a0fdce75f942836f621a2e281cb9b448cd583673ebcacb075de3faaf187
 - filename: test/fixtures/README.md
   checksum: d801c84c8b7d7f38f967573e9a3a70da4405b7cbcbf10d2a6e5be3d65fb3daa1
   allowed_patterns:
@@ -171,11 +171,11 @@ fileignoreconfig:
   ignore_detectors:
     - filename
 - filename: src/environments/environment.inputs.test.ts
-  checksum: 499a4601152dded32b766abd8e43aa2ddd88e4e62fc5389b00a268d730178565
+  checksum: 3590697ca0f0f0c0c7b6e64eddfecbdef8838ff260315c70178786490664682c
   ignore_detectors:
     - filename
 - filename: src/core/inputs.ts
-  checksum: 638c1093562cc19038395b498202d06aef53b8d2537ee80b715611f19f83c78b
+  checksum: a4094f68a2fb6b012cfc259f686e362d5a00b34dce85f9d46f1ead270263f15e
   allowed_patterns:
     - "FlagKey"
     - "InputKeys"
@@ -221,18 +221,19 @@ fileignoreconfig:
     - "b2c3d4e5f60718293a4b5c6d"
     - "c3d4e5f60718293a4b5c6d7e"
 - filename: src/core/rules.ts
-  checksum: ac94c82b5ce3805f986b5aeecc4e53579dfdf1473d9617c20bc126597657fe37
+  checksum: e76ecc51f119782824f465e2d30109cdde4a8b8f1464f2569f77f660dc28d0a7
   allowed_patterns:
     - "FlagKey"
 - filename: src/resources.ts
   allowed_patterns:
     - "FlagKey"
 - filename: src/resources.test.ts
+  checksum: 742d9faaa855390c853963388bb2479355fe69f0ee05b5a8965de091621d711d
   allowed_patterns:
     - "a project name passed on argv to the project resolver"
     - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
 - filename: AGENTS.md
-  checksum: 43c2a8c17f250dddaf387d7601719f57adce6f818e8cdcb9e8a00b1da598a598
+  checksum: aafd85677e293bf72dd5764875b202ac3a5531aa083c1c452adaa55021af8c95
   allowed_patterns:
     - "Do not add an exemption to a guard to make a new file pass"
     - "passes its own error wording to `client.request\\(req, MESSAGES\\)`"
@@ -250,13 +251,13 @@ fileignoreconfig:
 - filename: src/core/project-config.test.ts
   checksum: 65c0a613ec77d4dc6727224d4d097de4a02b300339286db692dbaea9379565ae
 - filename: src/core/resolve.ts
-  checksum: 5d150db11cb1c976911ecba61336118ddad051942da95f809695c0cf0346de42
+  checksum: a5608d22286efdd4915639faff6e05a588e60e205c74e0398e389822eb8c7292
 - filename: src/core/resolve.test.ts
-  checksum: b62b53aedd32ab01212508d79bf4c306dfbd9b0c9788e5fc449886eb770e0377
+  checksum: 8740a27f759a106e0ddcf38874f83394d2226dd8a908d9499898d774fea3a7a0
 - filename: src/git/local-repository.ts
   checksum: b9091ed135dfebdf590a5412bbfba2b2f96d4a177cf944a20909b93405268e9f
 - filename: test/guards/layering.test.ts
-  checksum: ee583108579c403cf5c389faccb4dcbecc6f8816a92b7c43cc22f56789f008f1
+  checksum: fea55eeb036ea4acb1cc4d177ae9cbfc1a06bbc5a1ea65b2f5c82717cd0251a9
 - filename: src/commands/launch/projects/create.test.ts
   checksum: 9c40b4b6ed4f7d678ecb921a71f5af7284cd685c1337f47144456ae43a38b1ad
 - filename: src/commands/launch/projects/delete.test.ts
@@ -264,11 +265,11 @@ fileignoreconfig:
 - filename: test/integration/projects-delete.test.ts
   checksum: bb59cbe1f4f7b3ac6aa7944067c1ab1214a7c5d20229e9d6577cdaabec56622e
 - filename: src/core/launch-command.ts
-  checksum: b14abd1d4cee3e93c4458ab3567b1f252564bda7e12773cfa1e0d678967664a4
+  checksum: 01904855aca54cbbcb846069cee5a0732da1db082110e7e454a5c1c532ab02fb
 - filename: src/core/launch-command.test.ts
   checksum: c4d3785f25377db560bb9daa5d0d080a0131056e6c31e3b45cb4f1f2347305ed
 - filename: src/projects/project.inputs.test.ts
-  checksum: eaecaba9eddec128186871550fc5802166fa56a2e89741d72ac955fcfe2f952f
+  checksum: 8242f4d40388f1a7f1d08c11d2571cb45a9294069a8248a5272bc5606807bb60
 - filename: test/integration/projects-command-flows.test.ts
   checksum: 30858bb3dff8a22406efa4ac82d882d1501797cdda24e09555aecc0bcd8dca0b
 - filename: src/core/redact.test.ts
@@ -296,7 +297,7 @@ fileignoreconfig:
 - filename: src/functions/function.errors.test.ts
   checksum: ac0a55e5bee974fefa9fb95541adba63e9a2c2c6e6c47b87c8ca1022542e75f0
 - filename: src/transport/errors.test.ts
-  checksum: b7e28a9062e29a87c8c8b882c6543d50e90e12509c5629ee362ffcac430d01f1
+  checksum: f38547e2a4639ae150b53f955963ce00c1922a4223c89e489ba5b7ca75a691d0
 - filename: src/transport/auth-strategy.ts
   checksum: 6fe87def1b508cb67203d4445d9bd889570e512ed4194dfc4fdd3182bc8b87b2
 - filename: src/functions/function.logger.test.ts
@@ -328,13 +329,13 @@ fileignoreconfig:
 - filename: src/commands/launch/env/update.test.ts
   checksum: 2da219594e7bdd589adc0eff9ff035252a75aaa51dfa20514b18fd3266d7b752
 - filename: README.md
-  checksum: e16168ac0870e0913de2d022522d000f2259208cf036fa5df1f8e8b975c11ba8
+  checksum: 9c87e9e46dbc9606b4946bb6d84ce36352d8f6d733280f5f48e0a65bd6cf6ded
   allowed_patterns:
     - "password-protection"
     - "-p, --password"
     - "-u, --username"
 - filename: test/integration/environments-create.test.ts
-  checksum: 1b87f454b1534bf0b73ebb52cdaf9af231beb57d5746e521a4504edad819c89a
+  checksum: 0c64a4408d3c150a33c442403688d1e1d058f415cfdba704e372455927daa7e4
 - filename: src/commands/launch/variables/list.test.ts
   checksum: 87ccb762f4931326fc50bca1c01aeb4a16d552e4dfa141d00370fdfafa4363be
 - filename: src/commands/launch/variables/set.test.ts
@@ -418,37 +419,49 @@ fileignoreconfig:
 - filename: test/fixtures/deployments-list.json
   checksum: 2f10f24dc0ceb8e85f5201b7c1530c0c540c044ef50b732cc29e07289112316e
 - filename: test/integration/deployments-get.test.ts
-  checksum: 80a4b8e9c4b389f6a072c8282f9eedcc8560553759df2a930279a6d99c8e0c55
+  checksum: beb431ee58fbb3cf72da369514bbeede2c7358f95960979157362053f5b89789
 - filename: test/integration/deployments-list.test.ts
   checksum: c661f0bd3682ea5b0bfeed782a7c5d03ed75bd86aa1c283bb4b2bda1325bab00
 - filename: src/deployments/deployment.inputs.test.ts
-  checksum: 76dadc6dfb9ca234af47438ca8bfcea456f5a2471e4db39be80f7bfb70b56c59
+  checksum: 4c6244f99f62f9731ee925526d17f3ee611d3562cc51cace09ad740ba20c4c84
 - filename: test/fixtures/deployment-get.json
   checksum: acae8ee5ba96a2aafcf43e0b35b3bd22df78bb9ddbe3bad5e7f86c537316721a
 - filename: src/commands/launch/deployments/get.test.ts
-  checksum: ba40d169408d10610c1a8265f100329e14dc5b462dc041d0ed316b3257fbdf48
+  checksum: ae3346f213f9ba5a0a32ef2f2f88146e705838f1eca035de659fc4f8d9c0223b
 - filename: src/commands/launch/deployments/list.test.ts
   checksum: e493cd51e7c65bbf5b4f71704478b7a669bca4342efc865a1363bc508fe6f9f0
 - filename: src/deployments/deployment.presenter.test.ts
-  checksum: 246326b5147417991b450138e48bf05506f8d1b15a6d4a074627c214e1daa5b7
+  checksum: e393d6bb6ce3fd92920f5003603b161186085ea8939fae704e6f71bd9e1778bc
 - filename: test/integration/deployments-create.test.ts
-  checksum: 43bfebbfbc892f0fed6de4b1539c902e1f8c1a3d4878dbd884469455090dfdcd
+  checksum: fd367019e10b47121898440e4b3a54fb2041d6302bee2dea28a97ad58eb88ee9
 - filename: src/deployments/deployment.watcher.test.ts
-  checksum: 68ce45de0545af878ae283e13c1cec9329998066598059186645fda003c31d64
+  checksum: c2cdab908cba7d4e162d06f59a471f918c959eb9c220ebc3666f0c6299f141b2
 - filename: src/deployments/deployment.create.ts
   checksum: ca64f3b29a68c4a2755a88a141e2cd9dbd6fa851a2776876d78c40f3168492e3
 - filename: src/commands/launch/deployments/create.test.ts
   checksum: 50c3f35c7246b49f6ebf5e48a9a9646ccbcb563c0c0e042fd38917e2f98cbba3
 - filename: src/deployments/deployment.create.test.ts
-  checksum: 2b0e481b6fb349bca249daee5ac1450a2942e55a4e0b0eed3c11a9b0a44bc39c
+  checksum: 6545afa21a23b7e5de18ad8ff417f88a184577e7042713cfda90758ccbcd9869
 - filename: test/integration/deployments-rollback.test.ts
-  checksum: e50b3ccf8748fa8c8e254ceb0838dd65619da6c6c2f874af6137be58812d9aed
+  checksum: 08400c5435c84cd162fefc585f6c32cddfcaa8909d2369341748b421e7f12073
 - filename: test/integration/deployments-cancel.test.ts
-  checksum: 9ab05fb14e29cd32eae65db8de120b4c3ddb6feb1962d1af220f6b668fb4595f
+  checksum: 02c012da974f1f9b8b851d7e00878fef50c1ba7e32b6acf72a309582c66aa5c2
 - filename: src/commands/launch/deployments/cancel.test.ts
-  checksum: afc864fa9498c03b2d23d8ea65e26e3590ea4ce03aa09b98c23bd2a28bd77125
+  checksum: da8d09de7f03cfe67df75ebc1636b36feb6688cf85984c357fd5304852d126e5
 - filename: src/commands/launch/deployments/rollback.test.ts
-  checksum: e4eeb8815b52d45f9059643033ecd3f003f7958bff4c90e6854b73c2ff27a7bb
+  checksum: 5331e774d07387b1691c47168afa8d454bdee60d26ac9c6ed3f4640fc85ff8b8
 - filename: src/deployments/deployments.api.test.ts
-  checksum: 1d0156a94477351919ccd2ec6f534c9a9ec47dc19fc72c9d705704b877b7460a
+  checksum: b27d91317c17f1754d5853c68f4968e63dc2b3579eab26b4c772cf3cd3efbdd0
+- filename: src/deployments/deployment.prompt.test.ts
+  checksum: 3367e53ce2f0284c14524da893e7f82ef613fcdac1e9689ac408709e7f7c153d
+- filename: test/integration/deployments-request-bodies.test.ts
+  checksum: 37d518b1d7671dc1bb9edd147f381c63ddb22e8a413dd43c1c280fb583e83ad2
+- filename: src/cache/cache.inputs.test.ts
+  checksum: 4c602f53a296caec6bab752c905a8abb3da2462ed83b0a5337e8838e87cd9dbd
+- filename: src/commands/launch/cache/purge.test.ts
+  checksum: f1a319cc3af775f28919e56fa17bd7b7e6b89cb4541db506ca8e5fac5edb6026
+- filename: src/deployments/commit.prompt.test.ts
+  checksum: d811a8b35d640708a9d0e7b03d006fcae4718192adee94c47f625ce7662ea715
+- filename: src/deployments/commit.prompt.ts
+  checksum: 6991eb373ee016ce44fc4f47044d559cfeefa1c411526d6fd88d77c568379041
 version: "1.0"

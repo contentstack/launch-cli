@@ -2,8 +2,8 @@ import { UsageError } from '../core/errors';
 import type { InterruptSource } from '../core/interruptible-ux';
 import type { ServiceContext } from '../core/service-context';
 import { asSentence, messageOf } from '../core/values';
-import { FolderUploader } from '../uploads/upload.folder';
 import { NoUploadDirectoryError } from '../uploads/upload.errors';
+import { FolderUploader } from '../uploads/upload.folder';
 import { DeploymentUnsuccessfulError, DeploymentWaitInterruptedError } from './deployment.errors';
 import type { DeploymentScope as FollowedDeployment } from './deployment.follower';
 import { DeploymentFollower } from './deployment.follower';
@@ -40,23 +40,20 @@ interface Source {
 
 function lastUploadOnGitHub(): UsageError {
   return new UsageError(
-    '--last-upload only applies to FileUpload projects; this project deploys from GitHub, so it has no uploaded ' +
-      'bundle to redeploy. Pass --commit <sha> to deploy a specific commit, or pass neither flag to deploy the ' +
-      'branch tip.',
+    '--last-upload applies only to FileUpload projects. Use --commit <sha> to deploy a specific commit.',
   );
 }
 
 function commitOnFileUpload(): UsageError {
   return new UsageError(
-    '--commit only applies to GitHub projects; this FileUpload project has no connected repository. ' +
-      'Pass --last-upload to redeploy the last uploaded bundle.',
+    '--commit applies only to GitHub projects. Use --last-upload to redeploy the last uploaded bundle.',
   );
 }
 
-function noProjectDirectory(path: string): UsageError {
+function noFilesToDeploy(dataDir: string): UsageError {
   return new UsageError(
-    `no project directory found at ${path}. Use --last-upload to redeploy the last uploaded bundle, ` +
-      'or run from your project directory / pass --data-dir.',
+    `No files to upload were found in "${dataDir}". ` +
+      'Use --data-dir to point to your project folder, or --last-upload to redeploy the last upload.',
   );
 }
 
@@ -112,7 +109,7 @@ export class DeploymentCreator {
 
       return { uploadUid: await uploader.upload(scope, request.dataDir, [request.configPath]) };
     } catch (error) {
-      throw error instanceof NoUploadDirectoryError ? noProjectDirectory(request.dataDir) : error;
+      throw error instanceof NoUploadDirectoryError ? noFilesToDeploy(request.dataDir) : error;
     }
   }
 
@@ -149,9 +146,9 @@ export class DeploymentCreator {
 
   private interruptedMessage(followed: FollowedDeployment): string {
     return (
-      `Stopped waiting for deployment ${followed.deployment}. It keeps running on Launch and was not cancelled. ` +
-      `Run csdx launch:deployments:get --org ${followed.org} --project ${followed.project} ` +
-      `--env ${followed.environment} --deployment ${followed.deployment} to see how it ends.`
+      `Stopped waiting. Deployment "${followed.deployment}" was not cancelled and continues on Launch. ` +
+      `Check it with csdx launch:deployments:get --org ${followed.org} --project ${followed.project} ` +
+      `--env ${followed.environment} --deployment ${followed.deployment}.`
     );
   }
 
@@ -161,8 +158,6 @@ export class DeploymentCreator {
   ): DeploymentUnsuccessfulError {
     return new DeploymentUnsuccessfulError(
       firstDeploymentFailureMessage({
-        created: `The deployment "${followed.deployment}"`,
-        plural: false,
         org: followed.org,
         project: followed.project,
         environmentUid: followed.environment,

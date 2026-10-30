@@ -50,6 +50,64 @@ describe('parseErrorEnvelope', () => {
     expect(error.message).toBe('too long');
   });
 
+  it('words a field-keyed validation failure whose message is only Bad request from the field and its code', () => {
+    const error = parseErrorEnvelope(400, {
+      errors: [{ environment: { code: 'property environment should not exist', message: 'Bad request' } }],
+      status: 400,
+    });
+
+    expect(error.message).toBe('The Launch API rejected the request: environment: property environment should not exist');
+    expect(error.status).toBe(400);
+    expect(error.exitCode).toBe(1);
+    expect(error.code).toBe('property environment should not exist');
+  });
+
+  it('names at most the first three rejected fields, each with its own detail', () => {
+    const error = parseErrorEnvelope(400, {
+      errors: [
+        { a: { code: 'a is bad', message: 'Bad request' } },
+        { b: { code: 'b is bad' } },
+        { e: { message: 'no code' } },
+        { c: { code: 'c-code', message: 'c is bad' } },
+        { d: { code: 'd is bad', message: 'Bad request' } },
+        { code: 'launch.BODY_EMPTY', message: 'empty' },
+      ],
+    });
+
+    expect(error.message).toBe('The Launch API rejected the request: a: a is bad; b: b is bad; c: c is bad');
+  });
+
+  it.each([['Bad request'], ['bad request'], [' Bad request '], ['']])(
+    'treats %j as the generic message and falls back to the code',
+    (message) => {
+      const error = parseErrorEnvelope(400, { errors: [{ name: { code: 'name is bad', message } }] });
+
+      expect(error.message).toBe('The Launch API rejected the request: name: name is bad');
+    },
+  );
+
+  it('keeps a mapped code wording over the field-keyed wording', () => {
+    const error = parseErrorEnvelope(
+      400,
+      { errors: [{ name: { code: 'launch.RESOURCE.DUPLICATE_NAME', message: 'Bad request' } }] },
+      MESSAGES,
+    );
+
+    expect(error.message).toBe('Something of that name already exists.');
+  });
+
+  it('falls back to the message when the first field has a generic message and no code', () => {
+    const error = parseErrorEnvelope(400, { errors: [{ name: { message: 'Bad request' } }] });
+
+    expect(error.message).toBe('Bad request');
+  });
+
+  it('leaves a Bad request with no field alone', () => {
+    const error = parseErrorEnvelope(400, { errors: [{ code: 'x', message: 'Bad request' }] });
+
+    expect(error.message).toBe('Bad request');
+  });
+
   it.each<[string, unknown]>([
     ['a field whose value is not an object', { name: 'oops' }],
     ['a field whose value is null', { name: null }],

@@ -226,7 +226,7 @@ describe('the --env input', () => {
   it('prompts with the environment picker scoped to the resolved organization and project', async () => {
     const { services: s, listed, asked } = envServices([]);
 
-    await expect(environmentResolution.env.prompt({ services: s, resolved: RESOLVED_SCOPE })).resolves.toBe('e9');
+    await expect(environmentResolution.env.prompt({ input: {}, services: s, resolved: RESOLVED_SCOPE })).resolves.toBe('e9');
     expect(listed).toEqual([{ ...RESOLVED_SCOPE, limit: 100, skip: 0 }]);
     expect((asked[0] as { message: string }).message).toBe('Choose an environment');
   });

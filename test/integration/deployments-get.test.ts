@@ -121,7 +121,8 @@ describe('integration: launch:deployments:get on the wire', () => {
       expect(valueOf(stdout, 'COMMIT MESSAGE')).toBe('Ship the homepage');
       expect(valueOf(stdout, 'URL')).toBe('https://production-sample-project.contentstackapps.com');
       expect(valueOf(stdout, 'ENVIRONMENT VARIABLES')).toContain('2');
-      expect(valueOf(stdout, 'BUILD LOGS')).toContain('csdx launch:logs:get');
+      expect(stdout).not.toContain('BUILD LOGS');
+      expect(stdout).not.toContain('launch:logs:get');
       expect(stdout).not.toContain('KEY_ONE');
       expect(stdout).not.toContain('value-one');
       expect(onWire).toEqual([]);
@@ -173,6 +174,79 @@ describe('integration: launch:deployments:get on the wire', () => {
     expect(error?.oclif?.exit).toBe(2);
     expect(error?.message).toBe('No deployments found in this environment.');
     expect(stdout).toBe('');
+  });
+
+  it('exits 2 with generic wording when the server answers 200 with a null deployment for another environment', async () => {
+    ownedProject();
+    const found = hub().get(`${DEPLOYMENTS}/${DEPLOYMENT_UID}`).reply(200, { deployment: null });
+
+    const { error, stdout } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID), config);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe(`No deployment with UID "${DEPLOYMENT_UID}" found in this environment.`);
+    expect(found.isDone()).toBe(true);
+    expect(stdout).toBe('');
+    expect(onWire).toEqual([]);
+  });
+
+  it.each([['6accca6d34'], [`${DEPLOYMENT_UID}f`], ['z'.repeat(24)]])(
+    'exits 2 naming --deployment for the malformed uid %s and puts no deployment request on the wire',
+    async (value) => {
+      ownedProject();
+      const found = hub().get(`${DEPLOYMENTS}/${value}`).reply(200, getFixture);
+      const latest = hub().get(DEPLOYMENTS).query(true).reply(200, listFixture);
+
+      const { error, stdout } = await runCommand(getArgs('--deployment', value), config);
+
+      expect(error?.oclif?.exit).toBe(2);
+      expect(error?.message).toBe(`Invalid --deployment value "${value}". Provide a 24-character hexadecimal deployment UID.`);
+      expect(error?.message).not.toContain('Parsing');
+      expect(error?.message).not.toContain('12 bytes');
+      expect(stdout).toBe('');
+      expect(found.isDone()).toBe(false);
+      expect(latest.isDone()).toBe(false);
+      expect(onWire).toEqual([]);
+    },
+  );
+
+  it('words the server invalid-uid refusal readably when it reaches the CLI', async () => {
+    ownedProject();
+    hub()
+      .get(`${DEPLOYMENTS}/${DEPLOYMENT_UID}`)
+      .reply(400, { errors: [{ deployment_uid: { code: 'launch.DEPLOYMENT.INVALID_DEPLOYMENT_UID', message: 'raw' } }] });
+
+    const { error } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID), config);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.message).toBe('The deployment UID is invalid. Provide a 24-character hexadecimal deployment UID.');
+  });
+
+  it('keeps a multi-line commit message to its first line so the table keeps its shape', async () => {
+    const restoreWidth = stdoutOfWidth(300);
+
+    try {
+      ownedProject();
+      hub()
+        .get(`${DEPLOYMENTS}/${DEPLOYMENT_UID}`)
+        .reply(200, {
+          deployment: {
+            ...getFixture.deployment,
+            commitMessage:
+              'Ship the homepage\n\nCo-Authored-By: Claude <[noreply@anthropic.com](mailto:noreply@anthropic.com)>',
+          },
+        });
+
+      const { error, stdout } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID), config);
+      const lines = stdout.trimEnd().split('\n');
+
+      expect(error).toBeUndefined();
+      expect(valueOf(stdout, 'COMMIT MESSAGE')).toBe('Ship the homepage');
+      expect(stdout).not.toContain('Co-Authored-By');
+      expect(new Set(lines.map((line) => [...line].length)).size).toBe(1);
+      expect(lines.every((line) => /^[\u250c\u2502\u251c\u2514]/.test(line))).toBe(true);
+    } finally {
+      restoreWidth();
+    }
   });
 
   it('leaves branch and commit rows out for a file-upload project', async () => {

@@ -274,6 +274,23 @@ describe('renderTable', () => {
     expect(lines.join('\n')).not.toContain('\u001b');
   });
 
+  it.each([
+    ['a line feed', 'Ship it\n\nCo-Authored-By: Claude'],
+    ['a carriage return', 'Ship it\r\nbody'],
+    ['a tab', 'Ship\tit'],
+    ['a colour escape', 'Ship \u001b[31mit\u001b[39m'],
+    ['a bell and a C1 control', 'Ship\u0007 it\u0085'],
+  ])('keeps a cell holding %s on one line, so the box keeps its shape', (_label, value) => {
+    const { ux, lines } = fakeUx();
+
+    renderTable(ux, [{ header: 'MESSAGE', value: (row: { value: string }) => row.value }], [{ value }, { value: 'ok' }]);
+
+    expect(lines).toHaveLength(7);
+    lines.forEach((line) => expect(line).not.toMatch(/\p{Cc}/u));
+    expect(new Set(lines.map((line) => [...line].length)).size).toBe(1);
+    expect(lines[3].startsWith('\u2502  Ship')).toBe(true);
+  });
+
   it('prints nothing rather than an unclosable box when there are no columns to size', () => {
     const { ux, lines } = fakeUx();
 

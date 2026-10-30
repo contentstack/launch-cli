@@ -492,6 +492,54 @@ describe('resolveInputs', () => {
     expect(inquired).toHaveLength(1);
   });
 
+  it('hands the prompt the command own declaration of the input and prompts only where promptWhen accepts it', async () => {
+    const declared: unknown[] = [];
+    const table = {
+      deployment: {
+        promptWhen: (input: { picker?: string }) => input.picker !== undefined,
+        prompt: async (args: { input: unknown }) => {
+          declared.push(args.input);
+          return 'picked';
+        },
+      },
+    } as unknown as Record<string, AnyResolutionSpec>;
+    const ask = (spec: AnyInputs) =>
+      withResolution(table, () =>
+        resolveInputs(spec, { parsed: {}, projectConfig: {}, services: services({ isTTY: true }) }),
+      );
+
+    const withPicker = await ask({ deployment: { required: true, picker: 'in-flight' } } as AnyInputs);
+    const without = await ask({ deployment: {} } as AnyInputs);
+
+    expect(withPicker).toEqual({ deployment: 'picked' });
+    expect(declared).toEqual([{ required: true, picker: 'in-flight' }]);
+    expect(without).toEqual({ deployment: undefined });
+  });
+
+  it('does not ask promptWhen at all when the flag already carries the value', async () => {
+    const asked: unknown[] = [];
+    const table = {
+      deployment: {
+        promptWhen: (input: unknown) => {
+          asked.push(input);
+          return true;
+        },
+        prompt: async () => 'picked',
+      },
+    } as unknown as Record<string, AnyResolutionSpec>;
+
+    const resolved = await withResolution(table, () =>
+      resolveInputs({ deployment: { required: true } } as AnyInputs, {
+        parsed: { deployment: 'given' },
+        projectConfig: {},
+        services: services({ isTTY: true }),
+      }),
+    );
+
+    expect(resolved).toEqual({ deployment: 'given' });
+    expect(asked).toEqual([]);
+  });
+
   it('keeps a numeric zero supplied on argv rather than treating it as absent', async () => {
     const resolved = await resolveInputs(inputs({ limit: {}, skip: {} }), {
       parsed: { limit: 0, skip: 0 },

@@ -315,8 +315,8 @@ describe('integration: launch:env:create on the wire', () => {
     expect(error?.oclif?.exit).toBe(1);
     expect(stdout).toContain('✔ Environment created successfully.');
     expect(error?.message).toContain(
-      `The environment "production" (${ENV_UID}) was created and has not been rolled back. ` +
-        `Run csdx launch:deployments:create --org ${ORG_UID} --project ${PROJECT_UID} --env ${ENV_UID}`,
+      `The environment "production" (${ENV_UID}) was created. ` +
+        `Run csdx launch:logs:get --org ${ORG_UID} --project ${PROJECT_UID} --env ${ENV_UID}`,
     );
   });
 });

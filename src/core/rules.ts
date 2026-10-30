@@ -17,16 +17,37 @@ function list(keys: string[]): string {
   return keys.map((key) => `--${key}`).join(', ');
 }
 
+export function oneOfMessage(keys: string[], supplied: string[]): string {
+  const detail = supplied.length === 0 ? 'none was supplied.' : `${list(supplied)} were supplied.`;
+
+  return `Pass exactly one of ${list(keys)}; ${detail}`;
+}
+
 export function exactlyOneOf(...keys: FlagKey[]): Rule {
   return (resolved, sources) => {
     const supplied = keys.filter((key) => isSupplied(resolved[key], sources[key]));
 
-    if (supplied.length === 1) {
-      return;
+    if (supplied.length !== 1) {
+      throw new UsageError(oneOfMessage(keys, supplied));
     }
+  };
+}
 
-    const detail = supplied.length === 0 ? 'none was supplied.' : `${list(supplied)} were supplied.`;
-    throw new UsageError(`Pass exactly one of ${list(keys)}; ${detail}`);
+export function atMostOneOf(...keys: FlagKey[]): Rule {
+  return (resolved, sources) => {
+    const supplied = keys.filter((key) => isSupplied(resolved[key], sources[key]));
+
+    if (supplied.length > 1) {
+      throw new UsageError(oneOfMessage(keys, supplied));
+    }
+  };
+}
+
+export function onlyWithFlag(flag: FlagKey, partner: FlagKey): Rule {
+  return (resolved, sources) => {
+    if (isSupplied(resolved[flag], sources[flag]) && !isSupplied(resolved[partner], sources[partner])) {
+      throw new UsageError(`--${flag} is only used with --${partner}.`);
+    }
   };
 }
 

@@ -442,7 +442,7 @@ describe('deployment log streaming', () => {
     expect(DEPLOYMENT_LOGS_FROM).toBe('1970-01-01T00:00:00.000Z');
   });
 
-  it('reports a failing log fetch once, keeps waiting on the deployment and resumes the logs where it left off', async () => {
+  it('prints nothing for a failing log fetch, keeps waiting on the deployment and resumes the logs where it left off', async () => {
     const { deps, lines, since } = streamingHarness(
       ['DEPLOYING', 'DEPLOYING', 'DEPLOYING', 'LIVE'],
       [
@@ -457,7 +457,6 @@ describe('deployment log streaming', () => {
 
     expect(outcome).toEqual(expect.objectContaining({ kind: 'success', status: 'LIVE' }));
     expect(lines).toEqual([
-      '  ! Could not read the deployment logs (Bad gateway). Still waiting on the deployment.',
       '2026-09-25 10:00:05.000:  Build complete',
     ]);
     expect(since).toEqual([
@@ -702,6 +701,95 @@ describe('deployment wait loop stopped from outside', () => {
     expect(events).toEqual(['sleep 1000', 'stop']);
   });
 
+  it.each([
+    ['the normal delay', 'DEPLOYING', undefined],
+    ['the error backoff', undefined, new Error('502 Bad Gateway')],
+  ])(
+    'rejects with the stop reason without sleeping when the stop lands while the poll is in flight (%s)',
+    async (_label, status, failure) => {
+      jest.useFakeTimers();
+
+      try {
+        const { deps, events, controller } = stoppable(['DEPLOYING']);
+        const reason = new Error('interrupted during the poll');
+        const slept: number[] = [];
+        const aborting = {
+          ...deps,
+          poll: async (): Promise<Deployment> => {
+            events.push('poll');
+            controller.abort(reason);
+
+            if (failure) {
+              throw failure;
+            }
+
+            return { uid: UID, status };
+          },
+          sleep: (ms: number) =>
+            new Promise<void>((resolve) => {
+              slept.push(ms);
+              setTimeout(resolve, ms);
+            }),
+        };
+
+        await expect(watchDeployment(aborting)).rejects.toBe(reason);
+        expect(slept).toEqual([]);
+        expect(events).toEqual(['poll', 'stop']);
+        expect(jest.getTimerCount()).toBe(0);
+      } finally {
+        jest.useRealTimers();
+      }
+    },
+  );
+
+  it('rejects with the stop reason without sleeping when the stop lands while the logs are being read', async () => {
+    jest.useFakeTimers();
+
+    try {
+      const { deps, events, controller } = stoppable(['DEPLOYING']);
+      const reason = new Error('interrupted during the logs read');
+      const slept: number[] = [];
+      const aborting = {
+        ...deps,
+        logs: async (): Promise<DeploymentLog[]> => {
+          controller.abort(reason);
+          return [];
+        },
+        sleep: (ms: number) =>
+          new Promise<void>((resolve) => {
+            slept.push(ms);
+            setTimeout(resolve, ms);
+          }),
+      };
+
+      await expect(watchDeployment(aborting)).rejects.toBe(reason);
+      expect(slept).toEqual([]);
+      expect(events).toEqual(['poll DEPLOYING', 'stop']);
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('rejects with the stop reason instead of reporting a terminal status that arrived after the stop', async () => {
+    const { deps, events, controller } = stoppable(['LIVE']);
+    const reason = new Error('interrupted during the final poll');
+    const aborting = {
+      ...deps,
+      poll: async (): Promise<Deployment> => {
+        controller.abort(reason);
+        return { uid: UID, status: 'LIVE' };
+      },
+      logs: async (): Promise<DeploymentLog[]> => {
+        events.push('logs');
+        return [];
+      },
+    };
+
+    await expect(watchDeployment(aborting)).rejects.toBe(reason);
+    expect(events).toEqual(['stop']);
+  });
+
   it('carries on normally when the sleep ends before any stop and ignores a stop that arrives after the end', async () => {
     const { deps, controller, polls, release } = stoppable(['DEPLOYING', 'LIVE']);
 
@@ -792,7 +880,7 @@ describe('deployment log drain on the terminal poll', () => {
     expect(since).toHaveLength(2);
   });
 
-  it('reports a read that fails mid-drain once, stops draining and leaves the outcome alone', async () => {
+  it('stops draining silently at a read that fails mid-drain and leaves the outcome alone', async () => {
     const { deps, lines } = streamingHarness(['LIVE'], [[logAt(1, 'one')], new Error('Bad gateway'), [logAt(2, 'two')]]);
     let reads = 0;
     const logs = (after: string): Promise<DeploymentLog[]> => {
@@ -805,17 +893,17 @@ describe('deployment log drain on the terminal poll', () => {
     expect(outcome).toEqual(expect.objectContaining({ kind: 'success', status: 'LIVE' }));
     expect(lines).toEqual([
       '2026-09-25 10:00:01.000:  one',
-      '  ! Could not read the deployment logs (Bad gateway). Still waiting on the deployment.',
     ]);
     expect(reads).toBe(2);
   });
 
-  it('does not repeat the unavailable notice when an earlier poll already reported it', async () => {
+  it('prints nothing for log reads that keep failing across polls', async () => {
     const { deps, lines } = streamingHarness(['DEPLOYING', 'LIVE'], [new Error('down'), new Error('down')]);
 
-    await watchDeployment(deps);
+    const outcome = await watchDeployment(deps);
 
-    expect(lines.filter((line) => line.includes('Could not read'))).toHaveLength(1);
+    expect(outcome).toEqual(expect.objectContaining({ kind: 'success', status: 'LIVE' }));
+    expect(lines).toEqual([]);
   });
 
   it('stops the drain when stopped mid-read, rejecting with the reason, reading no further and stopping the loader last', async () => {
@@ -957,5 +1045,55 @@ describe('deployment wait loop already stopped when it would sleep', () => {
     await expect(defaultWatchTiming().sleep(600_000, controller.signal)).rejects.toBe(reason);
 
     expect(timers()).toBe(before);
+  });
+});
+
+describe('deployment wait loop with an until condition', () => {
+  const isLive = (deployment: Deployment): boolean => deployment.status === 'LIVE';
+
+  it('keeps waiting through statuses that would otherwise end the wait until the condition holds', async () => {
+    const { deps, slept, pollCount } = harness(['ARCHIVED', 'FAILED', 'DEPLOYED', 'LIVE']);
+
+    const outcome = await watchDeployment({ ...deps, until: isLive });
+
+    expect(outcome.kind).toBe('success');
+    expect(outcome.status).toBe('LIVE');
+    expect(pollCount()).toBe(4);
+    expect(slept).toEqual([1000, 2000, 3000]);
+  });
+
+  it('hands every polled deployment to the condition', async () => {
+    const { deps } = harness(['ARCHIVED', 'LIVE']);
+    const seen: (string | undefined)[] = [];
+
+    await watchDeployment({
+      ...deps,
+      until: (deployment) => {
+        seen.push(deployment.status);
+        return isLive(deployment);
+      },
+    });
+
+    expect(seen).toEqual(['ARCHIVED', 'LIVE']);
+  });
+
+  it('reports a timeout with the last status when the condition never holds', async () => {
+    const { deps, slept, pollCount } = harness(['ARCHIVED'], { timeoutMs: 5000 });
+
+    const outcome = await watchDeployment({ ...deps, until: isLive });
+
+    expect(outcome.kind).toBe('timed-out');
+    expect(outcome.status).toBe('ARCHIVED');
+    expect(slept).toEqual([1000, 2000]);
+    expect(pollCount()).toBe(3);
+  });
+
+  it('propagates a poll failure that keeps recurring', async () => {
+    const outage = new Error('500 Internal Server Error');
+    const { deps, pollCount } = failingHarness([outage]);
+
+    await expect(watchDeployment({ ...deps, until: isLive })).rejects.toThrow('500 Internal Server Error');
+
+    expect(pollCount()).toBe(DEPLOYMENT_MAX_POLL_ERRORS);
   });
 });

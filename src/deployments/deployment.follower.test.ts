@@ -5,7 +5,7 @@ import type { WatchTiming } from './deployment.watcher';
 
 const SCOPE = { org: 'org1', project: 'p1', environment: 'e1', deployment: 'd1' };
 
-function harness(options: { withoutOpenUrl?: boolean } = {}) {
+function harness(options: { withoutOpenUrl?: boolean; statuses?: string[] } = {}) {
   const timeline: string[] = [];
   const polled: unknown[] = [];
   const logged: unknown[] = [];
@@ -14,7 +14,8 @@ function harness(options: { withoutOpenUrl?: boolean } = {}) {
     deployments: {
       get: async (params: unknown) => {
         polled.push(params);
-        return { uid: 'd1', status: 'LIVE' };
+        const statuses = options.statuses ?? ['LIVE'];
+        return { uid: 'd1', status: statuses[Math.min(polled.length, statuses.length) - 1] };
       },
     },
     deploymentLogs: {
@@ -58,6 +59,29 @@ describe('DeploymentFollower.watch', () => {
   });
 });
 
+describe('DeploymentFollower.waitUntilLive', () => {
+  it('polls the target in the scope it was given until it is LIVE, whatever it starts as, and reads no build logs', async () => {
+    const { follower, polled, logged, timeline } = harness({ statuses: ['ARCHIVED', 'DEPLOYED', 'LIVE'] });
+
+    const outcome = await follower.waitUntilLive(SCOPE);
+
+    expect(outcome).toEqual(expect.objectContaining({ kind: 'success', status: 'LIVE' }));
+    expect(polled).toEqual([SCOPE, SCOPE, SCOPE]);
+    expect(logged).toEqual([]);
+    expect(timeline).toEqual(['sleep 1000', 'sleep 2000']);
+  });
+
+  it('hands the stop signal to the wait so an already stopped wait never polls', async () => {
+    const { follower, polled } = harness();
+    const reason = new Error('interrupted');
+    const controller = new AbortController();
+    controller.abort(reason);
+
+    await expect(follower.waitUntilLive(SCOPE, controller.signal)).rejects.toBe(reason);
+    expect(polled).toEqual([]);
+  });
+});
+
 describe('DeploymentFollower.watch stopped from outside', () => {
   it('hands the stop signal to the wait loop so an already stopped wait never polls', async () => {
     const { follower, polled, logged } = harness();
@@ -78,7 +102,7 @@ describe('DeploymentFollower.announceLive', () => {
     await follower.announceLive({ uid: 'd1', deploymentUrl: 'site.example.test' });
 
     expect(timeline).toEqual([
-      'print Deployment URL https://site.example.test',
+      'print Deployment URL: https://site.example.test',
       `sleep ${SITE_OPEN_DELAY_MS}`,
       'open https://site.example.test',
     ]);
@@ -89,7 +113,21 @@ describe('DeploymentFollower.announceLive', () => {
 
     await follower.announceLive({ uid: 'd1' }, [{}, { url: 'custom.example.test' }, { url: 'other.example.test' }]);
 
-    expect(timeline).toEqual(['print Deployment URL https://custom.example.test']);
+    expect(timeline).toEqual(['print Deployment URL: https://custom.example.test']);
+  });
+
+  it('announces the preview url, with a scheme, when the deployment url is empty and a domain also exists', async () => {
+    const { follower, timeline } = harness();
+
+    await follower.announceLive({ uid: 'd1', deploymentUrl: '', previewUrl: 'preview.example.test' }, [
+      { url: 'https://www.example.com' },
+    ]);
+
+    expect(timeline).toEqual([
+      'print Deployment URL: https://preview.example.test',
+      `sleep ${SITE_OPEN_DELAY_MS}`,
+      'open https://preview.example.test',
+    ]);
   });
 
   it('prints nothing and opens nothing when there is no url to show', async () => {
@@ -105,6 +143,6 @@ describe('DeploymentFollower.announceLive', () => {
 
     await follower.announceLive({ uid: 'd1', deploymentUrl: 'https://site.example.test' });
 
-    expect(timeline).toEqual(['print Deployment URL https://site.example.test']);
+    expect(timeline).toEqual(['print Deployment URL: https://site.example.test']);
   });
 });

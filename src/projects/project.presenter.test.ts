@@ -55,7 +55,7 @@ describe('projectNotUpdatedLine', () => {
 });
 
 describe('project create presentation', () => {
-  it('says the project and environment survived a failed deployment and how to retry and inspect it', () => {
+  it('says the project and environment survived a failed deployment and what the cause command is', () => {
     const message = deploymentFailureMessage({
       org: 'org1',
       projectName: 'My Site',
@@ -67,15 +67,13 @@ describe('project create presentation', () => {
     });
 
     expect(message).toBe(
-      'The deployment did not succeed; its last status was FAILED. ' +
-        'The project "My Site" (p1) and its environment "Default" were created and have not been rolled back. ' +
-        'Run csdx launch:deployments:create --org org1 --project p1 --env e1 to try the deployment again, ' +
-        'or csdx launch:logs:get --org org1 --project p1 --env e1 --deployment d1 ' +
-        'to see why it did not succeed.',
+      'Deployment "d1" ended with status FAILED. ' +
+        'The project "My Site" (p1) and its environment "Default" were created. ' +
+        'Run csdx launch:logs:get --org org1 --project p1 --env e1 --deployment d1 to see the cause.',
     );
   });
 
-  it('tells a user whose wait ran out that the deployment may still finish, and never to start another one', () => {
+  it('tells a user whose wait ran out the deployment status and how to check it', () => {
     const message = deploymentFailureMessage({
       org: 'org1',
       projectName: 'My Site',
@@ -88,10 +86,9 @@ describe('project create presentation', () => {
     });
 
     expect(message).toBe(
-      'The deployment was still DEPLOYING when the CLI stopped waiting for it; it may still finish. ' +
-        'The project "My Site" (p1) and its environment "Default" were created. Do not start another deployment yet: ' +
-        'run csdx launch:deployments:get --org org1 --project p1 --env e1 --deployment d1 to see how it ends, ' +
-        'or csdx launch:logs:get --org org1 --project p1 --env e1 --deployment d1 to follow it.',
+      'Deployment "d1" was still DEPLOYING when the CLI stopped waiting. ' +
+        'The project "My Site" (p1) and its environment "Default" were created. ' +
+        'Run csdx launch:deployments:get --org org1 --project p1 --env e1 --deployment d1 to check its status.',
     );
     expect(message).not.toContain('deployments:create');
   });
@@ -106,7 +103,6 @@ describe('project create presentation', () => {
     });
 
     expect(message).not.toContain('undefined');
-    expect(message).toContain('Run csdx launch:deployments:create --org org1 --project p1 to try the deployment again');
-    expect(message).toContain('or csdx launch:logs:get --org org1 --project p1 to see why it did not succeed.');
+    expect(message).toContain('Run csdx launch:deployments:list --org org1 --project p1 to check.');
   });
 });

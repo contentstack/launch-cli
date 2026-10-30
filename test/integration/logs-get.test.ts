@@ -408,7 +408,7 @@ describe('integration: launch:logs:get on the wire', () => {
     expect(outputLines(stdout)).toEqual(['Stopped following the logs.']);
   });
 
-  it('T48: prints the unavailable notice once and still the status line when the log read fails', async () => {
+  it('T48: prints no read-failure notice, only the empty-logs line and the status line, when the log read fails', async () => {
     ownedProject();
     deploymentGet('LIVE');
     deploymentGet('LIVE');
@@ -420,9 +420,9 @@ describe('integration: launch:logs:get on the wire', () => {
     const { error, stdout } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID), config);
 
     expect(error).toBeUndefined();
-    expect(stdout.split('Could not read the deployment logs').length - 1).toBe(1);
-    expect(stdout).not.toContain('No deployment logs found');
-    expect(outputLines(stdout).at(-1)).toBe('Deployment #4 is LIVE.');
+    expect(stdout).not.toContain('Could not read the deployment logs');
+    expect(stdout).not.toContain('logs are down');
+    expect(outputLines(stdout)).toEqual([`No deployment logs found for deployment ${DEPLOYMENT_UID}.`, 'Deployment #4 is LIVE.']);
     expect(onWire).toEqual([]);
   });
 
@@ -453,15 +453,15 @@ describe('integration: launch:logs:get on the wire', () => {
     expect(logs.isDone()).toBe(false);
   });
 
-  it('T49: exits with a malformed-response error when the deployment comes back as null and reads no logs', async () => {
+  it('T49: exits 2 with the generic not-found wording when the deployment comes back as null and reads no logs', async () => {
     ownedProject();
     hub().get(DEPLOYMENT_PATH).reply(200, { deployment: null });
     const logs = hub().get(BUILD_LOGS).query(true).reply(200, { deploymentLogs: [] });
 
     const { error } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID), config);
 
-    expect(error?.oclif?.exit).toBe(1);
-    expect(error?.message).toContain('deployment response');
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe(`No deployment with UID "${DEPLOYMENT_UID}" found in this environment.`);
     expect(logs.isDone()).toBe(false);
   });
 
@@ -492,6 +492,7 @@ describe('integration: launch:logs:get on the wire', () => {
   it('T51: reads the window from the server-logs route with exact milliseconds and prints plain lines', async () => {
     const startTime = Date.parse('2026-10-28T09:00:00Z');
     const endTime = Date.parse('2026-10-28T15:30:00+05:30');
+    jest.spyOn(Date, 'now').mockReturnValue(NOW);
     ownedProject();
     deploymentGet('LIVE');
     const read = hub()

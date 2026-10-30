@@ -99,9 +99,9 @@ export async function resolveInputsTraced<S extends AnyInputs>(
       source = 'config';
     }
 
-    if (isAbsent(value) && rule.prompt && args.services.isTTY) {
+    if (isAbsent(value) && rule.prompt && args.services.isTTY && (rule.promptWhen?.(spec[key]) ?? true)) {
       requireDependencies(rule);
-      value = await rule.prompt({ services: args.services, resolved });
+      value = await rule.prompt({ input: spec[key], services: args.services, resolved });
       source = 'prompt';
     }
 

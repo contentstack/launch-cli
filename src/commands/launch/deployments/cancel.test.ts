@@ -1,10 +1,11 @@
 import { UsageError } from '../../../core/errors';
 import type { UxLike } from '../../../core/prompt';
+import { cancelNotAllowedMessage } from '../../../deployments/deployment.errors';
 import { LaunchApiError } from '../../../transport/errors';
 import DeploymentsCancel from './cancel';
 
 const UID = 'd1e2f3a4b5c6d7e8f9012345';
-const QUESTION = `Cancel deployment "${UID}"? This cannot be undone.`;
+const QUESTION = `Are you sure you want to cancel deployment "${UID}"?`;
 const SCOPE = { org: 'org1', project: 'proj1', environment: 'env1', deployment: UID };
 
 interface Harness {
@@ -13,6 +14,7 @@ interface Harness {
   outputIsTTY?: boolean;
   yes?: boolean;
   getFails?: Error;
+  found?: Record<string, unknown>;
   cancelFails?: Error;
 }
 
@@ -50,7 +52,7 @@ function commandUnderTest(harness: Harness) {
               throw harness.getFails;
             }
 
-            return { uid: UID };
+            return harness.found ?? { uid: UID, status: 'DEPLOYING' };
           },
           cancel: async (params: unknown) => {
             calls.push('cancel');
@@ -78,7 +80,7 @@ describe('launch:deployments:cancel', () => {
     expect(calls).toEqual(['get', 'cancel']);
     expect(got).toEqual([SCOPE]);
     expect(cancelled).toEqual([SCOPE]);
-    expect(lines).toEqual([`✔ Deployment "${UID}" cancelled.`]);
+    expect(lines).toEqual([`✔ Deployment "${UID}" cancelled successfully.`]);
   });
 
   it('skips the prompt when --yes was passed and colours the success line when stdout is a terminal', async () => {
@@ -88,7 +90,7 @@ describe('launch:deployments:cancel', () => {
 
     expect(inquired).toEqual([]);
     expect(calls).toEqual(['get', 'cancel']);
-    expect(lines).toEqual([`\u001b[32m✔ Deployment "${UID}" cancelled.\u001b[39m`]);
+    expect(lines).toEqual([`\u001b[32m✔ Deployment "${UID}" cancelled successfully.\u001b[39m`]);
   });
 
   it('says it was not cancelled and exits 3 without sending the cancel when the user declines', async () => {
@@ -141,6 +143,39 @@ describe('launch:deployments:cancel', () => {
     expect(lines).toEqual([]);
   });
 
+  it.each([
+    ['a finished deployment', { uid: UID, status: 'LIVE' }],
+    ['a failed deployment', { uid: UID, status: 'FAILED' }],
+    ['a deployment with no status', { uid: UID }],
+    ['an in-flight deployment the service marks as not cancellable', { uid: UID, status: 'DEPLOYING', isCancellable: false }],
+  ])('refuses %s with the cancel-not-allowed error before asking or posting', async (_label, found) => {
+    const { command, lines, inquired, calls, cancelled } = commandUnderTest({ answer: true, yes: true, found });
+
+    const error = (await command.run().catch((thrown: unknown) => thrown)) as LaunchApiError;
+
+    expect(error).toBeInstanceOf(LaunchApiError);
+    expect(error.exitCode).toBe(1);
+    expect(error.message).toBe(cancelNotAllowedMessage(UID));
+    expect(inquired).toEqual([]);
+    expect(calls).toEqual(['get']);
+    expect(cancelled).toEqual([]);
+    expect(lines).toEqual([]);
+  });
+
+  it.each([
+    ['an absent isCancellable', { uid: UID, status: 'QUEUED' }],
+    ['isCancellable true', { uid: UID, status: 'DEPLOYING', isCancellable: true }],
+    ['a null isCancellable', { uid: UID, status: 'DEPLOYING', isCancellable: null }],
+  ])('goes on to ask and cancel an in-flight deployment with %s', async (_label, found) => {
+    const { command, inquired, calls, cancelled } = commandUnderTest({ answer: true, found });
+
+    await command.run();
+
+    expect(inquired).toHaveLength(1);
+    expect(calls).toEqual(['get', 'cancel']);
+    expect(cancelled).toEqual([SCOPE]);
+  });
+
   it('propagates a failure from the cancel rather than reporting a success', async () => {
     const failure = new LaunchApiError(400, [{ message: 'x' }]);
     const { command, lines, calls } = commandUnderTest({ yes: true, cancelFails: failure });
@@ -156,7 +191,7 @@ describe('launch:deployments:cancel', () => {
       org: { required: true },
       project: { required: true },
       env: { required: true },
-      deployment: { required: true },
+      deployment: { required: true, picker: 'in-flight' },
       yes: {},
     });
     expect(Object.keys(DeploymentsCancel.flags).sort()).toEqual(Object.keys(DeploymentsCancel.inputs).sort());

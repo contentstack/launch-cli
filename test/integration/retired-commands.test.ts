@@ -29,7 +29,6 @@ const CONFIG: Record<string, unknown> = {
 let config: Interfaces.Config;
 
 const PLANNED_COMMANDS: Record<string, string> = {
-  'launch:site:open': 'CL-7172',
 };
 
 function commandsNamedInSource(): string[] {
@@ -206,6 +205,14 @@ describe('integration: retired V1 command names', () => {
 
     expect(stdout).toContain('launch:projects');
     expect(stdout).toContain('launch:functions');
+    expect(stdout).toContain('launch:site');
+  });
+
+  it('registers launch:site:open and no launch:site:view', () => {
+    const registered = config.commands.map((command) => command.id);
+
+    expect(registered).toContain('launch:site:open');
+    expect(registered).not.toContain('launch:site:view');
   });
 
   it('lists the launch:logs topic with its own description under launch --help', async () => {
