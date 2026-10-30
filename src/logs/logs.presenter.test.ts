@@ -8,7 +8,8 @@ import {
   noDeploymentLogsLine,
   noServerLogsLine,
   serverLogLine,
-  serverLogsCapLine,
+  serverLogsPageCapLine,
+  serverLogsResumeLine,
   serverLogsRetentionLine,
   stoppedFollowingLine,
 } from './logs.presenter';
@@ -38,11 +39,51 @@ describe('logs presenter', () => {
     );
   });
 
-  it('words the 5000-line notice exactly', () => {
-    expect(serverLogsCapLine(false)).toBe(
-      'Showing the newest 5000 server log lines in this window. Narrow --since/--until to see earlier ones.',
+  it('names the search text when nothing in the window matched it', () => {
+    const start = Date.parse('2026-10-28T09:00:00.000Z');
+    const end = Date.parse('2026-10-28T10:00:00.000Z');
+
+    expect(noServerLogsLine(start, end, false, 'upstream timeout')).toBe(
+      'No server logs matched "upstream timeout" between 2026-10-28T09:00:00.000Z and 2026-10-28T10:00:00.000Z.',
     );
-    expect(serverLogsCapLine(true)).toBe(yellow(serverLogsCapLine(false)));
+    expect(noServerLogsLine(start, end, true, 'x')).toBe(yellow(noServerLogsLine(start, end, false, 'x')));
+  });
+
+  it('words the page cap notice in yellow on a terminal and plain on a pipe', () => {
+    expect(serverLogsPageCapLine(false)).toBe('Stopped after 100 pages of server logs; more remain in this window.');
+    expect(serverLogsPageCapLine(true)).toBe(yellow(serverLogsPageCapLine(false)));
+  });
+
+  it('builds a resume command with the absolute window and the cursor, and no --search when there was none', () => {
+    const line = serverLogsResumeLine({
+      org: 'o1',
+      project: 'p1',
+      environment: 'e1',
+      deployment: 'd1',
+      startTime: Date.parse('2026-10-28T00:00:00.000Z'),
+      endTime: Date.parse('2026-10-28T12:00:00.250Z'),
+      cursor: '[1761652800000,"AZr3kQ"]',
+    });
+
+    expect(line).toBe(
+      'Resume with: csdx launch:logs:get --org o1 --project p1 --env e1 --deployment d1 --type server ' +
+        '--since 2026-10-28T00:00:00.000Z --until 2026-10-28T12:00:00.250Z --cursor \'[1761652800000,"AZr3kQ"]\'',
+    );
+  });
+
+  it('quotes the search for a shell, escaping a single quote inside it', () => {
+    const line = serverLogsResumeLine({
+      org: 'o1',
+      project: 'p1',
+      environment: 'e1',
+      deployment: 'd1',
+      startTime: 0,
+      endTime: 1,
+      search: "can't connect",
+      cursor: '[1,"a"]',
+    });
+
+    expect(line).toContain(` --search 'can'\\''t connect' --cursor '[1,"a"]'`);
   });
 
   it('words the 24 hour notice from the clamped start', () => {

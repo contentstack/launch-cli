@@ -98,8 +98,8 @@ function buildLogs(lines: unknown[]): nock.Scope {
 function serverLogs(window: { startTime: number; endTime: number }, entries: unknown[]): nock.Scope {
   return hub()
     .get(SERVER_LOGS)
-    .query({ startTime: String(window.startTime), endTime: String(window.endTime) })
-    .reply(200, { serverLogs: entries });
+    .query({ startTime: String(window.startTime), endTime: String(window.endTime), sortDirection: 'asc' })
+    .reply(200, { serverLogs: entries, pageInfo: { hasNewer: false } });
 }
 
 const SESSION_FRAME = 'event: session\ndata: {"expiresAt":"2026-10-28T12:05:00.000Z"}\n\n';
@@ -497,7 +497,7 @@ describe('integration: launch:logs:get on the wire', () => {
     deploymentGet('LIVE');
     const read = hub()
       .get(SERVER_LOGS)
-      .query({ startTime: String(startTime), endTime: String(endTime) })
+      .query({ startTime: String(startTime), endTime: String(endTime), sortDirection: 'asc' })
       .reply(200, {
         serverLogs: [
           { timestamp: '2026-10-28T09:15:00.123Z', message: 'GET /index 200', source: 'edge-fn-source' },
@@ -567,28 +567,75 @@ describe('integration: launch:logs:get on the wire', () => {
     ]);
   });
 
-  it.each([
-    [5000, true],
-    [4999, false],
-  ])('T54: with %i server lines the cap notice shows is %s', async (count, shows) => {
+  it('T54: walks two pages on the wire, carrying the newest cursor and the same window, and prints them in order', async () => {
     jest.spyOn(Date, 'now').mockReturnValue(NOW);
+    const window = { startTime: String(NOW - 3_600_000), endTime: String(NOW), sortDirection: 'asc', search: 'timeout' };
+    const firstCursor = `[${NOW - 1_800_000},"${DEPLOYMENT_UID}"]`;
     ownedProject();
     deploymentGet('LIVE');
-    serverLogs(
-      { startTime: NOW - 3_600_000, endTime: NOW },
-      Array.from({ length: count }, (_, index) => ({ timestamp: '2026-10-28T11:30:00.000Z', message: `line ${index}` })),
+    const first = hub()
+      .get(SERVER_LOGS)
+      .query(window)
+      .reply(200, {
+        serverLogs: [{ timestamp: '2026-10-28T11:30:00.000Z', message: 'upstream timeout one' }],
+        pageInfo: { hasOlder: null, hasNewer: true, oldestCursor: firstCursor, newestCursor: firstCursor },
+      });
+    const second = hub()
+      .get(SERVER_LOGS)
+      .query({ ...window, cursor: firstCursor })
+      .reply(200, {
+        serverLogs: [{ timestamp: '2026-10-28T11:45:00.000Z', message: 'upstream timeout two' }],
+        pageInfo: { hasOlder: null, hasNewer: false, oldestCursor: null, newestCursor: null },
+      });
+
+    const { error, stdout } = await runCommand(
+      getArgs('--deployment', DEPLOYMENT_UID, '--type', 'server', '--search', ' timeout '),
+      config,
     );
 
-    const { error, stdout } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID, '--type', 'server'), config);
+    expect(error).toBeUndefined();
+    expect(first.isDone()).toBe(true);
+    expect(second.isDone()).toBe(true);
+    expect(outputLines(stdout)).toEqual([
+      '2026-10-28 11:30:00.000:  upstream timeout one',
+      '2026-10-28 11:45:00.000:  upstream timeout two',
+    ]);
+    expect(onWire).toEqual([]);
+  });
+
+  it('stops a server that always has more after 100 requests and prints a resume command with an absolute window', async () => {
+    jest.spyOn(Date, 'now').mockReturnValue(NOW);
+    let reads = 0;
+    ownedProject();
+    deploymentGet('LIVE');
+    hub()
+      .get(SERVER_LOGS)
+      .query(true)
+      .times(101)
+      .reply(200, () => {
+        reads += 1;
+        const cursor = `[${NOW - 3_600_000 + reads},"${DEPLOYMENT_UID}"]`;
+        return {
+          serverLogs: [{ timestamp: NOW - 3_600_000 + reads, message: `line ${reads}` }],
+          pageInfo: { hasNewer: true, newestCursor: cursor },
+        };
+      });
+
+    const { error, stdout } = await runCommand(
+      getArgs('--deployment', DEPLOYMENT_UID, '--type', 'server', '--since', '1h'),
+      config,
+    );
     const lines = outputLines(stdout);
 
     expect(error).toBeUndefined();
-    expect(lines).toHaveLength(shows ? count + 1 : count);
-    expect(lines.at(-1)).toBe(
-      shows
-        ? 'Showing the newest 5000 server log lines in this window. Narrow --since/--until to see earlier ones.'
-        : `2026-10-28 11:30:00.000:  line ${count - 1}`,
-    );
+    expect(reads).toBe(100);
+    expect(lines).toHaveLength(102);
+    expect(lines.slice(-2)).toEqual([
+      'Stopped after 100 pages of server logs; more remain in this window.',
+      `Resume with: csdx launch:logs:get --org ${ORG_UID} --project ${PROJECT_UID} --env ${ENV_UID} ` +
+        `--deployment ${DEPLOYMENT_UID} --type server --since 2026-10-28T11:00:00.000Z ` +
+        `--until 2026-10-28T12:00:00.000Z --cursor '[${NOW - 3_600_000 + 100},"${DEPLOYMENT_UID}"]'`,
+    ]);
   });
 
   it('T55: prints the 24 hour notice first for --since 2d and sends the user own start time', async () => {
@@ -662,6 +709,53 @@ describe('integration: launch:logs:get on the wire', () => {
     expect(onWire).toEqual([]);
   }, 20_000);
 
+  it('words a field-keyed 400 for a foreign --cursor in the CLI own words, sends the cursor as given, exit 1', async () => {
+    jest.spyOn(Date, 'now').mockReturnValue(NOW);
+    ownedProject();
+    deploymentGet('LIVE');
+    const read = hub()
+      .get(SERVER_LOGS)
+      .query({ startTime: String(NOW - 3_600_000), endTime: String(NOW), sortDirection: 'asc', cursor: 'garbage' })
+      .reply(400, {
+        errors: [{ cursor: { code: 'launch.SERVERLOGS.INVALID_CURSOR', message: 'cursor is not valid' } }],
+        status: 400,
+      });
+
+    const { error, stdout } = await runCommand(
+      getArgs('--deployment', DEPLOYMENT_UID, '--type', 'server', '--cursor', 'garbage'),
+      config,
+    );
+
+    expect(read.isDone()).toBe(true);
+    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.message).toBe('That cursor was not produced by launch:logs:get. Run the command again without --cursor.');
+    expect(stdout).toBe('');
+    expect(onWire).toEqual([]);
+  });
+
+  it('exits 1 without printing unfiltered logs when a logs service before CL-7180 ignores --search', async () => {
+    jest.spyOn(Date, 'now').mockReturnValue(NOW);
+    ownedProject();
+    deploymentGet('LIVE');
+    const read = hub()
+      .get(SERVER_LOGS)
+      .query({ startTime: String(NOW - 3_600_000), endTime: String(NOW), sortDirection: 'asc', search: 'timeout' })
+      .reply(200, { serverLogs: [{ timestamp: '2026-10-28T11:30:00.000Z', message: 'GET / 200' }] });
+
+    const { error, stdout } = await runCommand(
+      getArgs('--deployment', DEPLOYMENT_UID, '--type', 'server', '--search', 'timeout'),
+      config,
+    );
+
+    expect(read.isDone()).toBe(true);
+    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.message).toBe(
+      'The Launch API in this region does not support --search or --cursor for server logs yet. ' +
+        'Run the command without them.',
+    );
+    expect(stdout).toBe('');
+  });
+
   it('T58: prints a fallback for server entries missing their timestamp, message or everything', async () => {
     jest.spyOn(Date, 'now').mockReturnValue(NOW);
     ownedProject();
@@ -680,10 +774,11 @@ describe('integration: launch:logs:get on the wire', () => {
     expect(stdout.split('\n')).toEqual(['', 'no time', '2026-10-28 11:00:00.000:', '2026-10-28 11:00:01.000:  epoch', '', '']);
   });
 
-  it('T59: a server run registers no SIGINT handler and starts no spinner', async () => {
+  it('T59: stops a server walk on Ctrl-C with a resume command and exit 3, no spinner, no listener left', async () => {
     const restoreStdout = stdoutReportingTTY(true);
     const loader = jest.spyOn(cliux, 'loaderV2');
     const baseline = process.listenerCount('SIGINT');
+    const firstCursor = `[${NOW - 1_800_000},"${DEPLOYMENT_UID}"]`;
     let during = -1;
 
     try {
@@ -692,16 +787,29 @@ describe('integration: launch:logs:get on the wire', () => {
       deploymentGet('LIVE');
       hub()
         .get(SERVER_LOGS)
-        .query(true)
+        .query({ startTime: String(NOW - 3_600_000), endTime: String(NOW), sortDirection: 'asc' })
         .reply(200, () => {
           during = process.listenerCount('SIGINT');
-          return { serverLogs: [{ timestamp: '2026-10-28T11:30:00.000Z', message: 'hi' }] };
+          setImmediate(() => process.emit('SIGINT'));
+          return {
+            serverLogs: [{ timestamp: '2026-10-28T11:30:00.000Z', message: 'hi' }],
+            pageInfo: { hasNewer: true, newestCursor: firstCursor },
+          };
         });
+      const second = hub().get(SERVER_LOGS).query(true).reply(200, { serverLogs: [], pageInfo: { hasNewer: false } });
 
-      const { error } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID, '--type', 'server'), config);
+      const { error, stdout } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID, '--type', 'server'), config);
 
-      expect(error).toBeUndefined();
-      expect(during).toBe(baseline);
+      expect(error?.oclif?.exit).toBe(3);
+      expect(outputLines(stdout)).toEqual([
+        expect.stringMatching(/^\d{2}:\d{2}:\d{2} {2}hi$/),
+        'Stopped following the logs.',
+        `Resume with: csdx launch:logs:get --org ${ORG_UID} --project ${PROJECT_UID} --env ${ENV_UID} ` +
+          `--deployment ${DEPLOYMENT_UID} --type server --since 2026-10-28T11:00:00.000Z ` +
+          `--until 2026-10-28T12:00:00.000Z --cursor '${firstCursor}'`,
+      ]);
+      expect(second.isDone()).toBe(false);
+      expect(during).toBe(baseline + 1);
       expect(process.listenerCount('SIGINT')).toBe(baseline);
       expect(loader).not.toHaveBeenCalled();
     } finally {
@@ -1032,6 +1140,8 @@ describe('integration: launch:logs:get on the wire', () => {
   it.each([
     [['--since', '1h'], '--since is only supported when --type is one of server; --type is deployment.'],
     [['--until', '1h', '--type', 'live'], '--until is only supported when --type is one of server; --type is live.'],
+    [['--search', 'timeout'], '--search is only supported when --type is one of server; --type is deployment.'],
+    [['--cursor', '[1,"a"]', '--type', 'live'], '--cursor is only supported when --type is one of server; --type is live.'],
     [['--since', '12hr', '--until', '2026-10-28T10:00:00Z', '--type', 'server'], '--since and --until must both be relative (like 12hr) or both absolute (ISO 8601) timestamps.'],
     [['--since', '30m', '--until', '2h', '--type', 'server'], '--since must not be later than --until.'],
   ])('T61: exits 2 for %j with nothing read', async (flags, message) => {

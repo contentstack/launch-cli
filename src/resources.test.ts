@@ -237,7 +237,7 @@ describe('the api surface', () => {
     const scope = { org: 'o1', project: 'p1', environment: 'e1', deployment: 'd1' };
 
     await api.deploymentLogs.after({ ...scope, timestamp: '2026-09-25T10:00:00.000Z' });
-    await api.serverLogs.window({ ...scope, startTime: 1, endTime: 2 });
+    await api.serverLogs.page({ ...scope, startTime: 1, endTime: 2 });
     await api.deployments.get(scope);
 
     expect(sent.logs.map((req) => req.path)).toEqual([

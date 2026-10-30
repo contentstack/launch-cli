@@ -1,9 +1,10 @@
+import { MAX_PAGES } from '../core/constants';
 import { DEPLOYMENT_WAIT_TIMEOUT_MS } from '../deployments/deployment.watcher';
 import { clockOf, deploymentLogLine } from '../deployments/deployment.presenter';
 import type { Deployment } from '../deployments/types';
 import { styled } from '../core/style';
 import { isRecord } from '../core/values';
-import { SERVER_LOGS_PAGE_CAP, type ServerLog } from './types';
+import type { ServerLog } from './types';
 
 const MS_PER_MINUTE = 60_000;
 
@@ -17,6 +18,18 @@ function deploymentLogsHint(scope: DeploymentScopeLabels, deploymentUid: string)
   const flags = `--org ${scope.org} --project ${scope.project} --env ${scope.environment}`;
 
   return `csdx launch:logs:get ${flags} --deployment ${deploymentUid}`;
+}
+
+export interface ServerLogsResume extends DeploymentScopeLabels {
+  deployment: string;
+  startTime: number;
+  endTime: number;
+  search?: string;
+  cursor: string;
+}
+
+function shellQuoted(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`;
 }
 
 function isoOf(time: number): string {
@@ -42,16 +55,23 @@ export function noDeploymentLogsLine(deployment: string, outputIsTTY: boolean): 
   return styled(`No deployment logs found for deployment ${deployment}.`, 'yellow', outputIsTTY);
 }
 
-export function noServerLogsLine(startTime: number, endTime: number, outputIsTTY: boolean): string {
-  return styled(`No server logs found between ${isoOf(startTime)} and ${isoOf(endTime)}.`, 'yellow', outputIsTTY);
+export function noServerLogsLine(startTime: number, endTime: number, outputIsTTY: boolean, search?: string): string {
+  const found = search === undefined ? 'found' : `matched "${search}"`;
+
+  return styled(`No server logs ${found} between ${isoOf(startTime)} and ${isoOf(endTime)}.`, 'yellow', outputIsTTY);
 }
 
-export function serverLogsCapLine(outputIsTTY: boolean): string {
-  return styled(
-    `Showing the newest ${SERVER_LOGS_PAGE_CAP} server log lines in this window. ` +
-      'Narrow --since/--until to see earlier ones.',
-    'yellow',
-    outputIsTTY,
+export function serverLogsPageCapLine(outputIsTTY: boolean): string {
+  return styled(`Stopped after ${MAX_PAGES} pages of server logs; more remain in this window.`, 'yellow', outputIsTTY);
+}
+
+export function serverLogsResumeLine(resume: ServerLogsResume): string {
+  const window = `--type server --since ${isoOf(resume.startTime)} --until ${isoOf(resume.endTime)}`;
+  const search = resume.search === undefined ? '' : ` --search ${shellQuoted(resume.search)}`;
+
+  return (
+    `Resume with: ${deploymentLogsHint(resume, resume.deployment)} ${window}` +
+    `${search} --cursor ${shellQuoted(resume.cursor)}`
   );
 }
 

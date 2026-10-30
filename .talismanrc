@@ -1,8 +1,10 @@
 fileignoreconfig:
+- filename: src/logs/logs.inputs.test.ts
+  checksum: 7b4df8790179c7dc4385acd1d380bb91397523bab111593742e2fc53c94da375
 - filename: test/integration/logs-get.test.ts
-  checksum: 7822d714f476fa4ee588f1b602a7c9e69b8843cc60c09b4ae14cbe4eb2b4ad3b
+  checksum: ce0b900bad922e911896de19387686fdc224ba6e62b380dae09e7153c59770a8
 - filename: src/commands/launch/logs/get.test.ts
-  checksum: 5ee3d8ba6b014b3a9ac558a750a9a58782bb679d32d30b621e41f977dcc98a0a
+  checksum: b1184a9ae3845f3a1f70c73d87c1ad287ba8277d190a0783820626a3a4cf60b3
 - filename: src/core/failure.test.ts
   checksum: 242d43885d1e3ef46edf1e347899a90549ebf95ec6827426746852f7a6dfc418
 - filename: test/integration/retired-commands.test.ts
@@ -228,12 +230,12 @@ fileignoreconfig:
   allowed_patterns:
     - "FlagKey"
 - filename: src/resources.test.ts
-  checksum: 05a4c54c69bfff1042fa0df038c46881830e3d7014777c87919c5c0739974f45
+  checksum: 5966384474a44b82bde8cf71e9c7d8c2e6c3b73e260a957e4691b20d6970b534
   allowed_patterns:
     - "a project name passed on argv to the project resolver"
     - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
 - filename: AGENTS.md
-  checksum: aafd85677e293bf72dd5764875b202ac3a5531aa083c1c452adaa55021af8c95
+  checksum: ba37b6b17d97940a6f7d5e69a531796ab0ee5b6859a9cd5cbdec56e4b7731b26
   allowed_patterns:
     - "Do not add an exemption to a guard to make a new file pass"
     - "passes its own error wording to `client.request\\(req, MESSAGES\\)`"
@@ -329,7 +331,7 @@ fileignoreconfig:
 - filename: src/commands/launch/env/update.test.ts
   checksum: 2da219594e7bdd589adc0eff9ff035252a75aaa51dfa20514b18fd3266d7b752
 - filename: README.md
-  checksum: 8f1e4d97fa7e97a4c6a3bdb6bbf3d0f4d3735c3dfc23579a4d0a7c6d725bc8e4
+  checksum: d054f1c14732d42c745f6e038f187aa5e04f6789b4d58cfaf5604e43fabc714e
   allowed_patterns:
     - "password-protection"
     - "-p, --password"
