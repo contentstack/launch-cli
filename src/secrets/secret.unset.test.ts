@@ -5,7 +5,7 @@ import type { UxLike } from '../core/prompt';
 import type { ServiceContext } from '../core/service-context';
 import { LaunchApiError, LaunchNetworkError } from '../transport/errors';
 import { SecretRemover } from './secret.unset';
-import { SecretsNotRemovedError } from './secrets.errors';
+import { SecretsNotRemovedError, SecretsRemovalStoppedError } from './secrets.errors';
 import type { SecretKeyParams } from './types';
 
 const SCOPE = { org: 'org1', project: 'proj1', environment: 'env1' };
@@ -160,22 +160,71 @@ describe('SecretRemover.remove', () => {
     expect(lines).toEqual(['\u001b[31mSecret A was not removed: no\u001b[39m']);
   });
 
-  it('stops at an error that is not an API answer, since the remaining keys would fail the same way', async () => {
+  it('stops at a network failure on the middle key and names what was removed, what failed and what was not attempted', async () => {
     const network = new LaunchNetworkError(`cannot reach ${randomUUID()}`, undefined);
-    const { run, removals, lines } = harnessed({ keys: ['A', 'B', 'C'], failures: { B: network } });
+    const { run, removals, lines, events } = harnessed({ keys: ['A', 'B', 'C', 'D', 'E'], failures: { C: network } });
+
+    const error = (await run().catch((thrown: unknown) => thrown)) as SecretsRemovalStoppedError;
+
+    expect(error).toBeInstanceOf(SecretsRemovalStoppedError);
+    expect(error.exitCode).toBe(1);
+    expect(error.cause).toBe(network);
+    expect(error.message).toBe(
+      `Stopped at secret C: ${network.message}\nRemoved: A, B.\nFailed: C.\nNot attempted: D, E.`,
+    );
+    expect(removals.map((removal) => removal.key)).toEqual(['A', 'B', 'C']);
+    expect(events).toEqual(['confirm', 'remove A', 'print', 'remove B', 'print', 'remove C']);
+    expect(lines).toEqual(['✔ Secret A removed.', '✔ Secret B removed.']);
+  });
+
+  it('counts an earlier API failure as failed and never lists the stopping key as removed', async () => {
+    const missing = new LaunchApiError(404, [{ message: 'gone' }]);
+    const network = new LaunchNetworkError('down', undefined);
+    const { run, removals } = harnessed({ keys: ['A', 'B', 'C', 'D'], failures: { A: missing, C: network } });
+
+    const error = (await run().catch((thrown: unknown) => thrown)) as SecretsRemovalStoppedError;
+
+    expect(error.message).toBe('Stopped at secret C: down\nRemoved: B.\nFailed: A, C.\nNot attempted: D.');
+    expect(removals.map((removal) => removal.key)).toEqual(['A', 'B', 'C']);
+  });
+
+  it('reports a network failure on the last key with nothing left unattempted', async () => {
+    const { run } = harnessed({ keys: ['A', 'B'], failures: { B: new LaunchNetworkError('down', undefined) } });
+
+    const error = (await run().catch((thrown: unknown) => thrown)) as SecretsRemovalStoppedError;
+
+    expect(error.message).toBe('Stopped at secret B: down\nRemoved: A.\nFailed: B.\nNot attempted: none.');
+  });
+
+  it('stops the same way for any other error, keeping it as the cause', async () => {
+    const usage = new UsageError('bad');
+    const { run, removals } = harnessed({ keys: ['A', 'B'], failures: { A: usage } });
+
+    const error = (await run().catch((thrown: unknown) => thrown)) as SecretsRemovalStoppedError;
+
+    expect(error).toBeInstanceOf(SecretsRemovalStoppedError);
+    expect(error.cause).toBe(usage);
+    expect(error.message).toBe('Stopped at secret A: bad\nRemoved: none.\nFailed: A.\nNot attempted: B.');
+    expect(removals.map((removal) => removal.key)).toEqual(['A']);
+  });
+
+  it('words a thrown value that is not an Error by its string form', async () => {
+    const { run } = harnessed({ keys: ['A'], failures: { A: 'plain text' } });
+
+    const error = (await run().catch((thrown: unknown) => thrown)) as SecretsRemovalStoppedError;
+
+    expect(error.message).toBe('Stopped at secret A: plain text\nRemoved: none.\nFailed: A.\nNot attempted: none.');
+  });
+
+  it.each([['.'], ['..']])('refuses the key %j, with the other keys, before confirming or deleting anything', async (key) => {
+    const { run, events, removals } = harnessed({ keys: ['A', key, 'B'] });
 
     const error = await run().catch((thrown: unknown) => thrown);
 
-    expect(error).toBe(network);
-    expect(removals.map((removal) => removal.key)).toEqual(['A', 'B']);
-    expect(lines).toEqual(['✔ Secret A removed.']);
-  });
-
-  it('lets a usage error propagate as it is', async () => {
-    const usage = new UsageError('bad');
-    const { run } = harnessed({ keys: ['A'], failures: { A: usage } });
-
-    await expect(run()).rejects.toBe(usage);
+    expect(error).toBeInstanceOf(UsageError);
+    expect((error as UsageError).message).toContain(`"${key}"`);
+    expect(events).toEqual([]);
+    expect(removals).toEqual([]);
   });
 
   it('lets a failure of the confirmation propagate before any request', async () => {

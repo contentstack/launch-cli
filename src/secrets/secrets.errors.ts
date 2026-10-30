@@ -76,6 +76,33 @@ export class SecretsNotRemovedError extends LaunchError {
   }
 }
 
+export interface RemovalStop {
+  removed: string[];
+  failed: string[];
+  notAttempted: string[];
+  cause: unknown;
+}
+
+function named(keys: string[]): string {
+  return keys.length === 0 ? 'none' : keys.join(', ');
+}
+
+export class SecretsRemovalStoppedError extends LaunchError {
+  readonly exitCode = EXIT_RUNTIME;
+  readonly cause: unknown;
+
+  constructor({ removed, failed, notAttempted, cause }: RemovalStop) {
+    const reason = cause instanceof Error ? cause.message : String(cause);
+
+    super(
+      `Stopped at secret ${failed[failed.length - 1]}: ${reason}\n` +
+        `Removed: ${named(removed)}.\nFailed: ${named(failed)}.\nNot attempted: ${named(notAttempted)}.`,
+    );
+    this.name = 'SecretsRemovalStoppedError';
+    this.cause = cause;
+  }
+}
+
 function withoutValue(text: string, value: string): string {
   return [value, value.trim()]
     .filter((form) => form !== '')

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { EXIT_RUNTIME } from '../core/constants';
 import { SessionExpiredError } from '../core/errors';
 import { LaunchApiError, LaunchNetworkError, parseErrorEnvelope } from '../transport/errors';
-import { SECRETS_ERROR_MESSAGES, SecretInputTimeoutError, SecretsNotRemovedError, asReadFailure, asWriteFailure } from './secrets.errors';
+import { SECRETS_ERROR_MESSAGES, SecretInputTimeoutError, SecretsNotRemovedError, SecretsRemovalStoppedError, asReadFailure, asWriteFailure } from './secrets.errors';
 
 const PREFIX = 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS';
 
@@ -248,5 +248,31 @@ describe('SecretsNotRemovedError', () => {
     expect(error.name).toBe('SecretsNotRemovedError');
     expect(error.exitCode).toBe(EXIT_RUNTIME);
     expect(error.message).toBe(message);
+  });
+});
+
+describe('SecretsRemovalStoppedError', () => {
+  it('names the cause, the keys removed, the keys that failed and the keys never attempted', () => {
+    const cause = new LaunchNetworkError('cannot reach the Launch API', undefined);
+
+    const error = new SecretsRemovalStoppedError({ removed: ['A', 'B'], failed: ['C'], notAttempted: ['D', 'E'], cause });
+
+    expect(error.name).toBe('SecretsRemovalStoppedError');
+    expect(error.exitCode).toBe(EXIT_RUNTIME);
+    expect(error.cause).toBe(cause);
+    expect(error.message).toBe(
+      'Stopped at secret C: cannot reach the Launch API\nRemoved: A, B.\nFailed: C.\nNot attempted: D, E.',
+    );
+  });
+
+  it('says none for an empty group and counts earlier API failures with the key it stopped on', () => {
+    const error = new SecretsRemovalStoppedError({
+      removed: [],
+      failed: ['A', 'B'],
+      notAttempted: [],
+      cause: new Error('boom'),
+    });
+
+    expect(error.message).toBe('Stopped at secret B: boom\nRemoved: none.\nFailed: A, B.\nNot attempted: none.');
   });
 });

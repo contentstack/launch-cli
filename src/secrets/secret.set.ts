@@ -2,7 +2,7 @@ import { UsageError } from '../core/errors';
 import { styled } from '../core/style';
 import type { ServiceContext } from '../core/service-context';
 import type { EnvironmentParams } from '../environments/environments.api';
-import { clientExposedWarning, emptyValueError } from './secret.rules';
+import { assertSecretKey, clientExposedWarning, emptyValueError } from './secret.rules';
 import type { SecretValueIo } from './secret.value';
 import { DEFAULT_SECRET_IO, readSecretValue } from './secret.value';
 
@@ -23,6 +23,8 @@ export class SecretSetter {
   async set({ org, project, environment, key, yes }: SetSecretRequest): Promise<boolean> {
     const scope = { org, project, environment };
     const colour = this.services.outputIsTTY === true;
+
+    assertSecretKey(key);
 
     if (!this.services.isTTY && !yes) {
       throw new UsageError(

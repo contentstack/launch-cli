@@ -2,6 +2,7 @@ import { isRecord } from '../core/values';
 import type { EnvironmentParams } from '../environments/environments.api';
 import { assertArray } from '../transport/envelope';
 import type { RestApiClient, RestRequest } from '../transport/rest-client';
+import { assertSecretKey } from './secret.rules';
 import { SECRETS_ERROR_MESSAGES, asReadFailure, asWriteFailure } from './secrets.errors';
 import type { SecretKeyParams, SecretSummary, SecretWriteParams, SecretWriteResult } from './types';
 
@@ -10,7 +11,13 @@ export * from './types';
 export function secretsPath({ project, environment }: EnvironmentParams, key?: string): string {
   const base = `/projects/${project}/environments/${environment}/secrets`;
 
-  return key === undefined ? base : `${base}/${encodeURIComponent(key)}`;
+  if (key === undefined) {
+    return base;
+  }
+
+  assertSecretKey(key);
+
+  return `${base}/${encodeURIComponent(key)}`;
 }
 
 function textOf(value: unknown): string | undefined {

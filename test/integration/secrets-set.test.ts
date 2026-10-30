@@ -11,6 +11,7 @@ import nock from 'nock';
 
 import { DEFAULT_SECRET_IO } from '../../src/secrets/secret.value';
 import { projectOwnership } from '../support/project-ownership';
+import { gluedValue } from '../support/glued-value';
 import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
 import { answerPrompts, onTerminal } from '../support/terminal';
 
@@ -313,7 +314,7 @@ describe('integration: launch:secrets:set on the wire', () => {
     ['-v<value>', (v: string) => setArgs([`-v${v}`])],
     ['-y<value> before --key', (v: string) => setArgs([], 'API_TOKEN', [`-y${v}`])],
   ])('S8 exits 2 with only the generic line, echoing nothing, for %s', async (_label, argvFor) => {
-    const value = randomUUID();
+    const value = gluedValue();
     pipe('');
     const list = held([]);
 
@@ -340,6 +341,43 @@ describe('integration: launch:secrets:set on the wire', () => {
     expect(error?.message).toBe('launch:secrets:set sets one secret at a time. Pass --key once.');
     expect(`${error?.message}${stdout}${stderr}`).not.toContain(value);
     expect(list.isDone()).toBe(false);
+  });
+
+  it.each([['.'], ['..']])('S5 rejects the key %j with exit 2 before reading stdin and sends no request', async (key) => {
+    const reads: string[] = [];
+
+    restoreStdin = pipedStdin(
+      new Readable({
+        read() {
+          reads.push('read');
+          this.push(randomUUID());
+          this.push(null);
+        },
+      }),
+    );
+    const list = held([]);
+    const write = posted();
+
+    const { error } = await runCommand(setArgs(['--yes'], key), config);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toContain(`"${key}"`);
+    expect(reads).toEqual([]);
+    expect([list.isDone(), write.isDone()]).toEqual([false, false]);
+    expect(onWire).toEqual([]);
+    expect(cliux.inquire).not.toHaveBeenCalled();
+  });
+
+  it('S5 sends a key with a slash as one encoded segment on a PUT', async () => {
+    pipe(randomUUID());
+    held(['a/../b']);
+    const write = put(200, { key: 'a/../b', updatedAt: '2026-09-02T10:00:00.000Z' }, 'a/../b');
+
+    const { error } = await runCommand(setArgs(['--yes'], '"a/../b"'), config);
+
+    expect(error).toBeUndefined();
+    expect(write.isDone()).toBe(true);
+    expect(sent.map((request) => request.path)).toEqual([`${SECRETS_PATH}/a%2F..%2Fb`]);
   });
 
   it('S8 exposes no --value flag in the command definition', async () => {

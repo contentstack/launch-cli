@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { Parser } from '@oclif/core';
 import type { Errors } from '@oclif/core';
 
+import { gluedValue } from '../../../../test/support/glued-value';
 import { UsageError } from '../../../core/errors';
 import type { UxLike } from '../../../core/prompt';
 import { catalog } from '../../../resources';
@@ -217,7 +218,7 @@ describe('launch:secrets:set', () => {
     it.each([
       ['a positional', ['--key', 'K', '--', randomUUID()]],
       ['a --value=', [`--value=${randomUUID()}`]],
-      ['a -v attached', [`-v${randomUUID()}`]],
+      ['a -v attached', [`-v${gluedValue()}`]],
     ])('S8 prints only the generic invalid-arguments line and exits 2 for a real parse error from %s', async (_label, argv) => {
       const raw = (await Parser.parse(argv, { flags: { key: catalog.key, yes: catalog.yes }, strict: true }).catch(
         (error: unknown) => error,

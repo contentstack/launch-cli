@@ -25,6 +25,18 @@ export function clientExposedWarning(key: string): string | undefined {
         'and is readable by anyone who loads the site. Do not keep a credential under this name.';
 }
 
+export function invalidKeyError(key: string): UsageError {
+  return new UsageError(
+    `"${key}" cannot be used as a secret key: "." and ".." are path segments, not names. Nothing was changed.`,
+  );
+}
+
+export function assertSecretKey(key: string): void {
+  if (key === '.' || key === '..') {
+    throw invalidKeyError(key);
+  }
+}
+
 export function emptyValueError(key: string): UsageError {
   return new UsageError(`The value for ${key} is empty. A secret needs a non-empty value; nothing was changed.`);
 }

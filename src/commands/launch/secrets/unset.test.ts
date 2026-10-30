@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { Parser } from '@oclif/core';
 import type { Errors } from '@oclif/core';
 
+import { gluedValue } from '../../../../test/support/glued-value';
 import { MissingInputError, UsageError } from '../../../core/errors';
 import type { UxLike } from '../../../core/prompt';
 import { LaunchApiError } from '../../../transport/errors';
@@ -206,7 +207,7 @@ describe('launch:secrets:unset', () => {
     it.each([
       ['a positional', ['--key', 'K', '--', randomUUID()]],
       ['a --value=', [`--value=${randomUUID()}`]],
-      ['a -v attached', [`-v${randomUUID()}`]],
+      ['a -v attached', [`-v${gluedValue()}`]],
     ])('prints only the generic invalid-arguments line and exits 2 for a real parse error from %s', async (_label, argv) => {
       const token = argv[argv.length - 1].replace(/^(--value=|-v)/, '');
       const raw = (await Parser.parse(argv, { flags: { key: catalog.key, yes: catalog.yes }, strict: true }).catch(

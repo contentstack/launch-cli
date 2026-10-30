@@ -108,6 +108,18 @@ function harnessed(harness: Harness) {
 }
 
 describe('SecretSetter.set', () => {
+  it.each([['.'], ['..']])('refuses the key %j before it reads stdin or sends anything', async (key) => {
+    const { run, events, prompts, lists, adds, refreshes } = harnessed({ key, yes: true, piped: randomUUID() });
+
+    const error = await run().catch((thrown: unknown) => thrown);
+
+    expect(error).toBeInstanceOf(UsageError);
+    expect((error as UsageError).exitCode).toBe(2);
+    expect((error as UsageError).message).toContain(`"${key}"`);
+    expect(events).toEqual([]);
+    expect([prompts, lists, adds, refreshes]).toEqual([[], [], [], []]);
+  });
+
   it('S1 adds a key that is absent from piped input with --yes: reads stdin, lists, confirms, POSTs and prompts for nothing', async () => {
     const value = randomUUID();
     const { run, events, prompts, lists, adds, refreshes, lines, questions } = harnessed({

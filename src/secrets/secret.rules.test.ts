@@ -1,9 +1,9 @@
-import { randomUUID } from 'node:crypto';
 
 import { Errors, Parser } from '@oclif/core';
 
 import { UsageError } from '../core/errors';
 import { catalog } from '../resources';
+import { gluedValue } from '../../test/support/glued-value';
 import {
   CLIENT_EXPOSED_PREFIXES,
   INVALID_ARGUMENTS_MESSAGE,
@@ -11,7 +11,9 @@ import {
   asSafeArgvFailure,
   clientExposedPrefix,
   clientExposedWarning,
+  assertSecretKey,
   emptyValueError,
+  invalidKeyError,
   singleKeyError,
 } from './secret.rules';
 
@@ -86,7 +88,7 @@ describe('singleKeyError', () => {
 });
 
 describe('asSafeArgvFailure', () => {
-  const secret = randomUUID();
+  const secret = gluedValue();
   async function realParseFailure(argv: string[]): Promise<unknown> {
     return Parser.parse(argv, { flags: { key: catalog.key, yes: catalog.yes }, strict: true }).catch(
       (error: unknown) => error,
@@ -148,4 +150,30 @@ describe('UNSET_INVALID_ARGUMENTS_MESSAGE', () => {
     );
     expect(UNSET_INVALID_ARGUMENTS_MESSAGE).not.toBe(INVALID_ARGUMENTS_MESSAGE);
   });
+});
+
+describe('assertSecretKey', () => {
+  it.each([['.'], ['..']])('refuses %j with a usage error naming the key', (key) => {
+    const thrown = ((): UsageError | undefined => {
+      try {
+        assertSecretKey(key);
+      } catch (error) {
+        return error as UsageError;
+      }
+
+      return undefined;
+    })();
+
+    expect(thrown).toBeInstanceOf(UsageError);
+    expect(thrown?.exitCode).toBe(2);
+    expect(thrown?.message).toBe(invalidKeyError(key).message);
+    expect(thrown?.message).toContain(`"${key}"`);
+  });
+
+  it.each([['API_TOKEN'], ['...'], ['.env'], ['a.b'], ['a..'], [' . '], ['%2e%2e'], ['a/b'], ['']])(
+    'accepts %j',
+    (key) => {
+      expect(() => assertSecretKey(key)).not.toThrow();
+    },
+  );
 });

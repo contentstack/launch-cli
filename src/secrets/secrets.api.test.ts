@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 
+import { UsageError } from '../core/errors';
 import { LaunchApiError, parseErrorEnvelope } from '../transport/errors';
 import type { RestApiClient, RestRequest } from '../transport/rest-client';
 import { SECRETS_ERROR_MESSAGES } from './secrets.errors';
@@ -33,6 +34,35 @@ describe('secretsPath', () => {
     expect(secretsPath(SCOPE, 'A/B C?d=1#e%f')).toBe(
       `/projects/${PROJECT}/environments/${ENVIRONMENT}/secrets/A%2FB%20C%3Fd%3D1%23e%25f`,
     );
+  });
+
+  it.each([['.'], ['..']])('refuses the dot segment %j, which a URL resolves out of the secrets prefix', (key) => {
+    expect(() => secretsPath(SCOPE, key)).toThrow(UsageError);
+    expect(() => secretsPath(SCOPE, key)).toThrow(`"${key}"`);
+  });
+
+  it('keeps a percent-encoded dot segment inside the prefix, where it stays one literal segment', () => {
+    const path = secretsPath(SCOPE, '%2e%2e');
+    const resolved = new URL(path, 'https://launch.example.test').pathname;
+
+    expect(path).toBe(`/projects/${PROJECT}/environments/${ENVIRONMENT}/secrets/%252e%252e`);
+    expect(resolved).toBe(path);
+    expect(resolved.startsWith(`/projects/${PROJECT}/environments/${ENVIRONMENT}/secrets/`)).toBe(true);
+  });
+
+  it.each([['API_TOKEN'], ['a.b'], ['...'], ['.env']])('keeps the ordinary key %j inside the prefix after URL resolution', (key) => {
+    const path = secretsPath(SCOPE, key);
+
+    expect(new URL(path, 'https://launch.example.test').pathname).toBe(
+      `/projects/${PROJECT}/environments/${ENVIRONMENT}/secrets/${encodeURIComponent(key)}`,
+    );
+  });
+
+  it('turns a slash in a key into %2F so it cannot open a second segment', () => {
+    const path = secretsPath(SCOPE, 'a/../b');
+
+    expect(path).toBe(`/projects/${PROJECT}/environments/${ENVIRONMENT}/secrets/a%2F..%2Fb`);
+    expect(new URL(path, 'https://launch.example.test').pathname).toBe(path);
   });
 
   it('keeps an empty key as a segment rather than dropping it', () => {
@@ -283,5 +313,19 @@ describe('SecretsApi.remove', () => {
     const { client } = fakeRestClient(async () => Promise.reject(new Error('socket closed')));
 
     await expect(new SecretsApi(client).remove({ ...SCOPE, key: 'A' })).rejects.toThrow('socket closed');
+  });
+});
+
+describe('SecretsApi with a dot-segment key', () => {
+  it.each([['.'], ['..']])('sends no request to refresh or remove the key %j', async (key) => {
+    const { client, requests } = fakeRestClient(async () => undefined);
+    const api = new SecretsApi(client);
+
+    const refreshed = await api.refresh({ ...SCOPE, key, value: randomUUID() }).catch((error: unknown) => error);
+    const removed = await api.remove({ ...SCOPE, key }).catch((error: unknown) => error);
+
+    expect(refreshed).toBeInstanceOf(UsageError);
+    expect(removed).toBeInstanceOf(UsageError);
+    expect(requests).toEqual([]);
   });
 });

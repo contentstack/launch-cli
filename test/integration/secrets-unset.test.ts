@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,6 +8,7 @@ import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
 import { projectOwnership } from '../support/project-ownership';
+import { gluedValue } from '../support/glued-value';
 import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
 import { answerPrompts, onTerminal } from '../support/terminal';
 
@@ -199,6 +199,39 @@ describe('integration: launch:secrets:unset on the wire', () => {
     expect(stdout + stderr).not.toContain('raw missing key');
   });
 
+  it('U4 names C as failed and D and E as not attempted when C hits a network failure, sending no DELETE for D or E', async () => {
+    const first = removal('A');
+    const second = removal('B');
+    const broken = hub().delete(`${SECRETS_PATH}/C`).replyWithError({ code: 'ECONNREFUSED', message: 'connect ECONNREFUSED' });
+    const fourth = removal('D');
+    const fifth = removal('E');
+
+    const { error, stdout, stderr } = await runCommand(unsetArgs(['A', 'B', 'C', 'D', 'E'], ['--yes']), config);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect([first.isDone(), second.isDone(), broken.isDone()]).toEqual([true, true, true]);
+    expect([fourth.isDone(), fifth.isDone()]).toEqual([false, false]);
+    expect(deleted).toEqual([`${SECRETS_PATH}/A`, `${SECRETS_PATH}/B`]);
+    expect(onWire).toEqual([]);
+    expect(stdout).toBe('✔ Secret A removed.\n✔ Secret B removed.\n');
+    expect(error?.message).toContain('Stopped at secret C: ');
+    expect(error?.message).toContain('\nRemoved: A, B.\nFailed: C.\nNot attempted: D, E.');
+    expect(stderr).toContain('Not attempted: D, E.');
+  });
+
+  it.each([['.'], ['..']])('rejects the key %j with exit 2 before confirming and sends no request', async (key) => {
+    const write = removal('API_TOKEN');
+
+    const { error } = await runCommand(unsetArgs(['API_TOKEN', `"${key}"`], ['--yes']), config);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toContain(`"${key}"`);
+    expect(write.isDone()).toBe(false);
+    expect(deleted).toEqual([]);
+    expect(onWire).toEqual([]);
+    expect(cliux.inquire).not.toHaveBeenCalled();
+  });
+
   it('U5 words a 403 as a permission failure for the key and exits 1', async () => {
     removal('API_TOKEN', 403, { errors: [{ code: 'launch.RBAC.FORBIDDEN', message: 'raw forbidden' }] });
 
@@ -250,7 +283,7 @@ describe('integration: launch:secrets:unset on the wire', () => {
     ['-v<token>', (v: string) => unsetArgs(['API_TOKEN'], [`-v${v}`, '--yes'])],
     ['a positional <token>', (v: string) => unsetArgs(['API_TOKEN'], ['--yes', '--', v])],
   ])('exits 2 with only the generic line, echoing nothing, for %s', async (_label, argvFor) => {
-    const token = randomUUID();
+    const token = gluedValue();
     const write = removal('API_TOKEN');
 
     const { error, stdout, stderr } = await runCommand(argvFor(token), config);

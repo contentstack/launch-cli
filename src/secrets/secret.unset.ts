@@ -2,7 +2,8 @@ import { styled } from '../core/style';
 import type { ServiceContext } from '../core/service-context';
 import type { EnvironmentParams } from '../environments/environments.api';
 import { LaunchApiError } from '../transport/errors';
-import { SecretsNotRemovedError } from './secrets.errors';
+import { assertSecretKey } from './secret.rules';
+import { SecretsNotRemovedError, SecretsRemovalStoppedError } from './secrets.errors';
 
 export interface RemoveSecretsRequest extends EnvironmentParams {
   keys: string[];
@@ -18,6 +19,9 @@ export class SecretRemover {
 
   async remove({ org, project, environment, keys: requested }: RemoveSecretsRequest): Promise<boolean> {
     const keys = [...new Set(requested)];
+
+    keys.forEach(assertSecretKey);
+
     const colour = this.services.outputIsTTY === true;
     const subject = keys.length === 1 ? 'secret' : 'secrets';
 
@@ -28,19 +32,29 @@ export class SecretRemover {
     }
 
     const stayed: string[] = [];
+    const removed: string[] = [];
 
-    for (const key of keys) {
+    for (const [index, key] of keys.entries()) {
       try {
         await this.services.api.secrets.remove({ org, project, environment, key });
-        this.services.ux.print(styled(`✔ Secret ${key} removed.`, 'green', colour));
       } catch (error) {
+        stayed.push(key);
+
         if (!(error instanceof LaunchApiError)) {
-          throw error;
+          throw new SecretsRemovalStoppedError({
+            removed,
+            failed: stayed,
+            notAttempted: keys.slice(index + 1),
+            cause: error,
+          });
         }
 
-        stayed.push(key);
         this.services.ux.print(styled(`Secret ${key} was not removed: ${error.message}`, 'red', colour));
+        continue;
       }
+
+      removed.push(key);
+      this.services.ux.print(styled(`✔ Secret ${key} removed.`, 'green', colour));
     }
 
     if (stayed.length > 0) {
