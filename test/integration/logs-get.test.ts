@@ -709,6 +709,30 @@ describe('integration: launch:logs:get on the wire', () => {
     expect(onWire).toEqual([]);
   }, 20_000);
 
+  it('words a field-keyed 400 for a foreign --cursor in the CLI own words, sends the cursor as given, exit 1', async () => {
+    jest.spyOn(Date, 'now').mockReturnValue(NOW);
+    ownedProject();
+    deploymentGet('LIVE');
+    const read = hub()
+      .get(SERVER_LOGS)
+      .query({ startTime: String(NOW - 3_600_000), endTime: String(NOW), sortDirection: 'asc', cursor: 'garbage' })
+      .reply(400, {
+        errors: [{ cursor: { code: 'launch.SERVERLOGS.INVALID_CURSOR', message: 'cursor is not valid' } }],
+        status: 400,
+      });
+
+    const { error, stdout } = await runCommand(
+      getArgs('--deployment', DEPLOYMENT_UID, '--type', 'server', '--cursor', 'garbage'),
+      config,
+    );
+
+    expect(read.isDone()).toBe(true);
+    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.message).toBe('That cursor was not produced by launch:logs:get. Run the command again without --cursor.');
+    expect(stdout).toBe('');
+    expect(onWire).toEqual([]);
+  });
+
   it('T58: prints a fallback for server entries missing their timestamp, message or everything', async () => {
     jest.spyOn(Date, 'now').mockReturnValue(NOW);
     ownedProject();

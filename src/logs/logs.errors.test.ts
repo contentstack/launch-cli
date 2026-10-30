@@ -17,6 +17,16 @@ describe('logs error wording', () => {
     ['launch.DEPLOYMENT.ENVIRONMENT_MISMATCH', 'That deployment does not belong to this environment.'],
     ['launch.PROJECT.NOT_FOUND', 'No project found with that UID.'],
     ['launch.DEPLOYMENT.NOT_FOUND', 'No deployment found with that UID.'],
+    ['launch.SERVERLOGS.SEARCH_TOO_LONG', '--search must be 256 characters or fewer.'],
+    [
+      'launch.SERVERLOGS.INVALID_CURSOR',
+      'That cursor was not produced by launch:logs:get. Run the command again without --cursor.',
+    ],
+    ['launch.SERVERLOGS.INVALID_SOURCE', 'The Launch API rejected the server log query. Update the CLI and try again.'],
+    [
+      'launch.SERVERLOGS.INVALID_SORT_DIRECTION',
+      'The Launch API rejected the server log query. Update the CLI and try again.',
+    ],
   ])('rewords %s and never shows the raw message', (code, wording) => {
     const error = new LaunchApiError(400, [{ code, message: 'raw server text' }], LOGS_ERROR_MESSAGES);
 
