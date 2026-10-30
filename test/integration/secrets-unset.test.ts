@@ -16,7 +16,7 @@ const LAUNCH_HUB_URL = 'https://launch-api.integration.test';
 const ORG_UID = 'blt4d9e2a7c1f6b3085';
 const PROJECT_UID = 'a1b2c3d4e5f60718293a4b5c';
 const ENV_UID = 'd4e5f60718293a4b5c6d7e8f';
-const SECRETS_PATH = `/manage/projects/${PROJECT_UID}/environments/${ENV_UID}/secrets`;
+const COLLECTION_PATH = `/manage/projects/${PROJECT_UID}/environments/${ENV_UID}/secrets`;
 const CODES = 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS';
 const QUESTION = 'Are you sure you want to remove the secret API_TOKEN from this environment?';
 const TWO_QUESTION = 'Are you sure you want to remove the secrets API_TOKEN, DB_PASSWORD from this environment?';
@@ -64,7 +64,7 @@ function hub() {
 }
 
 function removal(key: string, status = 204, body?: unknown) {
-  const path = `${SECRETS_PATH}/${encodeURIComponent(key)}`;
+  const path = `${COLLECTION_PATH}/${encodeURIComponent(key)}`;
 
   return hub()
     .delete(path)
@@ -114,7 +114,7 @@ describe('integration: launch:secrets:unset on the wire', () => {
 
     expect(error).toBeUndefined();
     expect([first.isDone(), second.isDone()]).toEqual([true, true]);
-    expect(deleted).toEqual([`${SECRETS_PATH}/DB_PASSWORD`, `${SECRETS_PATH}/API_TOKEN`]);
+    expect(deleted).toEqual([`${COLLECTION_PATH}/DB_PASSWORD`, `${COLLECTION_PATH}/API_TOKEN`]);
     expect(onWire).toEqual([]);
     expect(cliux.inquire).not.toHaveBeenCalled();
     expect(stdout).toBe('✔ Secret DB_PASSWORD removed.\n✔ Secret API_TOKEN removed.\n');
@@ -124,7 +124,7 @@ describe('integration: launch:secrets:unset on the wire', () => {
   it('U1 sends no body and no content type on a DELETE', async () => {
     const seen: { body: string; contentType: unknown }[] = [];
     const scope = hub()
-      .delete(`${SECRETS_PATH}/API_TOKEN`)
+      .delete(`${COLLECTION_PATH}/API_TOKEN`)
       .reply(204, function reply(_uri, requestBody) {
         seen.push({ body: String(requestBody), contentType: this.req.headers['content-type'] });
         return '';
@@ -188,7 +188,7 @@ describe('integration: launch:secrets:unset on the wire', () => {
 
     expect(error?.oclif?.exit).toBe(1);
     expect([first.isDone(), missing.isDone(), third.isDone()]).toEqual([true, true, true]);
-    expect(deleted).toEqual([`${SECRETS_PATH}/A`, `${SECRETS_PATH}/B`, `${SECRETS_PATH}/C`]);
+    expect(deleted).toEqual([`${COLLECTION_PATH}/A`, `${COLLECTION_PATH}/B`, `${COLLECTION_PATH}/C`]);
     expect(stdout).toBe(
       '✔ Secret A removed.\n' +
         'Secret B was not removed: No secret with that key exists in this environment.\n' +
@@ -202,7 +202,7 @@ describe('integration: launch:secrets:unset on the wire', () => {
   it('U4 names C as failed and D and E as not attempted when C hits a network failure, sending no DELETE for D or E', async () => {
     const first = removal('A');
     const second = removal('B');
-    const broken = hub().delete(`${SECRETS_PATH}/C`).replyWithError({ code: 'ECONNREFUSED', message: 'connect ECONNREFUSED' });
+    const broken = hub().delete(`${COLLECTION_PATH}/C`).replyWithError({ code: 'ECONNREFUSED', message: 'connect ECONNREFUSED' });
     const fourth = removal('D');
     const fifth = removal('E');
 
@@ -211,7 +211,7 @@ describe('integration: launch:secrets:unset on the wire', () => {
     expect(error?.oclif?.exit).toBe(1);
     expect([first.isDone(), second.isDone(), broken.isDone()]).toEqual([true, true, true]);
     expect([fourth.isDone(), fifth.isDone()]).toEqual([false, false]);
-    expect(deleted).toEqual([`${SECRETS_PATH}/A`, `${SECRETS_PATH}/B`]);
+    expect(deleted).toEqual([`${COLLECTION_PATH}/A`, `${COLLECTION_PATH}/B`]);
     expect(onWire).toEqual([]);
     expect(stdout).toBe('✔ Secret A removed.\n✔ Secret B removed.\n');
     expect(error?.message).toContain('Stopped at secret C: ');
@@ -273,7 +273,7 @@ describe('integration: launch:secrets:unset on the wire', () => {
 
     expect(error).toBeUndefined();
     expect(write.isDone()).toBe(true);
-    expect(deleted).toEqual([`${SECRETS_PATH}/A%2FB%20C%3Fd%3D1%23e%25f`]);
+    expect(deleted).toEqual([`${COLLECTION_PATH}/A%2FB%20C%3Fd%3D1%23e%25f`]);
     expect(stdout).toBe('✔ Secret A/B C?d=1#e%f removed.\n');
   });
 

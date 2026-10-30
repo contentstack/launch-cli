@@ -4,18 +4,18 @@ import { REDACTED } from '../core/redact';
 import { LaunchApiError, LaunchNetworkError } from '../transport/errors';
 import type { ApiErrorEntry, ErrorMessages } from '../transport/errors';
 
-const SECRETS = 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS';
+const ERROR_CODE_NAMESPACE = 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS';
 
 const SCOPE_NOT_FOUND_MESSAGE = 'The project or environment was not found.';
 
-const READ_FORBIDDEN_CODE = `${SECRETS}.READ_FORBIDDEN`;
-const READ_REJECTED_CODE = `${SECRETS}.READ_REJECTED`;
+const READ_FORBIDDEN_CODE = `${ERROR_CODE_NAMESPACE}.READ_FORBIDDEN`;
+const READ_REJECTED_CODE = `${ERROR_CODE_NAMESPACE}.READ_REJECTED`;
 const SCOPE_NOT_FOUND_CODE = 'launch.ENVIRONMENT.NOT_FOUND';
 
 export const SECRETS_ERROR_MESSAGES: ErrorMessages = {
-  [`${SECRETS}.KEY.CONFLICT`]: 'A secret or a variable with that key already exists in this environment.',
-  [`${SECRETS}.KEY.NOT_FOUND`]: 'No secret with that key exists in this environment.',
-  [`${SECRETS}.VALUE.MULTILINE`]: 'A secret value must be a single line.',
+  [`${ERROR_CODE_NAMESPACE}.KEY.CONFLICT`]: 'A secret or a variable with that key already exists in this environment.',
+  [`${ERROR_CODE_NAMESPACE}.KEY.NOT_FOUND`]: 'No secret with that key exists in this environment.',
+  [`${ERROR_CODE_NAMESPACE}.VALUE.MULTILINE`]: 'A secret value must be a single line.',
   'launch.ENVIRONMENT.ENVIRONMENT_VARIABLES.CONCURRENT_UPDATE':
     "Another change to this environment's variables and secrets landed at the same moment, so nothing was changed. " +
     'Run the command again.',
@@ -45,8 +45,8 @@ export function asReadFailure(error: unknown): unknown {
   return error;
 }
 
-const WRITE_FORBIDDEN_CODE = `${SECRETS}.WRITE_FORBIDDEN`;
-const WRITE_NOT_FOUND_CODE = `${SECRETS}.WRITE_NOT_FOUND`;
+const WRITE_FORBIDDEN_CODE = `${ERROR_CODE_NAMESPACE}.WRITE_FORBIDDEN`;
+const WRITE_NOT_FOUND_CODE = `${ERROR_CODE_NAMESPACE}.WRITE_NOT_FOUND`;
 
 const WRITE_MESSAGES: ErrorMessages = {
   ...SECRETS_ERROR_MESSAGES,

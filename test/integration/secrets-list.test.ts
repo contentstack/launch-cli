@@ -15,7 +15,7 @@ const LAUNCH_HUB_URL = 'https://launch-api.integration.test';
 const ORG_UID = 'blt4d9e2a7c1f6b3085';
 const PROJECT_UID = 'a1b2c3d4e5f60718293a4b5c';
 const ENV_UID = 'd4e5f60718293a4b5c6d7e8f';
-const SECRETS_PATH = `/manage/projects/${PROJECT_UID}/environments/${ENV_UID}/secrets`;
+const COLLECTION_PATH = `/manage/projects/${PROJECT_UID}/environments/${ENV_UID}/secrets`;
 const DATA_DIR = tmpdir();
 
 const CONFIG: Record<string, unknown> = {
@@ -41,7 +41,7 @@ function secretsRead(status: number, body?: unknown) {
     .matchHeader('x-organization-uid', ORG_UID)
     .matchHeader('x-project-uid', PROJECT_UID)
     .matchHeader('x-cs-api-version', '1.0')
-    .get(SECRETS_PATH)
+    .get(COLLECTION_PATH)
     .reply(status, body as nock.Body);
 }
 

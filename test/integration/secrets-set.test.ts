@@ -19,7 +19,7 @@ const LAUNCH_HUB_URL = 'https://launch-api.integration.test';
 const ORG_UID = 'blt4d9e2a7c1f6b3085';
 const PROJECT_UID = 'a1b2c3d4e5f60718293a4b5c';
 const ENV_UID = 'd4e5f60718293a4b5c6d7e8f';
-const SECRETS_PATH = `/manage/projects/${PROJECT_UID}/environments/${ENV_UID}/secrets`;
+const COLLECTION_PATH = `/manage/projects/${PROJECT_UID}/environments/${ENV_UID}/secrets`;
 const CODES = 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS';
 const ADD_QUESTION = 'Are you sure you want to add the secret API_TOKEN?';
 const REPLACE_QUESTION = 'Are you sure you want to replace the value of the secret API_TOKEN?';
@@ -84,15 +84,15 @@ function hub() {
 
 function held(keys: string[]) {
   return hub()
-    .get(SECRETS_PATH)
+    .get(COLLECTION_PATH)
     .reply(200, { secrets: keys.map((key) => ({ key, updatedAt: '2026-09-01T10:00:00.000Z' })), count: keys.length });
 }
 
 function posted(status = 201, body: unknown = { key: 'API_TOKEN', updatedAt: '2026-09-02T10:00:00.000Z' }) {
   return hub()
     .matchHeader('content-type', /application\/json/)
-    .post(SECRETS_PATH, (body_) => {
-      sent.push({ method: 'POST', path: SECRETS_PATH, body: body_ });
+    .post(COLLECTION_PATH, (body_) => {
+      sent.push({ method: 'POST', path: COLLECTION_PATH, body: body_ });
       return true;
     })
     .reply(status, body as nock.Body);
@@ -101,8 +101,8 @@ function posted(status = 201, body: unknown = { key: 'API_TOKEN', updatedAt: '20
 function put(status = 200, body: unknown = { key: 'API_TOKEN', updatedAt: '2026-09-02T10:00:00.000Z' }, key = 'API_TOKEN') {
   return hub()
     .matchHeader('content-type', /application\/json/)
-    .put(`${SECRETS_PATH}/${encodeURIComponent(key)}`, (body_) => {
-      sent.push({ method: 'PUT', path: `${SECRETS_PATH}/${encodeURIComponent(key)}`, body: body_ });
+    .put(`${COLLECTION_PATH}/${encodeURIComponent(key)}`, (body_) => {
+      sent.push({ method: 'PUT', path: `${COLLECTION_PATH}/${encodeURIComponent(key)}`, body: body_ });
       return true;
     })
     .reply(status, body as nock.Body);
@@ -158,7 +158,7 @@ describe('integration: launch:secrets:set on the wire', () => {
 
     expect(error).toBeUndefined();
     expect([list.isDone(), write.isDone()]).toEqual([true, true]);
-    expect(sent).toEqual([{ method: 'POST', path: SECRETS_PATH, body: { key: 'API_TOKEN', value } }]);
+    expect(sent).toEqual([{ method: 'POST', path: COLLECTION_PATH, body: { key: 'API_TOKEN', value } }]);
     expect(onWire).toEqual([]);
     expect(cliux.inquire).not.toHaveBeenCalled();
     expect(stdout).toBe('✔ Secret API_TOKEN added.\n');
@@ -178,7 +178,7 @@ describe('integration: launch:secrets:set on the wire', () => {
     expect(prompts.messages).toEqual(['Value for API_TOKEN', ADD_QUESTION]);
     expect(prompts.payloads[0]).toMatchObject({ type: 'password', mask: '*' });
     expect(prompts.payloads[1]).toMatchObject({ type: 'confirm', default: false });
-    expect(sent).toEqual([{ method: 'POST', path: SECRETS_PATH, body: { key: 'API_TOKEN', value } }]);
+    expect(sent).toEqual([{ method: 'POST', path: COLLECTION_PATH, body: { key: 'API_TOKEN', value } }]);
     expect(stdout).toBe('✔ Secret API_TOKEN added.\n');
     expect(JSON.stringify(prompts.payloads[1])).not.toContain(value);
   });
@@ -193,7 +193,7 @@ describe('integration: launch:secrets:set on the wire', () => {
 
     expect(error).toBeUndefined();
     expect([list.isDone(), write.isDone()]).toEqual([true, true]);
-    expect(sent).toEqual([{ method: 'PUT', path: `${SECRETS_PATH}/API_TOKEN`, body: { value } }]);
+    expect(sent).toEqual([{ method: 'PUT', path: `${COLLECTION_PATH}/API_TOKEN`, body: { value } }]);
     expect(onWire).toEqual([]);
     expect(stdout).toBe('✔ Secret API_TOKEN updated.\n');
   });
@@ -208,7 +208,7 @@ describe('integration: launch:secrets:set on the wire', () => {
 
     expect(error).toBeUndefined();
     expect(write.isDone()).toBe(true);
-    expect(sent[0].path).toBe(`${SECRETS_PATH}/A%2FB%20C`);
+    expect(sent[0].path).toBe(`${COLLECTION_PATH}/A%2FB%20C`);
   });
 
   it('S4 exits 3 and writes nothing when the confirmation is declined', async () => {
@@ -377,7 +377,7 @@ describe('integration: launch:secrets:set on the wire', () => {
 
     expect(error).toBeUndefined();
     expect(write.isDone()).toBe(true);
-    expect(sent.map((request) => request.path)).toEqual([`${SECRETS_PATH}/a%2F..%2Fb`]);
+    expect(sent.map((request) => request.path)).toEqual([`${COLLECTION_PATH}/a%2F..%2Fb`]);
   });
 
   it('S8 exposes no --value flag in the command definition', async () => {

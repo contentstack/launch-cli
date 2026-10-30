@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { EMPTY_SECRETS_MESSAGE, secretColumns } from './secret.presenter';
+import { EMPTY_LIST_MESSAGE, secretColumns } from './secret.presenter';
 
 describe('secretColumns', () => {
   it('has exactly the KEY and UPDATED columns, in that order', () => {
@@ -39,8 +39,8 @@ describe('secretColumns', () => {
   });
 });
 
-describe('EMPTY_SECRETS_MESSAGE', () => {
+describe('EMPTY_LIST_MESSAGE', () => {
   it('says the environment holds no secrets', () => {
-    expect(EMPTY_SECRETS_MESSAGE).toBe('No secrets found in this environment.');
+    expect(EMPTY_LIST_MESSAGE).toBe('No secrets found in this environment.');
   });
 });

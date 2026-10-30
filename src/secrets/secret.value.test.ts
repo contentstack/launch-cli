@@ -5,7 +5,7 @@ import type { UxLike } from '../core/prompt';
 import type { ServiceContext } from '../core/service-context';
 import { SecretInputTimeoutError } from './secrets.errors';
 import type { SecretValueIo } from './secret.value';
-import { DEFAULT_SECRET_IO, SECRET_STDIN_TIMEOUT_MS, readSecretValue, readWithin } from './secret.value';
+import { DEFAULT_SECRET_IO, STDIN_TIMEOUT_MS, readSecretValue, readWithin } from './secret.value';
 
 function ioOf(read: () => Promise<string>, stdinTimeoutMs = 1000) {
   const closed: string[] = [];
@@ -167,8 +167,8 @@ describe('readSecretValue', () => {
 
 describe('DEFAULT_SECRET_IO', () => {
   it('waits 30 seconds for standard input', () => {
-    expect(SECRET_STDIN_TIMEOUT_MS).toBe(30_000);
-    expect(DEFAULT_SECRET_IO.stdinTimeoutMs).toBe(SECRET_STDIN_TIMEOUT_MS);
+    expect(STDIN_TIMEOUT_MS).toBe(30_000);
+    expect(DEFAULT_SECRET_IO.stdinTimeoutMs).toBe(STDIN_TIMEOUT_MS);
   });
 
   it('reads the piped stream of the process', async () => {

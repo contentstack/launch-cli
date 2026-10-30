@@ -3,7 +3,7 @@ import { askSecret } from '../core/prompt';
 import type { ServiceContext } from '../core/service-context';
 import { SecretInputTimeoutError } from './secrets.errors';
 
-export const SECRET_STDIN_TIMEOUT_MS = 30_000;
+export const STDIN_TIMEOUT_MS = 30_000;
 
 export interface SecretValueIo {
   readStdin(): Promise<string>;
@@ -18,7 +18,7 @@ function destroy(stream: { destroy(): unknown }): void {
 export const DEFAULT_SECRET_IO: SecretValueIo = {
   readStdin: () => readPipedInput(),
   closeStdin: () => destroy(process.stdin),
-  stdinTimeoutMs: SECRET_STDIN_TIMEOUT_MS,
+  stdinTimeoutMs: STDIN_TIMEOUT_MS,
 };
 
 const MS_PER_SECOND = 1000;

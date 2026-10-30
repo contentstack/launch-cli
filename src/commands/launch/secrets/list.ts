@@ -2,7 +2,7 @@ import { LaunchCommand } from '../../../core/launch-command';
 import { flagsFor, inputs } from '../../../core/inputs';
 import { renderTable } from '../../../core/render';
 import { styled } from '../../../core/style';
-import { EMPTY_SECRETS_MESSAGE, secretColumns } from '../../../secrets/secret.presenter';
+import { EMPTY_LIST_MESSAGE, secretColumns } from '../../../secrets/secret.presenter';
 
 const listInputs = inputs({
   org: { required: true },
@@ -29,7 +29,7 @@ export default class SecretsList extends LaunchCommand<typeof listInputs> {
     });
 
     if (secrets.length === 0) {
-      this.ux.print(styled(EMPTY_SECRETS_MESSAGE, 'yellow', this.services.outputIsTTY === true));
+      this.ux.print(styled(EMPTY_LIST_MESSAGE, 'yellow', this.services.outputIsTTY === true));
       return;
     }
 

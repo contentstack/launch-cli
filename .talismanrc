@@ -474,7 +474,7 @@ fileignoreconfig:
 - filename: src/commands/launch/secrets/list.ts
   checksum: 1e3210e4f8c2ea8f2a6060e284765d8b36729c9b566804b1262ee84341ce6765
 - filename: src/secrets/secrets.errors.ts
-  checksum: 8df267949eead5791f33a3d29cde9372645da39aa6af990929fda73c79e6c090
+  checksum: 4a3a6cc9af567658149bdcba8dc5dd0de2a6cb2294bd6f1018b253e709ff1436
 - filename: src/secrets/secrets.api.test.ts
   checksum: 3ea97711bcdeb4d09c7d57f7a4df722103dbfacfa33520b02e0acb43aca17f8a
 - filename: src/secrets/secret.presenter.ts
@@ -488,7 +488,7 @@ fileignoreconfig:
 - filename: package.json
   checksum: 4e16bc9e214c18ea8ee2bb7562e6a468249739afb1474aed7b101c4a81a30d03
 - filename: test/integration/secrets-set.test.ts
-  checksum: 9cd9306f409eaa5db44900de533c199a07a250abd020755c71f9df4ac6995908
+  checksum: f01f5673125c48f537c593b9f8f3a728b6b16b42a3253c01f44558176ef48d89
 - filename: src/secrets/secret.rules.test.ts
   checksum: d0d344922623813219a58071da742cbf9b4534aa62d800e46b903c73b84e94f8
 - filename: src/commands/launch/secrets/set.ts
@@ -502,11 +502,11 @@ fileignoreconfig:
 - filename: src/commands/launch/secrets/set.test.ts
   checksum: 5288caf29722c4ef1bdcbd699b8720c94a0ede30f83c6c2fc89384e3d614093b
 - filename: src/secrets/secret.value.test.ts
-  checksum: 917ef36ad034b4d19993db92eace4a92c4b8f05404933183768a9cc18ac90ac5
+  checksum: 45595232451e8ec37231d17bead70b5bdd4aff44f0fa39f99d45a6c903c4dd93
 - filename: src/secrets/secret.set.test.ts
   checksum: 80b6b9c56280b6f5cb4be03fffd05b0421ea558997d9295ddde50b773f22b05f
 - filename: test/integration/secrets-unset.test.ts
-  checksum: 1bbcadaa6b32fd33ba1a215cc5aa6e932fc408da78b40b9405d965fe6f250937
+  checksum: ed2f37b50516817ef70e2dc11ed4d801374ade1f3588fa2320f71cac5033448e
 - filename: src/secrets/secret.unset.ts
   checksum: 597d7797c24716f443092fd40d077232ec1d9b2118707ee3aca453bacf38fa86
 - filename: src/commands/launch/secrets/unset.ts
