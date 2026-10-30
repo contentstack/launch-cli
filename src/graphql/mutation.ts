@@ -85,8 +85,35 @@ const rollbackDeploymentMutation: DocumentNode = gql`
   }
 `;
 
+const addEnvironmentSecretMutation: DocumentNode = gql`
+  mutation AddEnvironmentSecret($environment: EnvironmentInput!, $secret: EnvironmentSecretInput!) {
+    addEnvironmentSecret(environment: $environment, secret: $secret) {
+      key
+      updatedAt
+    }
+  }
+`;
+
+const refreshEnvironmentSecretMutation: DocumentNode = gql`
+  mutation RefreshEnvironmentSecret($environment: EnvironmentInput!, $secret: EnvironmentSecretInput!) {
+    refreshEnvironmentSecret(environment: $environment, secret: $secret) {
+      key
+      updatedAt
+    }
+  }
+`;
+
+const deleteEnvironmentSecretMutation: DocumentNode = gql`
+  mutation DeleteEnvironmentSecret($environment: EnvironmentInput!, $secret: EnvironmentSecretKeyInput!) {
+    deleteEnvironmentSecret(environment: $environment, secret: $secret)
+  }
+`;
+
 export {
   importProjectMutation,
+  addEnvironmentSecretMutation,
+  refreshEnvironmentSecretMutation,
+  deleteEnvironmentSecretMutation,
   createDeploymentMutation,
   rollbackDeploymentMutation,
   createSignedUploadUrlMutation,

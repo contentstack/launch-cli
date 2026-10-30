@@ -50,6 +50,62 @@ export const environmentsResponse = (nodes: Record<string, any>[] = [environment
   },
 });
 
+export const SECRET_KEY = 'API_TOKEN';
+
+export const secretNode = (overrides: Record<string, any> = {}) => ({
+  __typename: 'EnvironmentSecret',
+  key: SECRET_KEY,
+  updatedAt: '2026-01-01T00:00:00.000Z',
+  ...overrides,
+});
+
+export const environmentSecretsResponse = (secrets: Record<string, any>[] = [secretNode()]) => ({
+  data: {
+    Environments: {
+      __typename: 'EnvironmentConnection',
+      edges: [
+        {
+          __typename: 'EnvironmentEdge',
+          node: { __typename: 'Environment', uid: ENVIRONMENT_UID, name: ENVIRONMENT_NAME, secrets },
+        },
+      ],
+    },
+  },
+});
+
+export const addEnvironmentSecretResponse = (key = SECRET_KEY) => ({
+  data: { addEnvironmentSecret: secretNode({ key }) },
+});
+
+export const refreshEnvironmentSecretResponse = (key = SECRET_KEY) => ({
+  data: { refreshEnvironmentSecret: secretNode({ key }) },
+});
+
+export const deleteEnvironmentSecretResponse = () => ({
+  data: { deleteEnvironmentSecret: true },
+});
+
+export const SECRET_ERROR_CODES = {
+  keyConflict: 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS.KEY.CONFLICT',
+  notFound: 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS.KEY.NOT_FOUND',
+  multiline: 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS.VALUE.MULTILINE',
+};
+
+export const secretsFormErrorResponse = (code: string, key = 'secret') => ({
+  errors: [
+    {
+      message: 'Bad request',
+      extensions: {
+        exception: { errorObject: { [key]: [{ code }] }, key, message: 'Bad request', messages: [code], status: 400 },
+      },
+    },
+  ],
+});
+
+export const secretsApiErrorResponse = (status: number, message = 'Request failed') => ({
+  errors: [{ message, extensions: { exception: { status } } }],
+});
+
 export const projectsResponse = (
   projects: { uid: string; name: string }[] = [{ uid: PROJECT_UID, name: PROJECT_NAME }],
 ) => ({
