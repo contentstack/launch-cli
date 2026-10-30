@@ -1,7 +1,8 @@
 import { isRecord } from '../core/values';
 import { assertArray } from '../transport/envelope';
 import type { RestApiClient, RestRequest } from '../transport/rest-client';
-import { SECRETS_ERROR_MESSAGES, asSecretsFailure } from './secrets.errors';
+import type { ErrorMessages } from '../transport/errors';
+import { SECRETS_ERROR_MESSAGES, asSecretsFailure, secretKeyMessages } from './secrets.errors';
 import type { Secret, SecretsParams } from './types';
 
 export * from './types';
@@ -21,9 +22,9 @@ function secretsPath({ project, environment }: SecretsParams): string {
 export class SecretsApi {
   constructor(private readonly client: RestApiClient) {}
 
-  private async request<T>(req: RestRequest): Promise<T> {
+  private async request<T>(req: RestRequest, messages: ErrorMessages = SECRETS_ERROR_MESSAGES): Promise<T> {
     try {
-      return await this.client.request<T>(req, SECRETS_ERROR_MESSAGES);
+      return await this.client.request<T>(req, messages);
     } catch (error) {
       throw asSecretsFailure(error);
     }
@@ -40,5 +41,35 @@ export class SecretsApi {
     assertArray(response, 'secrets', 'secret list');
 
     return (response as { secrets: unknown[] }).secrets.flatMap(secretOf);
+  }
+
+  async add(params: SecretsParams, key: string, value: string): Promise<Secret> {
+    const response = await this.request<unknown>(
+      {
+        method: 'POST',
+        path: secretsPath(params),
+        orgUid: params.org,
+        projectUid: params.project,
+        body: { key, value },
+      },
+      secretKeyMessages(key),
+    );
+
+    return secretOf(response)[0] ?? {};
+  }
+
+  async refresh(params: SecretsParams, key: string, value: string): Promise<Secret> {
+    const response = await this.request<unknown>(
+      {
+        method: 'PUT',
+        path: `${secretsPath(params)}/${encodeURIComponent(key)}`,
+        orgUid: params.org,
+        projectUid: params.project,
+        body: { value },
+      },
+      secretKeyMessages(key),
+    );
+
+    return secretOf(response)[0] ?? {};
   }
 }
