@@ -161,7 +161,7 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
     }
 
     if (printed === 0) {
-      this.ux.print(noServerLogsLine(startTime, endTime, outputIsTTY));
+      this.ux.print(noServerLogsLine(startTime, endTime, outputIsTTY, search));
     }
 
     if (resume.cursor !== undefined) {

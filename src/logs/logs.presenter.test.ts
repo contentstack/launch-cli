@@ -39,6 +39,16 @@ describe('logs presenter', () => {
     );
   });
 
+  it('names the search text when nothing in the window matched it', () => {
+    const start = Date.parse('2026-10-28T09:00:00.000Z');
+    const end = Date.parse('2026-10-28T10:00:00.000Z');
+
+    expect(noServerLogsLine(start, end, false, 'upstream timeout')).toBe(
+      'No server logs matched "upstream timeout" between 2026-10-28T09:00:00.000Z and 2026-10-28T10:00:00.000Z.',
+    );
+    expect(noServerLogsLine(start, end, true, 'x')).toBe(yellow(noServerLogsLine(start, end, false, 'x')));
+  });
+
   it('words the page cap notice in yellow on a terminal and plain on a pipe', () => {
     expect(serverLogsPageCapLine(false)).toBe('Stopped after 100 pages of server logs; more remain in this window.');
     expect(serverLogsPageCapLine(true)).toBe(yellow(serverLogsPageCapLine(false)));

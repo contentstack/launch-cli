@@ -292,6 +292,16 @@ describe('LogsGet', () => {
     ]);
   });
 
+  it('names the search in the empty server notice when nothing matched it', async () => {
+    const { command, lines } = commandUnderTest({ resolved: { 'log-type': 'server', search: 'timeout' } });
+
+    await command.run();
+
+    expect(lines).toEqual([
+      'No server logs matched "timeout" between 2026-10-28T11:00:00.000Z and 2026-10-28T12:00:00.000Z.',
+    ]);
+  });
+
   it('prints the 24 hour notice before the lines and sends the window as the user gave it', async () => {
     const serverLogs = [{ timestamp: '2026-10-27T11:00:00.000Z', message: 'old' }];
     const { command, lines, walkCalls } = commandUnderTest({

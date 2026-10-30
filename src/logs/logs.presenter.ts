@@ -55,8 +55,10 @@ export function noDeploymentLogsLine(deployment: string, outputIsTTY: boolean): 
   return styled(`No deployment logs found for deployment ${deployment}.`, 'yellow', outputIsTTY);
 }
 
-export function noServerLogsLine(startTime: number, endTime: number, outputIsTTY: boolean): string {
-  return styled(`No server logs found between ${isoOf(startTime)} and ${isoOf(endTime)}.`, 'yellow', outputIsTTY);
+export function noServerLogsLine(startTime: number, endTime: number, outputIsTTY: boolean, search?: string): string {
+  const found = search === undefined ? 'found' : `matched "${search}"`;
+
+  return styled(`No server logs ${found} between ${isoOf(startTime)} and ${isoOf(endTime)}.`, 'yellow', outputIsTTY);
 }
 
 export function serverLogsPageCapLine(outputIsTTY: boolean): string {

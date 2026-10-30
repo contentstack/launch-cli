@@ -1,8 +1,8 @@
 fileignoreconfig:
 - filename: test/integration/logs-get.test.ts
-  checksum: 7822d714f476fa4ee588f1b602a7c9e69b8843cc60c09b4ae14cbe4eb2b4ad3b
+  checksum: fddd8566da6bd9d574005825167bd3ae0d053abb09a49bf49d4566c70fec5639
 - filename: src/commands/launch/logs/get.test.ts
-  checksum: 5ee3d8ba6b014b3a9ac558a750a9a58782bb679d32d30b621e41f977dcc98a0a
+  checksum: b1184a9ae3845f3a1f70c73d87c1ad287ba8277d190a0783820626a3a4cf60b3
 - filename: src/core/failure.test.ts
   checksum: 242d43885d1e3ef46edf1e347899a90549ebf95ec6827426746852f7a6dfc418
 - filename: test/integration/retired-commands.test.ts
@@ -228,7 +228,7 @@ fileignoreconfig:
   allowed_patterns:
     - "FlagKey"
 - filename: src/resources.test.ts
-  checksum: 05a4c54c69bfff1042fa0df038c46881830e3d7014777c87919c5c0739974f45
+  checksum: 5966384474a44b82bde8cf71e9c7d8c2e6c3b73e260a957e4691b20d6970b534
   allowed_patterns:
     - "a project name passed on argv to the project resolver"
     - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
