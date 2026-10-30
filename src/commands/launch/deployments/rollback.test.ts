@@ -57,7 +57,7 @@ function commandUnderTest(harness: Harness) {
               throw harness.getFails;
             }
 
-            return { uid: UID };
+            return { uid: UID, status: 'LIVE' };
           },
           rollback: async (params: unknown) => {
             calls.push('rollback');
@@ -85,12 +85,18 @@ describe('launch:deployments:rollback', () => {
     await command.run();
 
     expect(inquired).toEqual([{ type: 'confirm', name: 'confirm', message: QUESTION, default: false }]);
-    expect(calls).toEqual(['get', 'rollback']);
-    expect(got).toEqual([{ org: 'org1', project: 'proj1', environment: 'env1', deployment: UID }]);
+    expect(calls).toEqual(['get', 'rollback', 'get']);
+    expect(got).toEqual([
+      { org: 'org1', project: 'proj1', environment: 'env1', deployment: UID },
+      { org: 'org1', project: 'proj1', environment: 'env1', deployment: UID },
+    ]);
     expect(rolledBack).toEqual([
       { org: 'org1', project: 'proj1', environment: 'env1', deployment: UID, reason: 'bad release' },
     ]);
-    expect(lines).toEqual([`✔ Environment rolled back to deployment "${UID}" successfully.`]);
+    expect(lines).toEqual([
+      `Rollback to deployment "${UID}" started.`,
+      `✔ Environment rolled back to deployment "${UID}" successfully.`,
+    ]);
   });
 
   it('skips the prompt when --yes was passed and colours the success line when stdout is a terminal', async () => {
@@ -99,8 +105,11 @@ describe('launch:deployments:rollback', () => {
     await command.run();
 
     expect(inquired).toEqual([]);
-    expect(calls).toEqual(['get', 'rollback']);
-    expect(lines).toEqual([`\u001b[32m✔ Environment rolled back to deployment "${UID}" successfully.\u001b[39m`]);
+    expect(calls).toEqual(['get', 'rollback', 'get']);
+    expect(lines).toEqual([
+      `Rollback to deployment "${UID}" started.`,
+      `\u001b[32m✔ Environment rolled back to deployment "${UID}" successfully.\u001b[39m`,
+    ]);
   });
 
   it('hands an absent reason to the api as undefined', async () => {

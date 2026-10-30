@@ -47,11 +47,23 @@ function withoutCurrent(deployments: IdentifiedDeployment[]): IdentifiedDeployme
   return deployments.filter((_deployment, index) => index !== current);
 }
 
+function numbered(deployment: IdentifiedDeployment): string | undefined {
+  const number = deployment.deploymentNumber;
+
+  if (number === undefined || number === null) {
+    return undefined;
+  }
+
+  const text = printable(String(number));
+
+  return text ? `#${text}` : undefined;
+}
+
 export function deploymentChoice(deployment: IdentifiedDeployment): Choice {
   const status = printable(deployment.status) || '-';
   const detail = when(deployment);
 
-  const parts = [deployment.uid, status, detail].filter((part) => part !== undefined);
+  const parts = [numbered(deployment), deployment.uid, status, detail].filter((part) => part !== undefined);
 
   return { name: parts.join('  '), value: deployment.uid };
 }

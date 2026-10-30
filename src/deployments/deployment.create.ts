@@ -2,6 +2,7 @@ import { UsageError } from '../core/errors';
 import type { InterruptSource } from '../core/interruptible-ux';
 import type { ServiceContext } from '../core/service-context';
 import { asSentence, messageOf } from '../core/values';
+import { NoUploadDirectoryError } from '../uploads/upload.errors';
 import { FolderUploader } from '../uploads/upload.folder';
 import { DeploymentUnsuccessfulError, DeploymentWaitInterruptedError } from './deployment.errors';
 import type { DeploymentScope as FollowedDeployment } from './deployment.follower';
@@ -46,6 +47,13 @@ function lastUploadOnGitHub(): UsageError {
 function commitOnFileUpload(): UsageError {
   return new UsageError(
     '--commit applies only to GitHub projects. Use --last-upload to redeploy the last uploaded bundle.',
+  );
+}
+
+function noFilesToDeploy(dataDir: string): UsageError {
+  return new UsageError(
+    `No files to upload were found in "${dataDir}". ` +
+      'Use --data-dir to point to your project folder, or --last-upload to redeploy the last upload.',
   );
 }
 
@@ -96,9 +104,13 @@ export class DeploymentCreator {
       return {};
     }
 
-    const uploader = new FolderUploader(this.services);
+    try {
+      const uploader = new FolderUploader(this.services);
 
-    return { uploadUid: await uploader.upload(scope, request.dataDir, [request.configPath]) };
+      return { uploadUid: await uploader.upload(scope, request.dataDir, [request.configPath]) };
+    } catch (error) {
+      throw error instanceof NoUploadDirectoryError ? noFilesToDeploy(request.dataDir) : error;
+    }
   }
 
   private async follow(scope: DeploymentScope, deployment: IdentifiedDeployment): Promise<void> {

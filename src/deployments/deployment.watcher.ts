@@ -27,6 +27,7 @@ export interface DeploymentWatchDeps extends WatchTiming {
   loader: Loader;
   outputIsTTY: boolean;
   stop?: AbortSignal;
+  until?(deployment: Deployment): boolean;
 }
 
 export type DeploymentOutcomeKind = 'success' | 'failure' | 'timed-out';
@@ -100,6 +101,10 @@ async function freshLogs(deps: DeploymentWatchDeps, tail: LogTail): Promise<Depl
   }
 }
 
+function untilKind(until: (deployment: Deployment) => boolean, deployment: Deployment): 'success' | 'in-flight' {
+  return until(deployment) ? 'success' : 'in-flight';
+}
+
 async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
   const backoff = new RetryPolicy({ retryDelayMs: deps.pollDelayMs });
   const deadline = deps.now() + deps.timeoutMs;
@@ -131,7 +136,7 @@ async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
     deps.stop?.throwIfAborted();
 
     const status = normalizeStatus(deployment.status);
-    const kind = classifyStatus(deployment.status);
+    const kind = deps.until === undefined ? classifyStatus(deployment.status) : untilKind(deps.until, deployment);
     const terminal = kind === 'success' || kind === 'failure';
 
     for (const log of await freshLogs(deps, tail)) {

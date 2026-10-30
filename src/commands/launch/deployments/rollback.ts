@@ -8,6 +8,8 @@ import {
 } from '../../../deployments/deployment.presenter';
 import { ALL_DEPLOYMENTS } from '../../../deployments/deployment.prompt';
 import { fetchDeployment } from '../../../deployments/deployment.resolver';
+import { DeploymentRollback } from '../../../deployments/deployment.rollback';
+import { defaultWatchTiming } from '../../../deployments/deployment.watcher';
 
 const rollbackInputs = inputs({
   org: { required: true },
@@ -44,7 +46,7 @@ export default class DeploymentsRollback extends LaunchCommand<typeof rollbackIn
       this.exit(EXIT_CANCELLED);
     }
 
-    await this.services.api.deployments.rollback({ ...scope, deployment, reason });
+    await new DeploymentRollback(this.services, defaultWatchTiming()).rollback({ ...scope, deployment, reason });
 
     this.ux.print(rolledBackLine(deployment, outputIsTTY));
   }

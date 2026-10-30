@@ -808,3 +808,53 @@ describe('deployment wait loop stopped from outside', () => {
     await expect(watchDeployment({ ...deps, sleep: () => Promise.reject(broken) })).rejects.toBe(broken);
   });
 });
+
+describe('deployment wait loop with an until condition', () => {
+  const isLive = (deployment: Deployment): boolean => deployment.status === 'LIVE';
+
+  it('keeps waiting through statuses that would otherwise end the wait until the condition holds', async () => {
+    const { deps, slept, pollCount } = harness(['ARCHIVED', 'FAILED', 'DEPLOYED', 'LIVE']);
+
+    const outcome = await watchDeployment({ ...deps, until: isLive });
+
+    expect(outcome.kind).toBe('success');
+    expect(outcome.status).toBe('LIVE');
+    expect(pollCount()).toBe(4);
+    expect(slept).toEqual([1000, 2000, 3000]);
+  });
+
+  it('hands every polled deployment to the condition', async () => {
+    const { deps } = harness(['ARCHIVED', 'LIVE']);
+    const seen: (string | undefined)[] = [];
+
+    await watchDeployment({
+      ...deps,
+      until: (deployment) => {
+        seen.push(deployment.status);
+        return isLive(deployment);
+      },
+    });
+
+    expect(seen).toEqual(['ARCHIVED', 'LIVE']);
+  });
+
+  it('reports a timeout with the last status when the condition never holds', async () => {
+    const { deps, slept, pollCount } = harness(['ARCHIVED'], { timeoutMs: 5000 });
+
+    const outcome = await watchDeployment({ ...deps, until: isLive });
+
+    expect(outcome.kind).toBe('timed-out');
+    expect(outcome.status).toBe('ARCHIVED');
+    expect(slept).toEqual([1000, 2000]);
+    expect(pollCount()).toBe(3);
+  });
+
+  it('propagates a poll failure that keeps recurring', async () => {
+    const outage = new Error('500 Internal Server Error');
+    const { deps, pollCount } = failingHarness([outage]);
+
+    await expect(watchDeployment({ ...deps, until: isLive })).rejects.toThrow('500 Internal Server Error');
+
+    expect(pollCount()).toBe(DEPLOYMENT_MAX_POLL_ERRORS);
+  });
+});

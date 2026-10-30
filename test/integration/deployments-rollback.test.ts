@@ -5,6 +5,7 @@ import type { Interfaces } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
+import * as watcher from '../../src/deployments/deployment.watcher';
 import getFixture from '../fixtures/deployment-get.json';
 import notFoundFixture from '../fixtures/deployment-not-found.json';
 import { CTRL_C, answerPrompts, onTerminal, pretendTerminal } from '../support/terminal';
@@ -34,6 +35,10 @@ const CONFIG: Record<string, unknown> = {
 const DEPLOYMENTS = `/manage/projects/${PROJECT_UID}/environments/${ENV_UID}/deployments`;
 const QUESTION = `Are you sure you want to roll back this environment to deployment "${DEPLOYMENT_UID}"?`;
 const POST_PENDING = `POST ${LAUNCH_HUB_URL}:443${DEPLOYMENTS}/rollback`;
+
+const realWatchTiming = watcher.defaultWatchTiming;
+const STARTED = (uid: string): string => `Rollback to deployment "${uid}" started.\n`;
+const SUCCESS = (uid: string): string => `✔ Environment rolled back to deployment "${uid}" successfully.\n`;
 
 let config: Interfaces.Config;
 let onWire: string[];
@@ -73,7 +78,7 @@ const QUEUED_UID = 'f2e2d3c4b5a60718293a4b5c';
 const LISTED = {
   pagination: { count: 4, limit: 100 },
   deployments: [
-    { uid: RUNNING_UID, status: 'DEPLOYING', commitHash: '1234567aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+    { uid: RUNNING_UID, status: 'DEPLOYING', deploymentNumber: 5, commitHash: '1234567aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
     { uid: QUEUED_UID, status: 'QUEUED' },
     { uid: DEPLOYMENT_UID, status: 'LIVE', commitHash: '9fceb02d0ae598e95dc970b74767f19372d61af8' },
     { uid: OLDER_UID, status: 'FAILED', createdAt: '2025-11-06T07:39:19.230Z' },
@@ -84,6 +89,12 @@ function listing(page: unknown = LISTED): nock.Scope {
   projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
 
   return hub().get(DEPLOYMENTS).query({ limit: 100, skip: 0, rollbackEligible: 'true' }).reply(200, page as nock.Body);
+}
+
+function followUp(uid: string, statuses: string[]): nock.Scope[] {
+  return statuses.map((status) =>
+    hub().get(`${DEPLOYMENTS}/${uid}`).reply(200, { deployment: { uid, status } }),
+  );
 }
 
 function lookup(): nock.Scope {
@@ -104,6 +115,10 @@ describe('integration: launch:deployments:rollback on the wire', () => {
     routeConsoleLogToStdout();
     jest.spyOn(configHandler, 'get').mockImplementation((key: string) => CONFIG[key]);
     jest.spyOn(authHandler, 'compareOAuthExpiry').mockResolvedValue(undefined);
+    jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => ({
+      ...realWatchTiming(),
+      sleep: async () => undefined,
+    }));
   });
 
   afterEach(() => {
@@ -127,6 +142,8 @@ describe('integration: launch:deployments:rollback on the wire', () => {
       .matchHeader('content-type', /application\/json/)
       .reply(200, { deployment: getFixture.deployment }, undefined);
     rollback.on('replied', () => order.push('rollback'));
+    const [live] = followUp(DEPLOYMENT_UID, ['LIVE']);
+    live.on('replied', () => order.push('poll'));
 
     const { error, stdout } = await runCommand(
       args('--deployment', DEPLOYMENT_UID, '--reason', '"bad release"', '--yes'),
@@ -134,10 +151,10 @@ describe('integration: launch:deployments:rollback on the wire', () => {
     );
 
     expect(error).toBeUndefined();
-    expect(order).toEqual(['lookup', 'rollback']);
+    expect(order).toEqual(['lookup', 'rollback', 'poll']);
     expect(rollback.isDone()).toBe(true);
     expect(prompts.messages).toEqual([]);
-    expect(stdout).toBe(`✔ Environment rolled back to deployment "${DEPLOYMENT_UID}" successfully.\n`);
+    expect(stdout).toBe(`${STARTED(DEPLOYMENT_UID)}${SUCCESS(DEPLOYMENT_UID)}`);
     expect(onWire).toEqual([]);
   });
 
@@ -152,6 +169,7 @@ describe('integration: launch:deployments:rollback on the wire', () => {
           return true;
         })
         .reply(200, {});
+      followUp(DEPLOYMENT_UID, ['LIVE']);
 
       const { error } = await runCommand(args('--deployment', DEPLOYMENT_UID, ...extra, '--yes'), config);
 
@@ -224,6 +242,7 @@ describe('integration: launch:deployments:rollback on the wire', () => {
   it('posts exactly once and exits 0 when the user says yes at the prompt', async () => {
     const found = lookup();
     const rollback = hub().post(`${DEPLOYMENTS}/rollback`).once().reply(200, {});
+    followUp(DEPLOYMENT_UID, ['LIVE']);
     const prompts = answerPrompts({ [QUESTION]: true });
 
     const { error, stdout } = await onTerminal(() => runCommand(args('--deployment', DEPLOYMENT_UID), config));
@@ -232,7 +251,91 @@ describe('integration: launch:deployments:rollback on the wire', () => {
     expect(prompts.messages).toEqual([QUESTION]);
     expect(found.isDone()).toBe(true);
     expect(rollback.isDone()).toBe(true);
-    expect(stdout).toBe(`✔ Environment rolled back to deployment "${DEPLOYMENT_UID}" successfully.\n`);
+    expect(stdout).toBe(`${STARTED(DEPLOYMENT_UID)}${SUCCESS(DEPLOYMENT_UID)}`);
+    expect(onWire).toEqual([]);
+  });
+
+  it('waits for the target to become LIVE, whatever status it starts in, and only then reports the success', async () => {
+    lookup();
+    const rollback = hub().post(`${DEPLOYMENTS}/rollback`).reply(200, {});
+    const polls = followUp(DEPLOYMENT_UID, ['ARCHIVED', 'DEPLOYED', 'LIVE']);
+
+    const { error, stdout } = await runCommand(args('--deployment', DEPLOYMENT_UID, '--yes'), config);
+
+    expect(error).toBeUndefined();
+    expect(rollback.isDone()).toBe(true);
+    expect(polls.every((scope) => scope.isDone())).toBe(true);
+    expect(stdout).toBe(`${STARTED(DEPLOYMENT_UID)}${SUCCESS(DEPLOYMENT_UID)}`);
+    expect(onWire).toEqual([]);
+  });
+
+  it('exits 1 pointing at deployments:get, and never claims success, when the target is still not LIVE as the wait ends', async () => {
+    jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => ({
+      ...realWatchTiming(),
+      sleep: async () => undefined,
+      timeoutMs: 1,
+    }));
+    lookup();
+    hub().post(`${DEPLOYMENTS}/rollback`).reply(200, {});
+    followUp(DEPLOYMENT_UID, ['ARCHIVED']);
+
+    const { error, stdout } = await runCommand(args('--deployment', DEPLOYMENT_UID, '--yes'), config);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.message).toBe(
+      `Deployment "${DEPLOYMENT_UID}" was still ARCHIVED when the CLI stopped waiting. ` +
+        `Run csdx launch:deployments:get --org ${ORG_UID} --project ${PROJECT_UID} --env ${ENV_UID} ` +
+        `--deployment ${DEPLOYMENT_UID} to check whether the rollback completed.`,
+    );
+    expect(stdout).toBe(STARTED(DEPLOYMENT_UID));
+    expect(stdout).not.toContain('successfully');
+    expect(onWire).toEqual([]);
+  });
+
+  it('exits 1 pointing at deployments:get, and never claims success, when the status poll keeps failing', async () => {
+    lookup();
+    hub().post(`${DEPLOYMENTS}/rollback`).reply(200, {});
+    const polls = [1, 2, 3].map(() =>
+      hub()
+        .get(`${DEPLOYMENTS}/${DEPLOYMENT_UID}`)
+        .reply(500, { errors: [{ code: 'launch.SERVER.ERROR', message: 'boom' }], status: 500 }),
+    );
+
+    const { error, stdout } = await runCommand(args('--deployment', DEPLOYMENT_UID, '--yes'), config);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.message).toContain(`The rollback to deployment "${DEPLOYMENT_UID}" could not be confirmed`);
+    expect(error?.message).toContain(`csdx launch:deployments:get --org ${ORG_UID}`);
+    expect(error?.message).toContain(`--deployment ${DEPLOYMENT_UID}`);
+    expect(polls.every((scope) => scope.isDone())).toBe(true);
+    expect(stdout).toBe(STARTED(DEPLOYMENT_UID));
+    expect(stdout).not.toContain('successfully');
+    expect(onWire).toEqual([]);
+  });
+
+  it('stops waiting on Ctrl-C, exits 3 saying the rollback continues on Launch, and never claims success', async () => {
+    jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => ({
+      ...realWatchTiming(),
+      sleep: async () => {
+        process.emit('SIGINT');
+      },
+    }));
+    lookup();
+    hub().post(`${DEPLOYMENTS}/rollback`).reply(200, {});
+    const [first, second] = followUp(DEPLOYMENT_UID, ['ARCHIVED', 'LIVE']);
+
+    const { error, stdout } = await runCommand(args('--deployment', DEPLOYMENT_UID, '--yes'), config);
+
+    expect(error?.oclif?.exit).toBe(3);
+    expect(error?.message).toBe(
+      `Stopped waiting. The rollback to deployment "${DEPLOYMENT_UID}" was not cancelled and continues on Launch. ` +
+        `Check it with csdx launch:deployments:get --org ${ORG_UID} --project ${PROJECT_UID} --env ${ENV_UID} ` +
+        `--deployment ${DEPLOYMENT_UID}.`,
+    );
+    expect(first.isDone()).toBe(true);
+    expect(second.isDone()).toBe(false);
+    expect(stdout).toBe(STARTED(DEPLOYMENT_UID));
+    expect(process.listenerCount('SIGINT')).toBe(0);
     expect(onWire).toEqual([]);
   });
 
@@ -286,6 +389,7 @@ describe('integration: launch:deployments:rollback on the wire', () => {
     projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
     const found = hub().get(`${DEPLOYMENTS}/${OLDER_UID}`).reply(200, { deployment: { uid: OLDER_UID, status: 'FAILED' } });
     const rollback = hub().post(`${DEPLOYMENTS}/rollback`, { deployment: OLDER_UID }).reply(200, {});
+    followUp(OLDER_UID, ['LIVE']);
     const question = `Are you sure you want to roll back this environment to deployment "${OLDER_UID}"?`;
     const prompts = answerPrompts({ 'Choose a deployment for rollback': OLDER_UID, [question]: true });
 
@@ -296,7 +400,7 @@ describe('integration: launch:deployments:rollback on the wire', () => {
     expect(prompts.payloads[0]).toMatchObject({
       type: 'list',
       choices: [
-        { name: `${RUNNING_UID}  DEPLOYING  1234567`, value: RUNNING_UID },
+        { name: `#5  ${RUNNING_UID}  DEPLOYING  1234567`, value: RUNNING_UID },
         { name: `${QUEUED_UID}  QUEUED`, value: QUEUED_UID },
         { name: `${OLDER_UID}  FAILED  2025-11-06T07:39:19.230Z`, value: OLDER_UID },
       ],
@@ -304,7 +408,7 @@ describe('integration: launch:deployments:rollback on the wire', () => {
     expect(listed.isDone()).toBe(true);
     expect(found.isDone()).toBe(true);
     expect(rollback.isDone()).toBe(true);
-    expect(stdout).toBe(`✔ Environment rolled back to deployment "${OLDER_UID}" successfully.\n`);
+    expect(stdout).toBe(`${STARTED(OLDER_UID)}${SUCCESS(OLDER_UID)}`);
     expect(onWire).toEqual([]);
   });
 
@@ -312,6 +416,7 @@ describe('integration: launch:deployments:rollback on the wire', () => {
     lookup();
     const listed = hub().get(DEPLOYMENTS).query({ limit: 100, skip: 0, rollbackEligible: 'true' }).reply(200, LISTED);
     hub().post(`${DEPLOYMENTS}/rollback`).reply(200, {});
+    followUp(DEPLOYMENT_UID, ['LIVE']);
     const prompts = answerPrompts({ [QUESTION]: true });
 
     const { error } = await onTerminal(() => runCommand(args('--deployment', DEPLOYMENT_UID), config));

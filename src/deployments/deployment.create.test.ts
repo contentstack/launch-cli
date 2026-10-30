@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -275,7 +276,7 @@ describe('DeploymentCreator on a FileUpload project', () => {
     expect(printed).toEqual([]);
   });
 
-  it('refuses a missing project directory with the one shared wording, naming the path and --data-dir', async () => {
+  it('refuses a missing project directory naming the path and both ways out, --data-dir and --last-upload', async () => {
     const { creator, created, signedUrlCalls } = harness(FILE);
 
     const failure = await failureOf(creator.create(BASE));
@@ -283,8 +284,25 @@ describe('DeploymentCreator on a FileUpload project', () => {
     expect(failure).toBeInstanceOf(UsageError);
     expect((failure as LaunchError).exitCode).toBe(2);
     expect(failure.message).toBe(
-      `No files to upload were found in "${MISSING_DIR}". Pass your project folder with --data-dir.`,
+      `No files to upload were found in "${MISSING_DIR}". ` +
+        'Use --data-dir to point to your project folder, or --last-upload to redeploy the last upload.',
     );
+    expect(created).toEqual([]);
+    expect(signedUrlCalls).toEqual([]);
+  });
+});
+
+describe('DeploymentCreator on a FileUpload project whose archive is refused for another reason', () => {
+  it('keeps that error instead of rewording it as a missing directory', async () => {
+    const { creator, created, signedUrlCalls } = harness({ projectType: 'FILEUPLOAD' });
+    const dataDir = mkdtempSync(join(tmpdir(), 'launch-tiny-dir-'));
+    writeFileSync(join(dataDir, 'index.html'), 'x');
+
+    const failure = await failureOf(creator.create({ ...BASE, dataDir }));
+
+    expect(failure).toBeInstanceOf(UsageError);
+    expect(failure.message).not.toContain('No files to upload');
+    expect(failure.message).not.toContain('--last-upload');
     expect(created).toEqual([]);
     expect(signedUrlCalls).toEqual([]);
   });

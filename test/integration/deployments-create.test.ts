@@ -301,7 +301,7 @@ describe('integration: launch:deployments:create on the wire', () => {
     expect(onWire).toEqual([]);
   });
 
-  it('T27: refuses a missing project directory with exit 2, naming the path and --data-dir, and sends nothing', async () => {
+  it('T27: refuses a missing project directory with exit 2, naming the path, --data-dir and --last-upload, and sends nothing', async () => {
     fileProject();
     const create = captureCreate();
     const signed = signedUpload();
@@ -309,9 +309,9 @@ describe('integration: launch:deployments:create on the wire', () => {
     const { error } = await runCommand(createArgs('--data-dir', missingDir), config);
 
     expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toBe(
-      `No files to upload were found in "${missingDir}". Pass your project folder with --data-dir.`,
-    );
+    expect(error?.message).toContain(`"${missingDir}"`);
+    expect(error?.message).toContain('--data-dir');
+    expect(error?.message).toContain('--last-upload');
     expect(create.scope.isDone()).toBe(false);
     expect(signed.scope.isDone()).toBe(false);
     expect(onWire).toEqual([]);

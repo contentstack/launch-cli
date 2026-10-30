@@ -263,4 +263,21 @@ describe('promptForDeployment', () => {
     );
     expect(deploymentChoice({ uid: UID_A, status: 'LIVE', createdAt: '\u0007' }).name).toBe(`${UID_A}  LIVE`);
   });
+
+  it('puts the deployment number in front of the uid, keeping zero and refusing absent, null and blank values', () => {
+    expect(deploymentChoice({ uid: UID_A, status: 'LIVE', deploymentNumber: 12 }).name).toBe(`#12  ${UID_A}  LIVE`);
+    expect(deploymentChoice({ uid: UID_A, status: 'LIVE', deploymentNumber: 0 }).name).toBe(`#0  ${UID_A}  LIVE`);
+    expect(deploymentChoice({ uid: UID_A, status: 'LIVE' }).name).toBe(`${UID_A}  LIVE`);
+    expect(deploymentChoice({ uid: UID_A, status: 'LIVE', deploymentNumber: null as never }).name).toBe(`${UID_A}  LIVE`);
+    expect(deploymentChoice({ uid: UID_A, status: 'LIVE', deploymentNumber: '  ' as never }).name).toBe(
+      `${UID_A}  LIVE`,
+    );
+    expect(deploymentChoice({ uid: UID_A, status: 'LIVE', deploymentNumber: 12 }).value).toBe(UID_A);
+  });
+
+  it('never lets a control character in the deployment number reach the label', () => {
+    expect(deploymentChoice({ uid: UID_A, status: 'LIVE', deploymentNumber: '7\u001b[31m\r\n8' as never }).name).toBe(
+      `#7 8  ${UID_A}  LIVE`,
+    );
+  });
 });

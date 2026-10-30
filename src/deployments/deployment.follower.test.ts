@@ -5,7 +5,7 @@ import type { WatchTiming } from './deployment.watcher';
 
 const SCOPE = { org: 'org1', project: 'p1', environment: 'e1', deployment: 'd1' };
 
-function harness(options: { withoutOpenUrl?: boolean } = {}) {
+function harness(options: { withoutOpenUrl?: boolean; statuses?: string[] } = {}) {
   const timeline: string[] = [];
   const polled: unknown[] = [];
   const logged: unknown[] = [];
@@ -14,7 +14,8 @@ function harness(options: { withoutOpenUrl?: boolean } = {}) {
     deployments: {
       get: async (params: unknown) => {
         polled.push(params);
-        return { uid: 'd1', status: 'LIVE' };
+        const statuses = options.statuses ?? ['LIVE'];
+        return { uid: 'd1', status: statuses[Math.min(polled.length, statuses.length) - 1] };
       },
     },
     deploymentLogs: {
@@ -55,6 +56,29 @@ describe('DeploymentFollower.watch', () => {
     expect(outcome).toEqual(expect.objectContaining({ kind: 'success', status: 'LIVE' }));
     expect(polled).toEqual([SCOPE]);
     expect(logged).toEqual([{ ...SCOPE, timestamp: '1970-01-01T00:00:00.000Z' }]);
+  });
+});
+
+describe('DeploymentFollower.waitUntilLive', () => {
+  it('polls the target in the scope it was given until it is LIVE, whatever it starts as, and reads no build logs', async () => {
+    const { follower, polled, logged, timeline } = harness({ statuses: ['ARCHIVED', 'DEPLOYED', 'LIVE'] });
+
+    const outcome = await follower.waitUntilLive(SCOPE);
+
+    expect(outcome).toEqual(expect.objectContaining({ kind: 'success', status: 'LIVE' }));
+    expect(polled).toEqual([SCOPE, SCOPE, SCOPE]);
+    expect(logged).toEqual([]);
+    expect(timeline).toEqual(['sleep 1000', 'sleep 2000']);
+  });
+
+  it('hands the stop signal to the wait so an already stopped wait never polls', async () => {
+    const { follower, polled } = harness();
+    const reason = new Error('interrupted');
+    const controller = new AbortController();
+    controller.abort(reason);
+
+    await expect(follower.waitUntilLive(SCOPE, controller.signal)).rejects.toBe(reason);
+    expect(polled).toEqual([]);
   });
 });
 

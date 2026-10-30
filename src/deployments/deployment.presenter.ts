@@ -191,6 +191,44 @@ export function firstDeploymentFailureMessage(failure: FirstDeploymentFailure): 
   );
 }
 
+export function rollbackStartedLine(uid: string): string {
+  return `Rollback to deployment "${uid}" started.`;
+}
+
+export interface RollbackFollowUp {
+  org: string;
+  project: string;
+  environment: string;
+  deployment: string;
+}
+
+function checkRollbackCommand(followUp: RollbackFollowUp): string {
+  return (
+    `csdx launch:deployments:get --org ${followUp.org} --project ${followUp.project} ` +
+    `--env ${followUp.environment} --deployment ${followUp.deployment}`
+  );
+}
+
+export function rollbackInterruptedMessage(followUp: RollbackFollowUp): string {
+  return (
+    `Stopped waiting. The rollback to deployment "${followUp.deployment}" was not cancelled and continues on Launch. ` +
+    `Check it with ${checkRollbackCommand(followUp)}.`
+  );
+}
+
+export function rollbackUnconfirmedMessage(
+  followUp: RollbackFollowUp,
+  result: { status: string; reason?: string },
+): string {
+  const check = `Run ${checkRollbackCommand(followUp)} to check whether the rollback completed.`;
+
+  if (result.reason !== undefined) {
+    return `The rollback to deployment "${followUp.deployment}" could not be confirmed: ${result.reason} ${check}`;
+  }
+
+  return `Deployment "${followUp.deployment}" was still ${result.status} when the CLI stopped waiting. ${check}`;
+}
+
 export function deploymentRollbackQuestion(uid: string): string {
   return `Are you sure you want to roll back this environment to deployment "${uid}"?`;
 }
