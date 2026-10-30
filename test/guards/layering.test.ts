@@ -20,6 +20,7 @@ const RESOURCE_EDGES: Record<string, string[]> = {
   stacks: [],
   variables: ['environments', 'stacks'],
   cache: [],
+  logs: ['deployments'],
   site: ['deployments', 'environments'],
 };
 
@@ -152,6 +153,23 @@ describe('layering between resources', () => {
     );
 
     expect([...new Set(reachedByCommands)].sort()).toEqual(['deployments', 'environments', 'variables']);
+  });
+
+  it('records the one edge the logs resource and its command really use, and no others', () => {
+    expect(RESOURCE_EDGES.logs).toEqual(['deployments']);
+
+    expect([...new Set(sourceFilesIn('logs').flatMap((path) => crossResourceEdges(path)))].sort()).toEqual([
+      'deployments',
+    ]);
+
+    const commandFiles = filesUnder('commands/launch/logs', true).filter((path) => !path.endsWith('.test.ts'));
+    const reachedByCommands = commandFiles.flatMap((path) =>
+      importedPaths(path)
+        .map((specifier) => resourceOf(specifier, directoryOf(path)))
+        .filter((target): target is string => target !== undefined && target !== 'logs'),
+    );
+
+    expect([...new Set(reachedByCommands)].sort()).toEqual(['deployments']);
   });
 
   it('reports a disallowed edge rather than passing vacuously', () => {

@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 
 import { CancelledError } from './errors';
-import { cancelOnInterrupt, holdEventLoop } from './interruptible-ux';
+import { cancelOnInterrupt, holdEventLoop, onInterrupt } from './interruptible-ux';
 import type { UxLike } from './prompt';
 
 function pendingUx(): { ux: UxLike; payloads: unknown[]; printed: string[]; settle: (outcome: { value?: unknown; error?: Error }) => void } {
@@ -167,5 +167,75 @@ describe('holdEventLoop', () => {
 
     expect(during).toBe(before + 1);
     expect(activeTimers()).toBe(before);
+  });
+});
+
+describe('onInterrupt', () => {
+  it('runs the listener on Ctrl-C once and stops listening when released', async () => {
+    const signals = new EventEmitter();
+    const calls: string[] = [];
+
+    const release = onInterrupt(() => calls.push('interrupted'), signals);
+    const attached = signals.listenerCount('SIGINT');
+    signals.emit('SIGINT');
+    await new Promise((done) => setImmediate(done));
+    signals.emit('SIGINT');
+
+    expect(attached).toBe(1);
+    expect(calls).toEqual(['interrupted']);
+    expect(signals.listenerCount('SIGINT')).toBe(0);
+    release();
+  });
+
+  it('removes the listener on Release before any signal, and a second Release is harmless', () => {
+    const signals = new EventEmitter();
+    const calls: string[] = [];
+
+    const release = onInterrupt(() => calls.push('interrupted'), signals);
+    release();
+    release();
+    signals.emit('SIGINT');
+
+    expect(signals.listenerCount('SIGINT')).toBe(0);
+    expect(calls).toEqual([]);
+  });
+
+  it('is still listening while a later SIGINT listener runs, so signal-exit does not re-raise it and exit 130', async () => {
+    const signals = new EventEmitter();
+    const counted: number[] = [];
+
+    onInterrupt(() => undefined, signals);
+    signals.on('SIGINT', () => counted.push(signals.listenerCount('SIGINT')));
+    signals.emit('SIGINT');
+    await new Promise((done) => setImmediate(done));
+
+    expect(counted).toEqual([2]);
+    expect(signals.listenerCount('SIGINT')).toBe(1);
+  });
+
+  it('does not remove a listener that Release already removed when the signal then arrives in the same tick', async () => {
+    const signals = new EventEmitter();
+    const other = jest.fn();
+    signals.on('SIGINT', other);
+
+    const release = onInterrupt(() => undefined, signals);
+    signals.emit('SIGINT');
+    release();
+    release();
+    await new Promise((done) => setImmediate(done));
+
+    expect(signals.listenerCount('SIGINT')).toBe(1);
+    expect(other).toHaveBeenCalledTimes(1);
+  });
+
+  it('listens on the process itself by default and restores the listener count on Release', () => {
+    const before = process.listenerCount('SIGINT');
+
+    const release = onInterrupt(() => undefined);
+    const during = process.listenerCount('SIGINT');
+    release();
+
+    expect(during).toBe(before + 1);
+    expect(process.listenerCount('SIGINT')).toBe(before);
   });
 });

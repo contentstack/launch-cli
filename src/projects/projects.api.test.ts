@@ -299,7 +299,7 @@ describe('ProjectsApi', () => {
   it('buildApi exposes the projects resource', () => {
     const { client } = fakeRestClient({});
 
-    expect(buildApi(client, UNUSED_CMA, {} as never).projects).toBeInstanceOf(ProjectsApi);
+    expect(buildApi(client, UNUSED_CMA, {} as never, {} as never).projects).toBeInstanceOf(ProjectsApi);
   });
 });
 

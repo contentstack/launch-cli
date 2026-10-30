@@ -60,6 +60,7 @@ with exit code 2 and name their V2 replacements. `launch:functions:serve` is liv
 * [`csdx launch:functions`](#csdx-launchfunctions)
 * [`csdx launch:functions:serve`](#csdx-launchfunctionsserve)
 * [`csdx launch:logs`](#csdx-launchlogs)
+* [`csdx launch:logs:get`](#csdx-launchlogsget)
 * [`csdx launch:open`](#csdx-launchopen)
 * [`csdx launch:projects:create`](#csdx-launchprojectscreate)
 * [`csdx launch:projects:delete`](#csdx-launchprojectsdelete)
@@ -548,6 +549,39 @@ DESCRIPTION
 ```
 
 _See code: [src/commands/launch/logs/index.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/logs/index.ts)_
+
+## `csdx launch:logs:get`
+
+Read the build or server logs of a deployment of a Launch environment
+
+```
+USAGE
+  $ csdx launch:logs:get [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--deployment
+    <value>] [--since <value>] [--until <value>] [--type <value>]
+
+FLAGS
+  -c, --config=<value>      Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>    Current working directory
+      --deployment=<value>  Deployment UID
+      --env=<value>         Environment name or UID
+      --org=<value>         Organization UID
+      --project=<value>     Project name or UID
+      --since=<value>       Server logs only: start of the window, relative (45s, 30m, 12hr, 2d) or an ISO 8601
+                            timestamp with an offset. Defaults to one hour before --until
+      --type=<value>        Kind of logs to read (deployment | server | live). Defaults to deployment
+      --until=<value>       Server logs only: end of the window, relative (45s, 30m, 12hr, 2d) or an ISO 8601 timestamp
+                            with an offset. Defaults to now
+
+DESCRIPTION
+  Read the build or server logs of a deployment of a Launch environment
+
+EXAMPLES
+  $ csdx launch:logs:get --org <org-uid> --project <name-or-uid> --env <name-or-uid>
+
+  $ csdx launch:logs:get --org <org-uid> --project <name-or-uid> --env <name-or-uid> --deployment <deployment-uid> --type server --since 2h
+```
+
+_See code: [src/commands/launch/logs/get.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/logs/get.ts)_
 
 ## `csdx launch:open`
 

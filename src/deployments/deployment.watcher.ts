@@ -1,3 +1,4 @@
+import { MAX_PAGES } from '../core/constants';
 import type { Loader } from '../core/loader';
 import type { UxLike } from '../core/prompt';
 import { RetryPolicy } from '../transport/retry-policy';
@@ -13,7 +14,7 @@ export const DEPLOYMENT_MAX_POLL_ERRORS = 3;
 export const DEPLOYMENT_LOADER_MESSAGE = 'Loading deployment logs...';
 
 export interface WatchTiming {
-  sleep(ms: number): Promise<void>;
+  sleep(ms: number, stop?: AbortSignal): Promise<void>;
   now(): number;
   pollDelayMs: number;
   maxBackoffSteps: number;
@@ -38,9 +39,29 @@ export interface DeploymentOutcome {
   deployment: Deployment;
 }
 
+function abortableSleep(ms: number, stop?: AbortSignal): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    if (stop?.aborted) {
+      reject(stop.reason);
+      return;
+    }
+
+    const abandon = (): void => {
+      clearTimeout(timer);
+      reject(stop?.reason);
+    };
+    const timer = setTimeout(() => {
+      stop?.removeEventListener('abort', abandon);
+      resolve();
+    }, ms);
+
+    stop?.addEventListener('abort', abandon, { once: true });
+  });
+}
+
 export function defaultWatchTiming(): WatchTiming {
   return {
-    sleep: (ms: number) => new Promise<void>((done) => setTimeout(done, ms)),
+    sleep: abortableSleep,
     now: () => Date.now(),
     pollDelayMs: DEPLOYMENT_POLL_DELAY_MS,
     maxBackoffSteps: DEPLOYMENT_MAX_BACKOFF_STEPS,
@@ -72,15 +93,13 @@ function sleepUnlessStopped(deps: DeploymentWatchDeps, ms: number): Promise<void
     return deps.sleep(ms);
   }
 
-  if (stop.aborted) {
-    return Promise.reject(stop.reason);
-  }
+  stop.throwIfAborted();
 
   return new Promise<void>((resolve, reject) => {
     const abandon = (): void => reject(stop.reason);
 
     stop.addEventListener('abort', abandon, { once: true });
-    deps.sleep(ms).then(
+    deps.sleep(ms, stop).then(
       () => {
         stop.removeEventListener('abort', abandon);
         resolve();
@@ -139,8 +158,18 @@ async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
     const kind = deps.until === undefined ? classifyStatus(deployment.status) : untilKind(deps.until, deployment);
     const terminal = kind === 'success' || kind === 'failure';
 
-    for (const log of await freshLogs(deps, tail)) {
-      deps.ux.print(deploymentLogLine(log, deps.outputIsTTY, process.stdout.columns));
+    for (let page = 0; page < (terminal ? MAX_PAGES : 1); page += 1) {
+      const logs = await freshLogs(deps, tail);
+
+      deps.stop?.throwIfAborted();
+
+      for (const log of logs) {
+        deps.ux.print(deploymentLogLine(log, deps.outputIsTTY, process.stdout.columns));
+      }
+
+      if (logs.length === 0) {
+        break;
+      }
     }
 
     if (terminal) {

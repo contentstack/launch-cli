@@ -5,7 +5,7 @@ import { HttpClient, configHandler } from '@contentstack/cli-utilities';
 import { API_VERSION } from '../core/constants';
 import { LaunchApiError, LaunchNetworkError } from './errors';
 import type { HttpClientLike } from './rest-client';
-import { RestApiClient } from './rest-client';
+import { RestApiClient, buildRequestHeaders } from './rest-client';
 import { DEFAULT_REQUEST_TIMEOUT_MS } from './retry-policy';
 
 const QUOTA_CODE = 'launch.ORGANIZATION.REVALIDATE_RATE_LIMIT_EXCEEDED';
@@ -810,5 +810,38 @@ describe('RestApiClient', () => {
     expect(registered).toEqual([]);
 
     createSpy.mockRestore();
+  });
+});
+
+describe('buildRequestHeaders', () => {
+  const identity = { analyticsInfo: 'cli/2.0.0', auth: { headers: async () => ({ authtoken: 'tok' }) } };
+
+  it('returns the CLI marker, the api version, the auth headers and both scope headers', async () => {
+    const headers = await buildRequestHeaders(identity, { orgUid: 'org1', projectUid: 'proj1' });
+
+    expect(headers).toEqual({
+      'X-CS-CLI': 'cli/2.0.0',
+      'x-cs-api-version': API_VERSION,
+      authtoken: 'tok',
+      'x-organization-uid': 'org1',
+      'x-project-uid': 'proj1',
+    });
+  });
+
+  it('leaves the scope headers out when no scope is given', async () => {
+    const headers = await buildRequestHeaders(identity, {});
+
+    expect(headers).not.toHaveProperty('x-organization-uid');
+    expect(headers).not.toHaveProperty('x-project-uid');
+    expect(Object.keys(headers)).toHaveLength(3);
+  });
+
+  it.each([
+    ['orgUid', 'x-organization-uid'],
+    ['projectUid', 'x-project-uid'],
+  ])('refuses a blank %s rather than sending an unscoped request', async (field, header) => {
+    await expect(buildRequestHeaders(identity, { [field]: '  ' })).rejects.toThrow(
+      `${header} was given a blank value; an unscoped Launch API request is never correct.`,
+    );
   });
 });

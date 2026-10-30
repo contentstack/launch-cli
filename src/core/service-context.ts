@@ -3,6 +3,7 @@ import { buildApi } from '../resources';
 import { RestApiClient } from '../transport/rest-client';
 import { selectAuthStrategy } from '../transport/auth-strategy';
 import { createCmaSession } from '../transport/cma-client';
+import { EventStreamClient } from '../transport/event-stream';
 import { getLogsApiBaseUrl, getManageApiBaseUrl, resolveLaunchAppUrl } from './region';
 import { openInBrowser } from './browser';
 import type { UxLike } from './prompt';
@@ -37,6 +38,11 @@ export function buildServiceContext(options: ServiceContextOptions): ServiceCont
       clientFor(getManageApiBaseUrl(options.launchHubUrl)),
       cma,
       clientFor(getLogsApiBaseUrl(options.launchHubUrl)),
+      new EventStreamClient({
+        baseUrl: getLogsApiBaseUrl(options.launchHubUrl),
+        analyticsInfo: options.analyticsInfo,
+        auth,
+      }),
     ),
     ux: options.ux,
     isTTY: options.isTTY,

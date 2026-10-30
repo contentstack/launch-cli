@@ -96,7 +96,7 @@ export function wrapLogMessage(message: string, width: number): string[] {
   return rows;
 }
 
-function clockOf(time: number): string {
+export function clockOf(time: number): string {
   const at = new Date(time);
   const pad = (value: number) => String(value).padStart(2, '0');
 

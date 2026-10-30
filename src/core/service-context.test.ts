@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { HttpClient, authHandler, configHandler } from '@contentstack/cli-utilities';
+import nock from 'nock';
 
 import { SessionExpiredError, UnauthenticatedError } from './errors';
 import type { UxLike } from './prompt';
@@ -185,5 +186,32 @@ describe('buildServiceContext request wiring', () => {
     httpSpy.mockRestore();
     configSpy.mockRestore();
     expirySpy.mockRestore();
+  });
+});
+
+describe('buildServiceContext live logs wiring', () => {
+  afterEach(() => {
+    nock.cleanAll();
+  });
+
+  it('T84: opens the live route under the logs base path with the session token and the analytics info', async () => {
+    const token = randomUUID();
+    const configSpy = basicSession(token);
+    const route = nock('https://launch-api.test', {
+      reqheaders: { accept: 'text/event-stream', authtoken: token, 'x-cs-cli': 'cli/2.0.0', 'x-organization-uid': 'org1' },
+    })
+      .get('/logs/projects/p1/environments/e1/deployments/d1/logs/live')
+      .reply(200, 'data: hello\n\n', { 'content-type': 'text/event-stream' });
+    const frames: unknown[] = [];
+
+    await context().api.liveLogs.open(
+      { org: 'org1', project: 'p1', environment: 'e1', deployment: 'd1' },
+      { onFrame: (frame) => frames.push(frame) },
+      new AbortController().signal,
+    );
+
+    expect(route.isDone()).toBe(true);
+    expect(frames).toEqual([{ event: undefined, data: 'hello' }]);
+    configSpy.mockRestore();
   });
 });

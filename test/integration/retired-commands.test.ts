@@ -29,7 +29,6 @@ const CONFIG: Record<string, unknown> = {
 let config: Interfaces.Config;
 
 const PLANNED_COMMANDS: Record<string, string> = {
-  'launch:logs:get': 'CL-7171',
 };
 
 function commandsNamedInSource(): string[] {
@@ -135,6 +134,27 @@ describe('integration: retired V1 command names', () => {
     rmSync(projectDir, { recursive: true, force: true });
   });
 
+  it('leaves the live child of the retired logs topic reachable', async () => {
+    const registered = new Set(config.commands.map((command) => command.id));
+
+    const { error } = await runCommand(['launch:logs:get', '--org', 'o1', '--project', 'p1', '--type', 'build'], config);
+
+    expect(registered.has('launch:logs:get')).toBe(true);
+    expect(PLANNED_COMMANDS['launch:logs:get']).toBeUndefined();
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe('--type must be one of deployment, server, live; "build" is not.');
+    expect(error?.message).not.toContain('was removed in Launch CLI v2');
+  });
+
+  it('shows --type and never --log-type in launch:logs:get --help', async () => {
+    const { stdout } = await runCommand(['launch:logs:get', '--help'], config);
+
+    expect(stdout).toContain('--type=<value>');
+    expect(stdout).toContain('--since=<value>');
+    expect(stdout).toContain('--until=<value>');
+    expect(stdout).not.toContain('--log-type');
+  });
+
   it('names only commands that exist or are planned in a ticket, wherever the CLI tells a user to run one', () => {
     const registered = new Set(config.commands.map((command) => command.id));
     const named = commandsNamedInSource();
@@ -193,6 +213,19 @@ describe('integration: retired V1 command names', () => {
 
     expect(registered).toContain('launch:site:open');
     expect(registered).not.toContain('launch:site:view');
+  });
+
+  it('lists the launch:logs topic with its own description under launch --help', async () => {
+    const { stdout } = await runCommand(['launch', '--help'], config);
+
+    expect(stdout).toContain('launch:logs');
+    expect(stdout).toContain('Read Launch deployment, server and live logs');
+  });
+
+  it("lists the logs resource's verb under launch:logs --help", async () => {
+    const { stdout } = await runCommand(['launch:logs', '--help'], config);
+
+    expect(stdout).toContain('launch:logs:get');
   });
 
   it('lists the launch:cache topic with its own description under launch --help', async () => {
