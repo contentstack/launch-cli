@@ -4,11 +4,14 @@ import type { ServiceContext } from '../core/service-context';
 import type { SiteDomain } from '../site/site.url';
 import { siteUrlOf } from '../site/site.url';
 import { deploymentUrlLine } from './deployment.presenter';
+import { normalizeStatus } from './deployment.status';
 import type { DeploymentOutcome, WatchTiming } from './deployment.watcher';
 import { watchDeployment } from './deployment.watcher';
 import type { Deployment } from './types';
 
 export const SITE_OPEN_DELAY_MS = 6000;
+
+const LIVE_STATUS = 'LIVE';
 
 export interface DeploymentScope {
   org: string;
@@ -23,14 +26,28 @@ export class DeploymentFollower {
     private readonly timing: WatchTiming,
   ) {}
 
-  watch(scope: DeploymentScope): Promise<DeploymentOutcome> {
+  watch(scope: DeploymentScope, stop?: AbortSignal): Promise<DeploymentOutcome> {
     return watchDeployment({
       ...this.timing,
       ux: this.services.ux,
       outputIsTTY: this.services.outputIsTTY === true,
       loader: this.loader(),
+      stop,
       logs: (after) => this.services.api.deploymentLogs.after({ ...scope, timestamp: after }),
       poll: () => this.services.api.deployments.get(scope),
+    });
+  }
+
+  waitUntilLive(scope: DeploymentScope, stop?: AbortSignal): Promise<DeploymentOutcome> {
+    return watchDeployment({
+      ...this.timing,
+      ux: this.services.ux,
+      outputIsTTY: this.services.outputIsTTY === true,
+      loader: silentLoader,
+      stop,
+      logs: async () => [],
+      poll: () => this.services.api.deployments.get(scope),
+      until: (deployment) => normalizeStatus(deployment.status) === LIVE_STATUS,
     });
   }
 

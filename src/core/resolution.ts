@@ -1,6 +1,6 @@
 import type { ApiSurface, Catalog, FlagKey } from '../resources';
 import { DEFAULT_LIMIT } from './constants';
-import type { ValueOf } from './inputs';
+import type { InputSpec, ValueOf } from './inputs';
 import type { ProjectConfigKey } from './project-config';
 import type { UxLike } from './prompt';
 
@@ -11,21 +11,23 @@ export interface ResolveServices {
 }
 
 export interface PromptArgs<D extends FlagKey = never> {
+  input: InputSpec;
   services: ResolveServices;
   resolved: { [P in D]: ValueOf<Catalog[P]> };
 }
 
 export type InputSource = 'flag' | 'config' | 'prompt' | 'default';
 
-export interface NormalizeArgs<D extends FlagKey = never> extends PromptArgs<D> {
+export interface NormalizeArgs<D extends FlagKey = never> extends Omit<PromptArgs<D>, 'input'> {
   source: InputSource;
 }
 
-export interface LooseNormalizeArgs extends LooseArgs {
+export interface LooseNormalizeArgs extends Omit<LooseArgs, 'input'> {
   source: InputSource;
 }
 
 export interface LooseArgs {
+  input: InputSpec;
   services: ResolveServices;
   resolved: Partial<Record<FlagKey, unknown>>;
 }
@@ -34,6 +36,7 @@ export interface ResolutionSpec<T, D extends FlagKey = never, R extends T = T> {
   configPath?: ProjectConfigKey;
   configLabel?: string;
   dependsOn?: readonly D[];
+  promptWhen?(input: InputSpec): boolean;
   prompt?(args: PromptArgs<D>): Promise<T>;
   normalize?(value: T, args: NormalizeArgs<D>): Promise<R>;
   default?: T;
@@ -43,6 +46,7 @@ export interface AnyResolutionSpec {
   configPath?: ProjectConfigKey;
   configLabel?: string;
   dependsOn?: readonly FlagKey[];
+  promptWhen?(input: InputSpec): boolean;
   prompt?(args: LooseArgs): Promise<unknown>;
   normalize?(value: unknown, args: LooseNormalizeArgs): Promise<unknown>;
   default?: unknown;

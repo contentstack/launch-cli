@@ -54,9 +54,7 @@ export const DEPENDENCIES = {
   ...PROJECT_DEPENDENCIES,
   ...ENVIRONMENT_DEPENDENCIES,
   ...DEPLOYMENT_DEPENDENCIES,
-} satisfies Partial<
-  Record<FlagKey, readonly FlagKey[]>
->;
+} satisfies Partial<Record<FlagKey, readonly FlagKey[]>>;
 
 export type DependenciesOf<K extends FlagKey> = K extends keyof typeof DEPENDENCIES
   ? (typeof DEPENDENCIES)[K][number]

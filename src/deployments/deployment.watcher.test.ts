@@ -441,7 +441,7 @@ describe('deployment log streaming', () => {
     expect(DEPLOYMENT_LOGS_FROM).toBe('1970-01-01T00:00:00.000Z');
   });
 
-  it('reports a failing log fetch once, keeps waiting on the deployment and resumes the logs where it left off', async () => {
+  it('prints nothing for a failing log fetch, keeps waiting on the deployment and resumes the logs where it left off', async () => {
     const { deps, lines, since } = streamingHarness(
       ['DEPLOYING', 'DEPLOYING', 'DEPLOYING', 'LIVE'],
       [
@@ -456,7 +456,6 @@ describe('deployment log streaming', () => {
 
     expect(outcome).toEqual(expect.objectContaining({ kind: 'success', status: 'LIVE' }));
     expect(lines).toEqual([
-      '  ! Could not read the deployment logs (Bad gateway). Still waiting on the deployment.',
       '2026-09-25 10:00:05.000:  Build complete',
     ]);
     expect(since).toEqual([
@@ -627,3 +626,235 @@ describe('deployment log streaming', () => {
   );
 });
 
+describe('deployment wait loop stopped from outside', () => {
+  function stoppable(statuses: string[]) {
+    const events: string[] = [];
+    const controller = new AbortController();
+    let polls = 0;
+    let release: () => void = () => undefined;
+
+    const deps = {
+      poll: async (): Promise<Deployment> => {
+        const status = statuses[Math.min(polls, statuses.length - 1)];
+        polls += 1;
+        events.push(`poll ${status}`);
+        return { uid: UID, status };
+      },
+      logs: async (): Promise<DeploymentLog[]> => [],
+      loader: {
+        start: (message: string) => events.push(`start ${message}`),
+        stop: () => events.push('stop'),
+      },
+      ux: { print: (message: string) => events.push(`print ${message}`), inquire: async () => undefined as never },
+      outputIsTTY: false,
+      sleep: (ms: number) =>
+        new Promise<void>((resolve) => {
+          events.push(`sleep ${ms}`);
+          release = resolve;
+        }),
+      now: () => 0,
+      pollDelayMs: 1000,
+      maxBackoffSteps: 3,
+      timeoutMs: 60_000,
+      stop: controller.signal,
+    };
+
+    return { deps, events, controller, polls: () => polls, release: () => release() };
+  }
+
+  it('abandons the sleep, stops the loader and rejects with the stop reason when stopped between polls', async () => {
+    const { deps, events, controller, polls } = stoppable(['DEPLOYING']);
+    const reason = new Error('interrupted');
+
+    const waiting = watchDeployment(deps).catch((error: Error) => error);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    controller.abort(reason);
+
+    expect(await waiting).toBe(reason);
+    expect(polls()).toBe(1);
+    expect(events).toEqual(['poll DEPLOYING', `start ${DEPLOYMENT_LOADER_MESSAGE}`, 'sleep 1000', 'stop']);
+  });
+
+  it('does not poll at all when it is already stopped', async () => {
+    const { deps, events, controller, polls } = stoppable(['LIVE']);
+    const reason = new Error('already interrupted');
+    controller.abort(reason);
+
+    await expect(watchDeployment(deps)).rejects.toBe(reason);
+    expect(polls()).toBe(0);
+    expect(events).toEqual(['stop']);
+  });
+
+  it('stops waiting between failing polls too, rather than retrying once it was told to stop', async () => {
+    const { deps, events, controller } = stoppable(['DEPLOYING']);
+    const reason = new Error('interrupted during retry');
+    const blip = new Error('502 Bad Gateway');
+    const failing = { ...deps, poll: async (): Promise<Deployment> => Promise.reject(blip) };
+
+    const waiting = watchDeployment(failing).catch((error: Error) => error);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    controller.abort(reason);
+
+    expect(await waiting).toBe(reason);
+    expect(events).toEqual(['sleep 1000', 'stop']);
+  });
+
+  it.each([
+    ['the normal delay', 'DEPLOYING', undefined],
+    ['the error backoff', undefined, new Error('502 Bad Gateway')],
+  ])(
+    'rejects with the stop reason without sleeping when the stop lands while the poll is in flight (%s)',
+    async (_label, status, failure) => {
+      jest.useFakeTimers();
+
+      try {
+        const { deps, events, controller } = stoppable(['DEPLOYING']);
+        const reason = new Error('interrupted during the poll');
+        const slept: number[] = [];
+        const aborting = {
+          ...deps,
+          poll: async (): Promise<Deployment> => {
+            events.push('poll');
+            controller.abort(reason);
+
+            if (failure) {
+              throw failure;
+            }
+
+            return { uid: UID, status };
+          },
+          sleep: (ms: number) =>
+            new Promise<void>((resolve) => {
+              slept.push(ms);
+              setTimeout(resolve, ms);
+            }),
+        };
+
+        await expect(watchDeployment(aborting)).rejects.toBe(reason);
+        expect(slept).toEqual([]);
+        expect(events).toEqual(['poll', 'stop']);
+        expect(jest.getTimerCount()).toBe(0);
+      } finally {
+        jest.useRealTimers();
+      }
+    },
+  );
+
+  it('rejects with the stop reason without sleeping when the stop lands while the logs are being read', async () => {
+    jest.useFakeTimers();
+
+    try {
+      const { deps, events, controller } = stoppable(['DEPLOYING']);
+      const reason = new Error('interrupted during the logs read');
+      const slept: number[] = [];
+      const aborting = {
+        ...deps,
+        logs: async (): Promise<DeploymentLog[]> => {
+          controller.abort(reason);
+          return [];
+        },
+        sleep: (ms: number) =>
+          new Promise<void>((resolve) => {
+            slept.push(ms);
+            setTimeout(resolve, ms);
+          }),
+      };
+
+      await expect(watchDeployment(aborting)).rejects.toBe(reason);
+      expect(slept).toEqual([]);
+      expect(events).toEqual(['poll DEPLOYING', `start ${DEPLOYMENT_LOADER_MESSAGE}`, 'stop']);
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('rejects with the stop reason instead of reporting a terminal status that arrived after the stop', async () => {
+    const { deps, events, controller } = stoppable(['LIVE']);
+    const reason = new Error('interrupted during the final poll');
+    const aborting = {
+      ...deps,
+      poll: async (): Promise<Deployment> => {
+        controller.abort(reason);
+        return { uid: UID, status: 'LIVE' };
+      },
+      logs: async (): Promise<DeploymentLog[]> => {
+        events.push('logs');
+        return [];
+      },
+    };
+
+    await expect(watchDeployment(aborting)).rejects.toBe(reason);
+    expect(events).toEqual(['stop']);
+  });
+
+  it('carries on normally when the sleep ends before any stop and ignores a stop that arrives after the end', async () => {
+    const { deps, controller, polls, release } = stoppable(['DEPLOYING', 'LIVE']);
+
+    const waiting = watchDeployment(deps);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    release();
+    const outcome = await waiting;
+    controller.abort(new Error('too late'));
+
+    expect(outcome.kind).toBe('success');
+    expect(polls()).toBe(2);
+  });
+
+  it('passes a failing sleep through unchanged', async () => {
+    const { deps } = stoppable(['DEPLOYING']);
+    const broken = new Error('clock failed');
+
+    await expect(watchDeployment({ ...deps, sleep: () => Promise.reject(broken) })).rejects.toBe(broken);
+  });
+});
+
+describe('deployment wait loop with an until condition', () => {
+  const isLive = (deployment: Deployment): boolean => deployment.status === 'LIVE';
+
+  it('keeps waiting through statuses that would otherwise end the wait until the condition holds', async () => {
+    const { deps, slept, pollCount } = harness(['ARCHIVED', 'FAILED', 'DEPLOYED', 'LIVE']);
+
+    const outcome = await watchDeployment({ ...deps, until: isLive });
+
+    expect(outcome.kind).toBe('success');
+    expect(outcome.status).toBe('LIVE');
+    expect(pollCount()).toBe(4);
+    expect(slept).toEqual([1000, 2000, 3000]);
+  });
+
+  it('hands every polled deployment to the condition', async () => {
+    const { deps } = harness(['ARCHIVED', 'LIVE']);
+    const seen: (string | undefined)[] = [];
+
+    await watchDeployment({
+      ...deps,
+      until: (deployment) => {
+        seen.push(deployment.status);
+        return isLive(deployment);
+      },
+    });
+
+    expect(seen).toEqual(['ARCHIVED', 'LIVE']);
+  });
+
+  it('reports a timeout with the last status when the condition never holds', async () => {
+    const { deps, slept, pollCount } = harness(['ARCHIVED'], { timeoutMs: 5000 });
+
+    const outcome = await watchDeployment({ ...deps, until: isLive });
+
+    expect(outcome.kind).toBe('timed-out');
+    expect(outcome.status).toBe('ARCHIVED');
+    expect(slept).toEqual([1000, 2000]);
+    expect(pollCount()).toBe(3);
+  });
+
+  it('propagates a poll failure that keeps recurring', async () => {
+    const outage = new Error('500 Internal Server Error');
+    const { deps, pollCount } = failingHarness([outage]);
+
+    await expect(watchDeployment({ ...deps, until: isLive })).rejects.toThrow('500 Internal Server Error');
+
+    expect(pollCount()).toBe(DEPLOYMENT_MAX_POLL_ERRORS);
+  });
+});

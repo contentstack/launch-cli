@@ -27,9 +27,8 @@ export const UPLOAD_CHUNK_BYTES = 256 * 1024;
 export function refuseArchiveOutsideLimits(bytes: number): void {
   if (bytes < MIN_UPLOAD_BYTES) {
     throw new UsageError(
-      `Your project files zip to ${(bytes / BYTES_PER_KB).toFixed(1)} KB, under the ` +
-        `${MIN_UPLOAD_BYTES / BYTES_PER_KB} KB Launch accepts for a file upload. ` +
-        'Pass --data-dir with the folder holding your site\'s files.',
+      `The project archive is ${(bytes / BYTES_PER_KB).toFixed(1)} KB, below the ` +
+        `${MIN_UPLOAD_BYTES / BYTES_PER_KB} KB minimum for an upload. Pass a folder with more files using --data-dir.`,
     );
   }
 
@@ -38,9 +37,8 @@ export function refuseArchiveOutsideLimits(bytes: number): void {
   }
 
   throw new UsageError(
-    `Your project files zip to ${(bytes / BYTES_PER_MB).toFixed(1)} MB, over the ` +
-      `${MAX_UPLOAD_BYTES / BYTES_PER_MB} MB Launch accepts for a file upload. ` +
-      'Pass --data-dir with a folder holding only the files to deploy.',
+    `The project archive is ${(bytes / BYTES_PER_MB).toFixed(1)} MB, above the ` +
+      `${MAX_UPLOAD_BYTES / BYTES_PER_MB} MB maximum for an upload. Pass a smaller folder using --data-dir.`,
   );
 }
 

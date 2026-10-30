@@ -4,6 +4,7 @@ import { lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { UsageError } from '../core/errors';
+import { NoUploadDirectoryError } from './upload.errors';
 
 export const UPLOAD_EXCLUDED_NAMES: readonly string[] = [
   'node_modules',
@@ -45,10 +46,13 @@ function directoryStats(root: string) {
   }
 }
 
+function noFilesToUpload(root: string): string {
+  return `No files to upload were found in "${root}". Pass your project folder with --data-dir.`;
+}
+
 function unreadable(relative: string): UsageError {
   return new UsageError(
-    `The file "${relative}" could not be read, so the upload was not attempted. ` +
-      'Fix its permissions, or pass --data-dir with a folder the CLI can read.',
+    `The file "${relative}" cannot be read. Fix its permissions or pass a different folder with --data-dir.`,
   );
 }
 
@@ -96,9 +100,7 @@ export function archiveDirectory(root: string, excludedFiles: readonly string[] 
   const stats = directoryStats(root);
 
   if (stats === undefined || !stats.isDirectory()) {
-    throw new UsageError(
-      `No local project directory at "${root}". Pass --data-dir with the folder you want to upload.`,
-    );
+    throw new NoUploadDirectoryError(noFilesToUpload(root));
   }
 
   const found: Collected = { files: new Map(), links: [] };
@@ -111,10 +113,7 @@ export function archiveDirectory(root: string, excludedFiles: readonly string[] 
   const entries = [...found.files.keys()].sort();
 
   if (entries.length === 0) {
-    throw new UsageError(
-      `Nothing to upload from "${root}" once ${UPLOAD_EXCLUDED_NAMES.join(', ')} are excluded. ` +
-        'Pass --data-dir with the folder you want to upload.',
-    );
+    throw new NoUploadDirectoryError(noFilesToUpload(root));
   }
 
   const zip = new AdmZip();

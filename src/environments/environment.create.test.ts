@@ -363,24 +363,20 @@ describe('EnvironmentCreator', () => {
     expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
     expect((failure as DeploymentUnsuccessfulError).exitCode).toBe(1);
     expect((failure as Error).message).toBe(
-      'The deployment did not succeed; its last status was FAILED. ' +
-        'The environment "staging" (env9) was created and has not been rolled back. ' +
-        'Run csdx launch:deployments:create --org org1 --project proj1 --env env9 to try the deployment again, ' +
-        'or csdx launch:logs:get --org org1 --project proj1 --env env9 --deployment dep1 to see why it did not succeed.',
+      'Deployment "dep1" ended with status FAILED. The environment "staging" (env9) was created. ' +
+        'Run csdx launch:logs:get --org org1 --project proj1 --env env9 --deployment dep1 to see the cause.',
     );
     expect(lines).toContain('\u2714 Environment created successfully.');
     expect(calls.some((call) => call.startsWith('announce'))).toBe(false);
   });
 
-  it('words a wait that ran out as possibly still finishing, naming deployments:get instead of a retry', async () => {
+  it('words a wait that ran out with the status and deployments:get', async () => {
     const { creator } = creatorUnderTest({ outcome: { kind: 'timed-out', status: 'DEPLOYING' } });
 
     await expect(creator.create(request())).rejects.toThrow(
       new DeploymentUnsuccessfulError(
-        'The deployment was still DEPLOYING when the CLI stopped waiting for it; it may still finish. ' +
-          'The environment "staging" (env9) was created. Do not start another deployment yet: ' +
-          'run csdx launch:deployments:get --org org1 --project proj1 --env env9 --deployment dep1 to see how it ends, ' +
-          'or csdx launch:logs:get --org org1 --project proj1 --env env9 --deployment dep1 to follow it.',
+        'Deployment "dep1" was still DEPLOYING when the CLI stopped waiting. The environment "staging" (env9) was created. ' +
+          'Run csdx launch:deployments:get --org org1 --project proj1 --env env9 --deployment dep1 to check its status.',
       ),
     );
   });
@@ -400,10 +396,8 @@ describe('EnvironmentCreator', () => {
 
     await expect(creator.create(request())).rejects.toThrow(
       new DeploymentUnsuccessfulError(
-        'The deployment did not succeed; its last status was NONE. ' +
-          'The environment "staging" (env9) was created and has not been rolled back. ' +
-          'Run csdx launch:deployments:create --org org1 --project proj1 --env env9 to try the deployment again, ' +
-          'or csdx launch:logs:get --org org1 --project proj1 --env env9 to see why it did not succeed.',
+        'No deployment was found to follow. The environment "staging" (env9) was created. ' +
+          'Run csdx launch:deployments:list --org org1 --project proj1 --env env9 to check.',
       ),
     );
     expect(calls.filter((call) => call.startsWith('latest'))).toHaveLength(3);
@@ -411,17 +405,21 @@ describe('EnvironmentCreator', () => {
   });
 
   it.each([
-    [{ latestFails: new Error('lookup refused') }, ''],
-    [{ watchFails: new Error('watch refused') }, ' --deployment dep1'],
-  ])('words a failed step after the create the same partial-success way (%p)', async (fails, deployment) => {
+    [{ latestFails: new Error('lookup refused') }, '', 'The deployment'],
+    [{ watchFails: new Error('watch refused') }, ' --deployment dep1', 'Deployment "dep1"'],
+  ])('words a failed step after the create the same partial-success way (%p)', async (fails, deployment, subject) => {
     const { creator } = creatorUnderTest(fails);
 
     const failure = await creator.create(request()).catch((error: unknown) => error);
 
     expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
-    expect((failure as Error).message).toMatch(/^The deployment could not be followed to completion: \w+ refused\. /);
-    expect((failure as Error).message).toContain('The environment "staging" (env9) was created and has not been rolled back.');
-    expect((failure as Error).message).toContain(`csdx launch:logs:get --org org1 --project proj1 --env env9${deployment} to see`);
+    expect((failure as Error).message).toMatch(
+      new RegExp(`^${subject} could not be followed to completion: \\w+ refused\\. `),
+    );
+    expect((failure as Error).message).toContain('The environment "staging" (env9) was created.');
+    expect((failure as Error).message).toContain(
+      `csdx launch:deployments:get --org org1 --project proj1 --env env9${deployment} to check its status.`,
+    );
   });
 
   it('propagates a refused create without saying the environment was created', async () => {
@@ -440,7 +438,7 @@ describe('EnvironmentCreator', () => {
     });
 
     await expect(creator.create(request({ name: 'pre-release' }))).rejects.toThrow(
-      'The environment "pre-release" (env9) was created and has not been rolled back.',
+      'The environment "pre-release" (env9) was created.',
     );
   });
 });

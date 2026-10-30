@@ -54,7 +54,10 @@ async function drain(iterator: AsyncGenerator<EnvironmentsPage>): Promise<Enviro
 
 describe('EnvironmentsApi', () => {
   it('lists environments as a project-scoped GET carrying limit and skip', async () => {
-    const page = { pagination: { count: 1, limit: 10, skip: 0 }, environments: [{ uid: ENVIRONMENT, name: 'Default' }] };
+    const page = {
+      pagination: { count: 1, limit: 10, skip: 0 },
+      environments: [{ uid: ENVIRONMENT, name: 'Default' }],
+    };
     const { client, requests, messages } = fakeRestClient(page);
 
     const result = await new EnvironmentsApi(client).list({ ...SCOPE, limit: 10, skip: 0 });
@@ -108,7 +111,10 @@ describe('EnvironmentsApi', () => {
   it.each([[undefined], [null], [''], ['  ']])(
     'refuses a first environment whose uid is %p rather than handing back one nothing can address',
     async (uid) => {
-      const { client } = fakeRestClient({ pagination: { count: 1, limit: 1 }, environments: [{ uid, name: 'Default' }] });
+      const { client } = fakeRestClient({
+        pagination: { count: 1, limit: 1 },
+        environments: [{ uid, name: 'Default' }],
+      });
 
       const failure = await new EnvironmentsApi(client).first(SCOPE).catch((error: Error) => error);
 
@@ -146,7 +152,9 @@ describe('EnvironmentsApi', () => {
         .catch((error: Error) => error);
 
       expect(failure).toBeInstanceOf(LaunchApiError);
-      expect((failure as Error).message).toBe('The Launch API returned an environment response without an environment.');
+      expect((failure as Error).message).toBe(
+        'The Launch API returned an environment response without an environment.',
+      );
     },
   );
 
@@ -209,7 +217,9 @@ describe('EnvironmentsApi', () => {
   });
 
   it('stops once the reported count is reached exactly, even though the last page was full', async () => {
-    const { client, requests } = pagingRestClient([{ count: ENVIRONMENT_SCAN_PAGE_SIZE, size: ENVIRONMENT_SCAN_PAGE_SIZE }]);
+    const { client, requests } = pagingRestClient([
+      { count: ENVIRONMENT_SCAN_PAGE_SIZE, size: ENVIRONMENT_SCAN_PAGE_SIZE },
+    ]);
 
     const collected = await drain(new EnvironmentsApi(client).pages(SCOPE));
 
@@ -403,7 +413,12 @@ describe('EnvironmentsApi', () => {
     'refuses a create response %p that carries no addressable environment',
     async (body) => {
       const { client } = fakeRestClient(body);
-      const input = { name: 'x', outputDirectory: './out', frameworkPreset: 'OTHER' as const, environmentVariables: [] };
+      const input = {
+        name: 'x',
+        outputDirectory: './out',
+        frameworkPreset: 'OTHER' as const,
+        environmentVariables: [],
+      };
 
       await expect(new EnvironmentsApi(client).create({ ...SCOPE, input })).rejects.toBeInstanceOf(LaunchApiError);
     },
@@ -413,5 +428,50 @@ describe('EnvironmentsApi', () => {
     const { client } = fakeRestClient({ pagination: { count: 0, limit: 1 }, environments: [] });
 
     await expect(new EnvironmentsApi(client).first(SCOPE)).resolves.toBeUndefined();
+  });
+
+  it('reads the commits of an environment with a limit of 15 under the project scope and unwraps them', async () => {
+    const commits = [{ sha: randomBytes(20).toString('hex'), shortSha: 'abc1234', message: 'm' }];
+    const { client, requests, messages } = fakeRestClient({ pagination: { count: 1 }, commits });
+
+    const result = await new EnvironmentsApi(client).commits({ ...SCOPE, environment: ENVIRONMENT });
+
+    expect(result).toEqual(commits);
+    expect(requests).toEqual([
+      {
+        method: 'GET',
+        path: `/projects/${PROJECT}/environments/${ENVIRONMENT}/commits`,
+        orgUid: ORG,
+        projectUid: PROJECT,
+        query: { limit: 15 },
+      },
+    ]);
+    expect(messages).toEqual([ENVIRONMENT_ERROR_MESSAGES]);
+  });
+
+  it.each([
+    ['an empty body', {}],
+    ['a non-array member', { commits: 'x' }],
+    ['a null body', null],
+  ])('raises a malformed-response error for %s on the commits read', async (_label, body) => {
+    const { client } = fakeRestClient(body);
+
+    const failure = await new EnvironmentsApi(client)
+      .commits({ ...SCOPE, environment: ENVIRONMENT })
+      .catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(LaunchApiError);
+    expect((failure as Error).message).toContain('commit list');
+  });
+
+  it('propagates a failed commits read unchanged', async () => {
+    const failure = new LaunchApiError(500, []);
+    const client = {
+      request: async () => {
+        throw failure;
+      },
+    } as unknown as RestApiClient;
+
+    await expect(new EnvironmentsApi(client).commits({ ...SCOPE, environment: ENVIRONMENT })).rejects.toBe(failure);
   });
 });

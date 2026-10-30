@@ -1,7 +1,9 @@
 import { stripVTControlCharacters } from 'node:util';
 
+import type { TableColumn } from '../core/render';
 import { styled } from '../core/style';
-import { messageOf } from '../core/values';
+import { isAbsent, withoutControlCharacters } from '../core/values';
+import type { DeploymentScope } from './deployments.api';
 import type { Deployment, DeploymentLog } from './types';
 
 const GUTTER = '  ';
@@ -28,7 +30,7 @@ export function deploymentUrlOf(deployment: Deployment): string | undefined {
 }
 
 export function deploymentUrlLine(url: string, outputIsTTY: boolean): string {
-  return `${styled('Deployment URL', 'bold', outputIsTTY)} ${styled(url, 'cyan', outputIsTTY)}`;
+  return `${styled('Deployment URL:', 'bold', outputIsTTY)} ${styled(url, 'cyan', outputIsTTY)}`;
 }
 
 export function colouredLogMessage(message: string): string {
@@ -135,15 +137,9 @@ export function deploymentLogLine(log: DeploymentLog, outputIsTTY: boolean, colu
     .join('\n');
 }
 
-export function deploymentLogsUnavailableLine(error: unknown): string {
-  const reason = messageOf(error);
-
-  return `  ! Could not read the deployment logs (${reason}). Still waiting on the deployment.`;
-}
-
 export interface FirstDeploymentFailure {
-  created: string;
-  plural: boolean;
+  created?: string;
+  plural?: boolean;
   org: string;
   project: string;
   status: string;
@@ -153,30 +149,205 @@ export interface FirstDeploymentFailure {
   timedOut?: boolean;
 }
 
+function createdSentence(failure: FirstDeploymentFailure): string {
+  if (failure.created === undefined) {
+    return '';
+  }
+
+  return ` ${failure.created} ${failure.plural === true ? 'were' : 'was'} created.`;
+}
+
 export function firstDeploymentFailureMessage(failure: FirstDeploymentFailure): string {
   const scope = `--org ${failure.org} --project ${failure.project}`;
   const environment = failure.environmentUid === undefined ? '' : ` --env ${failure.environmentUid}`;
   const deployment = failure.deploymentUid === undefined ? '' : ` --deployment ${failure.deploymentUid}`;
-  const were = failure.plural ? 'were' : 'was';
+  const subject = failure.deploymentUid === undefined ? 'The deployment' : `Deployment "${failure.deploymentUid}"`;
+  const created = createdSentence(failure);
 
-  if (failure.timedOut === true) {
+  if (failure.deploymentUid === undefined && failure.reason === undefined && failure.timedOut !== true) {
     return (
-      `The deployment was still ${failure.status} when the CLI stopped waiting for it; it may still finish. ` +
-      `${failure.created} ${were} created. Do not start another deployment yet: ` +
-      `run csdx launch:deployments:get ${scope}${environment}${deployment} to see how it ends, ` +
-      `or csdx launch:logs:get ${scope}${environment}${deployment} to follow it.`
+      `No deployment was found to follow.${created} ` +
+      `Run csdx launch:deployments:list ${scope}${environment} to check.`
     );
   }
 
-  const opening =
-    failure.reason === undefined
-      ? `The deployment did not succeed; its last status was ${failure.status}. `
-      : `The deployment could not be followed to completion: ${failure.reason} `;
+  if (failure.timedOut === true) {
+    return (
+      `${subject} was still ${failure.status} when the CLI stopped waiting.${created} ` +
+      `Run csdx launch:deployments:get ${scope}${environment}${deployment} to check its status.`
+    );
+  }
+
+  if (failure.reason !== undefined) {
+    return (
+      `${subject} could not be followed to completion: ${failure.reason}${created} ` +
+      `Run csdx launch:deployments:get ${scope}${environment}${deployment} to check its status.`
+    );
+  }
 
   return (
-    opening +
-    `${failure.created} ${were} created and ${failure.plural ? 'have' : 'has'} not been rolled back. ` +
-    `Run csdx launch:deployments:create ${scope}${environment} to try the deployment again, ` +
-    `or csdx launch:logs:get ${scope}${environment}${deployment} to see why it did not succeed.`
+    `${subject} ended with status ${failure.status}.${created} ` +
+    `Run csdx launch:logs:get ${scope}${environment}${deployment} to see the cause.`
   );
+}
+
+export function rollbackStartedLine(uid: string): string {
+  return `Rollback to deployment "${uid}" started.`;
+}
+
+export interface RollbackFollowUp {
+  org: string;
+  project: string;
+  environment: string;
+  deployment: string;
+}
+
+function checkRollbackCommand(followUp: RollbackFollowUp): string {
+  return (
+    `csdx launch:deployments:get --org ${followUp.org} --project ${followUp.project} ` +
+    `--env ${followUp.environment} --deployment ${followUp.deployment}`
+  );
+}
+
+export function rollbackInterruptedMessage(followUp: RollbackFollowUp): string {
+  return (
+    `Stopped waiting. The rollback to deployment "${followUp.deployment}" was not cancelled and continues on Launch. ` +
+    `Check it with ${checkRollbackCommand(followUp)}.`
+  );
+}
+
+export function rollbackUnconfirmedMessage(
+  followUp: RollbackFollowUp,
+  result: { status: string; reason?: string },
+): string {
+  const check = `Run ${checkRollbackCommand(followUp)} to check whether the rollback completed.`;
+
+  if (result.reason !== undefined) {
+    return `The rollback to deployment "${followUp.deployment}" could not be confirmed: ${result.reason} ${check}`;
+  }
+
+  return `Deployment "${followUp.deployment}" was still ${result.status} when the CLI stopped waiting. ${check}`;
+}
+
+export function deploymentRollbackQuestion(uid: string): string {
+  return `Are you sure you want to roll back this environment to deployment "${uid}"?`;
+}
+
+export function deploymentCancelQuestion(uid: string): string {
+  return `Are you sure you want to cancel deployment "${uid}"?`;
+}
+
+export function rolledBackLine(uid: string, outputIsTTY: boolean): string {
+  return styled(`\u2714 Environment rolled back to deployment "${uid}" successfully.`, 'green', outputIsTTY);
+}
+
+export function deploymentCancelledLine(uid: string, outputIsTTY: boolean): string {
+  return styled(`\u2714 Deployment "${uid}" cancelled successfully.`, 'green', outputIsTTY);
+}
+
+export function deploymentNotRolledBackLine(outputIsTTY: boolean): string {
+  return styled('Environment not rolled back.', 'yellow', outputIsTTY);
+}
+
+export function deploymentNotCancelledLine(outputIsTTY: boolean): string {
+  return styled('Deployment not cancelled.', 'yellow', outputIsTTY);
+}
+
+export interface DeploymentDetailRow {
+  field: string;
+  value: string;
+}
+
+const SHORT_COMMIT_LENGTH = 7;
+
+const SUBJECT_MAX_LENGTH = 72;
+
+function singleLine(value: string): string {
+  return withoutControlCharacters(value).trim();
+}
+
+function text(value: string | undefined | null): string {
+  if (value === undefined || value === null || isAbsent(value)) {
+    return '-';
+  }
+
+  const line = singleLine(value);
+
+  return line === '' ? '-' : line;
+}
+
+function commitSubject(message: string | undefined | null): string {
+  const subject = (message ?? '')
+    .split(/\r\n|[\n\r]/)
+    .map(singleLine)
+    .find((line) => line !== '');
+
+  if (subject === undefined) {
+    return '-';
+  }
+
+  const units = [...subject];
+
+  return units.length > SUBJECT_MAX_LENGTH ? `${units.slice(0, SUBJECT_MAX_LENGTH - 1).join('')}\u2026` : subject;
+}
+
+function shortCommit(value: string | undefined): string {
+  const hash = text(value);
+
+  return hash.length > SHORT_COMMIT_LENGTH ? hash.slice(0, SHORT_COMMIT_LENGTH) : hash;
+}
+
+export function deploymentColumns(showGit: boolean): TableColumn<Deployment>[] {
+  const columns: TableColumn<Deployment>[] = [
+    { header: 'DEPLOYMENT UID', value: (deployment) => text(deployment.uid) },
+    { header: 'STATUS', value: (deployment) => text(deployment.status) },
+  ];
+
+  if (showGit) {
+    columns.push({ header: 'COMMIT', value: (deployment) => shortCommit(deployment.commitHash) });
+  }
+
+  columns.push({ header: 'UPDATED', value: (deployment) => text(deployment.updatedAt) });
+
+  if (showGit) {
+    columns.push({ header: 'BRANCH', value: (deployment) => text(deployment.gitBranch) });
+  }
+
+  return columns;
+}
+
+export const DEPLOYMENT_DETAIL_COLUMNS: TableColumn<DeploymentDetailRow>[] = [
+  { header: 'FIELD', value: (row) => row.field },
+  { header: 'VALUE', value: (row) => row.value },
+];
+
+export const DEPLOYMENT_VALUE_COLUMN = 1;
+
+export function deploymentVariablesSummary(deployment: Deployment, scope: DeploymentScope): string {
+  const count = Array.isArray(deployment.environmentVariables) ? deployment.environmentVariables.length : 0;
+
+  const flags = `--org ${scope.org} --project ${scope.project} --env ${scope.environment}`;
+
+  return `${count} (list them with csdx launch:variables:list ${flags})`;
+}
+
+export function deploymentDetailRows(
+  deployment: Deployment,
+  showGit: boolean,
+  scope: DeploymentScope,
+): DeploymentDetailRow[] {
+  const gitRows: DeploymentDetailRow[] = [
+    { field: 'BRANCH', value: text(deployment.gitBranch) },
+    { field: 'COMMIT', value: text(deployment.commitHash) },
+    { field: 'COMMIT MESSAGE', value: commitSubject(deployment.commitMessage) },
+  ];
+  return [
+    { field: 'DEPLOYMENT UID', value: text(deployment.uid) },
+    { field: 'STATUS', value: text(deployment.status) },
+    ...(showGit ? gitRows : []),
+    { field: 'URL', value: text(deploymentUrlOf(deployment)) },
+    { field: 'ENVIRONMENT VARIABLES', value: deploymentVariablesSummary(deployment, scope) },
+    { field: 'CREATED AT', value: text(deployment.createdAt) },
+    { field: 'UPDATED AT', value: text(deployment.updatedAt) },
+  ];
 }

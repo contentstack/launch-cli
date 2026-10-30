@@ -28,6 +28,8 @@ export interface Deployment {
   gitBranch?: string;
   commitHash?: string;
   commitMessage?: string;
+  environmentVariables?: unknown[] | null;
+  isCancellable?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

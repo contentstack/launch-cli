@@ -242,8 +242,7 @@ describe('refuseArchiveOutsideLimits', () => {
 
   it('names the archive size, the limit, and how to shrink the upload', () => {
     expect(() => refuseArchiveOutsideLimits(150 * 1024 * 1024)).toThrow(
-      'Your project files zip to 150.0 MB, over the 100 MB Launch accepts for a file upload. ' +
-        'Pass --data-dir with a folder holding only the files to deploy.',
+      'The project archive is 150.0 MB, above the 100 MB maximum for an upload. Pass a smaller folder using --data-dir.',
     );
   });
 
@@ -258,8 +257,7 @@ describe('refuseArchiveOutsideLimits', () => {
   it('refuses an archive under 1 KB before uploading, naming its size and how to fix it', () => {
     expect(() => refuseArchiveOutsideLimits(512)).toThrow(UsageError);
     expect(() => refuseArchiveOutsideLimits(512)).toThrow(
-      'Your project files zip to 0.5 KB, under the 1 KB Launch accepts for a file upload. ' +
-        'Pass --data-dir with the folder holding your site\'s files.',
+      'The project archive is 0.5 KB, below the 1 KB minimum for an upload. Pass a folder with more files using --data-dir.',
     );
   });
 });

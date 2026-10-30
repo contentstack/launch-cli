@@ -3,10 +3,7 @@ import type { UxLike } from '../core/prompt';
 import { RetryPolicy } from '../transport/retry-policy';
 import { LogTail } from './deployment.log-tail';
 import { classifyStatus, normalizeStatus } from './deployment.status';
-import {
-  deploymentLogLine,
-  deploymentLogsUnavailableLine,
-} from './deployment.presenter';
+import { deploymentLogLine } from './deployment.presenter';
 import type { Deployment, DeploymentLog } from './types';
 
 export const DEPLOYMENT_POLL_DELAY_MS = 2000;
@@ -29,6 +26,8 @@ export interface DeploymentWatchDeps extends WatchTiming {
   ux: UxLike;
   loader: Loader;
   outputIsTTY: boolean;
+  stop?: AbortSignal;
+  until?(deployment: Deployment): boolean;
 }
 
 export type DeploymentOutcomeKind = 'success' | 'failure' | 'timed-out';
@@ -66,15 +65,56 @@ export async function watchDeployment(deps: DeploymentWatchDeps): Promise<Deploy
   }
 }
 
+function sleepUnlessStopped(deps: DeploymentWatchDeps, ms: number): Promise<void> {
+  const { stop } = deps;
+
+  if (stop === undefined) {
+    return deps.sleep(ms);
+  }
+
+  if (stop.aborted) {
+    return Promise.reject(stop.reason);
+  }
+
+  return new Promise<void>((resolve, reject) => {
+    const abandon = (): void => reject(stop.reason);
+
+    stop.addEventListener('abort', abandon, { once: true });
+    deps.sleep(ms).then(
+      () => {
+        stop.removeEventListener('abort', abandon);
+        resolve();
+      },
+      (error: unknown) => {
+        stop.removeEventListener('abort', abandon);
+        reject(error);
+      },
+    );
+  });
+}
+
+async function freshLogs(deps: DeploymentWatchDeps, tail: LogTail): Promise<DeploymentLog[]> {
+  try {
+    return tail.fresh(await deps.logs(tail.since()));
+  } catch {
+    return [];
+  }
+}
+
+function untilKind(until: (deployment: Deployment) => boolean, deployment: Deployment): 'success' | 'in-flight' {
+  return until(deployment) ? 'success' : 'in-flight';
+}
+
 async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
   const backoff = new RetryPolicy({ retryDelayMs: deps.pollDelayMs });
   const deadline = deps.now() + deps.timeoutMs;
   let attempt = 0;
   let consecutiveErrors = 0;
   const tail = new LogTail();
-  let logsFailureReported = false;
 
   for (;;) {
+    deps.stop?.throwIfAborted();
+
     let deployment: Deployment;
 
     try {
@@ -89,26 +129,17 @@ async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
         throw error;
       }
 
-      await deps.sleep(retryIn);
+      await sleepUnlessStopped(deps, retryIn);
       continue;
     }
 
+    deps.stop?.throwIfAborted();
+
     const status = normalizeStatus(deployment.status);
-    const kind = classifyStatus(deployment.status);
+    const kind = deps.until === undefined ? classifyStatus(deployment.status) : untilKind(deps.until, deployment);
     const terminal = kind === 'success' || kind === 'failure';
 
-    let logs: DeploymentLog[] = [];
-
-    try {
-      logs = tail.fresh(await deps.logs(tail.since()));
-    } catch (error) {
-      if (!logsFailureReported) {
-        deps.ux.print(deploymentLogsUnavailableLine(error));
-        logsFailureReported = true;
-      }
-    }
-
-    for (const log of logs) {
+    for (const log of await freshLogs(deps, tail)) {
       deps.ux.print(deploymentLogLine(log, deps.outputIsTTY, process.stdout.columns));
     }
 
@@ -124,6 +155,6 @@ async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
     }
 
     deps.loader.start(DEPLOYMENT_LOADER_MESSAGE);
-    await deps.sleep(delay);
+    await sleepUnlessStopped(deps, delay);
   }
 }

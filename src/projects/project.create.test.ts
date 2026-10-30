@@ -425,7 +425,7 @@ describe('ProjectCreator on the GitHub path', () => {
         gitProviderMetadata: { gitProvider: 'GitHub' },
       },
     });
-    expect(printed).toEqual([CONNECTION_IDENTIFIED, repositoryFound(), PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
+    expect(printed).toEqual([CONNECTION_IDENTIFIED, repositoryFound(), PROJECT_CREATED, 'Deployment URL: https://my-site.example.test']);
   });
 
   it('sends the project description and the two toggles only when they were supplied', async () => {
@@ -767,7 +767,7 @@ describe('ProjectCreator on the GitHub path', () => {
     await creator.create(gitRequest());
 
     expect(printed).not.toContain(CONNECTION_IDENTIFIED);
-    expect(printed).toEqual([repositoryFound(), PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
+    expect(printed).toEqual([repositoryFound(), PROJECT_CREATED, 'Deployment URL: https://my-site.example.test']);
     expect(gitCalls[0]).toEqual({ org: ORG, provider: 'GitHub', namespace: 'my-org', search: 'my-repo', limit: 100, skip: 0 });
     expect(created).toHaveLength(1);
   });
@@ -1282,7 +1282,7 @@ describe('ProjectCreator on the FileUpload path', () => {
     const failure = await creator.create({ org: ORG, dataDir, configPath: configPathIn(dataDir) }).catch((error: Error) => error);
 
     expect(failure).toBeInstanceOf(UsageError);
-    expect((failure as Error).message).toContain('over the 100 MB Launch accepts for a file upload');
+    expect((failure as Error).message).toContain('above the 100 MB maximum for an upload');
     expect(calls.signedUploadUrl).toEqual([]);
     expect(uploadArchive).not.toHaveBeenCalled();
     expect(asked).toEqual(['Choose a project type to proceed']);
@@ -1295,7 +1295,7 @@ describe('ProjectCreator on the FileUpload path', () => {
     const failure = await creator.create(uploadRequest()).catch((error: Error) => error);
 
     expect(failure).toBeInstanceOf(UsageError);
-    expect((failure as Error).message).toContain('under the 1 KB Launch accepts for a file upload');
+    expect((failure as Error).message).toContain('below the 1 KB minimum for an upload');
     expect(calls.signedUploadUrl).toEqual([]);
     expect(uploadArchive).not.toHaveBeenCalled();
     expect(created).toEqual([]);
@@ -1336,7 +1336,7 @@ describe('ProjectCreator on the FileUpload path', () => {
     });
     const { creator, printed } = harness();
 
-    await expect(creator.create(uploadRequest())).rejects.toThrow('over the 100 MB Launch accepts');
+    await expect(creator.create(uploadRequest())).rejects.toThrow('above the 100 MB maximum for an upload');
 
     expect(printed).toEqual(['Preparing zip file...']);
   });
@@ -1406,7 +1406,7 @@ describe('ProjectCreator on the FileUpload path', () => {
     writeFileSync(join(dataDir, '.env'), 'SECRET=1');
     const { creator } = harness();
 
-    await expect(creator.create(uploadRequest())).rejects.toThrow('Nothing to upload');
+    await expect(creator.create(uploadRequest())).rejects.toThrow('No files to upload were found in');
     expect(uploadArchive).not.toHaveBeenCalled();
   });
 
@@ -1470,13 +1470,13 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed).toEqual([CONNECTION_IDENTIFIED, repositoryFound(), PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
+    expect(printed).toEqual([CONNECTION_IDENTIFIED, repositoryFound(), PROJECT_CREATED, 'Deployment URL: https://my-site.example.test']);
   });
 
   it.each([
-    [true, false, 'Deployment URL https://my-site.example.test'],
-    [false, true, '\u001b[1mDeployment URL\u001b[22m \u001b[36mhttps://my-site.example.test\u001b[39m'],
-    [false, undefined, 'Deployment URL https://my-site.example.test'],
+    [true, false, 'Deployment URL: https://my-site.example.test'],
+    [false, true, '\u001b[1mDeployment URL:\u001b[22m \u001b[36mhttps://my-site.example.test\u001b[39m'],
+    [false, undefined, 'Deployment URL: https://my-site.example.test'],
   ])(
     'styles the deployment url by where the output goes, not by stdin (stdin terminal: %s, output terminal: %s)',
     async (isTTY, outputIsTTY, line) => {
@@ -1493,7 +1493,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed).toContain('Deployment URL https://my-site.example.test');
+    expect(printed).toContain('Deployment URL: https://my-site.example.test');
   });
 
   it('exits 1 on a failed deployment, saying what survived and how to retry and inspect it', async () => {
@@ -1504,11 +1504,9 @@ describe('ProjectCreator waiting on the first deployment', () => {
     expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
     expect((failure as DeploymentUnsuccessfulError).exitCode).toBe(1);
     expect((failure as Error).message).toBe(
-      'The deployment did not succeed; its last status was FAILED. ' +
-      'The project "My Site" (p1) and its environment "Default" were created and have not been rolled back. ' +
-      'Run csdx launch:deployments:create --org org1 --project p1 --env e1 to try the deployment again, ' +
-      'or csdx launch:logs:get --org org1 --project p1 --env e1 --deployment d1 ' +
-      'to see why it did not succeed.',
+      'Deployment "d1" ended with status FAILED. ' +
+      'The project "My Site" (p1) and its environment "Default" were created. ' +
+      'Run csdx launch:logs:get --org org1 --project p1 --env e1 --deployment d1 to see the cause.',
     );
   });
 
@@ -1518,8 +1516,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
     const failure = await creator.create(gitRequest()).catch((error: Error) => error);
 
     expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
-    expect((failure as Error).message).toContain('The deployment was still DEPLOYING when the CLI stopped waiting');
-    expect((failure as Error).message).toContain('Do not start another deployment yet');
+    expect((failure as Error).message).toContain('was still DEPLOYING when the CLI stopped waiting.');
     expect((failure as Error).message).not.toContain('deployments:create');
   });
 
@@ -1529,7 +1526,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
     const failure = await creator.create(gitRequest()).catch((error: Error) => error);
 
     expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
-    expect((failure as Error).message).toContain('its last status was NONE');
+    expect((failure as Error).message).toContain('No deployment was found to follow.');
     expect((failure as Error).message).not.toContain('--deployment');
   });
 
@@ -1538,7 +1535,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed).toContain('Deployment URL https://my-site.example.test');
+    expect(printed).toContain('Deployment URL: https://my-site.example.test');
   });
 
   it('waits for the first environment to appear rather than calling an empty page a failure', async () => {
@@ -1548,7 +1545,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed).toContain('Deployment URL https://my-site.example.test');
+    expect(printed).toContain('Deployment URL: https://my-site.example.test');
   });
 
   it('exits 1 disclosing the project when looking up its first environment failed', async () => {
@@ -1560,7 +1557,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
     expect((failure as DeploymentUnsuccessfulError).exitCode).toBe(1);
     expect((failure as Error).message).toContain('Launch API request failed with status 502.');
     expect((failure as Error).message).toContain('The project "My Site" (p1)');
-    expect((failure as Error).message).toContain('have not been rolled back');
+    expect((failure as Error).message).toContain('were created.');
     expect((failure as Error).message).not.toContain('--environment');
     expect(calls.latest).toEqual([]);
   });
@@ -1586,7 +1583,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
     expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
     expect((failure as DeploymentUnsuccessfulError).exitCode).toBe(1);
     expect((failure as Error).message).toContain('The Launch API answered 502 Bad Gateway.');
-    expect((failure as Error).message).toContain('have not been rolled back');
+    expect((failure as Error).message).toContain('were created.');
     expect((failure as Error).message).toContain('--org org1 --project p1');
     expect((failure as Error).message).toContain('--env e1');
     expect((failure as Error).message).toContain('--deployment d1');
@@ -1599,7 +1596,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     expect(failure).toBeInstanceOf(DeploymentUnsuccessfulError);
     expect((failure as Error).message).toContain('socket hang up.');
-    expect((failure as Error).message).toContain('have not been rolled back');
+    expect((failure as Error).message).toContain('were created.');
   });
 
   it('exits 1 naming no environment when the API reported none either', async () => {
@@ -1627,7 +1624,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed).toContain('Deployment URL https://domain.example.test');
+    expect(printed).toContain('Deployment URL: https://domain.example.test');
   });
 
   it('reports no url at all when neither the deployment nor the environment has one', async () => {
@@ -1654,7 +1651,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
     expect(SITE_OPEN_DELAY_MS).toBe(6000);
     expect(opened).toEqual(['https://my-site.example.test']);
     expect(timeline.slice(-3)).toEqual([
-      'print Deployment URL https://my-site.example.test',
+      'print Deployment URL: https://my-site.example.test',
       'sleep 6000',
       'open https://my-site.example.test',
     ]);
@@ -1700,7 +1697,7 @@ describe('ProjectCreator waiting on the first deployment', () => {
 
     await creator.create(gitRequest());
 
-    expect(printed).toEqual([CONNECTION_IDENTIFIED, repositoryFound(), PROJECT_CREATED, 'Deployment URL https://my-site.example.test']);
+    expect(printed).toEqual([CONNECTION_IDENTIFIED, repositoryFound(), PROJECT_CREATED, 'Deployment URL: https://my-site.example.test']);
     expect(timeline).not.toContain(`sleep ${SITE_OPEN_DELAY_MS}`);
   });
 

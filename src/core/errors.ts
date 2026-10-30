@@ -22,6 +22,13 @@ export class UsageError extends LaunchError {
   }
 }
 
+export class FlagValueError extends UsageError {
+  constructor(readonly detail: string) {
+    super(detail);
+    this.name = 'FlagValueError';
+  }
+}
+
 export class CancelledError extends LaunchError {
   readonly exitCode = EXIT_CANCELLED;
 

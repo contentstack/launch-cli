@@ -76,6 +76,9 @@
       "launch:cache": {
         "description": "Purge the CDN cache of a Launch environment"
       },
+      "launch:deployments": {
+        "description": "Create, inspect, roll back and cancel the deployments of a Launch environment"
+      },
       "launch:site": {
         "description": "Open the live site of a Launch environment"
       },
@@ -116,6 +119,8 @@
       "ajv": "^6.12.6"
     },
     "qs": "^6.16.1",
+    "body-parser": "^1.20.9",
+    "csv-parse": "^7.0.2",
     "tmp": "^0.2.4",
     "fast-uri": "^3.1.9",
     "proxy-addr": "^2.0.8",
@@ -153,6 +158,11 @@
       "launch": "LNCH",
       "launch:cache:purge": "LNCH-CCH-PRG",
       "launch:deployments": "LNCH-DPLMNT",
+      "launch:deployments:cancel": "LNCH-DPLMNT-CNCL",
+      "launch:deployments:create": "LNCH-DPLMNT-CRT",
+      "launch:deployments:get": "LNCH-DPLMNT-GET",
+      "launch:deployments:list": "LNCH-DPLMNT-LS",
+      "launch:deployments:rollback": "LNCH-DPLMNT-RBK",
       "launch:environments": "LNCH-ENV",
       "launch:env:create": "LNCH-ENV-CRT",
       "launch:env:delete": "LNCH-ENV-DEL",

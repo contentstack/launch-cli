@@ -13,7 +13,7 @@ const RESOURCE_EDGES: Record<string, string[]> = {
   projects: ['environments', 'deployments', 'git', 'uploads', 'variables'],
   functions: [],
   environments: ['deployments', 'git', 'uploads', 'variables'],
-  deployments: ['site'],
+  deployments: ['uploads', 'site'],
   git: [],
   organizations: [],
   uploads: [],

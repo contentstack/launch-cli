@@ -1,0 +1,17 @@
+{
+  "deployment": {
+    "uid": "d1e2f3a4b5c6d7e8f9012345",
+    "status": "LIVE",
+    "deploymentNumber": 2,
+    "gitBranch": "main",
+    "commitHash": "9fceb02d0ae598e95dc970b74767f19372d61af8",
+    "commitMessage": "Ship the homepage",
+    "deploymentUrl": "production-sample-project.contentstackapps.com",
+    "environmentVariables": [
+      { "key": "KEY_ONE", "value": "value-one" },
+      { "key": "KEY_TWO", "value": "value-two" }
+    ],
+    "createdAt": "2025-11-07T08:00:00.000Z",
+    "updatedAt": "2025-11-07T08:10:00.000Z"
+  }
+}

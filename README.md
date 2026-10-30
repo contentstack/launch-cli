@@ -46,6 +46,11 @@ with exit code 2 and name their V2 replacements. `launch:functions:serve` is liv
 * [`csdx launch`](#csdx-launch)
 * [`csdx launch:cache:purge`](#csdx-launchcachepurge)
 * [`csdx launch:deployments`](#csdx-launchdeployments)
+* [`csdx launch:deployments:cancel`](#csdx-launchdeploymentscancel)
+* [`csdx launch:deployments:create`](#csdx-launchdeploymentscreate)
+* [`csdx launch:deployments:get`](#csdx-launchdeploymentsget)
+* [`csdx launch:deployments:list`](#csdx-launchdeploymentslist)
+* [`csdx launch:deployments:rollback`](#csdx-launchdeploymentsrollback)
 * [`csdx launch:env:create`](#csdx-launchenvcreate)
 * [`csdx launch:env:delete`](#csdx-launchenvdelete)
 * [`csdx launch:env:get`](#csdx-launchenvget)
@@ -153,6 +158,153 @@ DESCRIPTION
 ```
 
 _See code: [src/commands/launch/deployments/index.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/deployments/index.ts)_
+
+## `csdx launch:deployments:cancel`
+
+Cancel a deployment of a Launch environment that is still in progress
+
+```
+USAGE
+  $ csdx launch:deployments:cancel [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--deployment
+    <value>] [-y]
+
+FLAGS
+  -c, --config=<value>      Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>    Current working directory
+  -y, --yes                 Skip the confirmation prompt
+      --deployment=<value>  Deployment UID
+      --env=<value>         Environment name or UID
+      --org=<value>         Organization UID
+      --project=<value>     Project name or UID
+
+DESCRIPTION
+  Cancel a deployment of a Launch environment that is still in progress
+
+EXAMPLES
+  $ csdx launch:deployments:cancel --org <org-uid> --project <name-or-uid> --env <name-or-uid> --deployment <deployment-uid>
+
+  $ csdx launch:deployments:cancel --org <org-uid> --project <name-or-uid> --env <name-or-uid> --deployment <deployment-uid> --yes
+```
+
+_See code: [src/commands/launch/deployments/cancel.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/deployments/cancel.ts)_
+
+## `csdx launch:deployments:create`
+
+Deploy a Launch environment: the branch tip or a chosen commit on a GitHub project, the project directory or the last uploaded bundle on a FileUpload project
+
+```
+USAGE
+  $ csdx launch:deployments:create [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--commit
+    <value> | --last-upload]
+
+FLAGS
+  -c, --config=<value>    Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>  Current working directory
+      --commit=<value>    GitHub projects: deploy this commit. Pass --commit with no value to pick one from the recent
+                          commits
+      --env=<value>       Environment name or UID
+      --last-upload       FileUpload projects: redeploy the last uploaded bundle without uploading a new one
+      --org=<value>       Organization UID
+      --project=<value>   Project name or UID
+
+DESCRIPTION
+  Deploy a Launch environment: the branch tip or a chosen commit on a GitHub project, the project directory or the last
+  uploaded bundle on a FileUpload project
+
+EXAMPLES
+  $ csdx launch:deployments:create --org <org-uid> --project <name-or-uid> --env <name-or-uid>
+
+  $ csdx launch:deployments:create --org <org-uid> --project <name-or-uid> --env <name-or-uid> --commit <sha>
+
+  $ csdx launch:deployments:create --org <org-uid> --project <name-or-uid> --env <name-or-uid> --last-upload
+```
+
+_See code: [src/commands/launch/deployments/create.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/deployments/create.ts)_
+
+## `csdx launch:deployments:get`
+
+Show a deployment of a Launch environment, the latest one unless --deployment names another
+
+```
+USAGE
+  $ csdx launch:deployments:get [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--deployment
+    <value>]
+
+FLAGS
+  -c, --config=<value>      Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>    Current working directory
+      --deployment=<value>  Deployment UID
+      --env=<value>         Environment name or UID
+      --org=<value>         Organization UID
+      --project=<value>     Project name or UID
+
+DESCRIPTION
+  Show a deployment of a Launch environment, the latest one unless --deployment names another
+
+EXAMPLES
+  $ csdx launch:deployments:get --org <org-uid> --project <name-or-uid> --env <name-or-uid>
+
+  $ csdx launch:deployments:get --org <org-uid> --project <name-or-uid> --env <name-or-uid> --deployment <deployment-uid>
+```
+
+_See code: [src/commands/launch/deployments/get.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/deployments/get.ts)_
+
+## `csdx launch:deployments:list`
+
+List the deployments of a Launch environment
+
+```
+USAGE
+  $ csdx launch:deployments:list [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--limit
+    <value>] [--skip <value>]
+
+FLAGS
+  -c, --config=<value>    Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>  Current working directory
+      --env=<value>       Environment name or UID
+      --limit=<value>     Number of records to fetch (1-1000)
+      --org=<value>       Organization UID
+      --project=<value>   Project name or UID
+      --skip=<value>      Number of records to skip
+
+DESCRIPTION
+  List the deployments of a Launch environment
+
+EXAMPLES
+  $ csdx launch:deployments:list --org <org-uid> --project <name-or-uid> --env <name-or-uid>
+```
+
+_See code: [src/commands/launch/deployments/list.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/deployments/list.ts)_
+
+## `csdx launch:deployments:rollback`
+
+Roll a Launch environment back to a previous deployment
+
+```
+USAGE
+  $ csdx launch:deployments:rollback [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--deployment
+    <value>] [--reason <value>] [-y]
+
+FLAGS
+  -c, --config=<value>      Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>    Current working directory
+  -y, --yes                 Skip the confirmation prompt
+      --deployment=<value>  Deployment UID
+      --env=<value>         Environment name or UID
+      --org=<value>         Organization UID
+      --project=<value>     Project name or UID
+      --reason=<value>      Why the environment is being rolled back, recorded with the rollback
+
+DESCRIPTION
+  Roll a Launch environment back to a previous deployment
+
+EXAMPLES
+  $ csdx launch:deployments:rollback --org <org-uid> --project <name-or-uid> --env <name-or-uid> --deployment <deployment-uid>
+
+  $ csdx launch:deployments:rollback --org <org-uid> --project <name-or-uid> --env <name-or-uid> --deployment <deployment-uid> --reason "bad release" --yes
+```
+
+_See code: [src/commands/launch/deployments/rollback.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/deployments/rollback.ts)_
 
 ## `csdx launch:env:create`
 

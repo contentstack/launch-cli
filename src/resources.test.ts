@@ -98,7 +98,7 @@ describe('resolution', () => {
     const spy = jest.spyOn(prompt, 'promptForProject').mockResolvedValue(PROJECT_UID);
     const { services, resolved } = args();
 
-    await expect(table.project.prompt?.({ services, resolved })).resolves.toBe(PROJECT_UID);
+    await expect(table.project.prompt?.({ input: {}, services, resolved })).resolves.toBe(PROJECT_UID);
 
     expect(spy).toHaveBeenCalledWith(services, 'org1');
     spy.mockRestore();
@@ -177,7 +177,7 @@ describe('resolution', () => {
     const spy = jest.spyOn(organizationPrompt, 'promptForOrganization').mockResolvedValue('org9');
     const { services } = args();
 
-    await expect(table.org.prompt?.({ services, resolved: {} })).resolves.toBe('org9');
+    await expect(table.org.prompt?.({ input: {}, services, resolved: {} })).resolves.toBe('org9');
     expect(spy).toHaveBeenCalledWith(services);
     expect(table.org.normalize).toBeUndefined();
     expect(table.org.dependsOn).toBeUndefined();

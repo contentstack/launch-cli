@@ -4,6 +4,19 @@ import type { FrameworkPreset } from './frameworks';
 
 export type { Pagination };
 
+export interface CommitAuthor {
+  name?: string;
+  date?: string;
+}
+
+export interface Commit {
+  sha?: string;
+  shortSha?: string;
+  message?: string;
+  author?: CommitAuthor;
+  url?: string;
+}
+
 export interface EnvironmentVariableInput {
   key: string;
   value: string;

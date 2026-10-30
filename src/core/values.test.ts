@@ -1,5 +1,5 @@
 import { UsageError } from './errors';
-import { asSentence, isRecord, messageOf, oneOf, withinLength } from './values';
+import { asSentence, isRecord, messageOf, oneOf, withinLength, withoutControlCharacters } from './values';
 
 describe('input value helpers', () => {
   it.each([
@@ -63,5 +63,31 @@ describe('input value helpers', () => {
     expect(() => oneOf('res-mode', '   ', ['buffered', 'streaming'])).toThrow(
       '--res-mode must be one of buffered, streaming; "   " is not.',
     );
+  });
+});
+
+describe('withoutControlCharacters', () => {
+  it.each([
+    ['a line feed', 'a\nb', 'a b'],
+    ['a run of line breaks and a carriage return', 'a\r\n\n\nb', 'a b'],
+    ['a tab', 'a\tb', 'a b'],
+    ['a bell', 'a\u0007b', 'a b'],
+    ['a delete', 'a\u007fb', 'a b'],
+    ['a C1 control', 'a\u0085b', 'a b'],
+    ['a colour escape sequence', 'a\u001b[31mb\u001b[39m', 'ab'],
+    ['the last C0 control and the first C1 neighbour', 'a\u001fb\u00a0c', 'a b\u00a0c'],
+    ['no control character', 'plain text \u2026 \u{1f600}', 'plain text \u2026 \u{1f600}'],
+    ['an empty string', '', ''],
+  ])('replaces %s with one space', (_label, value, expected) => {
+    expect(withoutControlCharacters(value)).toBe(expected);
+  });
+
+  it('leaves the printable boundaries either side of the C0 and C1 ranges alone', () => {
+    expect(withoutControlCharacters('a b~\u00a0')).toBe('a b~\u00a0');
+    expect(withoutControlCharacters('\u001f')).toBe(' ');
+    expect(withoutControlCharacters('\u0020')).toBe(' ');
+    expect(withoutControlCharacters('\u007e')).toBe('~');
+    expect(withoutControlCharacters('\u009f')).toBe(' ');
+    expect(withoutControlCharacters('\u00a0')).toBe('\u00a0');
   });
 });
