@@ -1,5 +1,8 @@
-import { LaunchApiError } from '../transport/errors';
-import type { ErrorMessages } from '../transport/errors';
+import { EXIT_RUNTIME } from '../core/constants';
+import { LaunchError } from '../core/errors';
+import { REDACTED } from '../core/redact';
+import { LaunchApiError, LaunchNetworkError } from '../transport/errors';
+import type { ApiErrorEntry, ErrorMessages } from '../transport/errors';
 
 const SECRETS = 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS';
 
@@ -40,4 +43,70 @@ export function asReadFailure(error: unknown): unknown {
   }
 
   return error;
+}
+
+const WRITE_FORBIDDEN_CODE = `${SECRETS}.WRITE_FORBIDDEN`;
+const WRITE_NOT_FOUND_CODE = `${SECRETS}.WRITE_NOT_FOUND`;
+
+const WRITE_MESSAGES: ErrorMessages = {
+  ...SECRETS_ERROR_MESSAGES,
+  [WRITE_FORBIDDEN_CODE]: 'You do not have permission to change the secrets of this environment.',
+  [WRITE_NOT_FOUND_CODE]: 'The project, the environment or the secret was not found.',
+};
+
+export class SecretInputTimeoutError extends LaunchError {
+  readonly exitCode = EXIT_RUNTIME;
+
+  constructor(seconds: number) {
+    super(
+      `No value arrived on standard input within ${seconds} ${seconds === 1 ? 'second' : 'seconds'}, ` +
+        'so nothing was changed. ' +
+        'Pipe the value in, for example: printf \'%s\' "$TOKEN" | csdx launch:secrets:set --key <KEY> --yes',
+    );
+    this.name = 'SecretInputTimeoutError';
+  }
+}
+
+function withoutValue(text: string, value: string): string {
+  return [value, value.trim()]
+    .filter((form) => form !== '')
+    .reduce((redacted, form) => redacted.split(form).join(REDACTED), text);
+}
+
+function redactedEntry(entry: ApiErrorEntry, value: string): ApiErrorEntry {
+  return entry.message === undefined ? entry : { ...entry, message: withoutValue(entry.message, value) };
+}
+
+function reworded(error: LaunchApiError): LaunchApiError {
+  if (error.status === 403) {
+    return new LaunchApiError(403, [{ code: WRITE_FORBIDDEN_CODE }], WRITE_MESSAGES);
+  }
+
+  if (error.status === 404 && !(error.code in WRITE_MESSAGES)) {
+    return new LaunchApiError(404, [{ code: WRITE_NOT_FOUND_CODE }], WRITE_MESSAGES);
+  }
+
+  return error;
+}
+
+export function asWriteFailure(error: unknown, value: string): unknown {
+  if (error instanceof LaunchApiError) {
+    const { status, errors } = reworded(error);
+
+    return new LaunchApiError(
+      status,
+      errors.map((entry) => redactedEntry(entry, value)),
+      WRITE_MESSAGES,
+    );
+  }
+
+  if (error instanceof LaunchNetworkError) {
+    return new LaunchNetworkError(withoutValue(error.message, value), undefined, error.retryable);
+  }
+
+  if (error instanceof LaunchError) {
+    return error;
+  }
+
+  return error instanceof Error ? new Error(withoutValue(error.message, value)) : error;
 }

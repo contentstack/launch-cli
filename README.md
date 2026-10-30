@@ -69,6 +69,7 @@ with exit code 2 and name their V2 replacements. `launch:functions:serve` is liv
 * [`csdx launch:projects:update`](#csdx-launchprojectsupdate)
 * [`csdx launch:rollback`](#csdx-launchrollback)
 * [`csdx launch:secrets:list`](#csdx-launchsecretslist)
+* [`csdx launch:secrets:set`](#csdx-launchsecretsset)
 * [`csdx launch:site:open`](#csdx-launchsiteopen)
 * [`csdx launch:variables:list`](#csdx-launchvariableslist)
 * [`csdx launch:variables:set`](#csdx-launchvariablesset)
@@ -788,6 +789,36 @@ EXAMPLES
 ```
 
 _See code: [src/commands/launch/secrets/list.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/secrets/list.ts)_
+
+## `csdx launch:secrets:set`
+
+Add a secret to an environment, or replace its value when the key exists. Takes one --key. The value is read from a masked prompt, or from standard input when piped, and is never a flag
+
+```
+USAGE
+  $ csdx launch:secrets:set [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--key
+    <value>...] [-y]
+
+FLAGS
+  -c, --config=<value>    Path to the local '.cs-launch.json' file
+  -d, --data-dir=<value>  Current working directory
+  -y, --yes               Skip the confirmation prompt
+      --env=<value>       Environment name or UID
+      --key=<value>...    Environment variable key, repeatable
+      --org=<value>       Organization UID
+      --project=<value>   Project name or UID
+
+DESCRIPTION
+  Add a secret to an environment, or replace its value when the key exists. Takes one --key. The value is read from a
+  masked prompt, or from standard input when piped, and is never a flag
+
+EXAMPLES
+  $ csdx launch:secrets:set --org <org-uid> --project <name-or-uid> --env <name-or-uid> --key API_TOKEN
+
+  $ printf '%s' "$TOKEN" | csdx launch:secrets:set --org <org-uid> --project <name-or-uid> --env <name-or-uid> --key API_TOKEN --yes
+```
+
+_See code: [src/commands/launch/secrets/set.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/secrets/set.ts)_
 
 ## `csdx launch:site:open`
 

@@ -2,8 +2,8 @@ import { isRecord } from '../core/values';
 import type { EnvironmentParams } from '../environments/environments.api';
 import { assertArray } from '../transport/envelope';
 import type { RestApiClient, RestRequest } from '../transport/rest-client';
-import { SECRETS_ERROR_MESSAGES, asReadFailure } from './secrets.errors';
-import type { SecretSummary } from './types';
+import { SECRETS_ERROR_MESSAGES, asReadFailure, asWriteFailure } from './secrets.errors';
+import type { SecretSummary, SecretWriteParams, SecretWriteResult } from './types';
 
 export * from './types';
 
@@ -19,6 +19,10 @@ function textOf(value: unknown): string | undefined {
 
 function summaryOf(entry: unknown): SecretSummary[] {
   return isRecord(entry) ? [{ key: textOf(entry.key), updatedAt: textOf(entry.updatedAt) }] : [];
+}
+
+function resultOf(response: unknown): SecretWriteResult {
+  return summaryOf(response)[0] ?? { key: undefined, updatedAt: undefined };
 }
 
 export class SecretsApi {
@@ -41,5 +45,33 @@ export class SecretsApi {
     assertArray(response, 'secrets', 'secret list');
 
     return (response as { secrets: unknown[] }).secrets.flatMap(summaryOf);
+  }
+
+  async add({ org, project, environment, key, value }: SecretWriteParams): Promise<SecretWriteResult> {
+    const response = await this.request<unknown>({
+      method: 'POST',
+      path: secretsPath({ org, project, environment }),
+      orgUid: org,
+      projectUid: project,
+      body: { key, value },
+    }).catch((error: unknown) => {
+      throw asWriteFailure(error, value);
+    });
+
+    return resultOf(response);
+  }
+
+  async refresh({ org, project, environment, key, value }: SecretWriteParams): Promise<SecretWriteResult> {
+    const response = await this.request<unknown>({
+      method: 'PUT',
+      path: secretsPath({ org, project, environment }, key),
+      orgUid: org,
+      projectUid: project,
+      body: { value },
+    }).catch((error: unknown) => {
+      throw asWriteFailure(error, value);
+    });
+
+    return resultOf(response);
   }
 }

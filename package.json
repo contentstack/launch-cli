@@ -187,6 +187,7 @@
       "launch:projects:update": "LNCH-PRJ-UPD",
       "launch:rollback": "LNCH-RLBK",
       "launch:secrets:list": "LNCH-SEC-LS",
+      "launch:secrets:set": "LNCH-SEC-SET",
       "launch:site:open": "LNCH-SITE-OPN",
       "launch:variables:list": "LNCH-VAR-LS",
       "launch:variables:set": "LNCH-VAR-SET",

@@ -130,3 +130,112 @@ describe('SecretsApi.list', () => {
     await expect(new SecretsApi(client).list(SCOPE)).rejects.toBe(failure);
   });
 });
+
+describe('SecretsApi.add', () => {
+  it('POSTs the key and value to the collection with the scope headers and the secrets wording', async () => {
+    const value = randomUUID();
+    const { client, requests, messages } = fakeRestClient(async () => ({ key: 'API_TOKEN', updatedAt: '2026-09-01T10:00:00.000Z' }));
+
+    const result = await new SecretsApi(client).add({ ...SCOPE, key: 'API_TOKEN', value });
+
+    expect(requests).toEqual([
+      {
+        method: 'POST',
+        path: `/projects/${PROJECT}/environments/${ENVIRONMENT}/secrets`,
+        orgUid: ORG,
+        projectUid: PROJECT,
+        body: { key: 'API_TOKEN', value },
+      },
+    ]);
+    expect(messages).toEqual([SECRETS_ERROR_MESSAGES]);
+    expect(result).toEqual({ key: 'API_TOKEN', updatedAt: '2026-09-01T10:00:00.000Z' });
+  });
+
+  it.each([[undefined], [null], ['text'], [[]]])('answers with undefined fields when the response is not an object (%p)', async (answer) => {
+    const { client } = fakeRestClient(async () => answer);
+
+    await expect(new SecretsApi(client).add({ ...SCOPE, key: 'A', value: randomUUID() })).resolves.toEqual({
+      key: undefined,
+      updatedAt: undefined,
+    });
+  });
+
+  it('fills a missing updatedAt with undefined and drops a value the server echoes', async () => {
+    const value = randomUUID();
+    const { client } = fakeRestClient(async () => ({ key: 'A', value }));
+
+    const result = await new SecretsApi(client).add({ ...SCOPE, key: 'A', value });
+
+    expect(result).toEqual({ key: 'A', updatedAt: undefined });
+    expect(JSON.stringify(result)).not.toContain(value);
+  });
+
+  it('words a 403 in write context and strips an echoed value from a 400', async () => {
+    const value = randomUUID();
+    const forbidden = fakeRestClient(async () => {
+      throw parseErrorEnvelope(403, { errors: [{ code: 'launch.RBAC.FORBIDDEN' }] }, SECRETS_ERROR_MESSAGES);
+    });
+    const rejected = fakeRestClient(async () => {
+      throw parseErrorEnvelope(400, { errors: [{ code: 'launch.X', message: `bad ${value}` }] }, SECRETS_ERROR_MESSAGES);
+    });
+
+    const first = await new SecretsApi(forbidden.client).add({ ...SCOPE, key: 'A', value }).catch((error: unknown) => error);
+    const second = await new SecretsApi(rejected.client).add({ ...SCOPE, key: 'A', value }).catch((error: unknown) => error);
+
+    expect((first as LaunchApiError).message).toBe('You do not have permission to change the secrets of this environment.');
+    expect((second as LaunchApiError).message).toBe('bad ••••••');
+  });
+});
+
+describe('SecretsApi.refresh', () => {
+  it('PUTs only the value to the encoded key path with the scope headers', async () => {
+    const value = randomUUID();
+    const { client, requests, messages } = fakeRestClient(async () => ({ key: 'A/B', updatedAt: '2026-09-02T10:00:00.000Z' }));
+
+    const result = await new SecretsApi(client).refresh({ ...SCOPE, key: 'A/B', value });
+
+    expect(requests).toEqual([
+      {
+        method: 'PUT',
+        path: `/projects/${PROJECT}/environments/${ENVIRONMENT}/secrets/A%2FB`,
+        orgUid: ORG,
+        projectUid: PROJECT,
+        body: { value },
+      },
+    ]);
+    expect(messages).toEqual([SECRETS_ERROR_MESSAGES]);
+    expect(result).toEqual({ key: 'A/B', updatedAt: '2026-09-02T10:00:00.000Z' });
+  });
+
+  it('answers with undefined fields when the response has no body', async () => {
+    const { client } = fakeRestClient(async () => undefined);
+
+    await expect(new SecretsApi(client).refresh({ ...SCOPE, key: 'A', value: randomUUID() })).resolves.toEqual({
+      key: undefined,
+      updatedAt: undefined,
+    });
+  });
+
+  it('words a 404 on the key and strips an echoed value from a failure', async () => {
+    const value = randomUUID();
+    const missing = fakeRestClient(async () => {
+      throw parseErrorEnvelope(404, { errors: [{ code: 'launch.ENVIRONMENT.ENVIRONMENT_SECRETS.KEY.NOT_FOUND' }] }, SECRETS_ERROR_MESSAGES);
+    });
+    const rejected = fakeRestClient(async () => {
+      throw parseErrorEnvelope(400, { errors: [{ code: 'launch.X', message: `bad ${value}` }] }, SECRETS_ERROR_MESSAGES);
+    });
+
+    const first = await new SecretsApi(missing.client).refresh({ ...SCOPE, key: 'A', value }).catch((error: unknown) => error);
+    const second = await new SecretsApi(rejected.client).refresh({ ...SCOPE, key: 'A', value }).catch((error: unknown) => error);
+
+    expect((first as LaunchApiError).message).toBe('No secret with that key exists in this environment.');
+    expect((second as LaunchApiError).message).toBe('bad ••••••');
+  });
+
+  it('lets a plain failure propagate with the value stripped', async () => {
+    const value = randomUUID();
+    const { client } = fakeRestClient(async () => Promise.reject(new Error(`x ${value}`)));
+
+    await expect(new SecretsApi(client).refresh({ ...SCOPE, key: 'A', value })).rejects.toThrow('x ••••••');
+  });
+});
