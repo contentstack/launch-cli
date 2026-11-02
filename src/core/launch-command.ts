@@ -15,6 +15,7 @@ import type { AnyInputs, Resolved } from './inputs';
 import { resolveInputsTraced } from './resolve';
 import type { Rule } from './rules';
 import { cancelOnInterrupt } from './interruptible-ux';
+import { refusePasswordOnArgv } from './password-argv';
 import type { UxLike } from './prompt';
 import { registerSearchList } from './search-list';
 import type { FailureOutput } from './failure';
@@ -118,6 +119,10 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
     await super.init();
     registerSearchList();
     process.stdin.setMaxListeners(STDIN_MAX_LISTENERS);
+
+    if ('password' in this.contract.flags) {
+      refusePasswordOnArgv(this.argv);
+    }
 
     const { flags } = await this.parse({
       flags: this.contract.flags,
