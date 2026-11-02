@@ -1,5 +1,8 @@
 import type { ErrorMessages } from '../transport/errors';
 import { DEPLOYMENT_ERROR_MESSAGES } from '../deployments/deployment.errors';
+import { MAX_SEARCH_LENGTH } from './logs.inputs';
+
+const QUERY_REJECTED = 'The Launch API rejected the server log query. Update the CLI and try again.';
 
 export const LOGS_ERROR_MESSAGES: ErrorMessages = {
   ...DEPLOYMENT_ERROR_MESSAGES,
@@ -11,4 +14,9 @@ export const LOGS_ERROR_MESSAGES: ErrorMessages = {
   'launch.DEPLOYMENT.PROJECT_MISMATCH': 'That deployment does not belong to this project.',
   'launch.DEPLOYMENT.ENVIRONMENT_MISMATCH': 'That deployment does not belong to this environment.',
   'launch.PROJECT.NOT_FOUND': 'No project found with that UID.',
+  'launch.SERVERLOGS.SEARCH_TOO_LONG': `--search must be ${MAX_SEARCH_LENGTH} characters or fewer.`,
+  'launch.SERVERLOGS.INVALID_CURSOR':
+    'That cursor was not produced by launch:logs:get. Run the command again without --cursor.',
+  'launch.SERVERLOGS.INVALID_SOURCE': QUERY_REJECTED,
+  'launch.SERVERLOGS.INVALID_SORT_DIRECTION': QUERY_REJECTED,
 };

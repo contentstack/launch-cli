@@ -4,7 +4,8 @@ import { InputDependencyError } from '../core/errors';
 import type { ResolutionSpec } from '../core/resolution';
 import type { Rule } from '../core/rules';
 import { requireValueOf } from '../core/rules';
-import { isAbsent, oneOf } from '../core/values';
+import { isAbsent, oneOf, withinLength } from '../core/values';
+import type { FlagKey } from '../resources';
 
 export const LOG_TYPES = ['deployment', 'server', 'live'] as const;
 
@@ -14,7 +15,9 @@ export const DEFAULT_LOG_TYPE: LogType = 'deployment';
 
 export const LOG_TYPE_FLAG = 'type';
 
-export const WINDOW_LOG_TYPES: readonly LogType[] = ['server'];
+export const SERVER_ONLY_LOG_TYPES: readonly LogType[] = ['server'];
+
+export const MAX_SEARCH_LENGTH = 256;
 
 const WINDOW_FORMATS = 'relative (45s, 30m, 12hr, 2d) or an ISO 8601 timestamp with an offset';
 
@@ -27,6 +30,12 @@ export const logsFlags = {
   }),
   until: Flags.string({
     description: `Server logs only: end of the window, ${WINDOW_FORMATS}. Defaults to now`,
+  }),
+  search: Flags.string({
+    description: `Server logs only: show only lines containing this text, up to ${MAX_SEARCH_LENGTH} characters`,
+  }),
+  cursor: Flags.string({
+    description: 'Server logs only: resume from the cursor printed by an earlier run',
   }),
 };
 
@@ -41,9 +50,11 @@ export const logsResolution = {
   } satisfies ResolutionSpec<string, never, LogType>,
   since: { normalize: async (value) => value.trim() } satisfies ResolutionSpec<string>,
   until: { normalize: async (value) => value.trim() } satisfies ResolutionSpec<string>,
+  search: { normalize: (value) => withinLength('search', value, MAX_SEARCH_LENGTH) } satisfies ResolutionSpec<string>,
+  cursor: { normalize: async (value) => value.trim() } satisfies ResolutionSpec<string>,
 };
 
-export function windowOnlyWithServer(flag: 'since' | 'until'): Rule {
+export function onlyWithServer(flag: FlagKey): Rule {
   return (resolved) => {
     if (isAbsent(resolved[flag])) {
       return;
@@ -57,6 +68,6 @@ export function windowOnlyWithServer(flag: 'since' | 'until'): Rule {
       );
     }
 
-    requireValueOf(flag, LOG_TYPE_FLAG, WINDOW_LOG_TYPES, type);
+    requireValueOf(flag, LOG_TYPE_FLAG, SERVER_ONLY_LOG_TYPES, type);
   };
 }

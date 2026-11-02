@@ -163,9 +163,9 @@ src/
   git/          the internal git-namespace / repository / branch lookups
   organizations/ the --org flag, its organization picker, and the lookup behind it,
                 which reads the Contentstack Management API rather than Launch
-  logs/         logs:get: the server-log window parser and repository, the live log API over SSE, and
-                the LiveLogFollower that reconnects it; the build-log follow is deployments'. It
-                reaches deployments only
+  logs/         logs:get: the server-log window parser, the server-log repository and its cursor walk,
+                the live log API over SSE, and the LiveLogFollower that reconnects it; the build-log
+                follow is deployments'. It reaches deployments only
   cache/        the CDN cache purge behind launch:cache:purge: CacheApi, the --path / --prefix / --tags / --hosts
                 inputs and their normalisation, the criterion prompt and the success lines
   site/         the URL choice for an environment's live site (`siteUrlOf`, shared with the deployment follower),
@@ -495,7 +495,7 @@ promoting these to `src/core/catalog.ts` now.
 | 0 | none - oclif exits 0 implicitly | the command did what it was asked to do |
 | 1 | `EXIT_RUNTIME` | a runtime failure - `LaunchApiError`, `LaunchNetworkError`, `UnauthenticatedError`, anything oclif handles |
 | 2 | `EXIT_USAGE` | a usage error - `UsageError`, `MissingInputError`, a failing cross-flag rule |
-| 3 | `EXIT_CANCELLED` | the user declined a confirmation, chose nothing at a picker (`CancelledError`) or pressed Ctrl-C while the CLI was following a deployment's logs or a live log stream (`logs:get`) |
+| 3 | `EXIT_CANCELLED` | the user declined a confirmation, chose nothing at a picker (`CancelledError`) or pressed Ctrl-C while the CLI was following a deployment's logs, walking server-log pages or following a live log stream (`logs:get`) |
 
 `launch:functions:serve` is deliberately a plain oclif `Command` rather than a
 `LaunchCommand`, because it talks to no API and needs no auth gate, and it is **outside**
@@ -745,6 +745,16 @@ reconnects after `RetryPolicy.delayFor(n)`; `DEPLOYMENT_MAX_POLL_ERRORS` consecu
 server's own 5-minute cap: it exits 0 and is never followed by a reconnect. Ctrl-C aborts the same `AbortSignal` the
 sleep and the socket listen to, exit 3. The header builder, `buildRequestHeaders` in `rest-client.ts`, is the only place
 `X-CS-CLI`, `x-cs-api-version`, the auth headers and the org/project scope headers are assembled.
+
+**Server logs are a cursor walk.** `logs:get --type server` reads `GET …/logs/server-logs` oldest-first
+(`sortDirection=asc`) through `ServerLogsApi.pages`, which follows `pageInfo.newestCursor` with the same window,
+`--search` and `--cursor` and prints each page as it arrives, so a window is never held in memory. `nextCursorOf`
+is the one rule for "this page leads to another": `hasNewer` true, a non-empty page and a non-blank cursor. The walk
+also ends after `MAX_PAGES` pages, and a logs service without `pageInfo` (before CL-7180) ends it after one. When the
+last page still leads on, at the cap or on Ctrl-C (exit 3, after the page in hand is printed), the command prints a
+`Resume with:` command whose `--since`/`--until` are the **absolute** window of the run: re-resolving a relative
+`--since` on resume would move the start past the cursor and silently skip the logs between. The cursor is opaque;
+the CLI prints it single-quoted and never parses it, and the server's `INVALID_CURSOR` is the only check on it.
 
 **Writing a test for it: the fake clock must advance.** `now()` and `sleep()` are injected and both
 are required, not optional with defaults. A fake `now: () => 0` with a `sleep` that does nothing
