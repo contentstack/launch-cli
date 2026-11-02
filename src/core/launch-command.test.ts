@@ -461,6 +461,16 @@ describe('LaunchCommand.init authentication gate', () => {
   });
 });
 
+describe('LaunchCommand.init password on the command line', () => {
+  it('leaves -p and its value to the flag parser when the command has no --password flag', async () => {
+    const instance = new Probe(['-p', 'staging'], {} as never);
+    const parserRefusal = new Error('Nonexistent flag: -p');
+    (instance as unknown as { parse: jest.Mock }).parse = jest.fn().mockRejectedValue(parserRefusal);
+
+    await expect(instance.init()).rejects.toBe(parserRefusal);
+  });
+});
+
 describe('LaunchCommand.init terminal detection', () => {
   it.each([[false], [undefined]])('resolves isTTY to false when process.stdin.isTTY is %p', async (isTTY) => {
     const instance = probe();

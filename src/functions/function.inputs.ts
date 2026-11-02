@@ -6,7 +6,6 @@ export const DEFAULT_SERVE_PORT = '3000';
 
 export const serveFlags = {
   port: Flags.string({
-    char: 'p',
     default: DEFAULT_SERVE_PORT,
     description: 'Port number',
   }),

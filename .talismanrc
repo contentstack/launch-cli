@@ -268,9 +268,9 @@ fileignoreconfig:
 - filename: test/integration/projects-delete.test.ts
   checksum: bb59cbe1f4f7b3ac6aa7944067c1ab1214a7c5d20229e9d6577cdaabec56622e
 - filename: src/core/launch-command.ts
-  checksum: 01904855aca54cbbcb846069cee5a0732da1db082110e7e454a5c1c532ab02fb
+  checksum: 999468661532665870b81face9086998e543df648175e2417045840dc97cb1dd
 - filename: src/core/launch-command.test.ts
-  checksum: c4d3785f25377db560bb9daa5d0d080a0131056e6c31e3b45cb4f1f2347305ed
+  checksum: f2570ccfd27539240b251afafd67d5525e5831c4144daad7f7b909eb25e7ee0f
 - filename: src/projects/project.inputs.test.ts
   checksum: 8242f4d40388f1a7f1d08c11d2571cb45a9294069a8248a5272bc5606807bb60
 - filename: test/integration/projects-command-flows.test.ts
@@ -326,13 +326,13 @@ fileignoreconfig:
 - filename: src/core/prompt.test.ts
   checksum: 7be5497acf4cee870667751d44aa230e309784df76dc9e95d5ec2c4e6e6a57e0
 - filename: test/integration/environments-update.test.ts
-  checksum: 4cd0106bf1881d373d23f063314627057d85cab0c43b793f013ffc2ca8859036
+  checksum: 249f27ad679b68f40eac3af90c616229838bceffad57ba508dd298ab053fa51a
 - filename: src/commands/launch/env/update.ts
   checksum: 06add97108d878eaf415e32160439b8963683e63a0e37ce77a56f66b88383c7a
 - filename: src/commands/launch/env/update.test.ts
   checksum: 2da219594e7bdd589adc0eff9ff035252a75aaa51dfa20514b18fd3266d7b752
 - filename: README.md
-  checksum: b6af89e3dea468d56b666f4098a9b2224a5224ca45c9e94f7970d9e6674f3e6e
+  checksum: 916cd3b37e9c40a5d7d6d38437e279bbc573791588d4729ac741309134187724
   allowed_patterns:
     - "password-protection"
     - "-p, --password"
@@ -517,4 +517,8 @@ fileignoreconfig:
   checksum: 44ff11b9b4f3d7583d5faa4a2df45518c959eb4c29896cafe05ead19f215e4c7
 - filename: src/commands/launch/secrets/unset.test.ts
   checksum: a00e503cc66876fa1ef37eaab1a91e2e013af44d3add8ecd6fa08f269d550002
+- filename: src/core/password-argv.ts
+  checksum: 22a5aa7d95c6a5113a034d2cc9af4f152f8a366f1c271f86cd317ea2046f5b1d
+- filename: src/core/password-argv.test.ts
+  checksum: df87a19d09ff07b95d8118dd7e6bae5a13a86f0ecb8dce97e6022481d1e11256
 version: "1.0"

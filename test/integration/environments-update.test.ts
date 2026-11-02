@@ -107,10 +107,19 @@ describe('integration: launch:env:update on the wire', () => {
     expect(onWire).toEqual([]);
   });
 
-  it('refuses a password value on the command line with exit 2 before any request', async () => {
-    const { error } = await runCommand(updateArgs('--password-protection', 'enable', '-p', 'on-argv'), config);
+  it('refuses a password value on the command line with exit 2 before any request, without echoing it', async () => {
+    const password = randomBytes(8).toString('hex');
+
+    const { error, stdout, stderr } = await runCommand(
+      updateArgs('--password-protection', 'enable', '-p', password),
+      config,
+    );
 
     expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe(
+      '--password takes no value. Enter the password at the hidden prompt, or pipe it on standard input.',
+    );
+    expect(`${stdout}${stderr}`).not.toContain(password);
     expect(onWire).toEqual([]);
   });
 
