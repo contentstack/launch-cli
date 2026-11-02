@@ -638,6 +638,28 @@ describe('integration: launch:logs:get on the wire', () => {
     ]);
   });
 
+  it('T54: keeps the 5000-line notice when a logs service before CL-7180 returns a full page with no page info', async () => {
+    jest.spyOn(Date, 'now').mockReturnValue(NOW);
+    ownedProject();
+    deploymentGet('LIVE');
+    const read = hub()
+      .get(SERVER_LOGS)
+      .query({ startTime: String(NOW - 3_600_000), endTime: String(NOW), sortDirection: 'asc' })
+      .reply(200, {
+        serverLogs: Array.from({ length: 5000 }, (_, index) => ({ timestamp: '2026-10-28T11:30:00.000Z', message: `line ${index}` })),
+      });
+
+    const { error, stdout } = await runCommand(getArgs('--deployment', DEPLOYMENT_UID, '--type', 'server'), config);
+    const lines = outputLines(stdout);
+
+    expect(error).toBeUndefined();
+    expect(read.isDone()).toBe(true);
+    expect(lines).toHaveLength(5001);
+    expect(lines.at(-1)).toBe(
+      'Showing the newest 5000 server log lines in this window. Narrow --since/--until to see earlier ones.',
+    );
+  });
+
   it('T55: prints the 24 hour notice first for --since 2d and sends the user own start time', async () => {
     jest.spyOn(Date, 'now').mockReturnValue(NOW);
     ownedProject();

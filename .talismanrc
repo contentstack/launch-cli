@@ -2,9 +2,9 @@ fileignoreconfig:
 - filename: src/logs/logs.inputs.test.ts
   checksum: 7b4df8790179c7dc4385acd1d380bb91397523bab111593742e2fc53c94da375
 - filename: test/integration/logs-get.test.ts
-  checksum: ce0b900bad922e911896de19387686fdc224ba6e62b380dae09e7153c59770a8
+  checksum: 909965f29b2e6a0b6220b22c175b4a39edc05759fba1274a7a1f2f750a7e0e3b
 - filename: src/commands/launch/logs/get.test.ts
-  checksum: b1184a9ae3845f3a1f70c73d87c1ad287ba8277d190a0783820626a3a4cf60b3
+  checksum: d94d390de150956c799f64a84adfe0e02b5b21c66ddcc5cf55a1329aa67ec1a7
 - filename: src/core/failure.test.ts
   checksum: 242d43885d1e3ef46edf1e347899a90549ebf95ec6827426746852f7a6dfc418
 - filename: test/integration/retired-commands.test.ts

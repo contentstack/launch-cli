@@ -18,6 +18,7 @@ import {
   noDeploymentLogsLine,
   noServerLogsLine,
   serverLogLine,
+  serverLogsCapLine,
   serverLogsPageCapLine,
   serverLogsResumeLine,
   serverLogsRetentionLine,
@@ -26,6 +27,8 @@ import {
 import { LiveLogFollower } from '../../../logs/live-log.follower';
 import { parseLogWindow, type LogWindow } from '../../../logs/log-window';
 import { nextCursorOf } from '../../../logs/server-logs.api';
+import { SERVER_LOGS_PAGE_CAP, type ServerLogsPage } from '../../../logs/types';
+import { isRecord } from '../../../core/values';
 
 const getInputs = inputs({
   org: { required: true },
@@ -142,6 +145,7 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
     const { startTime, endTime, clampedFrom } = window;
     const { search, cursor } = this.resolved;
     let printed = 0;
+    let last: ServerLogsPage | undefined;
 
     if (clampedFrom !== undefined) {
       this.ux.print(serverLogsRetentionLine(clampedFrom, outputIsTTY));
@@ -154,6 +158,7 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
       }
 
       resume.cursor = nextCursorOf(page);
+      last = page;
 
       if (stop.aborted) {
         throw stop.reason;
@@ -162,6 +167,10 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
 
     if (printed === 0) {
       this.ux.print(noServerLogsLine(startTime, endTime, outputIsTTY, search));
+    }
+
+    if (last !== undefined && !isRecord(last.pageInfo) && last.logs.length === SERVER_LOGS_PAGE_CAP) {
+      this.ux.print(serverLogsCapLine(outputIsTTY));
     }
 
     if (resume.cursor !== undefined) {

@@ -268,6 +268,23 @@ describe('LogsGet', () => {
     ]);
   });
 
+  it.each([
+    [5000, true],
+    [4999, false],
+  ])('on a logs service without page info, %i lines show the 5000-line notice: %s', async (count, shows) => {
+    const logs = Array.from({ length: count }, (_, index) => ({ message: `line ${index}` }));
+    const { command, lines } = commandUnderTest({ resolved: { 'log-type': 'server' }, serverPages: [{ logs }] });
+
+    await command.run();
+
+    expect(lines).toHaveLength(shows ? count + 1 : count);
+    expect(lines.at(-1)).toBe(
+      shows
+        ? 'Showing the newest 5000 server log lines in this window. Narrow --since/--until to see earlier ones.'
+        : `line ${count - 1}`,
+    );
+  });
+
   it('prints a full page of 5000 lines with no cap notice when the server reports nothing newer', async () => {
     const serverLogs = Array.from({ length: 5000 }, (_, index) => ({
       timestamp: '2026-10-28T11:30:00.000Z',
