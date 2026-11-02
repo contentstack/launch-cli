@@ -107,8 +107,6 @@
     "prepare": "husky"
   },
   "overrides": {
-    "qs": "~6.16.2",
-    "follow-redirects": "^1.16.2",
     "tty-table": {
       "csv": "^6.6.4"
     },
