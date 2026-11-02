@@ -518,11 +518,11 @@ Serve cloud functions
 
 ```
 USAGE
-  $ csdx launch:functions:serve [-p <value>] [-d <value>]
+  $ csdx launch:functions:serve [--port <value>] [-d <value>]
 
 FLAGS
   -d, --data-dir=<value>  Current working directory
-  -p, --port=<value>      [default: 3000] Port number
+      --port=<value>      [default: 3000] Port number
 
 DESCRIPTION
   Serve cloud functions
@@ -534,7 +534,7 @@ EXAMPLES
 
   $ csdx launch:functions:serve --data-dir <path/of/current/working/dir>
 
-  $ csdx launch:functions:serve --data-dir <path/of/current/working/dir> -p <port-number>
+  $ csdx launch:functions:serve --data-dir <path/of/current/working/dir> --port <port-number>
 ```
 
 _See code: [src/commands/launch/functions/serve.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/functions/serve.ts)_

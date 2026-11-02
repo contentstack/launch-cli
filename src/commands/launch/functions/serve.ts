@@ -15,7 +15,7 @@ export default class Functions extends Command {
     '$ csdx launch:functions:serve',
     '$ csdx launch:functions:serve --port <port-number>',
     '$ csdx launch:functions:serve --data-dir <path/of/current/working/dir>',
-    '$ csdx launch:functions:serve --data-dir <path/of/current/working/dir> -p <port-number>',
+    '$ csdx launch:functions:serve --data-dir <path/of/current/working/dir> --port <port-number>',
   ];
 
   static flags = serveFlags;

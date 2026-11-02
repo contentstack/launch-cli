@@ -108,12 +108,13 @@ describe('launch:functions:serve flag definitions', () => {
       '$ csdx launch:functions:serve',
       '$ csdx launch:functions:serve --port <port-number>',
       '$ csdx launch:functions:serve --data-dir <path/of/current/working/dir>',
-      '$ csdx launch:functions:serve --data-dir <path/of/current/working/dir> -p <port-number>',
+      '$ csdx launch:functions:serve --data-dir <path/of/current/working/dir> --port <port-number>',
     ]);
   });
 
-  it('declares a port flag defaulting to 3000 and a data-dir flag', () => {
-    expect(Functions.flags.port).toMatchObject({ char: 'p', default: '3000', description: 'Port number' });
+  it('declares a port flag defaulting to 3000 with no short flag, and a data-dir flag', () => {
+    expect(Functions.flags.port).toMatchObject({ default: '3000', description: 'Port number' });
+    expect(Functions.flags.port.char).toBeUndefined();
     expect(Functions.flags.port.env).toBeUndefined();
     expect(Functions.flags['data-dir']).toMatchObject({ char: 'd', description: 'Current working directory' });
     expect(Functions.flags['data-dir'].default).toBeUndefined();

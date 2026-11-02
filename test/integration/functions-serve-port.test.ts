@@ -89,4 +89,11 @@ describe('integration: launch:functions:serve port handling', () => {
     expect(stderr).toBe('');
     await expect(errorLog()).resolves.toBe(INVALID_PORT_RECORD);
   });
+
+  it('rejects V1 -p as a nonexistent flag, so the port is only ever set with --port', async () => {
+    const { error } = await runCommand(['launch:functions:serve', '-p', '4000', '--data-dir', projectDir], config);
+
+    expect(error?.message).toContain('Nonexistent flag: -p');
+    expect(error?.oclif?.exit).toBe(2);
+  });
 });
