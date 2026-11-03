@@ -16,7 +16,7 @@ import type { FlagKey } from '../resources';
 import { LaunchCommand, projectConfigLoader, resolveLaunchContext } from './launch-command';
 import * as serviceContext from './service-context';
 import type { SearchListClass } from './search-list';
-import { utilitiesLoader } from './search-list';
+import { promptLibrary, utilitiesLoader } from './search-list';
 import { pretendTerminal, stdinReportingTTY, stdoutReportingTTY } from '../../test/support/terminal';
 
 class Probe extends LaunchCommand {
@@ -336,8 +336,7 @@ describe('LaunchCommand.init', () => {
   });
 
   it('registers the searchable picker on the inquirer cliux prompts with before anything can prompt', async () => {
-    const load = utilitiesLoader();
-    const prompts = (load('inquirer') as { prompt: { prompts: Record<string, unknown> } }).prompt.prompts;
+    const prompts = promptLibrary().prompt.prompts;
     delete prompts['search-list'];
     const instance = probe();
     const authSpy = jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
@@ -352,7 +351,7 @@ describe('LaunchCommand.init', () => {
     await instance.init();
 
     expect((registeredWhenParsed as SearchListClass).prototype).toBeInstanceOf(
-      load('inquirer-search-list') as SearchListClass,
+      utilitiesLoader()('inquirer-search-list') as SearchListClass,
     );
     expect(prompts['search-list']).toBe(registeredWhenParsed);
     authSpy.mockRestore();
