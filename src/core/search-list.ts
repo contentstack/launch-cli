@@ -153,12 +153,39 @@ export function utilitiesLoader(): ModuleLoader {
   return createRequire(require.resolve('@contentstack/cli-utilities'));
 }
 
+// cli-utilities 1 ships inquirer 8 (registerPrompt on the module, prompts under lib/prompts). csdx 2 forces
+// every plugin onto its own cli-utilities 2, whose inquirer 12 has registerPrompt only on the default export
+// and no lib/prompts, so list and checkbox keep inquirer's own paging there.
+function promptRegistry(inquirer: unknown): PromptRegistry {
+  const module = inquirer as Partial<PromptRegistry> & { default?: PromptRegistry };
+
+  return typeof module.registerPrompt === 'function' ? (module as PromptRegistry) : (module.default as PromptRegistry);
+}
+
+const ABSENT_MODULE_CODES = new Set(['MODULE_NOT_FOUND', 'ERR_PACKAGE_PATH_NOT_EXPORTED']);
+
+function loadIfPresent(load: ModuleLoader, id: string): unknown {
+  try {
+    return load(id);
+  } catch (error) {
+    if (ABSENT_MODULE_CODES.has(String((error as { code?: unknown }).code))) {
+      return undefined;
+    }
+
+    throw error;
+  }
+}
+
 export function registerSearchList(load: ModuleLoader = utilitiesLoader()): void {
-  const inquirer = load('inquirer') as PromptRegistry;
+  const inquirer = promptRegistry(load('inquirer'));
 
   inquirer.registerPrompt('search-list', launchSearchList(load('inquirer-search-list') as SearchListClass));
 
   for (const type of ['list', 'checkbox']) {
-    inquirer.registerPrompt(type, launchPaginated(load(`inquirer/lib/prompts/${type}`) as PaginatedClass));
+    const Prompt = loadIfPresent(load, `inquirer/lib/prompts/${type}`);
+
+    if (Prompt !== undefined) {
+      inquirer.registerPrompt(type, launchPaginated(Prompt as PaginatedClass));
+    }
   }
 }

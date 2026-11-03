@@ -361,6 +361,44 @@ describe('registerSearchList', () => {
     expect(registered[0][1]).not.toBe(SearchList);
   });
 
+  it('registers on the default export of an inquirer that has no top-level registerPrompt, as cli-utilities 2 ships', () => {
+    const registered: string[] = [];
+    const fakeLoad = (id: string): unknown =>
+      id === 'inquirer' ? { default: { registerPrompt: (name: string) => registered.push(name) } } : SearchList;
+
+    registerSearchList(fakeLoad);
+
+    expect(registered).toEqual(['search-list', 'list', 'checkbox']);
+  });
+
+  it.each([
+    ['its package exports hide lib/prompts, as inquirer 12 does', 'ERR_PACKAGE_PATH_NOT_EXPORTED'],
+    ['lib/prompts is missing from the package', 'MODULE_NOT_FOUND'],
+  ])('keeps the built-in list and checkbox when %s', (_reason, code) => {
+    const registered: string[] = [];
+    const fakeLoad = (id: string): unknown => {
+      if (id.startsWith('inquirer/lib/prompts/')) {
+        throw Object.assign(new Error(`Cannot load '${id}'`), { code });
+      }
+      return id === 'inquirer' ? { default: { registerPrompt: (name: string) => registered.push(name) } } : SearchList;
+    };
+
+    expect(() => registerSearchList(fakeLoad)).not.toThrow();
+    expect(registered).toEqual(['search-list']);
+  });
+
+  it('still fails when a list or checkbox prompt cannot load for any reason other than being absent', () => {
+    const broken = new Error('Unexpected token in inquirer/lib/prompts/list');
+    const fakeLoad = (id: string): unknown => {
+      if (id === 'inquirer/lib/prompts/list') {
+        throw broken;
+      }
+      return id === 'inquirer' ? { registerPrompt: () => undefined } : SearchList;
+    };
+
+    expect(() => registerSearchList(fakeLoad)).toThrow(broken);
+  });
+
   it('registers on the real inquirer cli-utilities depends on when no loader is given', () => {
     const inquirer = load('inquirer') as { prompt: { prompts: Record<string, unknown> } };
 
