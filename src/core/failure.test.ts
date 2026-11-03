@@ -72,6 +72,23 @@ describe('reportFailure', () => {
     await expect(outcome).resolves.toBe(exit);
     expect(lines).toEqual([]);
   });
+
+  it('lets an exit request raised by another copy of oclif pass through untouched, as csdx 2 hands its own to plugins', async () => {
+    const exit = Object.assign(new Error('EEXIT: 3'), { code: 'EEXIT', oclif: { exit: 3 } });
+    const { lines, outcome } = report(exit);
+
+    expect(exit).not.toBeInstanceOf(Errors.ExitError);
+    await expect(outcome).resolves.toBe(exit);
+    expect(lines).toEqual([]);
+  });
+
+  it('keeps the exit code of an oclif error raised by another copy of oclif', async () => {
+    const { lines, outcome } = report(Object.assign(new Error('Unexpected argument: extra'), { oclif: { exit: 2 } }));
+    const thrown = await outcome;
+
+    expect(lines).toEqual(['error: Unexpected argument: extra']);
+    expect(thrown.oclif.exit).toBe(2);
+  });
 });
 
 describe('handleStandaloneFailure', () => {

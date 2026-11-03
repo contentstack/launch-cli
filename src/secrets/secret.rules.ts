@@ -1,6 +1,5 @@
-import { Errors } from '@oclif/core';
-
 import { UsageError } from '../core/errors';
+import { isOclifError } from '../core/failure';
 
 export const CLIENT_EXPOSED_PREFIXES = ['NEXT_PUBLIC_', 'NUXT_PUBLIC_', 'VITE_', 'GATSBY_', 'PUBLIC_'] as const;
 
@@ -50,7 +49,7 @@ export function singleKeyError(count: number): UsageError {
 }
 
 export function asSafeArgvFailure(error: unknown, message: string = INVALID_ARGUMENTS_MESSAGE): unknown {
-  const isParseFailure = error instanceof Errors.CLIError && Object.prototype.hasOwnProperty.call(error, 'parse');
+  const isParseFailure = isOclifError(error) && Object.prototype.hasOwnProperty.call(error, 'parse');
 
   return isParseFailure ? new UsageError(message) : error;
 }
