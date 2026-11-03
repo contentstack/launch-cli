@@ -9,6 +9,18 @@ async function parse(argv: string[]): Promise<Record<string, unknown>> {
 }
 
 describe('coreFlags', () => {
+  it('gives --yes no short flag', () => {
+    expect(coreFlags.yes.char).toBeUndefined();
+  });
+
+  it('still parses --yes as true', async () => {
+    await expect(parse(['--yes'])).resolves.toMatchObject({ yes: true });
+  });
+
+  it('rejects -y at parse time rather than reading it as --yes', async () => {
+    await expect(parse(['-y'])).rejects.toThrow(/Nonexistent flag: -y/);
+  });
+
   it('advertises the limit range in the flag itself, not only in the help text', () => {
     expect(coreFlags.limit).toMatchObject({ min: 1, max: CLIENT_MAX_LIMIT });
     expect(coreFlags.limit.description).toBe(`Number of records to fetch (1-${CLIENT_MAX_LIMIT})`);
