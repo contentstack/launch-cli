@@ -130,6 +130,17 @@ describe('asSafeArgvFailure', () => {
     expect(asSafeArgvFailure('text')).toBe('text');
   });
 
+  it('replaces a parse error raised by another copy of oclif, as csdx 2 hands its own to plugins', () => {
+    const raw = Object.assign(new Error(`Unexpected argument: ${secret}`), { oclif: { exit: 2 }, parse: {} });
+
+    const safe = asSafeArgvFailure(raw) as UsageError;
+
+    expect(raw).not.toBeInstanceOf(Errors.CLIError);
+    expect(safe).toBeInstanceOf(UsageError);
+    expect(safe.message).toBe(INVALID_ARGUMENTS_MESSAGE);
+    expect(safe.message).not.toContain(secret);
+  });
+
   it('words the replacement with the message it is given, never an argv token', async () => {
     const raw = await realParseFailure([`--value=${secret}`]);
 

@@ -20,8 +20,8 @@
     "/oclif.manifest.json"
   ],
   "dependencies": {
-    "@contentstack/cli-command": "^1.8.7",
-    "@contentstack/cli-utilities": "^1.18.5",
+    "@contentstack/cli-command": "^2.0.2",
+    "@contentstack/cli-utilities": "^2.0.2",
     "@oclif/core": "^4.2.7",
     "@oclif/plugin-help": "^6.2.25",
     "@rollup/plugin-commonjs": "^28.0.9",

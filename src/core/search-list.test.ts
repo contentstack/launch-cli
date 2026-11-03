@@ -4,8 +4,8 @@ import {
   MORE_CHOICES_HINT,
   UnlistedAnswer,
   answerFor,
-  launchPaginated,
   launchSearchList,
+  promptLibrary,
   refuseUnlisted,
   registerSearchList,
   pageScroller,
@@ -265,33 +265,6 @@ describe('pageScroller', () => {
   });
 });
 
-describe('launchPaginated', () => {
-  interface Paginated {
-    paginator: { paginate(output: string, active: number, pageSize?: number): string };
-  }
-
-  class Upstream {
-    paginator = { paginate: (output: string) => output };
-  }
-
-  it('pages with its own scroller, which keeps the arrow moving and says how to see more', () => {
-    const Prompt = launchPaginated(Upstream as never) as unknown as new () => Paginated;
-    const prompt = new Prompt();
-    const lines = Array.from({ length: 10 }, (_, index) => `c${index}`).join('\n');
-
-    expect(prompt.paginator.paginate(lines, 3, 7).split('\n')).toEqual([
-      'c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', `\u001b[2m${MORE_CHOICES_HINT}\u001b[22m`,
-    ]);
-    expect(MORE_CHOICES_HINT).toBe('(Use ↑/↓ to see more options)');
-  });
-
-  it('gives each prompt a scroller of its own', () => {
-    const Prompt = launchPaginated(Upstream as never) as unknown as new () => Paginated;
-
-    expect(new Prompt().paginator).not.toBe(new Prompt().paginator);
-  });
-});
-
 describe('answerFor', () => {
   it('answers with the value of the choice whose name was typed in full', () => {
     expect(answerFor(CHOICES, 'NextJs')).toBe('NextJs');
@@ -343,35 +316,43 @@ describe('refuseUnlisted', () => {
   });
 });
 
+describe('promptLibrary', () => {
+  it('is the default export of the inquirer cli-utilities depends on, where inquirer 12 keeps its registry', () => {
+    const library = promptLibrary();
+
+    expect(library).toBe((load('inquirer') as { default: unknown }).default);
+    expect(typeof library.registerPrompt).toBe('function');
+    expect(Object.keys(library.prompt.prompts)).toEqual(expect.arrayContaining(['list', 'checkbox', 'confirm', 'input']));
+  });
+});
+
 describe('registerSearchList', () => {
-  it('registers the launch search list under search-list on the inquirer that cliux prompts with', () => {
+  it('registers the launch search list under search-list on the inquirer that cliux prompts with, and nothing else', () => {
     const registered: [string, unknown][] = [];
     const loaded: string[] = [];
     const fakeLoad = (id: string): unknown => {
       loaded.push(id);
-      return id === 'inquirer' ? { registerPrompt: (name: string, prompt: unknown) => registered.push([name, prompt]) } : SearchList;
+      return id === 'inquirer'
+        ? { default: { registerPrompt: (name: string, prompt: unknown) => registered.push([name, prompt]) } }
+        : SearchList;
     };
 
     registerSearchList(fakeLoad);
 
-    expect(loaded).toEqual(['inquirer', 'inquirer-search-list', 'inquirer/lib/prompts/list', 'inquirer/lib/prompts/checkbox']);
-    expect(registered.map(([name]) => name)).toEqual(['search-list', 'list', 'checkbox']);
-    expect(registered[0][0]).toBe('search-list');
+    expect(loaded).toEqual(['inquirer', 'inquirer-search-list']);
+    expect(registered.map(([name]) => name)).toEqual(['search-list']);
     expect((registered[0][1] as SearchListClass).prototype).toBeInstanceOf(SearchList);
     expect(registered[0][1]).not.toBe(SearchList);
   });
 
-  it('registers on the real inquirer cli-utilities depends on when no loader is given', () => {
-    const inquirer = load('inquirer') as { prompt: { prompts: Record<string, unknown> } };
+  it('registers on the real inquirer cli-utilities depends on when no loader is given, leaving its list and checkbox as they are', () => {
+    const library = promptLibrary();
+    const { list, checkbox } = library.prompt.prompts;
 
     registerSearchList();
 
-    expect((inquirer.prompt.prompts['search-list'] as SearchListClass).prototype).toBeInstanceOf(SearchList);
-    for (const type of ['list', 'checkbox']) {
-      const Upstream = load(`inquirer/lib/prompts/${type}`) as SearchListClass;
-
-      expect((inquirer.prompt.prompts[type] as SearchListClass).prototype).toBeInstanceOf(Upstream);
-      expect(inquirer.prompt.prompts[type]).not.toBe(Upstream);
-    }
+    expect((library.prompt.prompts['search-list'] as SearchListClass).prototype).toBeInstanceOf(SearchList);
+    expect(library.prompt.prompts.list).toBe(list);
+    expect(library.prompt.prompts.checkbox).toBe(checkbox);
   });
 });

@@ -40,12 +40,22 @@ function alreadyReported(err: Error): boolean {
   return (err as Error & { skipOclifErrorHandling?: boolean }).skipOclifErrorHandling === true;
 }
 
+// csdx 2 makes plugins use its own @oclif/core through cli-utilities, so errors its Command throws are not
+// instances of the Errors class imported here. Recognise them by the shape every oclif error carries.
+export function isOclifError(err: unknown): err is Errors.CLIError {
+  return err instanceof Error && typeof (err as { oclif?: unknown }).oclif === 'object';
+}
+
+function isExitRequest(err: Error): boolean {
+  return isOclifError(err) && (err as { code?: unknown }).code === 'EEXIT';
+}
+
 export async function reportFailure(err: Error, output: FailureOutput): Promise<unknown> {
-  if (err instanceof Errors.ExitError || alreadyReported(err)) {
+  if (isExitRequest(err) || alreadyReported(err)) {
     throw err;
   }
 
-  if (err instanceof Errors.CLIError) {
+  if (isOclifError(err)) {
     return failWith(err.message, err.oclif.exit, output);
   }
 

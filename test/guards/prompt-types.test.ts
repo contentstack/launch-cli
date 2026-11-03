@@ -1,14 +1,9 @@
 import { authHandler } from '@contentstack/cli-utilities';
 
 import { LaunchCommand } from '../../src/core/launch-command';
-import { utilitiesLoader } from '../../src/core/search-list';
+import { promptLibrary } from '../../src/core/search-list';
 import type { SourceFile } from '../support/sources';
 import { balancedCall, productionSources } from '../support/sources';
-
-interface PromptRegistry {
-  prompt: { prompts: Record<string, unknown> };
-  restoreDefaultPrompts(): void;
-}
 
 interface PromptCall {
   site: string;
@@ -43,30 +38,22 @@ function promptCallsInSrc(): PromptCall[] {
 }
 
 async function registeredAfterAFreshLaunchCommandInit(): Promise<string[]> {
-  const registry = utilitiesLoader()('inquirer') as PromptRegistry;
-  const prompts = registry.prompt.prompts;
-  const saved = { ...prompts };
+  const registry = promptLibrary();
+  const original = registry.prompt.prompts;
   const instance = new FreshCommand([], {} as never);
   jest.spyOn(authHandler, 'isAuthenticated').mockReturnValue(true);
   Object.defineProperty(instance, 'launchRegion', { value: { launchHubUrl: 'https://launch-api.test' } });
   Object.defineProperty(instance, 'config', { value: { userAgent: 'cli/2.0.0' } });
   (instance as unknown as { parse: () => Promise<unknown> }).parse = async () => ({ flags: {} });
 
-  for (const name of Object.keys(prompts)) {
-    delete prompts[name];
-  }
-
+  // inquirer 12 swaps in a fresh registry object rather than resetting the one it had.
   registry.restoreDefaultPrompts();
 
   try {
     await instance.init();
-    return Object.keys(prompts);
+    return Object.keys(registry.prompt.prompts);
   } finally {
-    for (const name of Object.keys(prompts)) {
-      delete prompts[name];
-    }
-
-    Object.assign(prompts, saved);
+    registry.prompt.prompts = original;
   }
 }
 
@@ -101,7 +88,7 @@ describe('guard: every prompt type the CLI asks for is registered with the real 
   });
 
   it('starts the registration check from inquirer defaults, so a registration left behind by another test cannot satisfy it', async () => {
-    const registry = utilitiesLoader()('inquirer') as PromptRegistry;
+    const registry = promptLibrary();
     const before = Object.keys(registry.prompt.prompts);
 
     const registered = await registeredAfterAFreshLaunchCommandInit();

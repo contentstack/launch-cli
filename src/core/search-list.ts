@@ -25,8 +25,10 @@ export type SearchListClass = new (...params: never[]) => SearchListPrompt;
 
 export type ModuleLoader = (id: string) => unknown;
 
-interface PromptRegistry {
+export interface PromptRegistry {
+  prompt: { prompts: Record<string, unknown> };
   registerPrompt(name: string, prompt: unknown): void;
+  restoreDefaultPrompts(): void;
 }
 
 export class UnlistedAnswer {
@@ -62,8 +64,6 @@ interface Paginator {
   paginate(output: string, active: number, pageSize?: number): string;
 }
 
-export type PaginatedClass = new (...params: never[]) => { paginator: Paginator };
-
 export function pageScroller(): Paginator {
   let top = 0;
 
@@ -85,15 +85,6 @@ export function pageScroller(): Paginator {
 
       return [...lines.slice(top, top + pageSize), styled(MORE_CHOICES_HINT, 'dim', true)].join('\n');
     },
-  };
-}
-
-export function launchPaginated(Prompt: PaginatedClass): PaginatedClass {
-  return class LaunchPaginated extends Prompt {
-    constructor(...params: never[]) {
-      super(...params);
-      this.paginator = pageScroller();
-    }
   };
 }
 
@@ -153,12 +144,11 @@ export function utilitiesLoader(): ModuleLoader {
   return createRequire(require.resolve('@contentstack/cli-utilities'));
 }
 
+// cli-utilities 2 ships inquirer 12, which exposes the prompt registry cliux prompts with as its default export.
+export function promptLibrary(load: ModuleLoader = utilitiesLoader()): PromptRegistry {
+  return (load('inquirer') as { default: PromptRegistry }).default;
+}
+
 export function registerSearchList(load: ModuleLoader = utilitiesLoader()): void {
-  const inquirer = load('inquirer') as PromptRegistry;
-
-  inquirer.registerPrompt('search-list', launchSearchList(load('inquirer-search-list') as SearchListClass));
-
-  for (const type of ['list', 'checkbox']) {
-    inquirer.registerPrompt(type, launchPaginated(load(`inquirer/lib/prompts/${type}`) as PaginatedClass));
-  }
+  promptLibrary(load).registerPrompt('search-list', launchSearchList(load('inquirer-search-list') as SearchListClass));
 }
