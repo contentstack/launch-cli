@@ -170,16 +170,16 @@ Cancel a deployment of a Launch environment that is still in progress
 ```
 USAGE
   $ csdx launch:deployments:cancel [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--deployment
-    <value>] [-y]
+    <value>] [--yes]
 
 FLAGS
   -c, --config=<value>      Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>    Current working directory
-  -y, --yes                 Skip the confirmation prompt
       --deployment=<value>  Deployment UID
       --env=<value>         Environment name or UID
       --org=<value>         Organization UID
       --project=<value>     Project name or UID
+      --yes                 Skip the confirmation prompt
 
 DESCRIPTION
   Cancel a deployment of a Launch environment that is still in progress
@@ -287,17 +287,17 @@ Roll a Launch environment back to a previous deployment
 ```
 USAGE
   $ csdx launch:deployments:rollback [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--deployment
-    <value>] [--reason <value>] [-y]
+    <value>] [--reason <value>] [--yes]
 
 FLAGS
   -c, --config=<value>      Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>    Current working directory
-  -y, --yes                 Skip the confirmation prompt
       --deployment=<value>  Deployment UID
       --env=<value>         Environment name or UID
       --org=<value>         Organization UID
       --project=<value>     Project name or UID
       --reason=<value>      Why the environment is being rolled back, recorded with the rollback
+      --yes                 Skip the confirmation prompt
 
 DESCRIPTION
   Roll a Launch environment back to a previous deployment
@@ -363,15 +363,15 @@ Delete an environment of a Launch project
 
 ```
 USAGE
-  $ csdx launch:env:delete [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [-y]
+  $ csdx launch:env:delete [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--yes]
 
 FLAGS
   -c, --config=<value>    Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>  Current working directory
-  -y, --yes               Skip the confirmation prompt
       --env=<value>       Environment name or UID
       --org=<value>       Organization UID
       --project=<value>   Project name or UID
+      --yes               Skip the confirmation prompt
 
 DESCRIPTION
   Delete an environment of a Launch project
@@ -443,7 +443,7 @@ USAGE
   $ csdx launch:env:update [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--name
     <value>] [--description <value>] [--branch <value>] [--framework <value>] [--build-cmd <value>] [--server-cmd
     <value>] [--output-dir <value>] [--res-mode <value>] [--auto-deploy <value>] [--cs-auth <value>] [--cache-priming
-    <value>] [--password-protection <value>] [-u <value>] [-p] [-y]
+    <value>] [--password-protection <value>] [-u <value>] [-p] [--yes]
 
 FLAGS
   -c, --config=<value>               Path to the local '.cs-launch.json' file
@@ -451,7 +451,6 @@ FLAGS
   -p, --password                     With --password-protection enable: read the password from standard input when there
                                      is no terminal (on a terminal it is asked at a hidden prompt)
   -u, --username=<value>             Password protection username, with --password-protection enable
-  -y, --yes                          Skip the confirmation prompt
       --auto-deploy=<value>          Deploy on every push, GitHub projects only (enable | disable)
       --branch=<value>               Git branch name, GitHub projects only
       --build-cmd=<value>            Build command
@@ -468,6 +467,7 @@ FLAGS
       --project=<value>              Project name or UID
       --res-mode=<value>             Response mode (buffered | streaming)
       --server-cmd=<value>           Server command
+      --yes                          Skip the confirmation prompt
 
 DESCRIPTION
   Update an environment of a Launch project
@@ -658,14 +658,14 @@ Delete a Launch project
 
 ```
 USAGE
-  $ csdx launch:projects:delete [-c <value>] [-d <value>] [--org <value>] [--project <value>] [-y]
+  $ csdx launch:projects:delete [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--yes]
 
 FLAGS
   -c, --config=<value>    Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>  Current working directory
-  -y, --yes               Skip the confirmation prompt
       --org=<value>       Organization UID
       --project=<value>   Project name or UID
+      --yes               Skip the confirmation prompt
 
 DESCRIPTION
   Delete a Launch project
@@ -800,16 +800,16 @@ Add a secret to an environment, or replace its value when the key exists. Takes 
 ```
 USAGE
   $ csdx launch:secrets:set [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--key
-    <value>...] [-y]
+    <value>...] [--yes]
 
 FLAGS
   -c, --config=<value>    Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>  Current working directory
-  -y, --yes               Skip the confirmation prompt
       --env=<value>       Environment name or UID
       --key=<value>...    Secret key
       --org=<value>       Organization UID
       --project=<value>   Project name or UID
+      --yes               Skip the confirmation prompt
 
 DESCRIPTION
   Add a secret to an environment, or replace its value when the key exists. Takes one --key. The value is read from a
@@ -830,16 +830,16 @@ Remove secrets from an environment, after asking for confirmation. Pass --key on
 ```
 USAGE
   $ csdx launch:secrets:unset [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--key
-    <value>...] [-y]
+    <value>...] [--yes]
 
 FLAGS
   -c, --config=<value>    Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>  Current working directory
-  -y, --yes               Skip the confirmation prompt
       --env=<value>       Environment name or UID
       --key=<value>...    Secret key, repeatable
       --org=<value>       Organization UID
       --project=<value>   Project name or UID
+      --yes               Skip the confirmation prompt
 
 DESCRIPTION
   Remove secrets from an environment, after asking for confirmation. Pass --key once per secret. A key that cannot be
@@ -955,16 +955,16 @@ Remove environment variables from an environment, after asking for confirmation
 ```
 USAGE
   $ csdx launch:variables:unset [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--key
-    <value>...] [-y]
+    <value>...] [--yes]
 
 FLAGS
   -c, --config=<value>    Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>  Current working directory
-  -y, --yes               Skip the confirmation prompt
       --env=<value>       Environment name or UID
       --key=<value>...    Environment variable key, repeatable
       --org=<value>       Organization UID
       --project=<value>   Project name or UID
+      --yes               Skip the confirmation prompt
 
 DESCRIPTION
   Remove environment variables from an environment, after asking for confirmation

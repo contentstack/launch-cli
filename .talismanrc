@@ -6,7 +6,7 @@ fileignoreconfig:
 - filename: src/commands/launch/logs/get.test.ts
   checksum: d94d390de150956c799f64a84adfe0e02b5b21c66ddcc5cf55a1329aa67ec1a7
 - filename: src/core/failure.test.ts
-  checksum: 242d43885d1e3ef46edf1e347899a90549ebf95ec6827426746852f7a6dfc418
+  checksum: d8be306f3bde77249360475bbb76093ce67458f3530c3b4c5bd7e6a516a910aa
 - filename: test/integration/retired-commands.test.ts
   checksum: c38d6e8dae6bd4d2034ff48bff488e89cc00d950a7417c6df890168ac743ae37
 - filename: test/integration/manage-base-path.test.ts
@@ -246,9 +246,6 @@ fileignoreconfig:
     - "what `limit` resolves to when nobody passed it"
     - "a test passes `var`, `env-file` and `from-stack`"
     - "an in-flight secret registry to redact against"
-- filename: src/core/search-list.test.ts
-  allowed_patterns:
-    - "passes a listed answer, and the answers beside it"
 - filename: src/core/project-config.ts
   checksum: 1f19da706128ee78e1fe20d8624626038893d908a7061b3f2633e741a77c93b6
 - filename: src/core/project-config.test.ts
@@ -270,7 +267,7 @@ fileignoreconfig:
 - filename: src/core/launch-command.ts
   checksum: 999468661532665870b81face9086998e543df648175e2417045840dc97cb1dd
 - filename: src/core/launch-command.test.ts
-  checksum: f2570ccfd27539240b251afafd67d5525e5831c4144daad7f7b909eb25e7ee0f
+  checksum: c4488f07834e0c6e765a954cd30b3222eba05944f48bec01839f024b1cb7622f
 - filename: src/projects/project.inputs.test.ts
   checksum: 8242f4d40388f1a7f1d08c11d2571cb45a9294069a8248a5272bc5606807bb60
 - filename: test/integration/projects-command-flows.test.ts
@@ -307,8 +304,10 @@ fileignoreconfig:
   checksum: 840b2b2b7f938e0862881871e8d568112631c58e12cf6c8a5be32e7552b8cf9e
 - filename: src/transport/cma-client.test.ts
   checksum: 85d62ef350b450cb09f1a840db79bdfb212d4f5fd650789d60d722915a892a59
+- filename: src/core/search-list.test.ts
+  checksum: 0c324ecf8de5cc2fc1ccc27223cae555d7db6c8061c4bd7288e0dc7fb28f6b87
 - filename: src/core/catalog.test.ts
-  checksum: bf8c203a8efc40a75f5407ceb29a639ea9a6e1fa081d02260def2d7e0fab958a
+  checksum: ec946f9a2802dfe71db501ac1fa10ceaac6fe29ef5e98ade40a11330e60718f7
 - filename: test/credential-guard.setup.ts
   checksum: 519ccbeb0552fdb1d5f27308c56477c0258ee6cc0adec8f618e8e5bc047cbf6d
 - filename: src/environments/types.ts
@@ -332,7 +331,7 @@ fileignoreconfig:
 - filename: src/commands/launch/env/update.test.ts
   checksum: 2da219594e7bdd589adc0eff9ff035252a75aaa51dfa20514b18fd3266d7b752
 - filename: README.md
-  checksum: 916cd3b37e9c40a5d7d6d38437e279bbc573791588d4729ac741309134187724
+  checksum: 112b973a24e59f79786df1b85b83ea35b1e355c52a8cbf3b28d98511959c60c8
   allowed_patterns:
     - "password-protection"
     - "-p, --password"
@@ -468,41 +467,41 @@ fileignoreconfig:
 - filename: src/deployments/commit.prompt.ts
   checksum: 6991eb373ee016ce44fc4f47044d559cfeefa1c411526d6fd88d77c568379041
 - filename: test/integration/secrets-list.test.ts
-  checksum: 206748f2339e5704f935e06b669bd20b01f5e91959427845ba63009fee1e6c19
+  checksum: 71b94f8f77f4575177d064a0cae84e4b7881b587b91d4fcd215fecc2a143b89e
 - filename: src/secrets/types.ts
-  checksum: 04837f0759638e4dff0363907bc7b02fb9c592d6d35b6b8a8c9fc2d6ce16269c
+  checksum: 225b81d89f22efc5ffc00b93f5cfcbf5889078f7a3d3bc4b9f8a800d2824b0a6
 - filename: src/secrets/secrets.api.ts
   checksum: be8e726215a79dbf99f26449d268dacd1b8baad823f74b7c4b0748f6d828402c
 - filename: src/commands/launch/secrets/list.ts
-  checksum: 1e3210e4f8c2ea8f2a6060e284765d8b36729c9b566804b1262ee84341ce6765
+  checksum: 4de3fb4afae29e7e98b3629f61d769597810e7682e336edd28c589515d81e47a
 - filename: src/secrets/secrets.errors.ts
   checksum: 4a3a6cc9af567658149bdcba8dc5dd0de2a6cb2294bd6f1018b253e709ff1436
 - filename: src/secrets/secrets.api.test.ts
   checksum: 3ea97711bcdeb4d09c7d57f7a4df722103dbfacfa33520b02e0acb43aca17f8a
 - filename: src/secrets/secret.presenter.ts
-  checksum: 137e225c62c84206f2b09788c50ca82c6557e04ac2eedefef26d62b40b713e67
+  checksum: dc2108fb03cf55f310d2d9cddc3a5748247a86f8cba78b2335922f21cd0e84d7
 - filename: src/secrets/secrets.errors.test.ts
   checksum: 791e3d269e7a7266bc4db0dbe98df01939a034d234deb73d9d8d45e4f5186030
 - filename: src/secrets/secret.presenter.test.ts
-  checksum: 92fafa522ea7ade4642091a9dbb438d33e225ebf3d8c2778d91b0a887bccb307
+  checksum: b62ed02a814ef44f6ec90b7ac1b00e599ca6c7409a7c42d2d0e45290c15cd683
 - filename: src/commands/launch/secrets/list.test.ts
   checksum: 109d1165d7ce16943b50955f60fd8a753a870115fdf5501fb2a5e4a1cf436eaa
 - filename: package.json
-  checksum: 4e16bc9e214c18ea8ee2bb7562e6a468249739afb1474aed7b101c4a81a30d03
+  checksum: 7ab7752a9256de42c91a49b77154596084534c183d22b91496f1f05a30011bf9
 - filename: test/integration/secrets-set.test.ts
   checksum: f01f5673125c48f537c593b9f8f3a728b6b16b42a3253c01f44558176ef48d89
 - filename: src/secrets/secret.rules.test.ts
-  checksum: d0d344922623813219a58071da742cbf9b4534aa62d800e46b903c73b84e94f8
+  checksum: 29f1c5842b7d7c895ccf4c2611af52f824168e264e228b2493bededfdd7a2e8e
 - filename: src/commands/launch/secrets/set.ts
   checksum: c712a2256bdf43db062ed80c04d313f07d21f4308aa09c6a6b5ba9220a444ca8
 - filename: src/secrets/secret.rules.ts
-  checksum: c45a5b147c8e4c795885187dcc9b99335e01ae550b23881f4c1f6f2c21a55546
+  checksum: a12c330ba6d5beb661b45c090257454319fc4279f824c3050b6cee626e2cd05c
 - filename: src/secrets/secret.value.ts
-  checksum: 0d4111f487c412eb93b4bd6a035edc6500018b0d7296e3ab59ca447b5039f962
+  checksum: ac7e4ccf9d058715e5ffea05e355973001b49970c69e5c612a975e1ac4b86ce3
 - filename: src/secrets/secret.set.ts
   checksum: c37228c6b7395ddda5d52fe06830aa8ccd05b163dad11531e40e971e88a9d2fb
 - filename: src/commands/launch/secrets/set.test.ts
-  checksum: 5288caf29722c4ef1bdcbd699b8720c94a0ede30f83c6c2fc89384e3d614093b
+  checksum: 8662c1081a115a62c6bde33b49e18bd1240dc8e2eb20c8838441a3b663a7c958
 - filename: src/secrets/secret.value.test.ts
   checksum: 45595232451e8ec37231d17bead70b5bdd4aff44f0fa39f99d45a6c903c4dd93
 - filename: src/secrets/secret.set.test.ts
@@ -516,7 +515,7 @@ fileignoreconfig:
 - filename: src/secrets/secret.unset.test.ts
   checksum: 44ff11b9b4f3d7583d5faa4a2df45518c959eb4c29896cafe05ead19f215e4c7
 - filename: src/commands/launch/secrets/unset.test.ts
-  checksum: a00e503cc66876fa1ef37eaab1a91e2e013af44d3add8ecd6fa08f269d550002
+  checksum: b13e1559c9ca0a576b321da1c2c01b4196b0c831540f9f857c55afa284f2c42b
 - filename: src/core/password-argv.ts
   checksum: 22a5aa7d95c6a5113a034d2cc9af4f152f8a366f1c271f86cd317ea2046f5b1d
 - filename: src/core/password-argv.test.ts
