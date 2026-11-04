@@ -361,10 +361,9 @@ than return a truncated list.
 `projects:create` and `env:create` take `--var` and `--dotenv` and reach the same resolver through
 `EnvironmentBuilder`, which asks last - after Contentstack Authentication, where V1 asked - with no auto-detection.
 With neither flag it offers a checkbox over the sources plus `Skip adding environment variables`, which cannot be
-combined with the others; without a terminal it sends an empty list. `--no-vars` is the flag form of that Skip
-choice, so a fully flagged create on a terminal asks nothing: it sends an empty list without the checkbox. Combined
-with `--var`, `--dotenv` or `--from-stack` it is a usage error from the `noVarsAlone` rule rather than oclif's
-`exclusive`, whose `--help` usage line would show those three sources excluding each other.
+combined with the others; a bare Enter with nothing ticked skips the same way, and without a terminal it sends an
+empty list. There is no `--no-vars` flag: variables are never required, so a fully flagged create on a terminal
+stops only at that checkbox, and a pipe or CI run skips it.
 
 **`--from-stack` and `--alias`.** `--from-stack` is a bare flag on `variables:set`, `projects:create` and
 `env:create`; `--alias <name>` (`-a`) names a delivery token saved with `csdx auth:tokens:add`, and is a usage error

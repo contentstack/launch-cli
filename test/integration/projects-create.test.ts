@@ -779,9 +779,9 @@ describe('integration: launch:projects:create on the wire', () => {
     expect(onWire).toEqual([]);
   });
 
-  it('asks nothing on a terminal when every value is a flag and --no-vars says there are no variables', async () => {
+  it('asks only for variables on a terminal when every other value is a flag, and a bare Enter skips them', async () => {
     let body: { environment?: { environmentVariables?: unknown } } | undefined;
-    const prompts = answerPrompts({});
+    const prompts = answerPrompts({ 'Add environment variables': [] });
     stubGitLookups();
     const create = hub()
       .post('/manage/projects', (sent: typeof body) => {
@@ -792,17 +792,17 @@ describe('integration: launch:projects:create on the wire', () => {
       .reply(201, { project: CREATED_PROJECT });
     stubFollowUp('LIVE');
 
-    const { error } = await onTerminal(() => runCommand([...gitFlags(), '--no-vars'], config));
+    const { error } = await onTerminal(() => runCommand(gitFlags(), config));
 
     expect(error).toBeUndefined();
-    expect(prompts.messages).toEqual([]);
+    expect(prompts.messages).toEqual(['Add environment variables']);
     expect(create.isDone()).toBe(true);
     expect(body?.environment?.environmentVariables).toEqual([]);
     expect(onWire).toEqual([]);
   });
 
-  it('refuses --no-vars with --var with exit 2 before any request', async () => {
-    const { error } = await runCommand([...gitFlags(), '--no-vars', '--var', 'A=1'], config);
+  it('refuses the removed --no-vars as an unknown flag with exit 2 before any request', async () => {
+    const { error } = await runCommand([...gitFlags(), '--no-vars'], config);
 
     expect(error?.oclif?.exit).toBe(2);
     expect(error?.message).toContain('--no-vars');

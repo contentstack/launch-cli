@@ -3,7 +3,7 @@ import { flagsFor, inputs } from '../../../core/inputs';
 import { defaultWatchTiming } from '../../../deployments/deployment.watcher';
 import { serverCommandFrameworkGate } from '../../../environments/environment.inputs';
 import { ProjectCreator } from '../../../projects/project.create';
-import { aliasRequiresFromStack, noVarsAlone } from '../../../variables/variable.rules';
+import { aliasRequiresFromStack } from '../../../variables/variable.rules';
 
 const createInputs = inputs({
   org: { required: true },
@@ -23,7 +23,6 @@ const createInputs = inputs({
   dotenv: {},
   'from-stack': {},
   alias: {},
-  'no-vars': {},
 });
 
 export default class ProjectsCreate extends LaunchCommand<typeof createInputs> {
@@ -42,7 +41,7 @@ export default class ProjectsCreate extends LaunchCommand<typeof createInputs> {
 
   static flags = flagsFor(createInputs);
 
-  static rules = [serverCommandFrameworkGate, aliasRequiresFromStack, noVarsAlone];
+  static rules = [serverCommandFrameworkGate, aliasRequiresFromStack];
 
   async run(): Promise<void> {
     const resolved = this.resolved;
@@ -67,7 +66,6 @@ export default class ProjectsCreate extends LaunchCommand<typeof createInputs> {
       envFiles: resolved['dotenv'],
       fromStack: resolved['from-stack'],
       alias: resolved.alias,
-      noVars: resolved['no-vars'],
     });
   }
 }
