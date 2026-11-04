@@ -64,7 +64,6 @@ export class EnvironmentBuilder {
         envFiles: request.envFiles,
         fromStack: request.fromStack,
         alias: request.alias,
-        noVars: request.noVars,
         dataDir: request.dataDir ?? '.',
       },
       this.services,

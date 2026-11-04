@@ -66,19 +66,17 @@ export async function chooseSources(
     { name: TYPED_CHOICE, value: TYPED_CHOICE },
     ...(prompt.skippable ? [{ name: SKIP_CHOICE, value: SKIP_CHOICE }] : []),
   ];
-  const picked = await askChoices(services.ux, prompt.message, choices, { requireOne: prompt.skippable });
+  const picked = await askChoices(services.ux, prompt.message, choices, { requireOne: false });
 
-  if (picked.includes(SKIP_CHOICE)) {
-    if (picked.length > 1) {
-      throw new UsageError(`'${SKIP_CHOICE}' cannot be combined with the other options.`);
-    }
-
-    services.ux.print('Skipped adding environment variables.');
-
-    return undefined;
+  if (picked.includes(SKIP_CHOICE) && picked.length > 1) {
+    throw new UsageError(`'${SKIP_CHOICE}' cannot be combined with the other options.`);
   }
 
-  if (picked.length === 0) {
+  if (picked.length === 0 || picked.includes(SKIP_CHOICE)) {
+    if (prompt.skippable) {
+      services.ux.print('Skipped adding environment variables.');
+    }
+
     return undefined;
   }
 

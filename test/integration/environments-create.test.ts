@@ -281,16 +281,17 @@ describe('integration: launch:env:create on the wire', () => {
       expect(sent[0].environmentVariables).toEqual([]);
     });
 
-    it('creates with no variables and asks nothing when --no-vars is given on a terminal', async () => {
-      const prompts = answerPrompts({});
+    it('creates with no variables when Enter is pressed with nothing selected', async () => {
+      const prompts = answerPrompts({ 'Add environment variables': [] });
       const sent: { environmentVariables?: unknown }[] = [];
       stubCreate(sent);
       stubFollowUp('LIVE');
 
-      const { error } = await onTerminal(() => runCommand([...WITH_AUTH, '--no-vars'], config));
+      const { error, stdout } = await onTerminal(() => runCommand(WITH_AUTH, config));
 
       expect(error).toBeUndefined();
-      expect(prompts.messages).toEqual([]);
+      expect(prompts.messages).toEqual(['Add environment variables']);
+      expect(stdout).toContain('Skipped adding environment variables.');
       expect(sent[0].environmentVariables).toEqual([]);
     });
 

@@ -96,15 +96,6 @@ describe('variable create', () => {
     expect(printed).toEqual([]);
   });
 
-  it('returns nothing on a terminal with --no-vars, asking nothing, reading nothing and printing nothing', async () => {
-    const { services, io, asked, reads, printed } = fakes({ files: { '/work/.env': 'X=1' } });
-
-    expect(await variablesForCreate({ ...NONE, noVars: true }, services, io)).toEqual([]);
-    expect(asked).toEqual([]);
-    expect(reads).toEqual([]);
-    expect(printed).toEqual([]);
-  });
-
   it('treats empty flag lists as no flags', async () => {
     const { services, io, asked } = fakes({ answers: { 'Add environment variables': [SKIP] } });
 
@@ -126,6 +117,15 @@ describe('variable create', () => {
         { name: SKIP, value: SKIP },
       ],
     });
+  });
+
+  it('lets a bare Enter through the checkbox with nothing selected', async () => {
+    const { services, io, asked } = fakes({ answers: { 'Add environment variables': [] } });
+
+    await variablesForCreate(NONE, services, io);
+
+    const validate = asked[0].payload.validate as (picked: unknown) => true | string;
+    expect(validate([])).toBe(true);
   });
 
   it('returns nothing and says so when Skip is chosen', async () => {
@@ -233,11 +233,11 @@ describe('variable create', () => {
     expect(output).not.toContain('never-printed-value');
   });
 
-  it.each([[undefined], [[]]])('returns nothing and prints no summary when nothing was selected (%p)', async (answer) => {
+  it.each([[undefined], [[]]])('skips and says so, as Skip does, when nothing was selected (%p)', async (answer) => {
     const { services, io, printed } = fakes({ answers: { 'Add environment variables': answer } });
 
     expect(await variablesForCreate(NONE, services, io)).toEqual([]);
-    expect(printed).toEqual([]);
+    expect(printed).toEqual(['Skipped adding environment variables.']);
   });
 
   it('propagates a cancelled path prompt, an unreadable file and a malformed typed line', async () => {
