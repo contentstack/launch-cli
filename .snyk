@@ -1,0 +1,22 @@
+# Snyk (https://snyk.io) policy file, patches or ignores known vulnerabilities.
+version: v1.25.1
+# ignores vulnerabilities until expiry date; change duration by modifying expiry date
+ignore:
+  SNYK-JS-ADMZIP-21707815:
+    - '*':
+        reason: >-
+          No fixed adm-zip release exists. launch-cli only builds a zip from the
+          user's own local files (src/uploads/upload.archive.ts) and never
+          parses an archive. Revisit when a fix ships.
+        expires: 2026-12-04T00:00:00.000Z
+        created: 2026-11-04T09:50:32.375Z
+  SNYK-JS-DEEPMERGE-19964053:
+    - '*':
+        reason: >-
+          No fixed deepmerge release exists. It is reached only through
+          @rollup/plugin-node-resolve during functions:serve, merging the plugin
+          options launch-cli sets itself, never external input. Revisit when a
+          fix ships.
+        expires: 2026-12-04T00:00:00.000Z
+        created: 2026-11-04T09:50:37.147Z
+patch: {}

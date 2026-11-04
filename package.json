@@ -144,6 +144,9 @@
     "brace-expansion@1": "^1.1.21",
     "istanbul-lib-processinfo": {
       "uuid": "^11.1.1"
+    },
+    "@oclif/core": {
+      "minimatch": "^11.0.1"
     }
   },
   "engines": {
