@@ -10,6 +10,6 @@ export const coreFlags = {
   }),
   skip: Flags.integer({ min: 0, description: 'Number of records to skip' }),
   yes: Flags.boolean({ description: 'Skip the confirmation prompt' }),
-  config: Flags.string({ char: 'c', description: `Path to the local '${PROJECT_CONFIG_FILE}' file` }),
+  config: Flags.string({ description: `Path to the local '${PROJECT_CONFIG_FILE}' file` }),
   'data-dir': Flags.string({ char: 'd', description: 'Current working directory' }),
 };

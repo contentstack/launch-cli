@@ -307,7 +307,7 @@ fileignoreconfig:
 - filename: src/core/search-list.test.ts
   checksum: 0c324ecf8de5cc2fc1ccc27223cae555d7db6c8061c4bd7288e0dc7fb28f6b87
 - filename: src/core/catalog.test.ts
-  checksum: ec946f9a2802dfe71db501ac1fa10ceaac6fe29ef5e98ade40a11330e60718f7
+  checksum: 950d5cbb8ebdbe13cf13908b72d5409f7fdf7515c9d93a7c84045efcf4420543
 - filename: test/credential-guard.setup.ts
   checksum: 519ccbeb0552fdb1d5f27308c56477c0258ee6cc0adec8f618e8e5bc047cbf6d
 - filename: src/environments/types.ts
@@ -331,7 +331,7 @@ fileignoreconfig:
 - filename: src/commands/launch/env/update.test.ts
   checksum: 2da219594e7bdd589adc0eff9ff035252a75aaa51dfa20514b18fd3266d7b752
 - filename: README.md
-  checksum: d955f95b66f10259eb2ddbe1935a67ce3c7f3a28187f0398e0af39ff75267c01
+  checksum: a3c7d1fc273e7b5b818f0a7f05664fd7ddbb05c2f2eb44c28b5d496aad828508
   allowed_patterns:
     - "password-protection"
     - "-p, --password"
