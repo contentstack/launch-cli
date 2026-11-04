@@ -487,7 +487,7 @@ fileignoreconfig:
 - filename: src/commands/launch/secrets/list.test.ts
   checksum: 109d1165d7ce16943b50955f60fd8a753a870115fdf5501fb2a5e4a1cf436eaa
 - filename: package.json
-  checksum: 7ab7752a9256de42c91a49b77154596084534c183d22b91496f1f05a30011bf9
+  checksum: 83e8c44d44e46b429f017de9af80e425d009ee0e660693e653365c7a0fbf701c
 - filename: test/integration/secrets-set.test.ts
   checksum: f01f5673125c48f537c593b9f8f3a728b6b16b42a3253c01f44558176ef48d89
 - filename: src/secrets/secret.rules.test.ts
