@@ -128,6 +128,15 @@ describe('variable create', () => {
     });
   });
 
+  it('lets a bare Enter through the checkbox with nothing selected', async () => {
+    const { services, io, asked } = fakes({ answers: { 'Add environment variables': [] } });
+
+    await variablesForCreate(NONE, services, io);
+
+    const validate = asked[0].payload.validate as (picked: unknown) => true | string;
+    expect(validate([])).toBe(true);
+  });
+
   it('returns nothing and says so when Skip is chosen', async () => {
     const { services, io, printed } = fakes({ answers: { 'Add environment variables': [SKIP] } });
 
@@ -233,11 +242,11 @@ describe('variable create', () => {
     expect(output).not.toContain('never-printed-value');
   });
 
-  it.each([[undefined], [[]]])('returns nothing and prints no summary when nothing was selected (%p)', async (answer) => {
+  it.each([[undefined], [[]]])('skips and says so, as Skip does, when nothing was selected (%p)', async (answer) => {
     const { services, io, printed } = fakes({ answers: { 'Add environment variables': answer } });
 
     expect(await variablesForCreate(NONE, services, io)).toEqual([]);
-    expect(printed).toEqual([]);
+    expect(printed).toEqual(['Skipped adding environment variables.']);
   });
 
   it('propagates a cancelled path prompt, an unreadable file and a malformed typed line', async () => {
