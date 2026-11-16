@@ -21,6 +21,18 @@ describe('coreFlags', () => {
     await expect(parse(['-y'])).rejects.toThrow(/Nonexistent flag: -y/);
   });
 
+  it('gives --config no short flag', () => {
+    expect(coreFlags.config.char).toBeUndefined();
+  });
+
+  it('still parses --config with its value', async () => {
+    await expect(parse(['--config', './.cs-launch.json'])).resolves.toMatchObject({ config: './.cs-launch.json' });
+  });
+
+  it('rejects -c at parse time rather than reading it as --config', async () => {
+    await expect(parse(['-c', './.cs-launch.json'])).rejects.toThrow(/Nonexistent flag: -c/);
+  });
+
   it('advertises the limit range in the flag itself, not only in the help text', () => {
     expect(coreFlags.limit).toMatchObject({ min: 1, max: CLIENT_MAX_LIMIT });
     expect(coreFlags.limit.description).toBe(`Number of records to fetch (1-${CLIENT_MAX_LIMIT})`);

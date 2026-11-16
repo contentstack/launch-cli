@@ -116,12 +116,12 @@ Purge an environment's CDN cache by path, cache tags or hostnames
 
 ```
 USAGE
-  $ csdx launch:cache:purge [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--path
+  $ csdx launch:cache:purge [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--path
     <value>] [--prefix] [--tags <value>] [--hosts <value>]
 
 FLAGS
-  -c, --config=<value>    Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>  Current working directory
+      --config=<value>    Path to the local '.cs-launch.json' file
       --env=<value>       Environment name or UID
       --hosts=<value>     Comma-separated hostnames to purge
       --org=<value>       Organization UID
@@ -169,12 +169,12 @@ Cancel a deployment of a Launch environment that is still in progress
 
 ```
 USAGE
-  $ csdx launch:deployments:cancel [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--deployment
-    <value>] [--yes]
+  $ csdx launch:deployments:cancel [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>]
+    [--deployment <value>] [--yes]
 
 FLAGS
-  -c, --config=<value>      Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>    Current working directory
+      --config=<value>      Path to the local '.cs-launch.json' file
       --deployment=<value>  Deployment UID
       --env=<value>         Environment name or UID
       --org=<value>         Organization UID
@@ -198,14 +198,14 @@ Deploy a Launch environment: the branch tip or a chosen commit on a GitHub proje
 
 ```
 USAGE
-  $ csdx launch:deployments:create [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--commit
-    <value> | --last-upload]
+  $ csdx launch:deployments:create [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>]
+    [--commit <value> | --last-upload]
 
 FLAGS
-  -c, --config=<value>    Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>  Current working directory
       --commit=<value>    GitHub projects: deploy this commit. Pass --commit with no value to pick one from the recent
                           commits
+      --config=<value>    Path to the local '.cs-launch.json' file
       --env=<value>       Environment name or UID
       --last-upload       FileUpload projects: redeploy the last uploaded bundle without uploading a new one
       --org=<value>       Organization UID
@@ -231,12 +231,12 @@ Show a deployment of a Launch environment, the latest one unless --deployment na
 
 ```
 USAGE
-  $ csdx launch:deployments:get [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--deployment
-    <value>]
+  $ csdx launch:deployments:get [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>]
+    [--deployment <value>]
 
 FLAGS
-  -c, --config=<value>      Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>    Current working directory
+      --config=<value>      Path to the local '.cs-launch.json' file
       --deployment=<value>  Deployment UID
       --env=<value>         Environment name or UID
       --org=<value>         Organization UID
@@ -259,12 +259,12 @@ List the deployments of a Launch environment
 
 ```
 USAGE
-  $ csdx launch:deployments:list [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--limit
+  $ csdx launch:deployments:list [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--limit
     <value>] [--skip <value>]
 
 FLAGS
-  -c, --config=<value>    Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>  Current working directory
+      --config=<value>    Path to the local '.cs-launch.json' file
       --env=<value>       Environment name or UID
       --limit=<value>     Number of records to fetch (1-1000)
       --org=<value>       Organization UID
@@ -286,12 +286,12 @@ Roll a Launch environment back to a previous deployment
 
 ```
 USAGE
-  $ csdx launch:deployments:rollback [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--deployment
-    <value>] [--reason <value>] [--yes]
+  $ csdx launch:deployments:rollback [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>]
+    [--deployment <value>] [--reason <value>] [--yes]
 
 FLAGS
-  -c, --config=<value>      Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>    Current working directory
+      --config=<value>      Path to the local '.cs-launch.json' file
       --deployment=<value>  Deployment UID
       --env=<value>         Environment name or UID
       --org=<value>         Organization UID
@@ -316,7 +316,7 @@ Create an environment in a Launch project and follow its first deployment
 
 ```
 USAGE
-  $ csdx launch:env:create [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--name <value>]
+  $ csdx launch:env:create [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--name <value>]
     [--description <value>] [--branch <value>] [--framework <value>] [--build-cmd <value>] [--server-cmd <value>]
     [--output-dir <value>] [--res-mode <value>] [--auto-deploy <value>] [--cs-auth <value>] [--var <value>...] [--dotenv
     <value>...] [--from-stack] [-a <value>]
@@ -324,11 +324,11 @@ USAGE
 FLAGS
   -a, --alias=<value>        Alias of a delivery token saved with csdx auth:tokens:add, used with --from-stack without a
                              prompt
-  -c, --config=<value>       Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>     Current working directory
       --auto-deploy=<value>  Deploy on every push, GitHub projects only (enable | disable)
       --branch=<value>       Git branch name, GitHub projects only
       --build-cmd=<value>    Build command
+      --config=<value>       Path to the local '.cs-launch.json' file
       --cs-auth=<value>      Contentstack Authentication (enable | disable)
       --description=<value>  Environment description (255 characters or fewer)
       --dotenv=<value>...    Path to a dotenv file, repeatable. Use - to read dotenv content from standard input
@@ -362,11 +362,11 @@ Delete an environment of a Launch project
 
 ```
 USAGE
-  $ csdx launch:env:delete [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--yes]
+  $ csdx launch:env:delete [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--yes]
 
 FLAGS
-  -c, --config=<value>    Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>  Current working directory
+      --config=<value>    Path to the local '.cs-launch.json' file
       --env=<value>       Environment name or UID
       --org=<value>       Organization UID
       --project=<value>   Project name or UID
@@ -389,11 +389,11 @@ Show a single environment of a Launch project
 
 ```
 USAGE
-  $ csdx launch:env:get [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>]
+  $ csdx launch:env:get [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>]
 
 FLAGS
-  -c, --config=<value>    Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>  Current working directory
+      --config=<value>    Path to the local '.cs-launch.json' file
       --env=<value>       Environment name or UID
       --org=<value>       Organization UID
       --project=<value>   Project name or UID
@@ -413,12 +413,12 @@ List the environments of a Launch project
 
 ```
 USAGE
-  $ csdx launch:env:list [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--limit <value>] [--skip
-    <value>]
+  $ csdx launch:env:list [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--limit <value>]
+    [--skip <value>]
 
 FLAGS
-  -c, --config=<value>    Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>  Current working directory
+      --config=<value>    Path to the local '.cs-launch.json' file
       --limit=<value>     Number of records to fetch (1-1000)
       --org=<value>       Organization UID
       --project=<value>   Project name or UID
@@ -439,13 +439,12 @@ Update an environment of a Launch project
 
 ```
 USAGE
-  $ csdx launch:env:update [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--name
+  $ csdx launch:env:update [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--name
     <value>] [--description <value>] [--branch <value>] [--framework <value>] [--build-cmd <value>] [--server-cmd
     <value>] [--output-dir <value>] [--res-mode <value>] [--auto-deploy <value>] [--cs-auth <value>] [--cache-priming
     <value>] [--password-protection <value>] [-u <value>] [-p] [--yes]
 
 FLAGS
-  -c, --config=<value>               Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>             Current working directory
   -p, --password                     With --password-protection enable: read the password from standard input when there
                                      is no terminal (on a terminal it is asked at a hidden prompt)
@@ -454,6 +453,7 @@ FLAGS
       --branch=<value>               Git branch name, GitHub projects only
       --build-cmd=<value>            Build command
       --cache-priming=<value>        Cache priming (enable | disable)
+      --config=<value>               Path to the local '.cs-launch.json' file
       --cs-auth=<value>              Contentstack Authentication (enable | disable)
       --description=<value>          Environment description (255 characters or fewer)
       --env=<value>                  Environment name or UID
@@ -558,12 +558,12 @@ Read the build or server logs of a deployment of a Launch environment
 
 ```
 USAGE
-  $ csdx launch:logs:get [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--deployment
-    <value>] [--since <value>] [--until <value>] [--search <value>] [--cursor <value>] [--type <value>]
+  $ csdx launch:logs:get [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>]
+    [--deployment <value>] [--since <value>] [--until <value>] [--search <value>] [--cursor <value>] [--type <value>]
 
 FLAGS
-  -c, --config=<value>      Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>    Current working directory
+      --config=<value>      Path to the local '.cs-launch.json' file
       --cursor=<value>      Server logs only: resume from the cursor printed by an earlier run
       --deployment=<value>  Deployment UID
       --env=<value>         Environment name or UID
@@ -607,19 +607,19 @@ Create a Launch project, its first environment, and its first deployment
 
 ```
 USAGE
-  $ csdx launch:projects:create [-c <value>] [-d <value>] [--org <value>] [--type <value>] [--name <value>] [--description
-    <value>] [--env-name <value>] [--branch <value>] [--framework <value>] [--build-cmd <value>] [--server-cmd <value>]
-    [--output-dir <value>] [--res-mode <value>] [--auto-deploy <value>] [--cs-auth <value>] [--var <value>...] [--dotenv
-    <value>...] [--from-stack] [-a <value>]
+  $ csdx launch:projects:create [--config <value>] [-d <value>] [--org <value>] [--type <value>] [--name <value>]
+    [--description <value>] [--env-name <value>] [--branch <value>] [--framework <value>] [--build-cmd <value>]
+    [--server-cmd <value>] [--output-dir <value>] [--res-mode <value>] [--auto-deploy <value>] [--cs-auth <value>]
+    [--var <value>...] [--dotenv <value>...] [--from-stack] [-a <value>]
 
 FLAGS
   -a, --alias=<value>        Alias of a delivery token saved with csdx auth:tokens:add, used with --from-stack without a
                              prompt
-  -c, --config=<value>       Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>     Current working directory
       --auto-deploy=<value>  Deploy on every push, GitHub projects only (enable | disable)
       --branch=<value>       Git branch name, GitHub projects only
       --build-cmd=<value>    Build command
+      --config=<value>       Path to the local '.cs-launch.json' file
       --cs-auth=<value>      Contentstack Authentication (enable | disable)
       --description=<value>  Project description (255 characters or fewer)
       --dotenv=<value>...    Path to a dotenv file, repeatable. Use - to read dotenv content from standard input
@@ -656,11 +656,11 @@ Delete a Launch project
 
 ```
 USAGE
-  $ csdx launch:projects:delete [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--yes]
+  $ csdx launch:projects:delete [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--yes]
 
 FLAGS
-  -c, --config=<value>    Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>  Current working directory
+      --config=<value>    Path to the local '.cs-launch.json' file
       --org=<value>       Organization UID
       --project=<value>   Project name or UID
       --yes               Skip the confirmation prompt
@@ -682,11 +682,11 @@ Show a single Launch project
 
 ```
 USAGE
-  $ csdx launch:projects:get [-c <value>] [-d <value>] [--org <value>] [--project <value>]
+  $ csdx launch:projects:get [--config <value>] [-d <value>] [--org <value>] [--project <value>]
 
 FLAGS
-  -c, --config=<value>    Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>  Current working directory
+      --config=<value>    Path to the local '.cs-launch.json' file
       --org=<value>       Organization UID
       --project=<value>   Project name or UID
 
@@ -705,11 +705,11 @@ List Launch projects in an organization
 
 ```
 USAGE
-  $ csdx launch:projects:list [-c <value>] [-d <value>] [--org <value>] [--limit <value>] [--skip <value>]
+  $ csdx launch:projects:list [--config <value>] [-d <value>] [--org <value>] [--limit <value>] [--skip <value>]
 
 FLAGS
-  -c, --config=<value>    Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>  Current working directory
+      --config=<value>    Path to the local '.cs-launch.json' file
       --limit=<value>     Number of records to fetch (1-1000)
       --org=<value>       Organization UID
       --skip=<value>      Number of records to skip
@@ -729,12 +729,12 @@ Update a Launch project
 
 ```
 USAGE
-  $ csdx launch:projects:update [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--name <value>]
+  $ csdx launch:projects:update [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--name <value>]
     [--description <value>]
 
 FLAGS
-  -c, --config=<value>       Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>     Current working directory
+      --config=<value>       Path to the local '.cs-launch.json' file
       --description=<value>  Project description (255 characters or fewer)
       --name=<value>         Project name (200 characters or fewer)
       --org=<value>          Organization UID
@@ -773,11 +773,11 @@ List the secrets of an environment by key and update time; values are never show
 
 ```
 USAGE
-  $ csdx launch:secrets:list [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>]
+  $ csdx launch:secrets:list [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>]
 
 FLAGS
-  -c, --config=<value>    Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>  Current working directory
+      --config=<value>    Path to the local '.cs-launch.json' file
       --env=<value>       Environment name or UID
       --org=<value>       Organization UID
       --project=<value>   Project name or UID
@@ -797,12 +797,12 @@ Add a secret to an environment, or replace its value when the key exists. Takes 
 
 ```
 USAGE
-  $ csdx launch:secrets:set [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--key
+  $ csdx launch:secrets:set [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--key
     <value>...] [--yes]
 
 FLAGS
-  -c, --config=<value>    Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>  Current working directory
+      --config=<value>    Path to the local '.cs-launch.json' file
       --env=<value>       Environment name or UID
       --key=<value>...    Secret key
       --org=<value>       Organization UID
@@ -827,12 +827,12 @@ Remove secrets from an environment, after asking for confirmation. Pass --key on
 
 ```
 USAGE
-  $ csdx launch:secrets:unset [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--key
+  $ csdx launch:secrets:unset [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--key
     <value>...] [--yes]
 
 FLAGS
-  -c, --config=<value>    Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>  Current working directory
+      --config=<value>    Path to the local '.cs-launch.json' file
       --env=<value>       Environment name or UID
       --key=<value>...    Secret key, repeatable
       --org=<value>       Organization UID
@@ -857,12 +857,12 @@ Open an environment's live site in your browser, or print its URL when there is 
 
 ```
 USAGE
-  $ csdx launch:site:open [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--deployment
-    <value>]
+  $ csdx launch:site:open [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>]
+    [--deployment <value>]
 
 FLAGS
-  -c, --config=<value>      Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>    Current working directory
+      --config=<value>      Path to the local '.cs-launch.json' file
       --deployment=<value>  Deployment UID
       --env=<value>         Environment name or UID
       --org=<value>         Organization UID
@@ -889,12 +889,12 @@ List the environment variables of an environment, with their values masked
 
 ```
 USAGE
-  $ csdx launch:variables:list [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--limit
+  $ csdx launch:variables:list [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--limit
     <value>] [--skip <value>]
 
 FLAGS
-  -c, --config=<value>    Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>  Current working directory
+      --config=<value>    Path to the local '.cs-launch.json' file
       --env=<value>       Environment name or UID
       --limit=<value>     Number of records to fetch (1-1000)
       --org=<value>       Organization UID
@@ -916,14 +916,14 @@ Add or change environment variables from --var, --dotenv or a detected .env file
 
 ```
 USAGE
-  $ csdx launch:variables:set [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--var
+  $ csdx launch:variables:set [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--var
     <value>...] [--dotenv <value>...] [--from-stack] [-a <value>]
 
 FLAGS
   -a, --alias=<value>      Alias of a delivery token saved with csdx auth:tokens:add, used with --from-stack without a
                            prompt
-  -c, --config=<value>     Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>   Current working directory
+      --config=<value>     Path to the local '.cs-launch.json' file
       --dotenv=<value>...  Path to a dotenv file, repeatable. Use - to read dotenv content from standard input
       --env=<value>        Environment name or UID
       --from-stack         Import the variables of a Contentstack stack. Asks for the stack and a delivery token on a
@@ -952,12 +952,12 @@ Remove environment variables from an environment, after asking for confirmation
 
 ```
 USAGE
-  $ csdx launch:variables:unset [-c <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--key
+  $ csdx launch:variables:unset [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--key
     <value>...] [--yes]
 
 FLAGS
-  -c, --config=<value>    Path to the local '.cs-launch.json' file
   -d, --data-dir=<value>  Current working directory
+      --config=<value>    Path to the local '.cs-launch.json' file
       --env=<value>       Environment name or UID
       --key=<value>...    Environment variable key, repeatable
       --org=<value>       Organization UID
