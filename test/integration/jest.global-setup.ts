@@ -10,9 +10,6 @@ const TEMP_PREFIXES = [
 ];
 const STALE_AFTER_MS = 60 * 60 * 1000;
 
-// Git exports these to hooks, and the pre-push hook runs this suite. Left set, every git call the harness
-// and the CLI make in the temp projects would act on this repository instead (from `git rev-parse
-// --local-env-vars`). Cleared here, in the parent process, so child processes inherit the clean env.
 const GIT_LOCAL_ENV_VARS = [
   'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_CONFIG', 'GIT_CONFIG_PARAMETERS', 'GIT_CONFIG_COUNT',
   'GIT_OBJECT_DIRECTORY', 'GIT_DIR', 'GIT_WORK_TREE', 'GIT_IMPLICIT_WORK_TREE', 'GIT_GRAFT_FILE',
