@@ -44,5 +44,5 @@ fileignoreconfig:
 - filename: test/unit/base-command.test.ts
   checksum: 4612c2a41c9d5a7af887f77842feee0a6f6a28ba95a094282b5e9aa20dba6c8c
 - filename: src/adapters/base-class.ts
-  checksum: 89acc2a399bbf689d5920aea4fd85a8ab89dadab8bd9ada462faa8a0fafae1d8
+  checksum: 75753f8762fc2fd3810672e7070bbdd48b152ec1ad90b18eb1ad5c817a9705aa
 version: "1.0"

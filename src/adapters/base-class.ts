@@ -1,4 +1,3 @@
-import open from 'open';
 import dotEnv from 'dotenv';
 import map from 'lodash/map';
 import keys from 'lodash/keys';
@@ -19,6 +18,7 @@ import { writeFileSync, existsSync, readFileSync } from 'fs';
 import { cliux as ux, ContentstackClient } from '@contentstack/cli-utilities';
 
 import { print, GraphqlApiClient, LogPolling, getOrganizations } from '../util';
+import { openUrl } from '../util/open-url';
 import { FILE_UPLOAD_SIZE_LIMIT_USER_MESSAGE, isLaunchDeploymentFileSizeRelatedError } from '../util/deployment-errors';
 import {
   branchesQuery,
@@ -423,7 +423,7 @@ export default class BaseClass {
       const gitHubConnectUrl = `${baseUrl.replace('api', 'app').replace('io', 'com')}/#!/launch/settings/connected-accounts`;
       this.log(`You can connect your ${this.config.provider} account to the UI using the following URL:`, 'info');
       this.log(gitHubConnectUrl, { color: 'green' });
-      open(gitHubConnectUrl);
+      await openUrl(gitHubConnectUrl);
       this.exit(1);
     } else if (emit) {
       this.$event.emit('provider-changed');
@@ -834,7 +834,7 @@ export default class BaseClass {
       if (openOnUi) {
         // NOTE delaying to open the deployment url. If we open quickly it's showing site not reachable
         setTimeout(() => {
-          open(deploymentUrl);
+          openUrl(deploymentUrl);
         }, 6000);
       }
     }
