@@ -74,7 +74,8 @@ export default class Open extends BaseCommand<typeof Open> {
   }
 
   /**
-   * @method checkAndSetProjectDetails - validate and set project details (ex. organizationUid, uid, environment, deployment)
+   * @method checkAndSetProjectDetails - validate and set project details
+   * (ex. organizationUid, uid, environment, deployment)
    *
    * @return {*}  {Promise<void>}
    * @memberof Logs
@@ -104,7 +105,8 @@ export default class Open extends BaseCommand<typeof Open> {
   }
 
   /**
-   * @method validateAndSelectEnvironment - check whether environment is validate or not. If not then option to select environment
+   * @method validateAndSelectEnvironment - check whether environment is validate or not.
+   * If not then option to select environment
    *
    * @return {*}  {Promise<void>}
    * @memberof Logs

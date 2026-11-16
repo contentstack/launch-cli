@@ -50,7 +50,7 @@ export default class BaseClass {
   public apolloClient: ApolloClient<any>;
   public projectCreationRetryCount: number = 0;
   public apolloLogsClient: ApolloClient<any> | undefined;
-  public envVariables: Array<Record<string, any>> = [];
+  public envVariables: Record<string, any>[] = [];
   public managementSdk: ContentstackClient | undefined;
 
   constructor(options: AdapterConstructorInputs) {
@@ -165,16 +165,16 @@ export default class BaseClass {
     const variables =
       this.config.provider === 'FileUpload'
         ? {
-            query: { uploadUid: this.config.uploadUid },
-          }
+          query: { uploadUid: this.config.uploadUid },
+        }
         : {
-            query: {
-              provider: this.config.provider,
-              repoName: fullName,
-              branchName: defaultBranch,
-              ...(namespace ? { namespace } : {}),
-            },
-          };
+          query: {
+            provider: this.config.provider,
+            repoName: fullName,
+            branchName: defaultBranch,
+            ...(namespace ? { namespace } : {}),
+          },
+        };
     this.config.framework = (await this.apolloClient
       .query({ query, variables })
       .then(
@@ -184,7 +184,7 @@ export default class BaseClass {
           },
         }) => framework,
       )
-      .catch((_error) => {
+      .catch(() => {
         // this.log("Something went wrong. Please try again.", "warn");
         // this.log(error, "error");
         // this.exit(1);
@@ -249,6 +249,7 @@ export default class BaseClass {
 
     if (listOfStacks.length === 0) {
       this.log(
+        // eslint-disable-next-line max-len
         'No stacks were found in your organization, or you do not have access to any. Please create a stack in the organization to proceed in the organization.',
         'error',
       );
@@ -327,7 +328,7 @@ export default class BaseClass {
    * @return {*}  {Array<{key: string, value: string}>}
    * @memberof BaseClass
    */
-  private parseEnvVariablesString(envString: string): Array<{ key: string; value: string }> {
+  private parseEnvVariablesString(envString: string): { key: string; value: string }[] {
     return map(split(envString, ','), (pair) => {
       const trimmedPair = (pair as string).trim();
       const colonIndex = trimmedPair.indexOf(':');
@@ -354,6 +355,7 @@ export default class BaseClass {
             type: 'input',
             name: 'variable',
             message:
+              // eslint-disable-next-line max-len
               'Enter key and value with a colon between them, and use a comma(,) for the key-value pair. Format: <key1>:<value1>, <key2>:<value2> Ex: APP_ENV:prod, TEST_ENV:testVal',
           })
           .then((variable) => this.parseEnvVariablesString(variable as string));
@@ -389,6 +391,7 @@ export default class BaseClass {
     let data: Record<string, any> = {};
 
     if (this.config.config && existsSync(this.config.config)) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       data = require(this.config.config);
     }
 
@@ -416,6 +419,7 @@ export default class BaseClass {
     if (includes(this.config.supportedAdapters, this.config.provider)) {
       const baseUrl = this.config.host.startsWith('http') ? this.config.host : `https://${this.config.host}`;
 
+      // eslint-disable-next-line max-len
       const gitHubConnectUrl = `${baseUrl.replace('api', 'app').replace('io', 'com')}/#!/launch/settings/connected-accounts`;
       this.log(`You can connect your ${this.config.provider} account to the UI using the following URL:`, 'info');
       this.log(gitHubConnectUrl, { color: 'green' });
@@ -505,7 +509,7 @@ export default class BaseClass {
    */
   inquireRequireValidation(input: any): string | boolean {
     if (isEmpty(input)) {
-      return "This field can't be empty.";
+      return 'This field can\'t be empty.';
     }
 
     return true;
@@ -540,7 +544,8 @@ export default class BaseClass {
       variablePreparationType.length > 1
     ) {
       this.log(
-        "The 'Skip adding environment variables' option cannot be combined with other environment variable options. Please choose either 'Skip adding environment variables' or one or more of the other available options.",
+        // eslint-disable-next-line max-len
+        'The \'Skip adding environment variables\' option cannot be combined with other environment variable options. Please choose either \'Skip adding environment variables\' or one or more of the other available options.',
         'error',
       );
       this.exit(1);
@@ -585,7 +590,7 @@ export default class BaseClass {
       this.exit(1);
     }
     if (!isEmpty(localEnv)) {
-      let envKeys: Record<string, any> = keys(localEnv);
+      const envKeys: Record<string, any> = keys(localEnv);
       const existingEnvKeys = map(this.envVariables, 'key');
       const localEnvData = map(envKeys, (key) => ({
         key,
@@ -630,22 +635,22 @@ export default class BaseClass {
 
     this.envVariables = map(cloneDeep(this.envVariables), (variable) => {
       switch (variable.key) {
-        case 'CONTENTSTACK_API_HOST':
-        case 'CONTENTSTACK_CDN':
-          if (variable.value.startsWith('http')) {
-            const url = new URL(variable.value);
-            variable.value = url?.host || this.config.host;
-          }
-          break;
-        case 'CONTENTSTACK_ENVIRONMENT':
-          variable.value = this.config.stackEnvironment;
-          break;
-        case 'CONTENTSTACK_API_KEY':
-          variable.value = this.config.selectedStack.api_key;
-          break;
-        case 'CONTENTSTACK_DELIVERY_TOKEN':
-          variable.value = this.config.deliveryToken?.token;
-          break;
+      case 'CONTENTSTACK_API_HOST':
+      case 'CONTENTSTACK_CDN':
+        if (variable.value.startsWith('http')) {
+          const url = new URL(variable.value);
+          variable.value = url?.host || this.config.host;
+        }
+        break;
+      case 'CONTENTSTACK_ENVIRONMENT':
+        variable.value = this.config.stackEnvironment;
+        break;
+      case 'CONTENTSTACK_API_KEY':
+        variable.value = this.config.selectedStack.api_key;
+        break;
+      case 'CONTENTSTACK_DELIVERY_TOKEN':
+        variable.value = this.config.deliveryToken?.token;
+        break;
       }
 
       return variable;
@@ -662,9 +667,9 @@ export default class BaseClass {
       ...(this.config.flags['show-variables']
         ? this.envVariables
         : this.envVariables.map(({ key, value }) => ({
-            key,
-            value: replace(value, /./g, '*'),
-          }))),
+          key,
+          value: replace(value, /./g, '*'),
+        }))),
     ];
 
     const headers = [{ value: 'key' }, { value: 'value' }];
@@ -710,7 +715,7 @@ export default class BaseClass {
 
         if (msgType === 'info') {
           forEach(message, (log: DeploymentLogResp | ServerLogResp) => {
-            let formattedLogTimestamp = new Date(log.timestamp).toISOString()?.slice(0, 23)?.replace('T', ' ');
+            const formattedLogTimestamp = new Date(log.timestamp).toISOString()?.slice(0, 23)?.replace('T', ' ');
             this.log(`${formattedLogTimestamp}:  ${log.message}`, msgType);
           });
         } else if (msgType === 'error') {
@@ -740,7 +745,7 @@ export default class BaseClass {
         await ux.inquire({
           type: 'confirm',
           name: 'deployLatestSource',
-          message: "Would you like to change the project's name and try again?",
+          message: 'Would you like to change the project\'s name and try again?',
         })
       ) {
         this.config.projectName = await ux.inquire({
@@ -781,6 +786,7 @@ export default class BaseClass {
 
     if (!environment) {
       this.log(
+        // eslint-disable-next-line max-len
         `Environment "${environmentFlagInput}" not found in this project. Please provide a valid environment name or UID.`,
         'error',
       );
