@@ -23,7 +23,7 @@
     "@apollo/client": "^3.14.0",
     "@contentstack/cli-command": "^2.0.2",
     "@contentstack/cli-utilities": "^2.0.2",
-    "@oclif/core": "^4.2.7",
+    "@oclif/core": "^4.14.0",
     "@oclif/plugin-help": "^6.2.25",
     "@rollup/plugin-commonjs": "^28.0.2",
     "@rollup/plugin-json": "^6.1.0",
