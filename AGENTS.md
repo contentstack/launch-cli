@@ -14,10 +14,15 @@
   Integration tests (`test/integration/`) exist to catch what unit tests cannot: they run a
   real oclif command end to end and assert on what the CLI *does*.
 - Run them with `npm run test:integration` (they are also part of `npm test`).
-- Only three things are replaced: the terminal prompt (`inquirer`), the `open` package, and
-  the Contentstack management SDK, which resolves its base URL as `https://<host>:443` and so
-  cannot be pointed at a local server. Apollo, the GraphQL documents, the CLI config store,
-  flag parsing, the filesystem and `git` all run for real.
+- Only these are replaced: the terminal prompt (`inquirer`), the browser opener
+  (`src/util/open-url`; the CLI never imports the `open` package directly, so mocking `open` has no
+  effect), `@oclif/core`'s `getPlatform` (it runs a native `import('wsl-utils')` that Jest's VM
+  cannot execute), and the Contentstack management SDK, which resolves its base URL as
+  `https://<host>:443` and so cannot be pointed at a local server. Apollo, the GraphQL documents,
+  the CLI config store, flag parsing, the filesystem and `git` all run for real.
+- `jest.global-setup.ts` clears git's repo-local environment variables (`git rev-parse
+  --local-env-vars`). Git exports them to hooks, and the pre-push hook runs this suite; left set,
+  the harness's git calls in its temp projects would act on this repository instead.
 - The Launch API is a local HTTP server (`test/integration/harness/launch-api.ts`) that the CLI
   reaches through a temporary region config. It records every GraphQL operation, so tests assert
   on the operations and variables the CLI actually sent rather than on internal method calls.

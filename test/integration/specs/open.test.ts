@@ -1,9 +1,8 @@
-import open from 'open';
-
 import Open from '../../../src/commands/launch/open';
+import { openUrl } from '../../../src/util/open-url';
 import { cma, fixtures, prompts, runCommand, Session, startSession } from '../harness';
 
-const openMock = open as unknown as jest.Mock;
+const openMock = openUrl as unknown as jest.Mock;
 
 describe('launch:open', () => {
   let session: Session;

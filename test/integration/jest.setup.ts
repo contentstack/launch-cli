@@ -1,6 +1,10 @@
-jest.mock('open', () => ({
-  __esModule: true,
-  default: jest.fn(async () => ({ pid: 1 })),
+jest.mock('../../src/util/open-url', () => ({
+  openUrl: jest.fn(async () => undefined),
+}));
+
+jest.mock(`${process.cwd()}/node_modules/@oclif/core/lib/util/os.js`, () => ({
+  ...jest.requireActual(`${process.cwd()}/node_modules/@oclif/core/lib/util/os.js`),
+  getPlatform: async () => require('node:os').platform(),
 }));
 
 jest.mock('@contentstack/cli-utilities/lib/contentstack-management-sdk', () => ({

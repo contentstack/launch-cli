@@ -1,4 +1,3 @@
-import open from 'open';
 import map from 'lodash/map';
 import find from 'lodash/find';
 import isEmpty from 'lodash/isEmpty';
@@ -7,6 +6,7 @@ import { FlagInput, Flags, cliux as ux } from '@contentstack/cli-utilities';
 import { BaseCommand } from '../../base-command';
 import { environmentsQuery } from '../../graphql';
 import { print, Logger, selectOrg, selectProject } from '../../util';
+import { openUrl } from '../../util/open-url';
 
 export default class Open extends BaseCommand<typeof Open> {
   static description = 'Open a website for an environment';
@@ -44,7 +44,7 @@ export default class Open extends BaseCommand<typeof Open> {
     if (!this.flags.environment) await this.getConfig();
 
     if (this.sharedConfig.currentConfig?.uid && !isEmpty(this.sharedConfig.currentConfig?.deployments)) {
-      this.openWebsite();
+      await this.openWebsite();
     } else {
       await this.prepareProjectDetails();
     }
@@ -55,7 +55,7 @@ export default class Open extends BaseCommand<typeof Open> {
    *
    * @memberof Open
    */
-  openWebsite() {
+  async openWebsite(): Promise<void> {
     const [deployment] = this.sharedConfig.currentConfig?.deployments || [];
 
     if (!isEmpty(deployment)) {
@@ -66,7 +66,7 @@ export default class Open extends BaseCommand<typeof Open> {
         { message: 'Deployment URL', bold: true },
         { message: deploymentUrl, color: 'cyan' },
       ]);
-      open(deploymentUrl);
+      await openUrl(deploymentUrl);
     } else {
       this.log('Website URL not found.!', 'error');
       this.exit(1);
@@ -74,7 +74,8 @@ export default class Open extends BaseCommand<typeof Open> {
   }
 
   /**
-   * @method checkAndSetProjectDetails - validate and set project details (ex. organizationUid, uid, environment, deployment)
+   * @method checkAndSetProjectDetails - validate and set project details
+   * (ex. organizationUid, uid, environment, deployment)
    *
    * @return {*}  {Promise<void>}
    * @memberof Logs
@@ -100,11 +101,12 @@ export default class Open extends BaseCommand<typeof Open> {
 
     await this.validateAndSelectEnvironment();
 
-    this.openWebsite();
+    await this.openWebsite();
   }
 
   /**
-   * @method validateAndSelectEnvironment - check whether environment is validate or not. If not then option to select environment
+   * @method validateAndSelectEnvironment - check whether environment is validate or not.
+   * If not then option to select environment
    *
    * @return {*}  {Promise<void>}
    * @memberof Logs
