@@ -52,8 +52,8 @@ function requiredPackages(): Map<string, string[]> {
   for (const path of runtimeSources(sourceRoot)) {
     const emitted = ts.transpileModule(readFileSync(path, 'utf8'), { compilerOptions: options, fileName: path });
 
-    for (const match of emitted.outputText.matchAll(/require\("([^"]+)"\)/g)) {
-      const specifier = match[1];
+    for (const match of emitted.outputText.matchAll(/\b(?:require|import)\((["'])([^"']+)\1\)/g)) {
+      const specifier = match[2];
 
       if (specifier.startsWith('.') || isBuiltin(specifier)) {
         continue;
@@ -78,6 +78,7 @@ describe('package dependencies', () => {
 
     expect(required.has('tslib')).toBe(true);
     expect(required.has('@oclif/core')).toBe(true);
+    expect(required.has('open')).toBe(true);
     expect(undeclared).toEqual([]);
   });
 
