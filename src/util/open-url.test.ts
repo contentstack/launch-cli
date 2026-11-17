@@ -10,11 +10,13 @@ describe('openUrl', () => {
   });
 
   it('resolves when the open package cannot be loaded', async () => {
-    await expect(
-      openUrl('https://example.com', async () => {
-        throw new Error('load failed');
-      }),
-    ).resolves.toBeUndefined();
+    const load = jest.fn(async () => {
+      throw new Error('load failed');
+    });
+
+    await expect(openUrl('https://example.com', load)).resolves.toBeUndefined();
+
+    expect(load).toHaveBeenCalledTimes(1);
   });
 
   it('resolves when opening the browser fails', async () => {
@@ -23,5 +25,7 @@ describe('openUrl', () => {
     });
 
     await expect(openUrl('https://example.com', async () => ({ default: open }))).resolves.toBeUndefined();
+
+    expect(open).toHaveBeenCalledWith('https://example.com');
   });
 });
