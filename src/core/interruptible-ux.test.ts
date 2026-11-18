@@ -102,7 +102,7 @@ describe('cancelOnInterrupt', () => {
     expect(loop.events).toEqual(['held', 'released']);
   });
 
-  it('keeps listening when a search-list prompt is aborted, so the SIGINT inquirer raises next cancels instead of killing the process', async () => {
+  it('cancels as soon as a search-list prompt is aborted, and stays attached only to absorb the SIGINT inquirer raises next', async () => {
     const signals = new EventEmitter();
     const inner = pendingUx();
     const loop = recordingHold();
@@ -110,13 +110,15 @@ describe('cancelOnInterrupt', () => {
 
     const answer = cancelOnInterrupt(inner.ux, { signals, hold: loop.hold }).inquire<string>(QUESTION);
     inner.settle({ error: aborted });
-    await new Promise((done) => setImmediate(done));
-    const listeningAfterAbort = signals.listenerCount('SIGINT');
+    const error = await answer.catch((e: unknown) => e);
+    const listeningBeforeSignal = signals.listenerCount('SIGINT');
+    const loopBeforeSignal = [...loop.events];
     signals.emit('SIGINT');
-
-    await expect(answer).rejects.toBeInstanceOf(CancelledError);
-    expect(listeningAfterAbort).toBe(1);
     await new Promise((done) => setImmediate(done));
+
+    expect(error).toBeInstanceOf(CancelledError);
+    expect(listeningBeforeSignal).toBe(1);
+    expect(loopBeforeSignal).toEqual(['held', 'released']);
     expect(signals.listenerCount('SIGINT')).toBe(0);
     expect(loop.events).toEqual(['held', 'released']);
   });

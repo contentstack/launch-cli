@@ -54,9 +54,13 @@ export function cancelOnInterrupt(ux: UxLike, options: InterruptOptions = {}): U
     print: (message) => ux.print(message),
     inquire: <T>(payload: unknown) =>
       new Promise<T>((resolve, reject) => {
-        const releaseLoop = hold();
+        let releaseLoop: Release | undefined = hold();
+        const freeLoop = (): void => {
+          releaseLoop?.();
+          releaseLoop = undefined;
+        };
         const release = (): void => {
-          releaseLoop();
+          freeLoop();
           signals.removeListener('SIGINT', cancel);
         };
         const cancel = (): void => {
@@ -65,8 +69,9 @@ export function cancelOnInterrupt(ux: UxLike, options: InterruptOptions = {}): U
         };
 
         const fail = (error: unknown): void => {
-          // inquirer 12 aborts a legacy search-list prompt on Ctrl-C, then raises the SIGINT `cancel` answers.
           if (isPromptAbort(error)) {
+            freeLoop();
+            reject(new CancelledError());
             return;
           }
 
