@@ -93,7 +93,7 @@ fileignoreconfig:
     - "'SECRET=hunter2'"
     - "formFieldKey"
 - filename: test/integration/projects-create.test.ts
-  checksum: c567d31fb18d0910410ce455c0a1b2f8ce6c8d46038396ec813ef73bd5fb8105
+  checksum: 5dd8e9b7c0d595f716b8046c2561cb240ef4144d0afddd5ed42e243442961515
 - filename: test/fixtures/README.md
   checksum: d801c84c8b7d7f38f967573e9a3a70da4405b7cbcbf10d2a6e5be3d65fb3daa1
   allowed_patterns:
@@ -337,7 +337,7 @@ fileignoreconfig:
     - "-p, --password"
     - "-u, --username"
 - filename: test/integration/environments-create.test.ts
-  checksum: 538527a26bc002aa21319aa615c9a9f00aaed494d0bdefc8db75c0eff3f8ec54
+  checksum: aaf11e8bc45b980aee892489d507e22362cf3d48d333d7c22f46b3a506944aca
 - filename: src/commands/launch/variables/list.test.ts
   checksum: 87ccb762f4931326fc50bca1c01aeb4a16d552e4dfa141d00370fdfafa4363be
 - filename: src/commands/launch/variables/set.test.ts
@@ -435,7 +435,7 @@ fileignoreconfig:
 - filename: src/deployments/deployment.presenter.test.ts
   checksum: e393d6bb6ce3fd92920f5003603b161186085ea8939fae704e6f71bd9e1778bc
 - filename: test/integration/deployments-create.test.ts
-  checksum: fd367019e10b47121898440e4b3a54fb2041d6302bee2dea28a97ad58eb88ee9
+  checksum: 2d3a8ed873ca9bf6274b074393b73f94bdf958bc2f74ef31a7558ae41c475eb4
 - filename: src/deployments/deployment.watcher.test.ts
   checksum: 0a9dab3e2436531279078bb5c0b3ef8524cebf7824b0602b7685ae0b4ef47923
 - filename: src/deployments/deployment.create.ts
@@ -487,7 +487,7 @@ fileignoreconfig:
 - filename: src/commands/launch/secrets/list.test.ts
   checksum: 109d1165d7ce16943b50955f60fd8a753a870115fdf5501fb2a5e4a1cf436eaa
 - filename: package.json
-  checksum: 83e8c44d44e46b429f017de9af80e425d009ee0e660693e653365c7a0fbf701c
+  checksum: ae6f7fdb23fd9476dd4fca5b84d0f3999b578a73b8187af2f94edbb0a2172b16
 - filename: test/integration/secrets-set.test.ts
   checksum: f01f5673125c48f537c593b9f8f3a728b6b16b42a3253c01f44558176ef48d89
 - filename: src/secrets/secret.rules.test.ts

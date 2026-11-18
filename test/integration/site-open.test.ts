@@ -17,6 +17,7 @@ import listFixture from '../fixtures/environments-list.json';
 import notFoundFixture from '../fixtures/environment-not-found.json';
 
 jest.mock('open', () => jest.fn());
+jest.mock('../../src/core/browser', () => jest.requireActual('../support/browser'));
 
 const LAUNCH_HUB_URL = 'https://launch-api.integration.test';
 const ORG_UID = 'blt4d9e2a7c1f6b3085';

@@ -15,6 +15,7 @@ import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
 import { projectOwnership } from '../support/project-ownership';
 
 jest.mock('open', () => jest.fn().mockResolvedValue(undefined));
+jest.mock('../../src/core/browser', () => jest.requireActual('../support/browser'));
 
 const realWatchTiming = watcher.defaultWatchTiming;
 

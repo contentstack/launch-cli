@@ -18,6 +18,7 @@ import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
 const SITE_PAGE = `<h1>site</h1><!-- ${randomBytes(2048).toString('hex')} -->`;
 
 jest.mock('open', () => jest.fn().mockResolvedValue(undefined));
+jest.mock('../../src/core/browser', () => jest.requireActual('../support/browser'));
 
 // Waiting is faked like the browser is: the real timing runs, but a wait returns at once and is recorded,
 // so the six seconds create waits before opening the site neither slows the suite nor goes unasserted.
