@@ -447,13 +447,13 @@ fileignoreconfig:
 - filename: test/integration/deployments-rollback.test.ts
   checksum: 08400c5435c84cd162fefc585f6c32cddfcaa8909d2369341748b421e7f12073
 - filename: test/integration/deployments-cancel.test.ts
-  checksum: 02c012da974f1f9b8b851d7e00878fef50c1ba7e32b6acf72a309582c66aa5c2
+  checksum: 95bf08ce05089d01ede8f4b41faa7ff01fff3b4e7961742a288ad2e3f5959d9d
 - filename: src/commands/launch/deployments/cancel.test.ts
   checksum: da8d09de7f03cfe67df75ebc1636b36feb6688cf85984c357fd5304852d126e5
 - filename: src/commands/launch/deployments/rollback.test.ts
   checksum: 5331e774d07387b1691c47168afa8d454bdee60d26ac9c6ed3f4640fc85ff8b8
 - filename: src/deployments/deployments.api.test.ts
-  checksum: b27d91317c17f1754d5853c68f4968e63dc2b3579eab26b4c772cf3cd3efbdd0
+  checksum: e581dc4de15f9e669f5dff81b9e5079835e9e3e73f5476399ccd1aeb6d974091
 - filename: src/deployments/deployment.prompt.test.ts
   checksum: 3367e53ce2f0284c14524da893e7f82ef613fcdac1e9689ac408709e7f7c153d
 - filename: test/integration/deployments-request-bodies.test.ts

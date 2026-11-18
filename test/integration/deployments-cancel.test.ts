@@ -264,6 +264,7 @@ describe('integration: launch:deployments:cancel on the wire', () => {
     ['the CANCEL_NOT_ALLOWED code', { code: 'launch.DEPLOYMENT.CANCEL_NOT_ALLOWED', message: 'x' }],
     ['the raw server message as the code', { code: RAW_REFUSAL, message: RAW_REFUSAL }],
     ['the raw server message alone', { message: RAW_REFUSAL }],
+    ['an empty error entry', {}],
   ])('exits 1 with readable wording, posting once, when the cancel is refused with %s', async (_name, entry) => {
     lookup();
     const cancel = cancelScope()

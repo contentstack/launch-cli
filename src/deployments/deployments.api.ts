@@ -1,9 +1,10 @@
 import { assertPage, hasUid, malformed, unwrap } from '../transport/envelope';
 import type { RestApiClient, RestRequest } from '../transport/rest-client';
 import { isRecord } from '../core/values';
-import { LaunchApiError } from '../transport/errors';
+import { LaunchApiError, type ApiErrorEntry } from '../transport/errors';
 import {
   CANCEL_NOT_ALLOWED_CODE,
+  CANCEL_NOT_ALLOWED_RAW_MESSAGE,
   DEPLOYMENT_ERROR_MESSAGES,
   DEPLOYMENT_NOT_FOUND_CODE,
   cancelNotAllowedError,
@@ -38,10 +39,26 @@ export interface RollbackDeploymentParams extends DeploymentScope {
   reason?: string;
 }
 
+function isRawRefusal(entry: ApiErrorEntry): boolean {
+  return entry.code === CANCEL_NOT_ALLOWED_RAW_MESSAGE || entry.message === CANCEL_NOT_ALLOWED_RAW_MESSAGE;
+}
+
+function isEmpty(entry: ApiErrorEntry): boolean {
+  return entry.field === undefined && entry.code === undefined && entry.message === undefined;
+}
+
+// The server answers a cancel that lost the race with a deployment finishing as {"errors":[{}]}.
+function isCancelRaceRefusal(error: LaunchApiError): boolean {
+  return (
+    error.status === 400 &&
+    (error.errors.some(isRawRefusal) || (error.errors.length > 0 && error.errors.every(isEmpty)))
+  );
+}
+
 function isCancelNotAllowed(error: unknown): error is LaunchApiError {
   return (
     error instanceof LaunchApiError &&
-    (error.status === 400 || error.errors.some((entry) => entry.code === CANCEL_NOT_ALLOWED_CODE))
+    (error.errors.some((entry) => entry.code === CANCEL_NOT_ALLOWED_CODE) || isCancelRaceRefusal(error))
   );
 }
 
