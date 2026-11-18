@@ -34,6 +34,22 @@ function attachCookies(request: Request, _response: Response, next: NextFunction
   next();
 }
 
+function defaultToNoStore(_request: Request, response: Response, next: NextFunction): void {
+  if (!response.getHeader('cache-control')) {
+    response.setHeader('cache-control', 'no-store');
+  }
+  next();
+}
+
+function applyRequestMiddleware(app: Express): void {
+  app.use(attachCookies);
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+  app.use(express.text());
+  app.use(express.raw());
+  app.use(defaultToNoStore);
+}
+
 import { loadDataURL } from './load-data-url';
 
 export function listenFailure(error: NodeJS.ErrnoException, servingPort: number): Error {
@@ -81,12 +97,9 @@ export class CloudFunctions {
 
     const app = express();
     app.disable('x-powered-by');
-    app.use(attachCookies);
-    app.use(express.text());
-    app.use(express.raw());
-
-    await this.applyAppRouter(exactRouteResources, app);
-    await this.applyAppRouter(dynamicRouteResources, app);
+    applyRequestMiddleware(app);
+    this.applyAppRouter(exactRouteResources, app);
+    this.applyAppRouter(dynamicRouteResources, app);
 
     return this.startServer(app, servingPort, [
       ...exactRouteResources,
@@ -127,36 +140,17 @@ export class CloudFunctions {
     });
   }
 
-  private async applyAppRouter(
-    cloudFunctionResources: CloudFunctionResource[],
-    app: Express
-  ): Promise<void> {
-    await Promise.all(
-      cloudFunctionResources.map(async (cloudFunctionResource) => {
-
-        app.use(express.json());
-        app.use(express.urlencoded({ extended: true }));
-
-        app.use((_request: Request, response: Response, next) => {
-          if (!response.getHeader('cache-control')) {
-            response.setHeader('cache-control', 'no-store');
-          }
-          next();
-        });
-
-        app.all(
-          cloudFunctionResource.apiResourceURI,
-          async (request: Request, response: Response) => {
-            try {
-              await cloudFunctionResource.handler(request, response);
-            } catch (error) {
-              console.error(error);
-              response.status(500).send();
-            }
-          }
-        );
-      })
-    );
+  private applyAppRouter(cloudFunctionResources: CloudFunctionResource[], app: Express): void {
+    cloudFunctionResources.forEach((cloudFunctionResource) => {
+      app.all(cloudFunctionResource.apiResourceURI, async (request: Request, response: Response) => {
+        try {
+          await cloudFunctionResource.handler(request, response);
+        } catch (error) {
+          console.error(error);
+          response.status(500).send();
+        }
+      });
+    });
   }
 
   private isProxyEdgeFile(filename: string): boolean {
