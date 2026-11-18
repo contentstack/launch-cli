@@ -2,7 +2,7 @@ fileignoreconfig:
 - filename: src/logs/logs.inputs.test.ts
   checksum: 7b4df8790179c7dc4385acd1d380bb91397523bab111593742e2fc53c94da375
 - filename: test/integration/logs-get.test.ts
-  checksum: 909965f29b2e6a0b6220b22c175b4a39edc05759fba1274a7a1f2f750a7e0e3b
+  checksum: 89ce4f3864c6316e8075e08fb86fb07d848cbe717f434c3b3e228622b263eed2
 - filename: src/commands/launch/logs/get.test.ts
   checksum: d94d390de150956c799f64a84adfe0e02b5b21c66ddcc5cf55a1329aa67ec1a7
 - filename: src/core/failure.test.ts
@@ -93,7 +93,7 @@ fileignoreconfig:
     - "'SECRET=hunter2'"
     - "formFieldKey"
 - filename: test/integration/projects-create.test.ts
-  checksum: 5dd8e9b7c0d595f716b8046c2561cb240ef4144d0afddd5ed42e243442961515
+  checksum: 7fe9bd2822624f634e3a83907c327223249cbb132d3591d7ae517b38d4fee161
 - filename: test/fixtures/README.md
   checksum: d801c84c8b7d7f38f967573e9a3a70da4405b7cbcbf10d2a6e5be3d65fb3daa1
   allowed_patterns:
@@ -236,7 +236,7 @@ fileignoreconfig:
     - "a project name passed on argv to the project resolver"
     - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
 - filename: AGENTS.md
-  checksum: 3379e8c597c8306e7377e60667f7df6e599e45e289928bc88b217356aa43feb1
+  checksum: ecab79e8abbaae85038afe4f9e8e90e310eef5b0c002cee2b014926850be2c56
   allowed_patterns:
     - "Do not add an exemption to a guard to make a new file pass"
     - "passes its own error wording to `client.request\\(req, MESSAGES\\)`"
@@ -337,7 +337,7 @@ fileignoreconfig:
     - "-p, --password"
     - "-u, --username"
 - filename: test/integration/environments-create.test.ts
-  checksum: aaf11e8bc45b980aee892489d507e22362cf3d48d333d7c22f46b3a506944aca
+  checksum: 23d388585ff2f40f8a13bf068c50694fefe423ccf312922cf8887d9f2607af22
 - filename: src/commands/launch/variables/list.test.ts
   checksum: 87ccb762f4931326fc50bca1c01aeb4a16d552e4dfa141d00370fdfafa4363be
 - filename: src/commands/launch/variables/set.test.ts
@@ -435,13 +435,13 @@ fileignoreconfig:
 - filename: src/deployments/deployment.presenter.test.ts
   checksum: e393d6bb6ce3fd92920f5003603b161186085ea8939fae704e6f71bd9e1778bc
 - filename: test/integration/deployments-create.test.ts
-  checksum: 2d3a8ed873ca9bf6274b074393b73f94bdf958bc2f74ef31a7558ae41c475eb4
+  checksum: fef71ae5b4bed7bcca111e90870238a26518e7a376475aa55768f5ffbe07ba36
 - filename: src/deployments/deployment.watcher.test.ts
-  checksum: 0a9dab3e2436531279078bb5c0b3ef8524cebf7824b0602b7685ae0b4ef47923
+  checksum: b04213c987716247cfb4f1ccac37ba96f0c9a73b4564bd45b4da8ee5def0b9ca
 - filename: src/deployments/deployment.create.ts
   checksum: ca64f3b29a68c4a2755a88a141e2cd9dbd6fa851a2776876d78c40f3168492e3
 - filename: src/commands/launch/deployments/create.test.ts
-  checksum: 50c3f35c7246b49f6ebf5e48a9a9646ccbcb563c0c0e042fd38917e2f98cbba3
+  checksum: bcbb2f85e0a78d38036af4723a0ce691f2692de05f5c7c9c3f97a5cca13497a6
 - filename: src/deployments/deployment.create.test.ts
   checksum: 6545afa21a23b7e5de18ad8ff417f88a184577e7042713cfda90758ccbcd9869
 - filename: test/integration/deployments-rollback.test.ts

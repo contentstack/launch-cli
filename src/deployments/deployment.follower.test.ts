@@ -42,20 +42,21 @@ function harness(options: { withoutOpenUrl?: boolean; statuses?: string[] } = {}
     pollDelayMs: 1000,
     maxBackoffSteps: 3,
     timeoutMs: 60_000,
+    logSettleMs: 3000,
   };
 
   return { follower: new DeploymentFollower(services, timing), timeline, polled, logged };
 }
 
 describe('DeploymentFollower.watch', () => {
-  it('polls the deployment and reads its logs in the scope it was given', async () => {
-    const { follower, polled, logged } = harness();
+  it('polls the deployment and reads its logs in the scope it was given, keeping on reading them while they settle', async () => {
+    const { follower, polled, logged } = harness({ statuses: ['DEPLOYING', 'LIVE'] });
 
     const outcome = await follower.watch(SCOPE);
 
     expect(outcome).toEqual(expect.objectContaining({ kind: 'success', status: 'LIVE' }));
-    expect(polled).toEqual([SCOPE]);
-    expect(logged).toEqual([{ ...SCOPE, timestamp: '1970-01-01T00:00:00.000Z' }]);
+    expect(polled).toEqual([SCOPE, SCOPE]);
+    expect(logged).toEqual(Array(5).fill({ ...SCOPE, timestamp: '1970-01-01T00:00:00.000Z' }));
   });
 });
 

@@ -10,6 +10,7 @@ import nock from 'nock';
 
 import open from 'open';
 
+import { DEPLOYMENT_LOG_LOOKBACK_MS } from '../../src/deployments/deployment.log-tail';
 import * as watcher from '../../src/deployments/deployment.watcher';
 import { CTRL_C, answerPrompts, onTerminal } from '../support/terminal';
 import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
@@ -211,7 +212,7 @@ function stubFollowUp(status: string, deploymentLogs: unknown[] = []): nock.Scop
     hub()
       .get(logsPath)
       .matchHeader('x-project-uid', PROJECT_UID)
-      .query({ timestamp: new Date(Date.parse(last) - 1).toISOString() })
+      .query({ timestamp: new Date(Date.parse(last) - DEPLOYMENT_LOG_LOOKBACK_MS).toISOString() })
       .reply(200, { deploymentLogs: [] });
   }
 
@@ -285,6 +286,7 @@ describe('integration: launch:projects:create on the wire', () => {
     slept = [];
     jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => ({
       ...realWatchTiming(),
+      logSettleMs: 0,
       sleep: async (ms: number) => {
         slept.push(ms);
       },

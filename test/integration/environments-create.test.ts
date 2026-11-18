@@ -117,6 +117,7 @@ describe('integration: launch:env:create on the wire', () => {
     jest.spyOn(authHandler, 'compareOAuthExpiry').mockResolvedValue(undefined);
     jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => ({
       ...realWatchTiming(),
+      logSettleMs: 0,
       sleep: async () => undefined,
     }));
   });
