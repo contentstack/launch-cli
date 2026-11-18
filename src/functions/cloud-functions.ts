@@ -52,6 +52,8 @@ export class CloudFunctions {
     if (!directoryExists) {
       throw new FunctionsDirectoryNotFoundError(this.pathToSourceCode);
     }
+    dotenv.config({ path: path.join(this.pathToSourceCode, ENV_FILE_NAME) });
+
     const cloudFunctionResources = await this.parseCloudFunctionResources();
 
     const hasCloudFunctionResources = cloudFunctionResources.length;
@@ -75,8 +77,6 @@ export class CloudFunctions {
 
     await this.applyAppRouter(exactRouteResources, app);
     await this.applyAppRouter(dynamicRouteResources, app);
-
-    dotenv.config({ path: path.join(this.pathToSourceCode, ENV_FILE_NAME) });
 
     return this.startServer(app, servingPort, [
       ...exactRouteResources,

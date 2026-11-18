@@ -307,19 +307,24 @@ describe('CloudFunctions serve routing', () => {
     expect((loggedErrors[0] as Error).message).toBe('handler blew up');
   });
 
-  it('loads the env file that sits beside the functions directory', async () => {
+  it('loads the env file beside the functions directory before the functions load', async () => {
     const envValue = randomUUID();
     writeFileSync(join(workspace, '.env'), `LAUNCH_TEST_VALUE=${envValue}\n`);
     writeFunctionFile(
       'env.js',
-      'export default function env(request, response) { response.json({ value: process.env.LAUNCH_TEST_VALUE }); }',
+      [
+        'const atLoad = process.env.LAUNCH_TEST_VALUE;',
+        'export default function env(request, response) {',
+        '  response.json({ atRequest: process.env.LAUNCH_TEST_VALUE, atLoad });',
+        '}',
+      ].join('\n'),
     );
     const port = await freePort();
 
     await new CloudFunctions(workspace).serve(port);
     const response = await sendRequest(port, '/env');
 
-    expect(JSON.parse(response.body)).toEqual({ value: envValue });
+    expect(JSON.parse(response.body)).toEqual({ atRequest: envValue, atLoad: envValue });
     delete process.env.LAUNCH_TEST_VALUE;
   });
 });
