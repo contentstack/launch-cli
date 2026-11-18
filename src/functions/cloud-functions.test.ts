@@ -312,6 +312,27 @@ describe('CloudFunctions serve routing', () => {
     expect(JSON.parse(response.body)).toEqual({ body: 'raw text' });
   });
 
+  it('hands an application/octet-stream body to the handler as a buffer', async () => {
+    writeFunctionFile(
+      'binary.js',
+      [
+        'export default function binary(request, response) {',
+        '  response.json({ isBuffer: Buffer.isBuffer(request.body), text: String(request.body) });',
+        '}',
+      ].join('\n'),
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/binary', {
+      method: 'POST',
+      headers: { 'content-type': 'application/octet-stream' },
+      body: 'binary data',
+    });
+
+    expect(JSON.parse(response.body)).toEqual({ isBuffer: true, text: 'binary data' });
+  });
+
   it('answers 404 for a path no function claims', async () => {
     writeFunctionFile('hello.js', 'export default function hello(request, response) { response.send("hi"); }');
     const port = await freePort();
