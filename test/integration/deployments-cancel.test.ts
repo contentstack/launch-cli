@@ -38,6 +38,7 @@ const POST_PENDING = `POST ${LAUNCH_HUB_URL}:443${CANCEL_PATH}`;
 const BODYLESS = { badheaders: ['content-type'] };
 const RAW_REFUSAL = 'This deployment has progressed beyond the point where it can be cancelled.';
 const CANCEL_WORDING = `Deployment "${DEPLOYMENT_UID}" cannot be cancelled because it is no longer in progress.`;
+const STATUS_400_WORDING = 'Launch API request failed with status 400.';
 
 let config: Interfaces.Config;
 let onWire: string[];
@@ -264,6 +265,7 @@ describe('integration: launch:deployments:cancel on the wire', () => {
     ['the CANCEL_NOT_ALLOWED code', { code: 'launch.DEPLOYMENT.CANCEL_NOT_ALLOWED', message: 'x' }],
     ['the raw server message as the code', { code: RAW_REFUSAL, message: RAW_REFUSAL }],
     ['the raw server message alone', { message: RAW_REFUSAL }],
+    ['an empty error entry', {}],
   ])('exits 1 with readable wording, posting once, when the cancel is refused with %s', async (_name, entry) => {
     lookup();
     const cancel = cancelScope()
@@ -277,6 +279,26 @@ describe('integration: launch:deployments:cancel on the wire', () => {
     expect(error?.message).toBe(CANCEL_WORDING);
     expect(cancel.isDone()).toBe(true);
     expect(onWire).toEqual([]);
+  });
+
+  it.each([
+    ['no errors array', { status: 400 }, STATUS_400_WORDING],
+    ['another message', { errors: [{ message: 'something else' }] }, 'something else'],
+    ['a string entry', { errors: ['deployment_uid is required'] }, STATUS_400_WORDING],
+    ['a null entry', { errors: [null] }, STATUS_400_WORDING],
+    ['an array entry', { errors: [[]] }, STATUS_400_WORDING],
+    ['a numeric code', { errors: [{ code: 400 }] }, STATUS_400_WORDING],
+    ['an entry under other keys', { errors: [{ error_message: 'x' }] }, STATUS_400_WORDING],
+    ['a field with a string value', { errors: [{ deployment_uid: 'must be a string' }] }, STATUS_400_WORDING],
+  ])('keeps its own wording when the cancel is refused with a 400 carrying %s', async (_name, body, wording) => {
+    lookup();
+    const cancel = cancelScope().post(CANCEL_PATH).once().reply(400, body);
+
+    const { error } = await runCommand(args('--deployment', DEPLOYMENT_UID, '--yes'), config);
+
+    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.message).toBe(wording);
+    expect(cancel.isDone()).toBe(true);
   });
 
   it.each([
