@@ -144,7 +144,7 @@ export function utilitiesLoader(): ModuleLoader {
   return createRequire(require.resolve('@contentstack/cli-utilities'));
 }
 
-// cli-utilities 2 ships inquirer 12, which exposes the prompt registry cliux prompts with as its default export.
+// cli-utilities 2 ships inquirer 12, whose default export is the prompt registry every Launch prompt goes through.
 export function promptLibrary(load: ModuleLoader = utilitiesLoader()): PromptRegistry {
   return (load('inquirer') as { default: PromptRegistry }).default;
 }

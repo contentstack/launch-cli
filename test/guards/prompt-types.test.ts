@@ -82,7 +82,7 @@ describe('guard: every prompt type the CLI asks for is registered with the real 
       .map(
         (call) =>
           `${call.site} asks for a '${call.type}' prompt, which LaunchCommand.init never registers ` +
-          'with the inquirer cliux.inquire uses - register it there or the prompt degrades to a text box',
+          'with the inquirer terminalUx prompts through - register it there or the prompt degrades to a text box',
       );
     expect(unregistered).toEqual([]);
   });

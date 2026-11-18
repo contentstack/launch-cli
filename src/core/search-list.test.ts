@@ -327,7 +327,7 @@ describe('promptLibrary', () => {
 });
 
 describe('registerSearchList', () => {
-  it('registers the launch search list under search-list on the inquirer that cliux prompts with, and nothing else', () => {
+  it('registers the launch search list under search-list on the inquirer that terminalUx prompts through, and nothing else', () => {
     const registered: [string, unknown][] = [];
     const loaded: string[] = [];
     const fakeLoad = (id: string): unknown => {
