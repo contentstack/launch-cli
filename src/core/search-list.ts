@@ -26,7 +26,7 @@ export type SearchListClass = new (...params: never[]) => SearchListPrompt;
 export type ModuleLoader = (id: string) => unknown;
 
 export interface PromptRegistry {
-  prompt: { prompts: Record<string, unknown> };
+  prompt: ((question: unknown) => Promise<Record<string, unknown>>) & { prompts: Record<string, unknown> };
   registerPrompt(name: string, prompt: unknown): void;
   restoreDefaultPrompts(): void;
 }
