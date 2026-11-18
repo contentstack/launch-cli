@@ -23,16 +23,20 @@ class FreshCommand extends LaunchCommand {
   }
 }
 
-function cliuxNames(source: SourceFile): string[] {
-  const imports = [...source.text.matchAll(/import\s*\{([^}]*)\}\s*from\s*'@contentstack\/cli-utilities'/g)];
+function importedAs(source: SourceFile, imported: string, from = "[^']+"): string[] {
+  const imports = [...source.text.matchAll(new RegExp(`import\\s*\\{([^}]*)\\}\\s*from\\s*'${from}'`, 'g'))];
 
   return imports.flatMap((match) =>
     match[1]
       .split(',')
       .map((specifier) => specifier.trim().split(/\s+as\s+/))
-      .filter(([imported]) => imported === 'cliux')
+      .filter(([name]) => name === imported)
       .map((parts) => parts[parts.length - 1]),
   );
+}
+
+function namesFor(source: SourceFile, imported: string): string[] {
+  return [...new Set([imported, ...importedAs(source, imported)])];
 }
 
 function isImport(use: Occurrence): boolean {
@@ -43,8 +47,12 @@ function isTheFunnel(use: Occurrence): boolean {
   return use.path === FUNNEL_FILE && use.text.includes(FUNNEL_CALL);
 }
 
+function usesOf(source: SourceFile, names: string[]): Occurrence[] {
+  return occurrences(source, new RegExp(`\\b(${names.join('|')})\\b`));
+}
+
 function detours(source: SourceFile): Occurrence[] {
-  const direct = cliuxNames(source).flatMap((name) => [
+  const direct = importedAs(source, 'cliux', '@contentstack\\/cli-utilities').flatMap((name) => [
     ...occurrences(source, new RegExp(`\\b${name}\\s*(\\??\\.)\\s*(${PROMPT_METHODS})\\b`)),
     ...occurrences(source, new RegExp(`\\b${name}\\b(?!\\s*\\??\\.)`)).filter((use) => !isImport(use)),
   ]);
@@ -53,11 +61,11 @@ function detours(source: SourceFile): Occurrence[] {
     source.path === REGISTRATION_FILE ? occurrences(source, new RegExp(`\\.(${PROMPT_METHODS})\\s*\\(`)) : [];
   const libraryCalls = [REGISTRATION_FILE, TERMINAL_FILE].includes(source.path)
     ? []
-    : occurrences(source, /\bpromptLibrary\b/).filter((use) => !isImport(use));
+    : usesOf(source, namesFor(source, 'promptLibrary')).filter((use) => !isImport(use));
   const unwrappedTerminal =
     source.path === TERMINAL_FILE
       ? []
-      : occurrences(source, /\bterminalUx\b/).filter((use) => !isImport(use) && !isTheFunnel(use));
+      : usesOf(source, namesFor(source, 'terminalUx')).filter((use) => !isImport(use) && !isTheFunnel(use));
   const wholeModule = [
     ...occurrences(source, /import\s*\*\s*as\s+\w+\s+from\s*'@contentstack\/cli-utilities'/),
     ...occurrences(source, /\brequire\(\s*'@contentstack\/cli-utilities'/),
@@ -118,6 +126,14 @@ describe('guard: every prompt goes through the one wrapper that maps Ctrl-C to e
       { path: 'cache/purge.prompt.ts', text: 'const answers = await promptLibrary().prompt(question);' },
       { path: 'environments/environment.prompt.ts', text: 'const name = await terminalUx.inquire(question);' },
       { path: 'deployments/deployment.prompt.ts', text: 'const ux = libraryUx(promptLibrary, print);' },
+      {
+        path: 'projects/project.prompt.ts',
+        text: 'import { terminalUx as tty } from \'../core/terminal-ux\';\nconst name = await tty.inquire(question);',
+      },
+      {
+        path: 'functions/function.prompt.ts',
+        text: 'import { promptLibrary as lib } from \'../core/search-list\';\nawait lib().prompt(question);',
+      },
     ];
 
     expect(promptDetoursIn(sources).map((detour) => detour.split('  <-')[0])).toEqual([
@@ -131,6 +147,8 @@ describe('guard: every prompt goes through the one wrapper that maps Ctrl-C to e
       'src/cache/purge.prompt.ts:1  const answers = await promptLibrary().prompt(question);',
       'src/environments/environment.prompt.ts:1  const name = await terminalUx.inquire(question);',
       'src/deployments/deployment.prompt.ts:1  const ux = libraryUx(promptLibrary, print);',
+      'src/projects/project.prompt.ts:2  const name = await tty.inquire(question);',
+      'src/functions/function.prompt.ts:2  await lib().prompt(question);',
     ]);
   });
 
