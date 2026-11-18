@@ -9,6 +9,7 @@ import express from 'express';
 import type { Express } from 'express-serve-static-core';
 import { realpathSync } from 'fs';
 import type { Server } from 'http';
+import type { AddressInfo } from 'net';
 import path from 'path';
 
 import { styled } from '../core/style';
@@ -133,7 +134,7 @@ export class CloudFunctions {
 
       const server = app.listen(servingPort, () => {
         server.off('error', refuse);
-        this.printServing(servingPort, cloudFunctionResources);
+        this.printServing((server.address() as AddressInfo).port, cloudFunctionResources);
         resolve(server);
       });
 

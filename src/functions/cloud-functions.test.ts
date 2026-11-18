@@ -216,6 +216,16 @@ describe('CloudFunctions serve routing', () => {
     ]);
   });
 
+  it('prints the port the server actually listens on when asked for port zero', async () => {
+    writeFunctionFile('hello.js', 'export default function hello(request, response) { response.send("hi"); }');
+
+    const server = (await new CloudFunctions(workspace).serve(0)) as Server;
+    const { port } = server.address() as AddressInfo;
+
+    expect(port).not.toBe(0);
+    expect(loggedLines).toContain(`Serving Cloud Functions at http://localhost:${port}`);
+  });
+
   it('colours the serving url cyan when stdout is a terminal', async () => {
     writeFunctionFile('hello.js', 'export default function hello(request, response) { response.end(); }');
     const port = await freePort();
