@@ -287,6 +287,16 @@ describe('CloudFunctions serve routing', () => {
     expect(JSON.parse(response.body)).toEqual({ sid: 'abc', theme: 'dark mode' });
   });
 
+  it('gives request.cookies an empty object when no cookie header is sent', async () => {
+    writeFunctionFile('cookies.js', 'export default function cookies(request, response) { response.json(request.cookies); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/cookies');
+
+    expect(JSON.parse(response.body)).toEqual({});
+  });
+
   it('answers 404 for a path no function claims', async () => {
     writeFunctionFile('hello.js', 'export default function hello(request, response) { response.send("hi"); }');
     const port = await freePort();

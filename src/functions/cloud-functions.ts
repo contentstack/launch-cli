@@ -30,9 +30,7 @@ function isHandler(value: unknown): value is CloudFunctionHandler {
 }
 
 function attachCookies(request: Request, _response: Response, next: NextFunction): void {
-  if (request.headers.cookie) {
-    request.cookies = parseCookieHeader(request.headers.cookie);
-  }
+  request.cookies = request.headers.cookie ? parseCookieHeader(request.headers.cookie) : {};
   next();
 }
 
