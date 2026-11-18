@@ -19,6 +19,9 @@ import type { SearchListClass } from './search-list';
 import { promptLibrary, utilitiesLoader } from './search-list';
 import { pretendTerminal, stdinReportingTTY, stdoutReportingTTY } from '../../test/support/terminal';
 
+const ORG_UID = 'blt1111111111111111';
+const ORG_FROM_FLAG = 'blt2222222222222222';
+
 class Probe extends LaunchCommand {
   static flags = {};
   static inputs = {};
@@ -322,7 +325,7 @@ describe('LaunchCommand.init', () => {
     }));
 
     await instance.init();
-    await instance['services'].api.projects.list({ org: 'org1' });
+    await instance['services'].api.projects.list({ org: ORG_UID });
 
     expect(parseMock).toHaveBeenCalledWith({ flags: Probe.flags, baseFlags: LaunchCommand.baseFlags, strict: true });
     expect(capturedBaseUrl).toBe(getManageApiBaseUrl('https://launch-api.test'));
@@ -389,7 +392,7 @@ describe('LaunchCommand.init', () => {
     const contextSpy = jest.spyOn(serviceContext, 'buildServiceContext');
 
     await instance.init();
-    await instance['services'].api.projects.list({ org: 'org1' });
+    await instance['services'].api.projects.list({ org: ORG_UID });
 
     expect(capturedBaseUrl).toBe(getManageApiBaseUrl('https://launch-api.contentstack.com'));
     expect(contextSpy).toHaveBeenCalledWith(
@@ -543,8 +546,8 @@ describe('LaunchCommand.init terminal detection', () => {
     );
 
     await instance.init();
-    await instance['services'].api.projects.list({ org: 'org1', limit: 5, skip: 10 });
-    await instance['services'].api.projects.update({ org: 'org1', project: 'p1', update: { name: 'Renamed' } });
+    await instance['services'].api.projects.list({ org: ORG_UID, limit: 5, skip: 10 });
+    await instance['services'].api.projects.update({ org: ORG_UID, project: 'p1', update: { name: 'Renamed' } });
 
     expect(capturedHeaders?.['X-CS-CLI']).toBe('csdx-cli/2.0.0 darwin-arm64');
     expect(wire.sent).toEqual([
@@ -616,7 +619,7 @@ describe('LaunchCommand.init config file notice', () => {
   });
 
   it('prints nothing when every value came from a flag', async () => {
-    const { printed } = await initInFolderHoldingAnOrg({ org: 'org-from-flag' });
+    const { printed } = await initInFolderHoldingAnOrg({ org: ORG_FROM_FLAG });
 
     expect(printed).toEqual([]);
   });
@@ -634,7 +637,7 @@ describe('LaunchCommand.init rules', () => {
     Object.defineProperty(instance, 'config', { value: { userAgent: 'cli/2.0.0' }, configurable: true });
     (instance as unknown as { parse: jest.Mock }).parse = jest
       .fn()
-      .mockResolvedValue({ flags: { org: 'org1', limit: 10 } });
+      .mockResolvedValue({ flags: { org: ORG_UID, limit: 10 } });
 
     await expect(instance.init()).rejects.toThrow('Pass exactly one of --org, --limit; --org, --limit were supplied.');
 
@@ -645,7 +648,7 @@ describe('LaunchCommand.init rules', () => {
 describe('resolveLaunchContext rules', () => {
   it('passes the declared rules through to the resolver, which evaluates them', async () => {
     const promise = resolveLaunchContext({
-      flags: { org: 'org1', limit: 10 },
+      flags: { org: ORG_UID, limit: 10 },
       inputs: { org: {}, limit: {} },
       rules: [exactlyOneOf('org', 'limit')],
       launchHubUrl: 'https://launch-api.test',
@@ -781,7 +784,7 @@ describe('resolveLaunchContext', () => {
   });
 
   it('words no notice when the flags supplied every value the config file also holds', async () => {
-    const result = await contextInFolderHoldingAnOrg({ org: 'org-from-flag' });
+    const result = await contextInFolderHoldingAnOrg({ org: ORG_FROM_FLAG });
 
     expect(result.configNotice).toBeUndefined();
   });
@@ -795,14 +798,14 @@ describe('projectConfigLoader', () => {
   }
 
   it('reads a default-location config only when a value is first needed, and only once', () => {
-    const { store: lazy, load } = store({ organizationUid: 'org1' });
+    const { store: lazy, load } = store({ organizationUid: ORG_UID });
 
     const loader = projectConfigLoader(lazy, false);
 
     expect(load).not.toHaveBeenCalled();
     expect(typeof loader).toBe('function');
-    expect((loader as () => object)()).toEqual({ organizationUid: 'org1' });
-    expect((loader as () => object)()).toEqual({ organizationUid: 'org1' });
+    expect((loader as () => object)()).toEqual({ organizationUid: ORG_UID });
+    expect((loader as () => object)()).toEqual({ organizationUid: ORG_UID });
     expect(load).toHaveBeenCalledTimes(1);
   });
 

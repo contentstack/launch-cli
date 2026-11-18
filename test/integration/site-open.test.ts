@@ -21,7 +21,7 @@ jest.mock('../../src/core/browser', () => jest.requireActual('../support/browser
 
 const LAUNCH_HUB_URL = 'https://launch-api.integration.test';
 const ORG_UID = 'blt4d9e2a7c1f6b3085';
-const OTHER_ORG_UID = randomBytes(9).toString('hex');
+const OTHER_ORG_UID = `blt${randomBytes(8).toString('hex')}`;
 const PROJECT_UID = randomBytes(12).toString('hex');
 const ENV_UID = randomBytes(12).toString('hex');
 const OTHER_PROJECT_ENV_UID = randomBytes(12).toString('hex');

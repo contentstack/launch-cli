@@ -9,6 +9,9 @@ import type { AnyResolutionSpec } from './resolution';
 import { resolveInputs, resolveInputsTraced } from './resolve';
 import { atLeastOneOf, exactlyOneOf } from './rules';
 
+const ORG_UID = 'blt1111111111111111';
+const ORG_FROM_FLAG = 'blt2222222222222222';
+
 function withResolution<T>(replacement: Record<string, AnyResolutionSpec>, run: () => Promise<T>): Promise<T> {
   const holder = resolutionModule as unknown as { resolutionTable: Record<string, AnyResolutionSpec> };
   const original = holder.resolutionTable;
@@ -73,12 +76,12 @@ function services(overrides: Partial<{ isTTY: boolean; answer: unknown }> = {}) 
 describe('resolveInputs', () => {
   it('prefers the flag, then config, then the default', async () => {
     const resolved = await resolveInputs(inputs({ org: { required: true }, limit: {}, skip: {} }), {
-      parsed: { org: 'from-flag' },
+      parsed: { org: ORG_FROM_FLAG },
       projectConfig: { organizationUid: 'from-config' },
       services: services(),
     });
 
-    expect(resolved).toEqual({ org: 'from-flag', limit: 100, skip: 0 });
+    expect(resolved).toEqual({ org: ORG_FROM_FLAG, limit: 100, skip: 0 });
   });
 
   it('falls back to config when the flag is absent', async () => {
@@ -93,7 +96,7 @@ describe('resolveInputs', () => {
 
   it('prompts when there is a TTY and no earlier source', async () => {
     const resolved = await resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
-      parsed: { org: 'org1' },
+      parsed: { org: ORG_UID },
       projectConfig: {},
       services: services({ isTTY: true, answer: PROJECT_UID }),
     });
@@ -163,13 +166,13 @@ describe('resolveInputs', () => {
     } as unknown as ApiSurface;
 
     const resolved = await resolveInputs(inputs({ project: { required: true }, org: { required: true } }), {
-      parsed: { org: 'org-from-flag' },
+      parsed: { org: ORG_FROM_FLAG },
       projectConfig: {},
       services: { api, ux, isTTY: true },
     });
 
-    expect(seen).toEqual(['org-from-flag']);
-    expect(resolved).toEqual({ org: 'org-from-flag', project: PROJECT_UID });
+    expect(seen).toEqual([ORG_FROM_FLAG]);
+    expect(resolved).toEqual({ org: ORG_FROM_FLAG, project: PROJECT_UID });
   });
 
   it('resolves inputs in declaration order so a later prompt can read an earlier value', async () => {
@@ -191,12 +194,12 @@ describe('resolveInputs', () => {
     } as unknown as ApiSurface;
 
     await resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
-      parsed: { org: 'org-from-flag' },
+      parsed: { org: ORG_FROM_FLAG },
       projectConfig: {},
       services: { api, ux, isTTY: true },
     });
 
-    expect(seen).toEqual(['org-from-flag']);
+    expect(seen).toEqual([ORG_FROM_FLAG]);
   });
 
   it('keeps an explicitly passed --skip 0 rather than treating it as absent', async () => {
@@ -221,7 +224,7 @@ describe('resolveInputs', () => {
 
   it('reads the project uid straight out of the config block', async () => {
     const resolved = await resolveInputs(inputs({ org: {}, project: { required: true } }), {
-      parsed: { org: 'org1' },
+      parsed: { org: ORG_UID },
       projectConfig: { uid: PROJECT_UID },
       services: services(),
     });
@@ -241,7 +244,7 @@ describe('resolveInputs', () => {
 
   it('normalises a project name supplied by flag into its uid', async () => {
     const resolved = await resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
-      parsed: { org: 'org1', project: 'Project One' },
+      parsed: { org: ORG_UID, project: 'Project One' },
       projectConfig: {},
       services: services(),
     });
@@ -251,7 +254,7 @@ describe('resolveInputs', () => {
 
   it('takes the config file uid field as a uid even when it reads like a name', async () => {
     const resolved = await resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
-      parsed: { org: 'org1' },
+      parsed: { org: ORG_UID },
       projectConfig: { uid: 'Project One' },
       services: services(),
     });
@@ -272,7 +275,7 @@ describe('resolveInputs', () => {
 
   it('prompts when the config file holds a null value rather than accepting it', async () => {
     const resolved = await resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
-      parsed: { org: 'org1' },
+      parsed: { org: ORG_UID },
       projectConfig: { uid: null },
       services: services({ isTTY: true, answer: PROJECT_UID }),
     });
@@ -303,7 +306,7 @@ describe('resolveInputs', () => {
 
   it('does not normalise a project input that resolved to nothing', async () => {
     const resolved = await resolveInputs(inputs({ org: { required: true }, project: {} }), {
-      parsed: { org: 'org1' },
+      parsed: { org: ORG_UID },
       projectConfig: {},
       services: services(),
     });
@@ -313,7 +316,7 @@ describe('resolveInputs', () => {
 
   it('propagates the cancellation the picker raises when the user chooses nothing', async () => {
     const promise = resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
-      parsed: { org: 'org1' },
+      parsed: { org: ORG_UID },
       projectConfig: {},
       services: services({ isTTY: true, answer: undefined }),
     });
@@ -348,7 +351,7 @@ describe('resolveInputs', () => {
     } as unknown as ApiSurface;
 
     const resolved = await resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
-      parsed: { org: 'org1', project: PROJECT_UID },
+      parsed: { org: ORG_UID, project: PROJECT_UID },
       projectConfig: {},
       services: { api, ux, isTTY: true },
     });
@@ -383,7 +386,7 @@ describe('resolveInputs', () => {
     } as unknown as ApiSurface;
 
     const resolved = await resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
-      parsed: { org: 'org1' },
+      parsed: { org: ORG_UID },
       projectConfig: { uid: PROJECT_UID },
       services: { api, ux, isTTY: true },
     });
@@ -394,7 +397,7 @@ describe('resolveInputs', () => {
 
   it('propagates a usage error raised while normalising a value', async () => {
     const promise = resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
-      parsed: { org: 'org1', project: 'ghost' },
+      parsed: { org: ORG_UID, project: 'ghost' },
       projectConfig: {},
       services: services(),
     });
@@ -415,12 +418,12 @@ describe('resolveInputs', () => {
 
   it('excludes parsed flags the spec does not declare', async () => {
     const resolved = await resolveInputs(inputs({ org: { required: true } }), {
-      parsed: { org: 'org1', limit: 10, skip: 5, config: '/tmp/.cs-launch.json' },
+      parsed: { org: ORG_UID, limit: 10, skip: 5, config: '/tmp/.cs-launch.json' },
       projectConfig: {},
       services: services(),
     });
 
-    expect(resolved).toEqual({ org: 'org1' });
+    expect(resolved).toEqual({ org: ORG_UID });
     expect(Object.keys(resolved)).toEqual(['org']);
   });
 
@@ -483,7 +486,7 @@ describe('resolveInputs', () => {
     } as unknown as ApiSurface;
 
     const resolved = await resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
-      parsed: { org: 'org1', project: blank },
+      parsed: { org: ORG_UID, project: blank },
       projectConfig: {},
       services: { api, ux, isTTY: true },
     });
@@ -567,14 +570,14 @@ describe('resolveInputs dependency ordering', () => {
 
     const resolved = await withResolution(reversedResolution(), () =>
       resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
-        parsed: { org: 'org-from-flag', project: 'Project One' },
+        parsed: { org: ORG_FROM_FLAG, project: 'Project One' },
         projectConfig: {},
         services: recordingServices(seen),
       }),
     );
 
-    expect(seen).toEqual(['org-from-flag']);
-    expect(resolved).toEqual({ org: 'org-from-flag', project: PROJECT_UID });
+    expect(seen).toEqual([ORG_FROM_FLAG]);
+    expect(resolved).toEqual({ org: ORG_FROM_FLAG, project: PROJECT_UID });
   });
 
   it('prompts project against the resolved org even when the resolution entries are reversed', async () => {
@@ -582,14 +585,14 @@ describe('resolveInputs dependency ordering', () => {
 
     const resolved = await withResolution(reversedResolution(), () =>
       resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
-        parsed: { org: 'org-from-flag' },
+        parsed: { org: ORG_FROM_FLAG },
         projectConfig: {},
         services: recordingServices(seen),
       }),
     );
 
-    expect(seen).toEqual(['org-from-flag']);
-    expect(resolved).toEqual({ org: 'org-from-flag', project: PROJECT_UID });
+    expect(seen).toEqual([ORG_FROM_FLAG]);
+    expect(resolved).toEqual({ org: ORG_FROM_FLAG, project: PROJECT_UID });
   });
 
   it('throws naming both flags when a command declares project without org', async () => {
@@ -615,7 +618,7 @@ describe('resolveInputs dependency ordering', () => {
 
     const promise = withResolution(cyclic, () =>
       resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
-        parsed: { org: 'org1', project: 'Project One' },
+        parsed: { org: ORG_UID, project: 'Project One' },
         projectConfig: {},
         services: recordingServices([]),
       }),
@@ -672,20 +675,20 @@ describe('resolveInputs dependency ordering', () => {
     const seen: unknown[] = [];
 
     const resolved = await resolveInputs(inputs({ org: {}, project: {} }), {
-      parsed: { org: 'org1', project: 'Project One' },
+      parsed: { org: ORG_UID, project: 'Project One' },
       projectConfig: {},
       services: recordingServices(seen),
     });
 
-    expect(resolved).toEqual({ org: 'org1', project: PROJECT_UID });
-    expect(seen).toEqual(['org1']);
+    expect(resolved).toEqual({ org: ORG_UID, project: PROJECT_UID });
+    expect(seen).toEqual([ORG_UID]);
   });
 
   it('takes a config-supplied project uid as a uid rather than sniffing its shape', async () => {
     const seen: unknown[] = [];
 
     const resolved = await resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
-      parsed: { org: 'org1' },
+      parsed: { org: ORG_UID },
       projectConfig: { uid: 'blt4d9e2a7c1f6b3085' },
       services: { ...recordingServices(seen), isTTY: false },
     });
@@ -698,13 +701,13 @@ describe('resolveInputs dependency ordering', () => {
     const seen: unknown[] = [];
 
     const resolved = await resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
-      parsed: { org: 'org1', project: 'Project One' },
+      parsed: { org: ORG_UID, project: 'Project One' },
       projectConfig: {},
       services: recordingServices(seen),
     });
 
     expect(resolved.project).toBe(PROJECT_UID);
-    expect(seen).toEqual(['org1']);
+    expect(seen).toEqual([ORG_UID]);
   });
 
   it('takes a picked project uid as a uid rather than sniffing its shape', async () => {
@@ -717,13 +720,13 @@ describe('resolveInputs dependency ordering', () => {
     };
 
     const resolved = await resolveInputs(inputs({ org: { required: true }, project: { required: true } }), {
-      parsed: { org: 'org1' },
+      parsed: { org: ORG_UID },
       projectConfig: {},
       services,
     });
 
     expect(resolved.project).toBe('blt4d9e2a7c1f6b3085');
-    expect(seen).toEqual(['org1']);
+    expect(seen).toEqual([ORG_UID]);
   });
 
   it('runs a normalize that declares no dependency at all without demanding one', async () => {
@@ -734,18 +737,18 @@ describe('resolveInputs dependency ordering', () => {
 
     const resolved = await withResolution(custom, () =>
       resolveInputs(inputs({ org: { required: true } }), {
-        parsed: { org: 'org1' },
+        parsed: { org: ORG_UID },
         projectConfig: {},
         services: recordingServices([]),
       }),
     );
 
-    expect(resolved).toEqual({ org: 'org1-normalised' });
+    expect(resolved).toEqual({ org: `${ORG_UID}-normalised` });
   });
 
   it('restores the catalog order for inputs that declare no dependency at all', async () => {
     const resolved = await resolveInputs(inputs({ org: { required: true }, limit: {}, skip: {} }), {
-      parsed: { org: 'org1' },
+      parsed: { org: ORG_UID },
       projectConfig: {},
       services: services(),
     });
@@ -757,18 +760,18 @@ describe('resolveInputs dependency ordering', () => {
 describe('resolveInputs cross-flag rules', () => {
   it('evaluates declared rules against the resolved values and returns them when every rule passes', async () => {
     const resolved = await resolveInputs(inputs({ org: { required: true }, limit: {} }), {
-      parsed: { org: 'org1', limit: 10 },
+      parsed: { org: ORG_UID, limit: 10 },
       projectConfig: {},
       services: services(),
       rules: [exactlyOneOf('org', 'skip')],
     });
 
-    expect(resolved).toEqual({ org: 'org1', limit: 10 });
+    expect(resolved).toEqual({ org: ORG_UID, limit: 10 });
   });
 
   it('throws the rule usage error when a rule fails against the resolved values', async () => {
     const promise = resolveInputs(inputs({ org: { required: true }, limit: {} }), {
-      parsed: { org: 'org1', limit: 10 },
+      parsed: { org: ORG_UID, limit: 10 },
       projectConfig: {},
       services: services(),
       rules: [exactlyOneOf('org', 'limit')],
@@ -816,7 +819,7 @@ describe('resolveInputs cross-flag rules and where a value came from', () => {
   it('counts a value from the config file as supplied', async () => {
     const promise = resolveInputs(inputs({ org: {}, limit: {} }), {
       parsed: { limit: 10 },
-      projectConfig: { organizationUid: 'org1' },
+      projectConfig: { organizationUid: ORG_UID },
       services: services(),
       rules: [exactlyOneOf('org', 'limit')],
     });
@@ -826,7 +829,7 @@ describe('resolveInputs cross-flag rules and where a value came from', () => {
 
   it('counts a value the user answered at a prompt as supplied', async () => {
     const promise = resolveInputs(inputs({ org: { required: true }, project: {} }), {
-      parsed: { org: 'org1' },
+      parsed: { org: ORG_UID },
       projectConfig: {},
       services: services({ isTTY: true, answer: PROJECT_UID }),
       rules: [exactlyOneOf('org', 'project')],

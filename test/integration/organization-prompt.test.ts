@@ -293,4 +293,19 @@ describe('integration: the organization prompt', () => {
     expect(inquired).toEqual([]);
     expect(onWire).toEqual([]);
   });
+
+  it('exits 2 saying --org takes a UID when it is given an organization name, and sends no request', async () => {
+    useSession(session());
+    const inquired = answering([]);
+    const projects = nock(LAUNCH_HUB_URL).get('/manage/projects').query(true).reply(200, listFixture);
+
+    // runCommand re-splits its argv on spaces, so the shell's quoting is spelled out
+    const { error } = await onTerminal(['launch:projects:list', '--org', '"Acme Production"', '--data-dir', DATA_DIR]);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe('--org accepts an organization UID, not a name.');
+    expect(projects.isDone()).toBe(false);
+    expect(inquired).toEqual([]);
+    expect(onWire).toEqual([]);
+  });
 });

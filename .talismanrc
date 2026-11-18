@@ -231,7 +231,7 @@ fileignoreconfig:
   allowed_patterns:
     - "FlagKey"
 - filename: src/resources.test.ts
-  checksum: 6ff9df735323c036cbd5eb5fb321fef110a05b7ae99e61d7687bebc2c0b6dde1
+  checksum: 6c2a0938d406767bbc80890aece988fbef1b01f809bd4b488403946aaef2ad37
   allowed_patterns:
     - "a project name passed on argv to the project resolver"
     - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
@@ -253,7 +253,7 @@ fileignoreconfig:
 - filename: src/core/resolve.ts
   checksum: a5608d22286efdd4915639faff6e05a588e60e205c74e0398e389822eb8c7292
 - filename: src/core/resolve.test.ts
-  checksum: 8740a27f759a106e0ddcf38874f83394d2226dd8a908d9499898d774fea3a7a0
+  checksum: 7491778e802793695ae6a63e0d0652dd36f1058d8a608f28c9991807adf1cfd2
 - filename: src/git/local-repository.ts
   checksum: b9091ed135dfebdf590a5412bbfba2b2f96d4a177cf944a20909b93405268e9f
 - filename: test/guards/layering.test.ts
@@ -267,7 +267,7 @@ fileignoreconfig:
 - filename: src/core/launch-command.ts
   checksum: 999468661532665870b81face9086998e543df648175e2417045840dc97cb1dd
 - filename: src/core/launch-command.test.ts
-  checksum: c4488f07834e0c6e765a954cd30b3222eba05944f48bec01839f024b1cb7622f
+  checksum: 40c554e420c60e38d738190128588bc43c6f347da2d1e648b65d93419ca9f2c3
 - filename: src/projects/project.inputs.test.ts
   checksum: 8242f4d40388f1a7f1d08c11d2571cb45a9294069a8248a5272bc5606807bb60
 - filename: test/integration/projects-command-flows.test.ts
@@ -279,7 +279,7 @@ fileignoreconfig:
 - filename: src/commands/launch/env/list.test.ts
   checksum: f5de16e0fd37a85ceb31a7fbc8e9058347ccc072f53c95d4f49ef15e923f4e95
 - filename: src/commands/launch/projects/get.test.ts
-  checksum: ecc48c6a381de44858eafa57fdfd8c24c087837d2869909c8326db8e77148f29
+  checksum: 3aeffc4e4742ea9c5b3d9e6c5ea2248ced1d19a273bbc7d7948d471774b0d739
 - filename: test/integration/projects-list-command.test.ts
   checksum: 5f49dc7f384fb9e33c8fb91f1c67b17ffc2fd3bbde3663f90f820056407e98a0
 - filename: src/functions/cloud-functions.test.ts
