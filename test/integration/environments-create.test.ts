@@ -16,6 +16,7 @@ import { answerPrompts, onTerminal } from '../support/terminal';
 import projectFixture from '../fixtures/project-get.json';
 
 jest.mock('open', () => jest.fn().mockResolvedValue(undefined));
+jest.mock('../../src/core/browser', () => jest.requireActual('../support/browser'));
 
 const realWatchTiming = watcher.defaultWatchTiming;
 
