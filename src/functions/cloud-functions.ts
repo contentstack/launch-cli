@@ -239,6 +239,7 @@ export class CloudFunctions {
     bundledFiles
       .map((bundledFile) => realpathSync(bundledFile))
       .filter((bundledFile) => path.relative(functionsDirectory, bundledFile).startsWith('..'))
+      .filter((bundledFile) => !bundledFile.split(path.sep).includes('node_modules'))
       .forEach((outsideFile) => {
         const imported = path.relative(projectDirectory, outsideFile);
         const warning =

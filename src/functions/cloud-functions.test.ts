@@ -367,6 +367,27 @@ describe('CloudFunctions serve routing', () => {
     );
   });
 
+  it('does not warn about a package imported from node_modules', async () => {
+    writeProjectFile(join('node_modules', 'fake-pkg', 'package.json'), '{"name":"fake-pkg","main":"index.js"}');
+    writeProjectFile(join('node_modules', 'fake-pkg', 'index.js'), 'module.exports = { greeting: "from package" };');
+    writeFunctionFile(
+      'pkg.js',
+      'import pkg from "fake-pkg"; export default function usesPkg(request, response) { response.send(pkg.greeting); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/pkg');
+
+    expect(response.body).toBe('from package');
+    expect(loggedLines).toEqual([
+      'Detected Serverless Functions:',
+      '  λ /pkg',
+      '',
+      `Serving Cloud Functions at http://localhost:${port}`,
+    ]);
+  });
+
   it('answers 404 for a path no function claims', async () => {
     writeFunctionFile('hello.js', 'export default function hello(request, response) { response.send("hi"); }');
     const port = await freePort();
