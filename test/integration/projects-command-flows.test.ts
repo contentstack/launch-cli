@@ -3,12 +3,12 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { authHandler, cliux, configHandler } from '@contentstack/cli-utilities';
+import { authHandler, configHandler } from '@contentstack/cli-utilities';
 import type { Interfaces } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
-import { pretendTerminal } from '../support/terminal';
+import { pretendTerminal, stubPrompts } from '../support/terminal';
 import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
 
 import getFixture from '../fixtures/project-get.json';
@@ -256,7 +256,7 @@ describe('integration: end-to-end command flows', () => {
     useSession(basicSession());
     const restoreTTY = pretendTerminal();
     const inquired: unknown[] = [];
-    jest.spyOn(cliux, 'inquire').mockImplementation(async (payload: unknown) => {
+    stubPrompts((payload) => {
       inquired.push(payload);
       return PROJECT_UID as never;
     });
@@ -288,7 +288,7 @@ describe('integration: end-to-end command flows', () => {
   it('exits 3 when the picker comes back with nothing chosen', async () => {
     useSession(basicSession());
     const restoreTTY = pretendTerminal();
-    jest.spyOn(cliux, 'inquire').mockResolvedValue(undefined as never);
+    stubPrompts(() => undefined);
     nock(LAUNCH_HUB_URL).get('/manage/projects').query({ limit: '100', skip: '0' }).reply(200, listFixture);
 
     const { error } = await runLaunch(['launch:projects:get', '--org', ORG_UID, '--data-dir', tmpdir()]);

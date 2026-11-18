@@ -1,14 +1,14 @@
-import { cliux } from '@contentstack/cli-utilities';
-
 import { EXIT_CANCELLED } from '../../src/core/constants';
 import { CancelledError } from '../../src/core/errors';
 import { LaunchCommand } from '../../src/core/launch-command';
 import type { UxLike } from '../../src/core/prompt';
+import { terminalUx } from '../../src/core/terminal-ux';
 import type { Occurrence, SourceFile } from '../support/sources';
 import { describeOccurrence, occurrences, productionSources } from '../support/sources';
+import { ctrlC } from '../support/terminal';
 
 const FUNNEL_FILE = 'core/launch-command.ts';
-const FUNNEL_CALL = 'cancelOnInterrupt(cliux)';
+const FUNNEL_CALL = 'cancelOnInterrupt(terminalUx)';
 const REGISTRATION_FILE = 'core/search-list.ts';
 const PROMPT_LIBRARIES = /['"](inquirer|inquirer-[\w-]+|@inquirer\/[\w-]+|enquirer|prompts|(node:)?readline)['"]/;
 const PROMPT_METHODS = 'inquire|prompt|confirm';
@@ -77,11 +77,10 @@ describe('guard: every prompt goes through the one wrapper that maps Ctrl-C to e
   });
 
   it('turns Ctrl-C at any prompt a LaunchCommand issues into CancelledError with exit 3', async () => {
-    jest.spyOn(cliux, 'inquire').mockImplementation(() => new Promise<never>(() => undefined));
+    jest.spyOn(terminalUx, 'inquire').mockRejectedValue(ctrlC());
     const ux = (new FreshCommand([], {} as never) as unknown as { ux: UxLike }).ux;
 
     const answer = ux.inquire({ type: 'input', name: 'value', message: 'Project name' });
-    process.emit('SIGINT');
 
     await expect(answer).rejects.toBeInstanceOf(CancelledError);
     await expect(answer).rejects.toHaveProperty('exitCode', EXIT_CANCELLED);

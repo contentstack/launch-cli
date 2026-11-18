@@ -7,6 +7,7 @@ import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
 import * as watcher from '../../src/deployments/deployment.watcher';
+import { terminalUx } from '../../src/core/terminal-ux';
 import { EVENT_STREAM_IDLE_TIMEOUT_MS } from '../../src/transport/event-stream';
 import listFixture from '../fixtures/deployments-list.json';
 import notFoundFixture from '../fixtures/deployment-not-found.json';
@@ -198,7 +199,7 @@ describe('integration: launch:logs:get on the wire', () => {
       expect(other.isDone()).toBe(false);
       expect(outputLines(stdout)).toEqual(['2026-10-28 10:00:00.000:  Installing dependencies...', 'Deployment #4 is LIVE.']);
       expect(answered.messages).toEqual([]);
-      expect(cliux.inquire).not.toHaveBeenCalled();
+      expect(terminalUx.inquire).not.toHaveBeenCalled();
       expect(onWire).toEqual([]);
     } finally {
       restoreStdin();

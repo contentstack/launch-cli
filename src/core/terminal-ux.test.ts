@@ -29,6 +29,8 @@ describe('libraryUx', () => {
 });
 
 describe('terminalUx', () => {
+  beforeEach(() => jest.mocked(terminalUx.inquire).mockRestore());
+
   it('asks through the inquirer cli-utilities ships, the one search-list is registered with', async () => {
     const prompt = jest.spyOn(promptLibrary(), 'prompt').mockResolvedValue({ value: 'Default' });
 
