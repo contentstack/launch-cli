@@ -43,13 +43,13 @@ function freePort(): Promise<number> {
   });
 }
 
-function sendRequest(
-  port: number,
-  path: string,
-  method = 'GET',
-  headers: Record<string, string> = {},
-  body?: string,
-): Promise<HttpResponse> {
+interface RequestOptions {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+}
+
+function sendRequest(port: number, path: string, { method = 'GET', headers = {}, body }: RequestOptions = {}): Promise<HttpResponse> {
   return new Promise((resolve, reject) => {
     const clientRequest = httpRequest({ host: '127.0.0.1', port, path, method, headers }, (response) => {
       let body = '';
@@ -273,7 +273,7 @@ describe('CloudFunctions serve routing', () => {
     const port = await freePort();
 
     await new CloudFunctions(workspace).serve(port);
-    const response = await sendRequest(port, '/echo', 'POST');
+    const response = await sendRequest(port, '/echo', { method: 'POST' });
 
     expect(JSON.parse(response.body)).toEqual({ method: 'POST' });
   });
@@ -283,7 +283,7 @@ describe('CloudFunctions serve routing', () => {
     const port = await freePort();
 
     await new CloudFunctions(workspace).serve(port);
-    const response = await sendRequest(port, '/cookies', 'GET', { cookie: 'sid=abc; theme=dark%20mode' });
+    const response = await sendRequest(port, '/cookies', { headers: { cookie: 'sid=abc; theme=dark%20mode' } });
 
     expect(JSON.parse(response.body)).toEqual({ sid: 'abc', theme: 'dark mode' });
   });
@@ -303,7 +303,11 @@ describe('CloudFunctions serve routing', () => {
     const port = await freePort();
 
     await new CloudFunctions(workspace).serve(port);
-    const response = await sendRequest(port, '/body', 'POST', { 'content-type': 'text/plain' }, 'raw text');
+    const response = await sendRequest(port, '/body', {
+      method: 'POST',
+      headers: { 'content-type': 'text/plain' },
+      body: 'raw text',
+    });
 
     expect(JSON.parse(response.body)).toEqual({ body: 'raw text' });
   });
