@@ -44,8 +44,15 @@ export class LaunchApiError extends LaunchError {
   readonly status: number;
   readonly code: string;
   readonly errors: ApiErrorEntry[];
+  /** The errors array as the server sent it, before entries it can't read are reduced to {}. */
+  readonly rawErrors: readonly unknown[];
 
-  constructor(status: number, errors: ApiErrorEntry[], messages: ErrorMessages = {}) {
+  constructor(
+    status: number,
+    errors: ApiErrorEntry[],
+    messages: ErrorMessages = {},
+    rawErrors: readonly unknown[] = errors,
+  ) {
     const [primary] = errors;
     super(
       messageForCode(messages, primary?.code) ??
@@ -57,6 +64,7 @@ export class LaunchApiError extends LaunchError {
     this.status = status;
     this.code = primary?.code ?? 'launch.UNKNOWN';
     this.errors = errors;
+    this.rawErrors = rawErrors;
   }
 }
 
@@ -100,7 +108,9 @@ function entryFrom(value: unknown): ApiErrorEntry {
 export function parseErrorEnvelope(status: number, body: unknown, messages: ErrorMessages = {}): LaunchApiError {
   const errors = typeof body === 'object' && body !== null && 'errors' in body ? body.errors : undefined;
 
-  return new LaunchApiError(status, Array.isArray(errors) ? errors.map(entryFrom) : [], messages);
+  const sent: unknown[] = Array.isArray(errors) ? errors : [];
+
+  return new LaunchApiError(status, sent.map(entryFrom), messages, sent);
 }
 
 export const PROXY_ERROR_CODES: readonly string[] = ['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'ERR_BAD_RESPONSE'];

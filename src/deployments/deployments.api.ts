@@ -43,15 +43,16 @@ function isRawRefusal(entry: ApiErrorEntry): boolean {
   return entry.code === CANCEL_NOT_ALLOWED_RAW_MESSAGE || entry.message === CANCEL_NOT_ALLOWED_RAW_MESSAGE;
 }
 
-function isEmpty(entry: ApiErrorEntry): boolean {
-  return entry.field === undefined && entry.code === undefined && entry.message === undefined;
+function isEmptyEntry(sent: unknown): boolean {
+  return isRecord(sent) && Object.keys(sent).length === 0;
 }
 
-// The server answers a cancel that lost the race with a deployment finishing as {"errors":[{}]}.
+// The race answers {"errors":[{}]} (or the raw refusal message). Judge {} on what was sent:
+// entries the parser can't read also parse to {}.
 function isCancelRaceRefusal(error: LaunchApiError): boolean {
   return (
     error.status === 400 &&
-    (error.errors.some(isRawRefusal) || (error.errors.length > 0 && error.errors.every(isEmpty)))
+    (error.errors.some(isRawRefusal) || (error.rawErrors.length > 0 && error.rawErrors.every(isEmptyEntry)))
   );
 }
 

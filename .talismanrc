@@ -297,7 +297,7 @@ fileignoreconfig:
 - filename: src/functions/function.errors.test.ts
   checksum: ac0a55e5bee974fefa9fb95541adba63e9a2c2c6e6c47b87c8ca1022542e75f0
 - filename: src/transport/errors.test.ts
-  checksum: f38547e2a4639ae150b53f955963ce00c1922a4223c89e489ba5b7ca75a691d0
+  checksum: 72bd1e9af33dbb9dd4e86803534ebadbda37af5f0aeeefb4f99734cf027c7f39
 - filename: src/transport/auth-strategy.ts
   checksum: 6fe87def1b508cb67203d4445d9bd889570e512ed4194dfc4fdd3182bc8b87b2
 - filename: src/functions/function.logger.test.ts
@@ -447,13 +447,13 @@ fileignoreconfig:
 - filename: test/integration/deployments-rollback.test.ts
   checksum: 08400c5435c84cd162fefc585f6c32cddfcaa8909d2369341748b421e7f12073
 - filename: test/integration/deployments-cancel.test.ts
-  checksum: 95bf08ce05089d01ede8f4b41faa7ff01fff3b4e7961742a288ad2e3f5959d9d
+  checksum: 8972ed5f23e7dee8acf677ae9a26d2d28ef8144d03bc7623c5fd29f096a3aed0
 - filename: src/commands/launch/deployments/cancel.test.ts
   checksum: da8d09de7f03cfe67df75ebc1636b36feb6688cf85984c357fd5304852d126e5
 - filename: src/commands/launch/deployments/rollback.test.ts
   checksum: 5331e774d07387b1691c47168afa8d454bdee60d26ac9c6ed3f4640fc85ff8b8
 - filename: src/deployments/deployments.api.test.ts
-  checksum: e581dc4de15f9e669f5dff81b9e5079835e9e3e73f5476399ccd1aeb6d974091
+  checksum: 7a9b375ee156a6c61de30570814ce8f8109c90ca3863e760167ba018dd60b596
 - filename: src/deployments/deployment.prompt.test.ts
   checksum: 3367e53ce2f0284c14524da893e7f82ef613fcdac1e9689ac408709e7f7c153d
 - filename: test/integration/deployments-request-bodies.test.ts

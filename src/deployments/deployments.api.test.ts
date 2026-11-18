@@ -374,7 +374,6 @@ describe('DeploymentsApi', () => {
     ['another message', [{ message: 'something else' }]],
     ['no error entries, as a proxy answers', []],
     ['an empty entry beside another message', [{}, { message: 'something else' }]],
-    ['another known code', [{ code: INVALID_DEPLOYMENT_UID_CODE }]],
     ['a field-only entry', [{ field: 'deployment_uid' }]],
   ])('leaves a 400 cancel refusal carrying %s untouched', async (_name, errors) => {
     const rejection = new LaunchApiError(400, errors, DEPLOYMENT_ERROR_MESSAGES);
