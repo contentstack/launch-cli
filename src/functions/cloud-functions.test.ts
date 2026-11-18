@@ -43,9 +43,14 @@ function freePort(): Promise<number> {
   });
 }
 
-function sendRequest(port: number, path: string, method = 'GET'): Promise<HttpResponse> {
+function sendRequest(
+  port: number,
+  path: string,
+  method = 'GET',
+  headers: Record<string, string> = {},
+): Promise<HttpResponse> {
   return new Promise((resolve, reject) => {
-    const clientRequest = httpRequest({ host: '127.0.0.1', port, path, method }, (response) => {
+    const clientRequest = httpRequest({ host: '127.0.0.1', port, path, method, headers }, (response) => {
       let body = '';
       response.setEncoding('utf8');
       response.on('data', (chunk) => {
@@ -270,6 +275,16 @@ describe('CloudFunctions serve routing', () => {
     const response = await sendRequest(port, '/echo', 'POST');
 
     expect(JSON.parse(response.body)).toEqual({ method: 'POST' });
+  });
+
+  it('parses the cookie header into request.cookies', async () => {
+    writeFunctionFile('cookies.js', 'export default function cookies(request, response) { response.json(request.cookies); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/cookies', 'GET', { cookie: 'sid=abc; theme=dark%20mode' });
+
+    expect(JSON.parse(response.body)).toEqual({ sid: 'abc', theme: 'dark mode' });
   });
 
   it('answers 404 for a path no function claims', async () => {

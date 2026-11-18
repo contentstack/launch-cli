@@ -1,5 +1,7 @@
+import { parse as parseCookieHeader } from 'cookie';
 import dotenv from 'dotenv';
 import type {
+  NextFunction,
   Request,
   Response,
 } from 'express';
@@ -74,6 +76,12 @@ export class CloudFunctions {
 
     const app = express();
     app.disable('x-powered-by');
+    app.use((request: Request, _response: Response, next: NextFunction) => {
+      if (request.headers.cookie) {
+        request.cookies = parseCookieHeader(request.headers.cookie);
+      }
+      next();
+    });
 
     await this.applyAppRouter(exactRouteResources, app);
     await this.applyAppRouter(dynamicRouteResources, app);
