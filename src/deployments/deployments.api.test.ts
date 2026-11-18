@@ -339,6 +339,8 @@ describe('DeploymentsApi', () => {
     ['the code', [{ code: 'launch.DEPLOYMENT.CANCEL_NOT_ALLOWED', message: 'x' }]],
     ['the raw message as the code', [{ code: CANCEL_NOT_ALLOWED_RAW_MESSAGE, message: CANCEL_NOT_ALLOWED_RAW_MESSAGE }]],
     ['the raw message alone', [{ message: CANCEL_NOT_ALLOWED_RAW_MESSAGE }]],
+    ['an empty error entry', [{}]],
+    ['another message', [{ message: 'something else' }]],
   ])('words a cancel refused with %s as the cancel-not-allowed message', async (_name, errors) => {
     const rejection = new LaunchApiError(400, errors, DEPLOYMENT_ERROR_MESSAGES);
     const client = { request: async () => Promise.reject(rejection) } as unknown as RestApiClient;
@@ -355,13 +357,24 @@ describe('DeploymentsApi', () => {
     expect(failure.message).not.toBe(CANCEL_NOT_ALLOWED_RAW_MESSAGE);
   });
 
-  it('leaves a 400 with another message, and a non-400 with the raw message, untouched on cancel', async () => {
-    const other = new LaunchApiError(400, [{ message: 'something else' }]);
+  it('words a non-400 cancel refused with the code as the cancel-not-allowed message, keeping its status', async () => {
+    const rejection = new LaunchApiError(409, [{ code: 'launch.DEPLOYMENT.CANCEL_NOT_ALLOWED', message: 'x' }]);
+    const client = { request: async () => Promise.reject(rejection) } as unknown as RestApiClient;
+
+    const failure = (await new DeploymentsApi(client)
+      .cancel({ ...SCOPE, deployment: DEPLOYMENT })
+      .catch((error: unknown) => error)) as LaunchApiError;
+
+    expect(failure.status).toBe(409);
+    expect(failure.message).toBe(`Deployment "${DEPLOYMENT}" cannot be cancelled because it is no longer in progress.`);
+  });
+
+  it('leaves a non-400 refusal untouched on cancel', async () => {
     const wrongStatus = new LaunchApiError(409, [{ message: CANCEL_NOT_ALLOWED_RAW_MESSAGE }]);
     const notFound = new LaunchApiError(404, [{ code: 'launch.DEPLOYMENT.NOT_FOUND', message: 'x' }], DEPLOYMENT_ERROR_MESSAGES);
     const plain = new Error('boom');
 
-    for (const rejection of [other, wrongStatus, notFound, plain]) {
+    for (const rejection of [wrongStatus, notFound, plain]) {
       const client = { request: async () => Promise.reject(rejection) } as unknown as RestApiClient;
 
       await expect(new DeploymentsApi(client).cancel({ ...SCOPE, deployment: DEPLOYMENT })).rejects.toBe(rejection);
