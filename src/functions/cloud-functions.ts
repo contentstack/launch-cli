@@ -7,6 +7,7 @@ import type {
 } from 'express';
 import express from 'express';
 import type { Express } from 'express-serve-static-core';
+import { realpathSync } from 'fs';
 import type { Server } from 'http';
 import path from 'path';
 
@@ -230,6 +231,23 @@ export class CloudFunctions {
     return { exactRouteResources, dynamicRouteResources };
   }
 
+  private warnAboutImportsOutsideFunctions(cloudFunctionFilePath: string, bundledFiles: string[]): void {
+    const projectDirectory = realpathSync(this.pathToSourceCode);
+    const functionsDirectory = realpathSync(this.cloudFunctionsDirectoryPath);
+    const importer = path.relative(projectDirectory, realpathSync(cloudFunctionFilePath));
+
+    bundledFiles
+      .map((bundledFile) => realpathSync(bundledFile))
+      .filter((bundledFile) => path.relative(functionsDirectory, bundledFile).startsWith('..'))
+      .forEach((outsideFile) => {
+        const imported = path.relative(projectDirectory, outsideFile);
+        const warning =
+          `warn: ${importer} imports ${imported}, ` +
+          `which is outside ${CLOUD_FUNCTIONS_DIRECTORY}/ and will not be available when deployed.`;
+        console.log(styled(warning, 'yellow', process.stdout.isTTY === true));
+      });
+  }
+
   private async buildHandlerForFilepath(cloudFunctionFilePath: string): Promise<CloudFunctionHandler | null> {
     const [{ rollup }, { nodeResolve }, { default: commonjs }, { default: json }] = await Promise.all([
       import('rollup'),
@@ -241,6 +259,7 @@ export class CloudFunctions {
       input: cloudFunctionFilePath,
       plugins: [nodeResolve({ preferBuiltins: true }), commonjs(), json()],
     });
+    this.warnAboutImportsOutsideFunctions(cloudFunctionFilePath, bundle.watchFiles);
 
     const { output } = await bundle.generate({
       format: 'esm',

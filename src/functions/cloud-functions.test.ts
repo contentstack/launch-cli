@@ -27,10 +27,14 @@ let loggedLines: string[];
 let loggedErrors: unknown[];
 let exitCodes: (number | undefined)[];
 
-function writeFunctionFile(relativePath: string, source: string): void {
-  const absolutePath = join(workspace, 'functions', relativePath);
+function writeProjectFile(relativePath: string, source: string): void {
+  const absolutePath = join(workspace, relativePath);
   mkdirSync(dirname(absolutePath), { recursive: true });
   writeFileSync(absolutePath, source);
+}
+
+function writeFunctionFile(relativePath: string, source: string): void {
+  writeProjectFile(join('functions', relativePath), source);
 }
 
 function freePort(): Promise<number> {
@@ -344,6 +348,23 @@ describe('CloudFunctions serve routing', () => {
     });
 
     expect(JSON.parse(response.body)).toEqual({ isBuffer: true, text: 'binary data' });
+  });
+
+  it('warns about an import from outside the functions directory and still serves the function', async () => {
+    writeProjectFile(join('shared', 'util.js'), 'export const greeting = "shared";');
+    writeFunctionFile(
+      join('api', 'x.js'),
+      'import { greeting } from "../../shared/util.js"; export default function x(request, response) { response.send(greeting); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/api/x');
+
+    expect(response.body).toBe('shared');
+    expect(loggedLines).toContain(
+      'warn: functions/api/x.js imports shared/util.js, which is outside functions/ and will not be available when deployed.',
+    );
   });
 
   it('answers 404 for a path no function claims', async () => {
