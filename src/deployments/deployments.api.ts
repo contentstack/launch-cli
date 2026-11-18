@@ -47,8 +47,6 @@ function isEmptyEntry(sent: unknown): boolean {
   return isRecord(sent) && Object.keys(sent).length === 0;
 }
 
-// The race answers {"errors":[{}]} (or the raw refusal message). Judge {} on what was sent:
-// entries the parser can't read also parse to {}.
 function isCancelRaceRefusal(error: LaunchApiError): boolean {
   return (
     error.status === 400 &&

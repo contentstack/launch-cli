@@ -44,7 +44,6 @@ export class LaunchApiError extends LaunchError {
   readonly status: number;
   readonly code: string;
   readonly errors: ApiErrorEntry[];
-  /** The errors array as the server sent it, before entries it can't read are reduced to {}. */
   readonly rawErrors: readonly unknown[];
 
   constructor(
