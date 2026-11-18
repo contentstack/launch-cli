@@ -29,6 +29,13 @@ function isHandler(value: unknown): value is CloudFunctionHandler {
   return typeof value === 'function';
 }
 
+function attachCookies(request: Request, _response: Response, next: NextFunction): void {
+  if (request.headers.cookie) {
+    request.cookies = parseCookieHeader(request.headers.cookie);
+  }
+  next();
+}
+
 import { loadDataURL } from './load-data-url';
 
 export function listenFailure(error: NodeJS.ErrnoException, servingPort: number): Error {
@@ -76,12 +83,7 @@ export class CloudFunctions {
 
     const app = express();
     app.disable('x-powered-by');
-    app.use((request: Request, _response: Response, next: NextFunction) => {
-      if (request.headers.cookie) {
-        request.cookies = parseCookieHeader(request.headers.cookie);
-      }
-      next();
-    });
+    app.use(attachCookies);
 
     await this.applyAppRouter(exactRouteResources, app);
     await this.applyAppRouter(dynamicRouteResources, app);
