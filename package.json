@@ -116,7 +116,8 @@
     "diff": "^8.0.3",
     "@oclif/core": {
       "minimatch": "^11.0.1"
-    }
+    },
+    "papaparse": "^5.7.1"
   },
   "engines": {
     "node": ">=22.0.0"
