@@ -38,6 +38,10 @@ function isPromptExit(error: unknown): boolean {
   return error instanceof Error && error.name === 'ExitPromptError';
 }
 
+function isPromptAbort(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortPromptError';
+}
+
 export interface InterruptOptions {
   signals?: InterruptSource;
   hold?: () => Release;
@@ -61,6 +65,11 @@ export function cancelOnInterrupt(ux: UxLike, options: InterruptOptions = {}): U
         };
 
         const fail = (error: unknown): void => {
+          // inquirer 12 aborts a legacy search-list prompt on Ctrl-C, then raises the SIGINT `cancel` answers.
+          if (isPromptAbort(error)) {
+            return;
+          }
+
           release();
           reject(isPromptExit(error) ? new CancelledError() : error);
         };
