@@ -34,6 +34,10 @@ export function onInterrupt(listener: () => void, signals: InterruptSource = pro
   return release;
 }
 
+function isPromptExit(error: unknown): boolean {
+  return error instanceof Error && error.name === 'ExitPromptError';
+}
+
 export interface InterruptOptions {
   signals?: InterruptSource;
   hold?: () => Release;
@@ -58,7 +62,7 @@ export function cancelOnInterrupt(ux: UxLike, options: InterruptOptions = {}): U
 
         const fail = (error: unknown): void => {
           release();
-          reject(error);
+          reject(isPromptExit(error) ? new CancelledError() : error);
         };
 
         signals.on('SIGINT', cancel);

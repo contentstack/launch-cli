@@ -88,6 +88,20 @@ describe('cancelOnInterrupt', () => {
     expect(signals.listenerCount('SIGINT')).toBe(1);
   });
 
+  it('rejects with CancelledError when the prompt itself reports Ctrl-C, as inquirer 12 does in raw mode, then stops listening', async () => {
+    const signals = new EventEmitter();
+    const inner = pendingUx();
+    const loop = recordingHold();
+    const ctrlC = Object.assign(new Error('User force closed the prompt with SIGINT'), { name: 'ExitPromptError' });
+
+    const answer = cancelOnInterrupt(inner.ux, { signals, hold: loop.hold }).inquire<string>(QUESTION);
+    inner.settle({ error: ctrlC });
+
+    await expect(answer).rejects.toBeInstanceOf(CancelledError);
+    expect(signals.listenerCount('SIGINT')).toBe(0);
+    expect(loop.events).toEqual(['held', 'released']);
+  });
+
   it('propagates the prompt failure unchanged rather than calling it a cancellation, then stops listening', async () => {
     const signals = new EventEmitter();
     const inner = pendingUx();
