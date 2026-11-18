@@ -19,5 +19,4 @@ export function libraryUx(library: () => Prompter, print: (message: string) => v
   };
 }
 
-// cli-utilities' own inquire calls process.exit(130) on Ctrl-C, so prompts go to the inquirer it wraps instead.
 export const terminalUx: UxLike = libraryUx(promptLibrary, (message) => cliux.print(message));
