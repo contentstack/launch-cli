@@ -8,7 +8,7 @@ import type { Interfaces } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
-import { pretendTerminal, stubPrompts } from '../support/terminal';
+import { answerPrompts, CTRL_C, pretendTerminal, stubPrompts } from '../support/terminal';
 import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
 
 import getFixture from '../fixtures/project-get.json';
@@ -297,5 +297,21 @@ describe('integration: end-to-end command flows', () => {
 
     expect(error?.oclif?.exit).toBe(3);
     expect(error?.message).toBe('Cancelled. Nothing was changed.');
+  });
+
+  it('exits 3 when Ctrl-C aborts the searchable project picker', async () => {
+    useSession(basicSession());
+    const restoreTTY = pretendTerminal();
+    answerPrompts({ 'Choose a project': CTRL_C });
+    nock(LAUNCH_HUB_URL).get('/manage/projects').query({ limit: '100', skip: '0' }).reply(200, listFixture);
+
+    const { error } = await runLaunch(['launch:projects:get', '--org', ORG_UID, '--data-dir', tmpdir()]);
+    await new Promise((done) => setImmediate(done));
+
+    restoreTTY();
+
+    expect(error?.oclif?.exit).toBe(3);
+    expect(error?.message).toBe('Cancelled. Nothing was changed.');
+    expect(process.listenerCount('SIGINT')).toBe(0);
   });
 });

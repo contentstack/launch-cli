@@ -52,16 +52,20 @@ export interface AnsweredPrompts {
 
 export type PromptHandler = (payload: Record<string, unknown>) => unknown;
 
-// Stubs the terminal every LaunchCommand prompt reaches, answering each question with what `answer` returns for it.
 export function stubPrompts(answer: PromptHandler): jest.SpyInstance {
   return jest
     .spyOn(terminalUx, 'inquire')
     .mockImplementation(async (payload: unknown) => answer(payload as Record<string, unknown>) as never);
 }
 
-// What inquirer 12 rejects with when Ctrl-C reaches a prompt in raw mode, where it is a keypress rather than a SIGINT.
 export function ctrlC(): Error {
   return Object.assign(new Error('User force closed the prompt with SIGINT'), { name: 'ExitPromptError' });
+}
+
+export function ctrlCAtSearchList(): Error {
+  setImmediate(() => process.emit('SIGINT'));
+
+  return Object.assign(new Error('Prompt was aborted'), { name: 'AbortPromptError' });
 }
 
 export function answerPrompts(answers: Record<string, unknown>): AnsweredPrompts {
@@ -77,7 +81,7 @@ export function answerPrompts(answers: Record<string, unknown>): AnsweredPrompts
     }
 
     if (answers[message] === CTRL_C) {
-      throw ctrlC();
+      throw payload.type === 'search-list' ? ctrlCAtSearchList() : ctrlC();
     }
 
     return answers[message];
