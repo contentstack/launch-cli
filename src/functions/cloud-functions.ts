@@ -82,6 +82,7 @@ export class CloudFunctions {
     const app = express();
     app.disable('x-powered-by');
     app.use(attachCookies);
+    app.use(express.text());
 
     await this.applyAppRouter(exactRouteResources, app);
     await this.applyAppRouter(dynamicRouteResources, app);

@@ -48,6 +48,7 @@ function sendRequest(
   path: string,
   method = 'GET',
   headers: Record<string, string> = {},
+  body?: string,
 ): Promise<HttpResponse> {
   return new Promise((resolve, reject) => {
     const clientRequest = httpRequest({ host: '127.0.0.1', port, path, method, headers }, (response) => {
@@ -65,7 +66,7 @@ function sendRequest(
       });
     });
     clientRequest.on('error', reject);
-    clientRequest.end();
+    clientRequest.end(body);
   });
 }
 
@@ -295,6 +296,16 @@ describe('CloudFunctions serve routing', () => {
     const response = await sendRequest(port, '/cookies');
 
     expect(JSON.parse(response.body)).toEqual({});
+  });
+
+  it('hands a text/plain body to the handler as the raw string', async () => {
+    writeFunctionFile('body.js', 'export default function body(request, response) { response.json({ body: request.body }); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/body', 'POST', { 'content-type': 'text/plain' }, 'raw text');
+
+    expect(JSON.parse(response.body)).toEqual({ body: 'raw text' });
   });
 
   it('answers 404 for a path no function claims', async () => {
