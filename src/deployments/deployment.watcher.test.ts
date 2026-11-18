@@ -8,6 +8,7 @@ import {
   DEPLOYMENT_MAX_POLL_ERRORS,
   DEPLOYMENT_POLL_DELAY_MS,
   DEPLOYMENT_LOADER_MESSAGE,
+  DEPLOYMENT_LOG_SETTLE_MS,
   DEPLOYMENT_WAIT_TIMEOUT_MS,
   defaultWatchTiming,
   watchDeployment,
@@ -358,6 +359,8 @@ describe('deployment wait loop', () => {
     expect(timing.pollDelayMs).toBe(DEPLOYMENT_POLL_DELAY_MS);
     expect(timing.maxBackoffSteps).toBe(DEPLOYMENT_MAX_BACKOFF_STEPS);
     expect(timing.timeoutMs).toBe(DEPLOYMENT_WAIT_TIMEOUT_MS);
+    expect(timing.logSettleMs).toBe(DEPLOYMENT_LOG_SETTLE_MS);
+    expect(DEPLOYMENT_LOG_SETTLE_MS).toBe(10_000);
   });
 });
 
@@ -417,7 +420,7 @@ describe('deployment log streaming', () => {
     ]);
   });
 
-  it('asks for everything on the first fetch and then from one millisecond before the last line it printed', async () => {
+  it('asks for everything on the first fetch and then from the look-back window before the newest line it printed', async () => {
     const { deps, since } = streamingHarness(
       ['DEPLOYING', 'DEPLOYING', 'DEPLOYING', 'LIVE'],
       [
@@ -435,9 +438,9 @@ describe('deployment log streaming', () => {
 
     expect(since).toEqual([
       DEPLOYMENT_LOGS_FROM,
-      '2026-09-25T10:00:01.455Z',
-      '2026-09-25T10:00:01.455Z',
-      '2026-09-25T10:00:01.999Z',
+      '2026-09-25T09:59:51.456Z',
+      '2026-09-25T09:59:51.456Z',
+      '2026-09-25T09:59:52.000Z',
     ]);
     expect(DEPLOYMENT_LOGS_FROM).toBe('1970-01-01T00:00:00.000Z');
   });
@@ -463,7 +466,7 @@ describe('deployment log streaming', () => {
       DEPLOYMENT_LOGS_FROM,
       DEPLOYMENT_LOGS_FROM,
       DEPLOYMENT_LOGS_FROM,
-      '2026-09-25T10:00:04.999Z',
+      '2026-09-25T09:59:55.000Z',
     ]);
   });
 
@@ -536,7 +539,7 @@ describe('deployment log streaming', () => {
 
       await watchDeployment(deps);
 
-      expect(since).toEqual([DEPLOYMENT_LOGS_FROM, '2026-09-25T10:00:00.122Z']);
+      expect(since).toEqual([DEPLOYMENT_LOGS_FROM, '2026-09-25T09:59:50.123Z']);
       expect(lines).toContain('two');
     },
   );
@@ -833,9 +836,9 @@ describe('deployment log drain on the terminal poll', () => {
     ]);
     expect(since).toEqual([
       DEPLOYMENT_LOGS_FROM,
-      '2026-09-25T10:00:00.999Z',
-      '2026-09-25T10:00:01.999Z',
-      '2026-09-25T10:00:02.999Z',
+      '2026-09-25T09:59:51.000Z',
+      '2026-09-25T09:59:52.000Z',
+      '2026-09-25T09:59:53.000Z',
     ]);
     expect(slept).toEqual([]);
   });
@@ -864,10 +867,10 @@ describe('deployment log drain on the terminal poll', () => {
 
     expect(since).toEqual([
       DEPLOYMENT_LOGS_FROM,
-      '2026-09-25T10:00:00.999Z',
-      '2026-09-25T10:00:01.999Z',
-      '2026-09-25T10:00:02.999Z',
-      '2026-09-25T10:00:03.999Z',
+      '2026-09-25T09:59:51.000Z',
+      '2026-09-25T09:59:52.000Z',
+      '2026-09-25T09:59:53.000Z',
+      '2026-09-25T09:59:54.000Z',
     ]);
   });
 
@@ -926,6 +929,65 @@ describe('deployment log drain on the terminal poll', () => {
     expect(reads).toBe(2);
     expect(lines).toEqual(['2026-09-25 10:00:01.000:  line 1']);
     expect(events.at(-1)).toBe('stop');
+  });
+});
+
+describe('deployment log settling after the terminal poll', () => {
+  it('keeps reading for the settle window and prints a line that only became readable after the deployment ended', async () => {
+    const { deps, lines } = streamingHarness(
+      ['DEPLOYING', 'LIVE'],
+      [[], [logAt(3, 'Site is live')], [], [logAt(2, 'Build and hosting completed')], []],
+    );
+
+    const outcome = await watchDeployment({ ...deps, logSettleMs: 3000 });
+
+    expect(outcome.kind).toBe('success');
+    expect(lines).toEqual([
+      '2026-09-25 10:00:03.000:  Site is live',
+      '2026-09-25 10:00:02.000:  Build and hosting completed',
+    ]);
+  });
+
+  it('does not wait for the logs to settle on a deployment that ended before the watch began', async () => {
+    const { deps, since } = streamingHarness(['LIVE'], [[logAt(1, 'one')], []]);
+    const slept: number[] = [];
+
+    await watchDeployment({ ...deps, logSettleMs: 3000, sleep: async (ms) => void slept.push(ms) });
+
+    expect(slept).toEqual([]);
+    expect(since).toHaveLength(2);
+  });
+
+  it('still waits for the logs to settle on a deployment that ended within the settle window before the watch began', async () => {
+    const { deps } = streamingHarness(['LIVE'], [[]]);
+    const slept: number[] = [];
+    const endedJustNow = async (): Promise<Deployment> => ({ uid: UID, status: 'LIVE', updatedAt: new Date(-2500).toISOString() });
+
+    await watchDeployment({ ...deps, poll: endedJustNow, logSettleMs: 3000, sleep: async (ms) => void slept.push(ms) });
+
+    expect(slept).toEqual([1000, 1000, 1000]);
+  });
+
+  it('reads again after a read that failed while the logs settle, rather than giving up on them', async () => {
+    const { deps, lines } = streamingHarness(
+      ['DEPLOYING', 'FAILED'],
+      [[], [], new Error('Gateway timeout'), [logAt(2, 'npm ERR! build failed')], []],
+    );
+
+    const outcome = await watchDeployment({ ...deps, logSettleMs: 3000 });
+
+    expect(outcome.kind).toBe('failure');
+    expect(lines).toEqual(['2026-09-25 10:00:02.000:  npm ERR! build failed']);
+  });
+
+  it('sleeps the poll delay between settle reads, reading the logs settle window / poll delay times', async () => {
+    const { deps, since } = streamingHarness(['DEPLOYING', 'LIVE'], [[]]);
+    const slept: number[] = [];
+
+    await watchDeployment({ ...deps, logSettleMs: 3500, sleep: async (ms) => void slept.push(ms) });
+
+    expect(slept).toEqual([1000, 1000, 1000, 1000]);
+    expect(since).toHaveLength(5);
   });
 });
 

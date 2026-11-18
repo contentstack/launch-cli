@@ -11,6 +11,7 @@ export const DEPLOYMENT_POLL_DELAY_MS = 2000;
 export const DEPLOYMENT_MAX_BACKOFF_STEPS = 5;
 export const DEPLOYMENT_WAIT_TIMEOUT_MS = 20 * 60 * 1000;
 export const DEPLOYMENT_MAX_POLL_ERRORS = 3;
+export const DEPLOYMENT_LOG_SETTLE_MS = 10_000;
 export const DEPLOYMENT_LOADER_MESSAGE = 'Loading deployment logs...';
 
 export interface WatchTiming {
@@ -19,6 +20,7 @@ export interface WatchTiming {
   pollDelayMs: number;
   maxBackoffSteps: number;
   timeoutMs: number;
+  logSettleMs?: number;
 }
 
 export interface DeploymentWatchDeps extends WatchTiming {
@@ -66,6 +68,7 @@ export function defaultWatchTiming(): WatchTiming {
     pollDelayMs: DEPLOYMENT_POLL_DELAY_MS,
     maxBackoffSteps: DEPLOYMENT_MAX_BACKOFF_STEPS,
     timeoutMs: DEPLOYMENT_WAIT_TIMEOUT_MS,
+    logSettleMs: DEPLOYMENT_LOG_SETTLE_MS,
   };
 }
 
@@ -120,6 +123,35 @@ async function freshLogs(deps: DeploymentWatchDeps, tail: LogTail): Promise<Depl
   }
 }
 
+async function printFreshLogs(deps: DeploymentWatchDeps, tail: LogTail): Promise<number> {
+  const logs = await freshLogs(deps, tail);
+
+  deps.stop?.throwIfAborted();
+
+  for (const log of logs) {
+    deps.ux.print(deploymentLogLine(log, deps.outputIsTTY, process.stdout.columns));
+  }
+
+  return logs.length;
+}
+
+/** Logs reach the logs service seconds after the deployment ends, so keep reading for a while. */
+async function settleLogs(deps: DeploymentWatchDeps, tail: LogTail): Promise<void> {
+  const reads = Math.floor((deps.logSettleMs ?? 0) / deps.pollDelayMs);
+
+  for (let read = 0; read < reads; read += 1) {
+    deps.loader.start(DEPLOYMENT_LOADER_MESSAGE);
+    await sleepUnlessStopped(deps, deps.pollDelayMs);
+    await printFreshLogs(deps, tail);
+  }
+}
+
+function endedWithin(deployment: Deployment, windowMs: number, now: number): boolean {
+  const endedAt = deployment.updatedAt ? Date.parse(deployment.updatedAt) : Number.NaN;
+
+  return now - endedAt <= windowMs;
+}
+
 function untilKind(until: (deployment: Deployment) => boolean, deployment: Deployment): 'success' | 'in-flight' {
   return until(deployment) ? 'success' : 'in-flight';
 }
@@ -130,6 +162,7 @@ async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
   let attempt = 0;
   let consecutiveErrors = 0;
   const tail = new LogTail();
+  let sawInFlight = false;
 
   for (;;) {
     deps.stop?.throwIfAborted();
@@ -159,22 +192,20 @@ async function waitFor(deps: DeploymentWatchDeps): Promise<DeploymentOutcome> {
     const terminal = kind === 'success' || kind === 'failure';
 
     for (let page = 0; page < (terminal ? MAX_PAGES : 1); page += 1) {
-      const logs = await freshLogs(deps, tail);
-
-      deps.stop?.throwIfAborted();
-
-      for (const log of logs) {
-        deps.ux.print(deploymentLogLine(log, deps.outputIsTTY, process.stdout.columns));
-      }
-
-      if (logs.length === 0) {
+      if ((await printFreshLogs(deps, tail)) === 0) {
         break;
       }
     }
 
     if (terminal) {
+      if (sawInFlight || endedWithin(deployment, deps.logSettleMs ?? 0, deps.now())) {
+        await settleLogs(deps, tail);
+      }
+
       return { kind, status, deployment };
     }
+
+    sawInFlight = true;
 
     attempt += 1;
     const delay = backoff.delayFor(Math.min(attempt, deps.maxBackoffSteps));

@@ -713,11 +713,15 @@ waits `SITE_OPEN_DELAY_MS` (six seconds, V1's wait, because a site opened the mo
 live can still answer "site not reachable") and opens that url in the browser, terminal or not, as V1
 did. The wait goes through the injected `sleep`, so it is awaited and the browser opens before the
 command returns.
-The first read asks from `DEPLOYMENT_LOGS_FROM` (the epoch) and every later one from the last
-parseable timestamp printed: with a `timestamp` the service returns what came strictly after it in
-ascending order, and without one it returns the newest page in **descending** order, so never let the
-cursor drop the query. The poll that sees the terminal status still reads the logs once more before
-returning, so the last lines of a build are never lost. The logs are auxiliary: a
+The first read asks from `DEPLOYMENT_LOGS_FROM` (the epoch) and every later one from
+`DEPLOYMENT_LOG_LOOKBACK_MS` (10 s) before the newest parseable timestamp printed: with a `timestamp`
+the service returns what came strictly after it in ascending order, and without one it returns the
+newest page in **descending** order, so never let the cursor drop the query. The look-back exists
+because logs become searchable **out of timestamp order** (the logs background-jobs service batches
+its bulk writes every 2 s, and the `deployment-logs` index has two shards that refresh on their own),
+so a cursor at the newest line skips an older line indexed after it (CL-8805). `LogTail` remembers each
+line it printed by timestamp, stage and message with a repeat count, so a re-read prints nothing twice
+and identical lines in one millisecond still all print. The logs are auxiliary: a
 failed read prints nothing, is retried from the same cursor on the next poll, and never changes the
 outcome - the status poll alone decides that.
 
@@ -725,7 +729,14 @@ outcome - the status poll alone decides that.
 reading from the advancing `tail.since()` until `tail.fresh` returns nothing new, at most `MAX_PAGES` reads, so a
 build that wrote more than one page after the last in-flight poll is never cut short. An in-flight poll still makes
 exactly one read. A read that fails mid-drain prints nothing, ends the drain and never changes the
-outcome. `stop` (an `AbortSignal` on `DeploymentWatchDeps`, `DeploymentFollower.watch(scope, stop)`) ends the wait
+outcome. After the drain the watcher **lets the logs settle**: a deployment turns LIVE before its last
+lines are searchable (the agent logs `Build and hosting completed.` after it starts the job that marks
+the site live), so it makes `logSettleMs / pollDelayMs` more reads (`DEPLOYMENT_LOG_SETTLE_MS` 10 s /
+2 s = 5), sleeping the poll delay before each, a failed one simply followed by the next. It settles only
+when the watch saw the deployment in flight or its `updatedAt` is within `logSettleMs`, so `logs:get` on a
+long-finished deployment returns at once; `waitUntilLive` reads no logs and passes `logSettleMs: 0`.
+`logSettleMs` is optional on `WatchTiming` and absent means no settling, so a test timing without it
+keeps its old read count. `stop` (an `AbortSignal` on `DeploymentWatchDeps`, `DeploymentFollower.watch(scope, stop)`) ends the wait
 with `stop.reason` wherever it is noticed: before a poll, after one, during the drain, and at the sleep - a signal
 already aborted when the loop would sleep ends it at once rather than sleeping the full delay, and the default
 `sleep` takes the signal as its second argument and clears its timer on abort, so no timer outlives an interrupt.

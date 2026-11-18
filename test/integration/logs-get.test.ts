@@ -140,6 +140,7 @@ describe('integration: launch:logs:get on the wire', () => {
     jest.spyOn(authHandler, 'compareOAuthExpiry').mockResolvedValue(undefined);
     jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => ({
       ...realWatchTiming(),
+      logSettleMs: 0,
       sleep: async () => undefined,
     }));
   });
@@ -321,6 +322,7 @@ describe('integration: launch:logs:get on the wire', () => {
     let clock = NOW;
     jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => ({
       ...realWatchTiming(),
+      logSettleMs: 0,
       now: () => clock,
       sleep: async (ms: number) => {
         clock += ms;
@@ -345,7 +347,7 @@ describe('integration: launch:logs:get on the wire', () => {
   });
 
   it('T47: stops on Ctrl-C with the yellow line and exit 3, no Error line, no extra poll, nothing left behind', async () => {
-    jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => realWatchTiming());
+    jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => ({ ...realWatchTiming(), logSettleMs: 0 }));
     const restoreStdout = stdoutReportingTTY(true);
     jest.spyOn(cliux, 'loaderV2').mockReturnValue(undefined as never);
     const listenersBefore = process.listenerCount('SIGINT');
@@ -390,7 +392,7 @@ describe('integration: launch:logs:get on the wire', () => {
   });
 
   it('T47: prints the interrupt line plain on a pipe', async () => {
-    jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => realWatchTiming());
+    jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => ({ ...realWatchTiming(), logSettleMs: 0 }));
     ownedProject();
     hub().get(DEPLOYMENT_PATH).times(5).reply(200, { deployment: { uid: DEPLOYMENT_UID, status: 'DEPLOYING' } });
     hub()
@@ -910,7 +912,7 @@ describe('integration: launch:logs:get on the wire', () => {
   });
 
   it('T88: ends the command at the server-limit frame although the stream stays open with heartbeats and more frames', async () => {
-    jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => realWatchTiming());
+    jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => ({ ...realWatchTiming(), logSettleMs: 0 }));
     const listenersBefore = process.listenerCount('SIGINT');
     const timers = trackTimers(EVENT_STREAM_IDLE_TIMEOUT_MS);
     const events: string[] = [];
@@ -1057,6 +1059,7 @@ describe('integration: launch:logs:get on the wire', () => {
     const sleeps: number[] = [];
     jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => ({
       ...realWatchTiming(),
+      logSettleMs: 0,
       sleep: async (ms: number) => void sleeps.push(ms),
     }));
     const attempts = liveRoute().times(3).replyWithError({ code: 'ECONNRESET', message: 'socket hang up' });
@@ -1100,7 +1103,7 @@ describe('integration: launch:logs:get on the wire', () => {
     [true, `${ESCAPE}[33mStopped following the logs.${ESCAPE}[39m`],
     [false, 'Stopped following the logs.'],
   ])('T92: Ctrl-C on a live stream (terminal=%s) prints the stop line, exits 3 and leaves nothing behind', async (tty, stopLine) => {
-    jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => realWatchTiming());
+    jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => ({ ...realWatchTiming(), logSettleMs: 0 }));
     const restoreStdout = stdoutReportingTTY(tty);
     jest.spyOn(cliux, 'loaderV2').mockReturnValue(undefined as never);
     const listenersBefore = process.listenerCount('SIGINT');
@@ -1138,7 +1141,7 @@ describe('integration: launch:logs:get on the wire', () => {
   });
 
   it('T93: Ctrl-C while the command waits to reconnect cancels the wait and opens nothing more', async () => {
-    jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => realWatchTiming());
+    jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => ({ ...realWatchTiming(), logSettleMs: 0 }));
     const listenersBefore = process.listenerCount('SIGINT');
     const timers = trackTimers(1000);
     ownedProject();
