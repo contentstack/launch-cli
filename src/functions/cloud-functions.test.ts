@@ -298,6 +298,19 @@ describe('CloudFunctions serve routing', () => {
     expect(JSON.parse(response.body)).toEqual({});
   });
 
+  it.each([
+    ['application/json', '{"name":"launch","tags":["a","b"]}'],
+    ['application/x-www-form-urlencoded', 'name=launch&tags[]=a&tags[]=b'],
+  ])('hands a %s body to the handler as a parsed object', async (contentType, body) => {
+    writeFunctionFile('body.js', 'export default function body(request, response) { response.json({ body: request.body }); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/body', { method: 'POST', headers: { 'content-type': contentType }, body });
+
+    expect(JSON.parse(response.body)).toEqual({ body: { name: 'launch', tags: ['a', 'b'] } });
+  });
+
   it('hands a text/plain body to the handler as the raw string', async () => {
     writeFunctionFile('body.js', 'export default function body(request, response) { response.json({ body: request.body }); }');
     const port = await freePort();
