@@ -520,4 +520,6 @@ fileignoreconfig:
   checksum: 22a5aa7d95c6a5113a034d2cc9af4f152f8a366f1c271f86cd317ea2046f5b1d
 - filename: src/core/password-argv.test.ts
   checksum: df87a19d09ff07b95d8118dd7e6bae5a13a86f0ecb8dce97e6022481d1e11256
+- filename: test/integration/prompt-ctrl-c-on-a-terminal.test.ts
+  checksum: f712885cded1bef4d64a8e1d7532f95b6696e7d7522dfeba55edf211d07fb837
 version: "1.0"

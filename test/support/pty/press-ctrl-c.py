@@ -2,7 +2,8 @@
 
 Usage: python3 press-ctrl-c.py <marker> <command> [args...]
 
-A signal death prints as a negative number (-2 for SIGINT). Exit code 124 means <marker> never appeared.
+A signal death prints as a negative number (-2 for SIGINT). 124 means <marker> never appeared,
+125 that the command was still running when the time ran out (it is killed).
 """
 import os
 import pty
@@ -15,7 +16,6 @@ SETTLE_SECONDS = 0.3
 
 
 def read_chunk(fd):
-    """Next output from the terminal, b'' once the command has closed it, None if nothing arrived yet."""
     if not select.select([fd], [], [], 0.1)[0]:
         return None
     try:
@@ -39,6 +39,17 @@ def drain(fd, deadline):
         pass
 
 
+def wait_for_exit(pid, deadline):
+    while time.time() < deadline:
+        finished, status = os.waitpid(pid, os.WNOHANG)
+        if finished:
+            return os.waitstatus_to_exitcode(status)
+        time.sleep(0.05)
+    os.kill(pid, 9)
+    os.waitpid(pid, 0)
+    return 125
+
+
 def main():
     marker = sys.argv[1].encode()
     command = sys.argv[2:]
@@ -56,8 +67,7 @@ def main():
     time.sleep(SETTLE_SECONDS)
     os.write(fd, b'\x03')
     drain(fd, deadline)
-    _, status = os.waitpid(pid, 0)
-    print(os.waitstatus_to_exitcode(status))
+    print(wait_for_exit(pid, deadline))
 
 
 main()

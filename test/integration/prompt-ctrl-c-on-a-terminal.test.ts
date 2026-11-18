@@ -19,15 +19,14 @@ function exitCodeAfterCtrlC(promptType: string): number {
       join(PTY, 'ctrl-c-prompt.fixture.ts'),
       promptType,
     ],
-    { encoding: 'utf8' },
+    { encoding: 'utf8', timeout: 45_000 },
   );
 
   return Number(output.trim());
 }
 
-// Simulating SIGINT hid CL-8790: in raw mode Ctrl-C reaches inquirer as typed input, so type it for real.
 describe('Ctrl-C at a real prompt on a terminal', () => {
-  it.each(['input', 'list', 'checkbox', 'confirm', 'search-list'])(
+  it.each(['input', 'password', 'list', 'checkbox', 'confirm', 'search-list'])(
     'exits 3 as cancelled at the %s prompt',
     (promptType) => {
       expect(exitCodeAfterCtrlC(promptType)).toBe(EXIT_CANCELLED);
