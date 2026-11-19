@@ -392,6 +392,26 @@ describe('CloudFunctions serve routing', () => {
     );
   });
 
+  it('does not warn about a file in a functions subfolder whose name starts with two dots', async () => {
+    writeFunctionFile(join('..shared', 'util.js'), 'export const greeting = "inside";');
+    writeFunctionFile(
+      'dots.js',
+      'import { greeting } from "./..shared/util.js"; export default function dots(request, response) { response.send(greeting); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/dots');
+
+    expect(response.body).toBe('inside');
+    expect(loggedLines).toEqual([
+      'Detected Serverless Functions:',
+      '  λ /dots',
+      '',
+      `Serving Cloud Functions at http://localhost:${port}`,
+    ]);
+  });
+
   it('does not warn about a package imported from node_modules', async () => {
     writeProjectFile(join('node_modules', 'fake-pkg', 'package.json'), '{"name":"fake-pkg","main":"index.js"}');
     writeProjectFile(join('node_modules', 'fake-pkg', 'index.js'), 'module.exports = { greeting: "from package" };');

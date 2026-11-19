@@ -33,6 +33,11 @@ function isHandler(value: unknown): value is CloudFunctionHandler {
   return typeof value === 'function';
 }
 
+function isOutsideDirectory(directory: string, file: string): boolean {
+  const relativePath = path.relative(directory, file);
+  return relativePath === '..' || relativePath.startsWith(`..${path.sep}`);
+}
+
 function attachCookies(request: Request, _response: Response, next: NextFunction): void {
   request.cookies = request.headers.cookie ? parseCookieHeader(request.headers.cookie) : {};
   next();
@@ -241,7 +246,7 @@ export class CloudFunctions {
 
     bundledFiles
       .map((bundledFile) => realpathSync(bundledFile))
-      .filter((bundledFile) => path.relative(functionsDirectory, bundledFile).startsWith('..'))
+      .filter((bundledFile) => isOutsideDirectory(functionsDirectory, bundledFile))
       .filter((bundledFile) => !bundledFile.split(path.sep).includes('node_modules'))
       .forEach((outsideFile) => {
         const imported = path.relative(projectDirectory, outsideFile);
