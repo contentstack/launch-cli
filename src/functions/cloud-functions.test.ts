@@ -531,6 +531,21 @@ describe('CloudFunctions serve routing', () => {
     expect((await sendRequest(port, '/cached')).cacheControl).toBe('max-age=60');
   });
 
+  it('defaults cache-control to no-store on the 400 for a malformed json body', async () => {
+    writeFunctionFile('body.js', 'export default function body(request, response) { response.json({ body: request.body }); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/body', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{bad json',
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.cacheControl).toBe('no-store');
+  });
+
   it('answers 500 and logs when a handler throws', async () => {
     writeFunctionFile('broken.js', 'export default function broken() { throw new Error("handler blew up"); }');
     const port = await freePort();

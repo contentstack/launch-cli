@@ -124,12 +124,12 @@ function defaultToNoStore(_request: Request, response: Response, next: NextFunct
 }
 
 function applyRequestMiddleware(app: Express): void {
+  app.use(defaultToNoStore);
   app.use(attachCookies);
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   app.use(express.text({ limit: DEPLOYED_PAYLOAD_LIMIT }));
   app.use(express.raw({ limit: DEPLOYED_PAYLOAD_LIMIT }));
-  app.use(defaultToNoStore);
 }
 
 import { loadDataURL } from './load-data-url';
