@@ -92,12 +92,13 @@ function parse(text: string): Map<string, string> {
     }
 
     const read = readValue(statement.slice(separator + 1), lines.slice(index + 1));
+    const closesBadly = read !== undefined && read.tail !== '' && !read.tail.startsWith('#');
 
-    if (read === undefined) {
+    if (read === undefined || (closesBadly && read.linesRead > 1)) {
       throw new DotenvLineError(index + 1, `opens a quote for ${key} that is never closed`);
     }
 
-    if (read.tail !== '' && !read.tail.startsWith('#')) {
+    if (closesBadly) {
       throw new DotenvLineError(index + 1, `has text after the closing quote of ${key}`);
     }
 
