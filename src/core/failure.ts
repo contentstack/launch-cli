@@ -41,12 +41,12 @@ const OCLIF_HELP_HINT = '\nSee more help with --help';
 
 const HELP_SENTENCE = 'Run the command with --help to see its flags.';
 
-function asOneSentence(message: string): string {
+function withHelpSentence(message: string): string {
   if (!message.endsWith(OCLIF_HELP_HINT)) {
     return message;
   }
 
-  return `${asSentence(message.slice(0, -OCLIF_HELP_HINT.length))} ${HELP_SENTENCE}`;
+  return `${asSentence(message.slice(0, -OCLIF_HELP_HINT.length))}\n${HELP_SENTENCE}`;
 }
 
 function alreadyReported(err: Error): boolean {
@@ -69,7 +69,7 @@ export async function reportFailure(err: Error, output: FailureOutput): Promise<
   }
 
   if (isOclifError(err)) {
-    return failWith(asOneSentence(err.message), err.oclif.exit, output);
+    return failWith(withHelpSentence(err.message), err.oclif.exit, output);
   }
 
   if (output.debug) {
