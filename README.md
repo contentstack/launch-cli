@@ -851,30 +851,25 @@ _See code: [src/commands/launch/secrets/unset.ts](https://github.com/contentstac
 
 ## `csdx launch:site:open`
 
-Open an environment's live site in your browser, or print its URL when there is no terminal. On a terminal, when the environment has more than one domain, you choose which one to open; --deployment opens that deployment's preview URL without asking.
+Open an environment's live site in your browser, or print its URL when there is no terminal. On a terminal, when the environment has more than one domain, you choose which one to open.
 
 ```
 USAGE
   $ csdx launch:site:open [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>]
-    [--deployment <value>]
 
 FLAGS
-  -d, --data-dir=<value>    Current working directory
-      --config=<value>      Path to the local '.cs-launch.json' file
-      --deployment=<value>  Deployment UID
-      --env=<value>         Environment name or UID
-      --org=<value>         Organization UID
-      --project=<value>     Project name or UID
+  -d, --data-dir=<value>  Current working directory
+      --config=<value>    Path to the local '.cs-launch.json' file
+      --env=<value>       Environment name or UID
+      --org=<value>       Organization UID
+      --project=<value>   Project name or UID
 
 DESCRIPTION
   Open an environment's live site in your browser, or print its URL when there is no terminal. On a terminal, when the
-  environment has more than one domain, you choose which one to open; --deployment opens that deployment's preview URL
-  without asking.
+  environment has more than one domain, you choose which one to open.
 
 EXAMPLES
   $ csdx launch:site:open --org <org-uid> --project <name-or-uid> --env <name-or-uid>
-
-  $ csdx launch:site:open --org <org-uid> --project <name-or-uid> --env <name-or-uid> --deployment <uid>
 
   $ url=$(csdx launch:site:open --org <org-uid> --project <name-or-uid> --env <name-or-uid>)
 ```

@@ -1,3 +1,4 @@
+import { webUrlOf } from '../core/url';
 import { deploymentUrlOf } from '../deployments/deployment.presenter';
 import type { Deployment } from '../deployments/types';
 
@@ -16,13 +17,5 @@ export function siteUrlOf(deployment: Deployment | undefined, domains: readonly 
     return fromDeployment;
   }
 
-  const domain = domains.find((entry) => Boolean(entry.url));
-
-  return domain === undefined ? undefined : deploymentUrlOf({ uid: deployment.uid, deploymentUrl: domain.url });
-}
-
-export function previewUrlOf(deployment: Deployment): string | undefined {
-  const previewUrl = deployment.previewUrl?.trim();
-
-  return previewUrl ? deploymentUrlOf({ uid: deployment.uid, previewUrl }) : undefined;
+  return domains.map((entry) => webUrlOf(entry.url)).find((url) => url !== undefined);
 }

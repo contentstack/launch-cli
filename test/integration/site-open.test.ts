@@ -30,8 +30,6 @@ const ENVIRONMENTS_PATH = `/manage/projects/${PROJECT_UID}/environments`;
 const ENV_PATH = `${ENVIRONMENTS_PATH}/${ENV_UID}`;
 const DEPLOYMENTS_PATH = `${ENV_PATH}/deployments`;
 const DEPLOYMENT_UID = randomBytes(12).toString('hex');
-const DEPLOYMENT_PATH = `${DEPLOYMENTS_PATH}/${DEPLOYMENT_UID}`;
-const PREVIEW_URL = 'https://preview-1a2b.contentstackapps.com';
 const LIVE_URL = 'https://sample-project.contentstackapps.com';
 const DOMAIN_URL = 'https://production-sample-project.contentstackapps.com';
 const QUESTION = 'Which domain do you want to open?';
@@ -250,39 +248,6 @@ describe('integration: launch:site:open on the wire', () => {
     expect(nock.pendingMocks()).toEqual([]);
   });
 
-  it("opens the named deployment's preview url, not its deployment url, reading the environment first and never the list", async () => {
-    withTerminal(true);
-    const ownership = projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
-    const environment = nock(LAUNCH_HUB_URL)
-      .matchHeader('x-organization-uid', ORG_UID)
-      .matchHeader('x-project-uid', PROJECT_UID)
-      .get(ENV_PATH)
-      .reply(200, () => {
-        sent.push(`GET ${ENV_PATH}`);
-        return getFixture;
-      });
-    const deployment = nock(LAUNCH_HUB_URL)
-      .matchHeader('x-organization-uid', ORG_UID)
-      .matchHeader('x-project-uid', PROJECT_UID)
-      .get(DEPLOYMENT_PATH)
-      .reply(200, () => {
-        sent.push(`GET ${DEPLOYMENT_PATH}`);
-        return { deployment: { uid: DEPLOYMENT_UID, deploymentUrl: LIVE_URL, previewUrl: PREVIEW_URL } };
-      });
-    const list = nock(LAUNCH_HUB_URL).get(DEPLOYMENTS_PATH).query(true).reply(200, { deployments: [] });
-
-    const { error, stdout } = await runOpen(openArgs('--env', ENV_UID, '--deployment', DEPLOYMENT_UID));
-
-    expect(error).toBeUndefined();
-    expect(stripVTControlCharacters(stdout)).toContain(`✔ Opening ${PREVIEW_URL} in your browser...`);
-    expect(open).toHaveBeenCalledTimes(1);
-    expect(open).toHaveBeenCalledWith(PREVIEW_URL);
-    expect(sent).toEqual([`GET ${ENV_PATH}`, `GET ${DEPLOYMENT_PATH}`]);
-    expect([ownership, environment, deployment].map((scope) => scope.isDone())).toEqual([true, true, true]);
-    expect(list.isDone()).toBe(false);
-    expect(onWire).toEqual([]);
-  });
-
   it('asks which domain to open as a single-select list with the default first and preselected, and opens only the one picked', async () => {
     withTerminal(true);
     const prompts = answerPrompts({ [QUESTION]: DOMAIN_URL });
@@ -322,12 +287,15 @@ describe('integration: launch:site:open on the wire', () => {
     expect(onWire).toEqual([]);
   });
 
-  it('has no --domain flag: it is refused as unknown with exit 2 before any request or browser', async () => {
+  it.each([
+    ['--domain', 'www.example.com'],
+    ['--deployment', DEPLOYMENT_UID],
+  ])('has no %s flag: it is refused as unknown with exit 2 before any request or browser', async (flag, value) => {
     withTerminal(true);
     forbidPrompts();
     reads([{ uid: 'd1', deploymentUrl: LIVE_URL }]);
 
-    const { error } = await runOpen(openArgs('--env', ENV_UID, '--domain', 'www.example.com'));
+    const { error } = await runOpen(openArgs('--env', ENV_UID, flag, value));
 
     expect(error?.oclif?.exit).toBe(2);
     expect(error?.message).toContain('Nonexistent flag');
@@ -366,31 +334,6 @@ describe('integration: launch:site:open on the wire', () => {
     expect(stripVTControlCharacters(stdout)).toContain(`✔ Opening ${LIVE_URL} in your browser...`);
   });
 
-  it('asks nothing for a named deployment on a terminal and opens its preview url', async () => {
-    withTerminal(true);
-    const prompts = forbidPrompts();
-    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
-    nock(LAUNCH_HUB_URL)
-      .get(ENV_PATH)
-      .reply(200, () => {
-        sent.push(`GET ${ENV_PATH}`);
-        return getFixture;
-      });
-    nock(LAUNCH_HUB_URL)
-      .get(DEPLOYMENT_PATH)
-      .reply(200, () => {
-        sent.push(`GET ${DEPLOYMENT_PATH}`);
-        return { deployment: { uid: DEPLOYMENT_UID, deploymentUrl: LIVE_URL, previewUrl: PREVIEW_URL } };
-      });
-
-    const { error } = await runOpen(openArgs('--env', ENV_UID, '--deployment', DEPLOYMENT_UID));
-
-    expect(error).toBeUndefined();
-    expect(prompts.messages).toEqual([]);
-    expect(open).toHaveBeenCalledWith(PREVIEW_URL);
-    expect(sent).toEqual([`GET ${ENV_PATH}`, `GET ${DEPLOYMENT_PATH}`]);
-  });
-
   it('exits 2 with the yellow not-found line and asks nothing when there is no deployment but two domains', async () => {
     withTerminal(true);
     const prompts = forbidPrompts();
@@ -413,35 +356,6 @@ describe('integration: launch:site:open on the wire', () => {
     expect(error?.oclif?.exit).toBe(2);
     expect(stdout).toContain(`\u001b[33m${NOT_FOUND_LINE}\u001b[39m`);
     expect(prompts.messages).toEqual([]);
-    expect(open).not.toHaveBeenCalled();
-  });
-
-  it('refuses a deployment that is not a 24-hex uid before any request reaches the wire', async () => {
-    withTerminal(true);
-
-    const { error, stdout } = await runOpen(openArgs('--env', ENV_UID, '--deployment', 'not-a-uid'));
-
-    expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toContain('--deployment');
-    expect(stdout).toBe('');
-    expect(onWire).toEqual([]);
-    expect(open).not.toHaveBeenCalled();
-  });
-
-  it('exits 2 with the not-found wording for a deployment the environment does not have', async () => {
-    withTerminal(true);
-    projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
-    nock(LAUNCH_HUB_URL).get(ENV_PATH).reply(200, getFixture);
-    const deployment = nock(LAUNCH_HUB_URL)
-      .get(DEPLOYMENT_PATH)
-      .reply(404, { errors: [{ code: 'launch.DEPLOYMENT.NOT_FOUND', message: 'Deployment not found' }] });
-
-    const { error, stdout } = await runOpen(openArgs('--env', ENV_UID, '--deployment', DEPLOYMENT_UID));
-
-    expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toBe('No deployment found with that UID.');
-    expect(deployment.isDone()).toBe(true);
-    expect(stdout).toBe('');
     expect(open).not.toHaveBeenCalled();
   });
 

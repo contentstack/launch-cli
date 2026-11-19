@@ -2,6 +2,7 @@ import { stripVTControlCharacters } from 'node:util';
 
 import type { TableColumn } from '../core/render';
 import { styled } from '../core/style';
+import { webUrlOf } from '../core/url';
 import { isAbsent, withoutControlCharacters } from '../core/values';
 import type { DeploymentScope } from './deployments.api';
 import type { Deployment, DeploymentLog } from './types';
@@ -20,13 +21,7 @@ const COLOUR_SEQUENCE = /[\u001b\u009b]\[[0-9;:]*m/g;
 /* eslint-enable no-control-regex */
 
 export function deploymentUrlOf(deployment: Deployment): string | undefined {
-  const url = deployment.deploymentUrl || deployment.previewUrl;
-
-  if (!url) {
-    return undefined;
-  }
-
-  return url.startsWith('http') ? url : `https://${url}`;
+  return webUrlOf(deployment.deploymentUrl);
 }
 
 export function deploymentUrlLine(url: string, outputIsTTY: boolean): string {
