@@ -7,7 +7,7 @@ import type { AddressInfo } from 'net';
 import { tmpdir } from 'os';
 import { dirname, join, win32 } from 'path';
 
-import { CloudFunctions, isOutsideDirectory, listenFailure } from './cloud-functions';
+import { CloudFunctions, functionFilesImporting, isOutsideDirectory, listenFailure } from './cloud-functions';
 import { PortInUseError } from './function.errors';
 import { loadDataURL } from './load-data-url';
 
@@ -392,6 +392,81 @@ describe('CloudFunctions serve routing', () => {
     );
   });
 
+  it('warns once, naming the shared helper that imports the outside file rather than each function using it', async () => {
+    writeProjectFile('config.js', 'export const region = "na";');
+    writeFunctionFile(join('lib', 'db.js'), 'import { region } from "../../config.js"; export const db = `db-${region}`;');
+    writeFunctionFile('a.js', 'import { db } from "./lib/db.js"; export default function a(request, response) { response.send(db); }');
+    writeFunctionFile('b.js', 'import { db } from "./lib/db.js"; export default function b(request, response) { response.send(db); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+
+    expect(loggedLines).toEqual([
+      'warn: functions/lib/db.js imports config.js, which is outside functions/ and will not be available when deployed.',
+      'Detected Serverless Functions:',
+      '  λ /a',
+      '  λ /b',
+      '',
+      `Serving Cloud Functions at http://localhost:${port}`,
+    ]);
+  });
+
+  it('names the function, not an outside file, for an outside file reached through another outside file', async () => {
+    writeProjectFile('config.js', 'export const region = "na";');
+    writeProjectFile('other.js', 'import { region } from "./config.js"; export const label = `other-${region}`;');
+    writeFunctionFile('a.js', 'import { label } from "../other.js"; export default function a(request, response) { response.send(label); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+
+    expect(loggedLines).toEqual([
+      'warn: functions/a.js imports other.js, which is outside functions/ and will not be available when deployed.',
+      'warn: functions/a.js imports config.js, which is outside functions/ and will not be available when deployed.',
+      'Detected Serverless Functions:',
+      '  λ /a',
+      '',
+      `Serving Cloud Functions at http://localhost:${port}`,
+    ]);
+  });
+
+  it('warns about an outside file reached through a dynamic import', async () => {
+    writeProjectFile('config.js', 'export const region = "na";');
+    writeFunctionFile(
+      'dyn.js',
+      'export default async function dyn(request, response) { const { region } = await import("../config.js"); response.send(region); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+
+    expect(loggedLines).toEqual([
+      'warn: functions/dyn.js imports config.js, which is outside functions/ and will not be available when deployed.',
+      'Detected Serverless Functions:',
+      '  λ /dyn',
+      '',
+      `Serving Cloud Functions at http://localhost:${port}`,
+    ]);
+  });
+
+  it('names the commonjs function, not the bundler proxy, when it requires an outside es module', async () => {
+    writeProjectFile('config.js', 'export const region = "na";');
+    writeFunctionFile(
+      'cjs.js',
+      'const { region } = require("../config.js"); module.exports = function cjs(request, response) { response.send(region); };',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+
+    expect(loggedLines).toEqual([
+      'warn: functions/cjs.js imports config.js, which is outside functions/ and will not be available when deployed.',
+      'Detected Serverless Functions:',
+      '  λ /cjs',
+      '',
+      `Serving Cloud Functions at http://localhost:${port}`,
+    ]);
+  });
+
   it('does not warn about a file in a functions subfolder whose name starts with two dots', async () => {
     writeFunctionFile(join('..shared', 'util.js'), 'export const greeting = "inside";');
     writeFunctionFile(
@@ -487,6 +562,20 @@ describe('CloudFunctions serve routing', () => {
 
     expect(JSON.parse(response.body)).toEqual({ atRequest: envValue, atLoad: envValue });
     delete process.env.LAUNCH_TEST_VALUE;
+  });
+});
+
+describe('functionFilesImporting', () => {
+  it('follows virtual importers to function files and stops on a cycle between virtual modules', () => {
+    const importersById = new Map<string, readonly string[]>([
+      ['/project/config.js', ['\0config.js?proxy-a']],
+      ['\0config.js?proxy-a', ['\0config.js?proxy-b', '/project/functions/a.js']],
+      ['\0config.js?proxy-b', ['\0config.js?proxy-a']],
+    ]);
+
+    expect(functionFilesImporting('/project/config.js', importersById, '/project/functions')).toEqual([
+      '/project/functions/a.js',
+    ]);
   });
 });
 

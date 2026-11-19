@@ -11,6 +11,7 @@ import { realpathSync } from 'fs';
 import type { Server } from 'http';
 import type { AddressInfo } from 'net';
 import path from 'path';
+import type { Plugin } from 'rollup';
 
 import { styled } from '../core/style';
 import { isRecord } from '../core/values';
@@ -31,6 +32,42 @@ const DEPLOYED_PAYLOAD_LIMIT = '6mb';
 
 function isHandler(value: unknown): value is CloudFunctionHandler {
   return typeof value === 'function';
+}
+
+export type ImportersById = Map<string, readonly string[]>;
+
+function recordImporters(importersById: ImportersById): Plugin {
+  return {
+    name: 'launch-record-importers',
+    buildEnd() {
+      for (const moduleId of this.getModuleIds()) {
+        const moduleInfo = this.getModuleInfo(moduleId);
+        if (moduleInfo) {
+          importersById.set(moduleId, [...moduleInfo.importers, ...moduleInfo.dynamicImporters]);
+        }
+      }
+    },
+  };
+}
+
+export function functionFilesImporting(
+  moduleId: string,
+  importersById: ImportersById,
+  functionsDirectory: string,
+  visited = new Set<string>(),
+): string[] {
+  return (importersById.get(moduleId) ?? []).flatMap((importer) => {
+    if (path.isAbsolute(importer) && !isOutsideDirectory(functionsDirectory, importer)) {
+      return [importer];
+    }
+
+    if (visited.has(importer)) {
+      return [];
+    }
+
+    visited.add(importer);
+    return functionFilesImporting(importer, importersById, functionsDirectory, visited);
+  });
 }
 
 export function isOutsideDirectory(directory: string, file: string, pathApi: path.PlatformPath = path): boolean {
@@ -68,6 +105,7 @@ export function listenFailure(error: NodeJS.ErrnoException, servingPort: number)
 export class CloudFunctions {
   private cloudFunctionsDirectoryPath: string;
   private pathToSourceCode: string;
+  private readonly reportedOutsideImports = new Set<string>();
 
   constructor(pathToSourceCode: string) {
     this.cloudFunctionsDirectoryPath = path.join(
@@ -239,21 +277,26 @@ export class CloudFunctions {
     return { exactRouteResources, dynamicRouteResources };
   }
 
-  private warnAboutImportsOutsideFunctions(cloudFunctionFilePath: string, bundledFiles: string[]): void {
+  private warnAboutImportsOutsideFunctions(importersById: ImportersById): void {
     const projectDirectory = realpathSync(this.pathToSourceCode);
     const functionsDirectory = realpathSync(this.cloudFunctionsDirectoryPath);
-    const importer = path.relative(projectDirectory, realpathSync(cloudFunctionFilePath));
 
-    bundledFiles
-      .map((bundledFile) => realpathSync(bundledFile))
-      .filter((bundledFile) => isOutsideDirectory(functionsDirectory, bundledFile))
-      .filter((bundledFile) => !bundledFile.split(path.sep).includes('node_modules'))
+    [...importersById.keys()]
+      .filter((moduleId) => path.isAbsolute(moduleId))
+      .filter((moduleId) => isOutsideDirectory(functionsDirectory, moduleId))
+      .filter((moduleId) => !moduleId.split(path.sep).includes('node_modules'))
       .forEach((outsideFile) => {
         const imported = path.relative(projectDirectory, outsideFile);
-        const warning =
-          `warn: ${importer} imports ${imported}, ` +
-          `which is outside ${CLOUD_FUNCTIONS_DIRECTORY}/ and will not be available when deployed.`;
-        console.log(styled(warning, 'yellow', process.stdout.isTTY === true));
+        functionFilesImporting(outsideFile, importersById, functionsDirectory)
+          .forEach((id) => {
+            const warning =
+              `warn: ${path.relative(projectDirectory, id)} imports ${imported}, ` +
+              `which is outside ${CLOUD_FUNCTIONS_DIRECTORY}/ and will not be available when deployed.`;
+            if (!this.reportedOutsideImports.has(warning)) {
+              this.reportedOutsideImports.add(warning);
+              console.log(styled(warning, 'yellow', process.stdout.isTTY === true));
+            }
+          });
       });
   }
 
@@ -264,11 +307,12 @@ export class CloudFunctions {
       import('@rollup/plugin-commonjs'),
       import('@rollup/plugin-json'),
     ]);
+    const importersById: ImportersById = new Map();
     const bundle = await rollup({
       input: cloudFunctionFilePath,
-      plugins: [nodeResolve({ preferBuiltins: true }), commonjs(), json()],
+      plugins: [nodeResolve({ preferBuiltins: true }), commonjs(), json(), recordImporters(importersById)],
     });
-    this.warnAboutImportsOutsideFunctions(cloudFunctionFilePath, bundle.watchFiles);
+    this.warnAboutImportsOutsideFunctions(importersById);
 
     const { output } = await bundle.generate({
       format: 'esm',
