@@ -89,6 +89,7 @@ describe('variable dotenv', () => {
     ['A=1\n = abc', 2, 'has no key before "="'],
     ['PASS="abc\nB=2', 1, 'opens a quote for PASS that is never closed'],
     ['A=1\nKEY="v"x', 2, 'has text after the closing quote of KEY'],
+    ['A=1\nB=2\nA=3', 3, 'repeats the key A'],
   ])('refuses a malformed line, naming its line number (%p)', (text, line, problem) => {
     const error = lineErrorOf(text);
 
@@ -109,10 +110,6 @@ describe('variable dotenv', () => {
       { key: 'B', value: '2' },
     ]);
     expect(parsed.skipped).toEqual(['EMPTY', 'BLANK', 'NOTE']);
-  });
-
-  it('takes the last occurrence of a repeated key', () => {
-    expect(parseDotenv('A=1\nA=2').variables).toEqual([{ key: 'A', value: '2' }]);
   });
 
   it.each([[''], ['   \n'], ['# only a comment']])('returns nothing for text with no variables (%p)', (text) => {

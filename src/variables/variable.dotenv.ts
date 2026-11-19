@@ -87,6 +87,10 @@ function parse(text: string): Map<string, string> {
       throw new DotenvLineError(index + 1, 'has no key before "="');
     }
 
+    if (parsed.has(key)) {
+      throw new DotenvLineError(index + 1, `repeats the key ${key}`);
+    }
+
     const read = readValue(statement.slice(separator + 1), lines.slice(index + 1));
 
     if (read === undefined) {
