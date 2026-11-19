@@ -19,10 +19,6 @@ const choices = [
 ];
 
 ux.inquire({ type: process.argv[2], name: 'value', message: 'Choose an environment', choices }).then(
-  () => {
-    process.exitCode = 0;
-  },
-  (error: { exitCode?: number }) => {
-    process.exitCode = error.exitCode ?? 1;
-  },
+  () => process.exit(0),
+  (error: { exitCode?: number }) => process.exit(error.exitCode ?? 1),
 );
