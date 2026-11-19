@@ -357,13 +357,13 @@ fileignoreconfig:
 - filename: src/variables/variable.create.test.ts
   checksum: a2650ca8e081afcf76c801d20e2df4baa96f814d1513080ba24971db0ae3a1bf
 - filename: src/variables/variable.dotenv.test.ts
-  checksum: c3d5e33189736bb42b7c4fac7375cf0307681b34feca4830b49331f55a130f78
+  checksum: 052f2825b778402e199e64ec887dc13f8fc2748535b8d176eb73dc6528f14824
 - filename: src/variables/variable.dotenv.ts
-  checksum: 337273d2ce8d987a6e7cf6a0f743df5031c24ac719cbe31e99fff16d7ffefa79
+  checksum: 9dae58ca744cf45332d054387fa0707169d01c1b57754af5133898c0c0efeb8c
 - filename: src/variables/variable.errors.ts
   checksum: f66b960365b83561f70b5fcef521bcc8a00d99b4415fb6a5df5bcf752a91d480
 - filename: src/variables/variable.files.test.ts
-  checksum: d8b0efd6bb448c4d501ba52c47119b352ef29d6b5b66cec0e7d373a0ce91a36c
+  checksum: 3e7aa019c36d06af1934833528c3eaeb93a04dff7744ad13feeba983707cb2d9
 - filename: src/variables/variable.inputs.test.ts
   checksum: 4b3b9a6c353d099a65ef8f522cff8e46e5c0edbf66bcdb59e0d6dd4f87c78c84
 - filename: src/variables/variable.inputs.ts
@@ -417,7 +417,7 @@ fileignoreconfig:
 - filename: test/integration/variables-list.test.ts
   checksum: 5ea6a0fcd331496ca19773e90dab81e09eb5290b8f22a1880bffc7916f3778b2
 - filename: test/integration/variables-set-unset.test.ts
-  checksum: 7af9dde4711849d0908d0de54347055a7c2a8d8920f9fcc0b24382b02bceaed9
+  checksum: e2213a515b6137ef4b2759f3d906a8ab6a204c34523c7963c1453fbd1f3727ed
 - filename: test/fixtures/deployments-list.json
   checksum: 2f10f24dc0ceb8e85f5201b7c1530c0c540c044ef50b732cc29e07289112316e
 - filename: test/integration/deployments-get.test.ts
