@@ -13,7 +13,6 @@ import {
 const FULL = {
   uid: 'e1',
   name: 'production',
-  description: 'the live site',
   domains: [{ url: 'https://a.io' }, {}, { url: '  ' }, { url: 'https://b.io' }],
   gitBranch: 'main',
   frameworkPreset: 'NEXTJS',
@@ -77,7 +76,6 @@ describe('environmentDetailRows', () => {
     expect(environmentDetailRows(FULL)).toEqual([
       { field: 'ENVIRONMENT UID', value: 'e1' },
       { field: 'NAME', value: 'production' },
-      { field: 'DESCRIPTION', value: 'the live site' },
       { field: 'BRANCH', value: 'main' },
       { field: 'FRAMEWORK', value: 'NEXTJS' },
       { field: 'BUILD COMMAND', value: 'npm run build' },
@@ -98,7 +96,6 @@ describe('environmentDetailRows', () => {
 
   it('renders a placeholder for every field an environment arrives without, and a zero variable count', () => {
     expect(environmentDetailRows({}).map((row) => row.value)).toEqual([
-      '-',
       '-',
       '-',
       '-',
