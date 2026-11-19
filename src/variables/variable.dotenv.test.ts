@@ -1,4 +1,14 @@
-import { parseDotenv } from './variable.dotenv';
+import { DotenvLineError, parseDotenv } from './variable.dotenv';
+
+function lineErrorOf(text: string): DotenvLineError {
+  try {
+    parseDotenv(text);
+  } catch (error) {
+    return error as DotenvLineError;
+  }
+
+  throw new Error('parseDotenv did not throw');
+}
 
 describe('variable dotenv', () => {
   it('reads each KEY=VALUE line in order, ignoring comments and blank lines', () => {
@@ -72,6 +82,14 @@ describe('variable dotenv', () => {
       { key: 'KEY', value: '-----BEGIN KEY-----\nabc=\ndef==\n-----END KEY-----' },
       { key: 'B', value: '2' },
     ]);
+  });
+
+  it('refuses a line with no equals sign, naming its line number', () => {
+    const error = lineErrorOf('A=1\n\nAPI_URL https://x');
+
+    expect(error).toBeInstanceOf(DotenvLineError);
+    expect(error.line).toBe(3);
+    expect(error.problem).toBe('has no "="');
   });
 
   it('keeps an equals sign inside a value', () => {

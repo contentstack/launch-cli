@@ -2,7 +2,7 @@ import { join } from 'node:path';
 
 import { UsageError } from '../core/errors';
 import { parseDotenv } from './variable.dotenv';
-import type { ParsedDotenv } from './variable.dotenv';
+import type { DotenvLineError, ParsedDotenv } from './variable.dotenv';
 
 export const STDIN_PATH = '-';
 
@@ -17,13 +17,19 @@ export interface EnvFileSource extends ParsedDotenv {
   label: string;
 }
 
-async function readOne(path: string, reader: EnvFileReader): Promise<EnvFileSource> {
-  if (path === STDIN_PATH) {
-    return { label: 'standard input', ...parseDotenv(await reader.readStdin()) };
-  }
-
+function parseSource(label: string, text: string): EnvFileSource {
   try {
-    return { label: path, ...parseDotenv(await reader.readFile(path)) };
+    return { label, ...parseDotenv(text) };
+  } catch (error) {
+    const { line, problem } = error as DotenvLineError;
+
+    throw new UsageError(`Line ${line} of ${label} ${problem}.`);
+  }
+}
+
+async function readText(path: string, reader: EnvFileReader): Promise<string> {
+  try {
+    return await reader.readFile(path);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       throw new UsageError(`--dotenv ${path} was not found.`);
@@ -31,6 +37,14 @@ async function readOne(path: string, reader: EnvFileReader): Promise<EnvFileSour
 
     throw error;
   }
+}
+
+async function readOne(path: string, reader: EnvFileReader): Promise<EnvFileSource> {
+  if (path === STDIN_PATH) {
+    return parseSource('standard input', await reader.readStdin());
+  }
+
+  return parseSource(path, await readText(path, reader));
 }
 
 export async function readEnvFiles(paths: string[], reader: EnvFileReader): Promise<EnvFileSource[]> {

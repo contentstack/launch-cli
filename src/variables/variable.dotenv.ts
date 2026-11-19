@@ -5,6 +5,16 @@ export interface ParsedDotenv {
   skipped: string[];
 }
 
+export class DotenvLineError extends Error {
+  constructor(
+    readonly line: number,
+    readonly problem: string,
+  ) {
+    super(`Line ${line} ${problem}`);
+    this.name = 'DotenvLineError';
+  }
+}
+
 const INLINE_COMMENT = /[ \t]#/;
 const EXPORT_PREFIX = /^export[ \t]+/;
 const QUOTES = ['"', "'", '`'];
@@ -56,9 +66,13 @@ function parse(text: string): Map<string, string> {
     const statement = lines[index].trimStart().replace(EXPORT_PREFIX, '');
     const separator = statement.indexOf('=');
 
-    if (statement.trim() === '' || statement.startsWith('#') || separator < 0) {
+    if (statement.trim() === '' || statement.startsWith('#')) {
       index++;
       continue;
+    }
+
+    if (separator < 0) {
+      throw new DotenvLineError(index + 1, 'has no "="');
     }
 
     const { value, linesRead } = readValue(statement.slice(separator + 1), lines.slice(index + 1));
