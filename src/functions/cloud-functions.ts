@@ -70,6 +70,42 @@ export function functionFilesImporting(
   });
 }
 
+class OutsideImportReporter {
+  private readonly reported = new Set<string>();
+
+  constructor(
+    private readonly projectDirectory: string,
+    private readonly functionsDirectory: string,
+  ) {}
+
+  report(importersById: ImportersById): void {
+    [...importersById.keys()]
+      .filter((moduleId) => path.isAbsolute(moduleId))
+      .filter((moduleId) => isOutsideDirectory(this.functionsDirectory, moduleId))
+      .filter((moduleId) => !moduleId.split(path.sep).includes('node_modules'))
+      .forEach((outsideFile) => {
+        functionFilesImporting(outsideFile, importersById, this.functionsDirectory).forEach((importer) => {
+          this.warnOnce(importer, outsideFile);
+        });
+      });
+  }
+
+  private warnOnce(importer: string, outsideFile: string): void {
+    const pair = `${importer}\0${outsideFile}`;
+    if (this.reported.has(pair)) {
+      return;
+    }
+
+    this.reported.add(pair);
+    const importerPath = path.relative(this.projectDirectory, importer);
+    const outsidePath = path.relative(this.projectDirectory, outsideFile);
+    const warning =
+      `warn: ${importerPath} imports ${outsidePath}, ` +
+      `which is outside ${CLOUD_FUNCTIONS_DIRECTORY}/ and will not be available when deployed.`;
+    console.log(styled(warning, 'yellow', process.stdout.isTTY === true));
+  }
+}
+
 export function isOutsideDirectory(directory: string, file: string, pathApi: path.PlatformPath = path): boolean {
   const relativePath = pathApi.relative(directory, file);
   return relativePath === '..' || relativePath.startsWith(`..${pathApi.sep}`) || pathApi.isAbsolute(relativePath);
@@ -105,7 +141,6 @@ export function listenFailure(error: NodeJS.ErrnoException, servingPort: number)
 export class CloudFunctions {
   private cloudFunctionsDirectoryPath: string;
   private pathToSourceCode: string;
-  private readonly reportedOutsideImports = new Set<string>();
 
   constructor(pathToSourceCode: string) {
     this.cloudFunctionsDirectoryPath = path.join(
@@ -209,6 +244,10 @@ export class CloudFunctions {
     CloudFunctionResource[]
     > {
     const filePaths = await walkFileSystem(this.cloudFunctionsDirectoryPath);
+    const outsideImports = new OutsideImportReporter(
+      realpathSync(this.pathToSourceCode),
+      realpathSync(this.cloudFunctionsDirectoryPath),
+    );
 
     const cloudFunctionResources: CloudFunctionResource[] = [];
     for await (const filePath of filePaths) {
@@ -220,7 +259,7 @@ export class CloudFunctions {
         continue;
       }
 
-      const handler = await this.buildHandlerForFilepath(filePath);
+      const handler = await this.buildHandlerForFilepath(filePath, outsideImports);
       if (!handler) {
         continue;
       }
@@ -277,30 +316,10 @@ export class CloudFunctions {
     return { exactRouteResources, dynamicRouteResources };
   }
 
-  private warnAboutImportsOutsideFunctions(importersById: ImportersById): void {
-    const projectDirectory = realpathSync(this.pathToSourceCode);
-    const functionsDirectory = realpathSync(this.cloudFunctionsDirectoryPath);
-
-    [...importersById.keys()]
-      .filter((moduleId) => path.isAbsolute(moduleId))
-      .filter((moduleId) => isOutsideDirectory(functionsDirectory, moduleId))
-      .filter((moduleId) => !moduleId.split(path.sep).includes('node_modules'))
-      .forEach((outsideFile) => {
-        const imported = path.relative(projectDirectory, outsideFile);
-        functionFilesImporting(outsideFile, importersById, functionsDirectory)
-          .forEach((id) => {
-            const warning =
-              `warn: ${path.relative(projectDirectory, id)} imports ${imported}, ` +
-              `which is outside ${CLOUD_FUNCTIONS_DIRECTORY}/ and will not be available when deployed.`;
-            if (!this.reportedOutsideImports.has(warning)) {
-              this.reportedOutsideImports.add(warning);
-              console.log(styled(warning, 'yellow', process.stdout.isTTY === true));
-            }
-          });
-      });
-  }
-
-  private async buildHandlerForFilepath(cloudFunctionFilePath: string): Promise<CloudFunctionHandler | null> {
+  private async buildHandlerForFilepath(
+    cloudFunctionFilePath: string,
+    outsideImports: OutsideImportReporter,
+  ): Promise<CloudFunctionHandler | null> {
     const [{ rollup }, { nodeResolve }, { default: commonjs }, { default: json }] = await Promise.all([
       import('rollup'),
       import('@rollup/plugin-node-resolve'),
@@ -312,7 +331,7 @@ export class CloudFunctions {
       input: cloudFunctionFilePath,
       plugins: [nodeResolve({ preferBuiltins: true }), commonjs(), json(), recordImporters(importersById)],
     });
-    this.warnAboutImportsOutsideFunctions(importersById);
+    outsideImports.report(importersById);
 
     const { output } = await bundle.generate({
       format: 'esm',
