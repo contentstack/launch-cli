@@ -21,6 +21,7 @@ interface Harness {
   fails?: 'project' | 'environment' | 'update';
   passwordProtected?: boolean;
   piped?: string;
+  current?: Record<string, unknown>;
 }
 
 function updaterUnderTest(harness: Harness = {}) {
@@ -63,6 +64,7 @@ function updaterUnderTest(harness: Harness = {}) {
             uid: 'env1',
             frameworkPreset: 'frameworkPreset' in harness ? harness.frameworkPreset : 'NEXTJS',
             passwordProtection: { isEnabled: harness.passwordProtected ?? false },
+            ...harness.current,
           };
         },
         update: async (params: unknown) => {
@@ -99,7 +101,7 @@ function request(fields: Partial<EnvironmentUpdateRequest>): EnvironmentUpdateRe
 
 describe('EnvironmentUpdater', () => {
   it('maps every supplied flag onto its body field and sends one PUT', async () => {
-    const { updater, sent, lines } = updaterUnderTest();
+    const { updater, sent, lines } = updaterUnderTest({ frameworkPreset: 'GATSBY' });
 
     await expect(
       updater.update(
@@ -185,6 +187,81 @@ describe('EnvironmentUpdater', () => {
     expect(sent).toEqual([{ ...SCOPE, update: { name: 'renamed' } }]);
   });
 
+  it.each([
+    [{ resMode: 'streaming' as const }, { isStreamingEnabled: true }],
+    [{ resMode: 'buffered' as const }, { isStreamingEnabled: false }],
+    [{ csAuth: 'disable' as const }, { isContentstackAuthenticationEnabled: false }],
+    [{ autoDeploy: 'enable' as const }, { autoDeployOnPush: true }],
+    [{ cachePriming: 'disable' as const }, { isCachePrimingEnabled: false }],
+    [{ passwordProtection: 'disable' as const }, {}],
+    [
+      { buildCmd: 'npm run build', outputDir: '.next', framework: 'NEXTJS' as const, branch: 'sample', name: 'staging' },
+      { buildCommand: 'npm run build', outputDirectory: '.next', gitBranch: 'sample', name: 'staging' },
+    ],
+    [{ description: 'the live site', serverCmd: 'npm start' }, { description: 'the live site', serverCommand: 'npm start' }],
+  ])(
+    'says nothing changed, asks nothing and sends nothing when %p matches the current settings',
+    async (fields, current) => {
+      const { updater, calls, lines, questions } = updaterUnderTest({ current });
+
+      await expect(updater.update(request(fields))).resolves.toBe('unchanged');
+
+      expect(calls).not.toContain('update');
+      expect(questions).toEqual([]);
+      expect(lines).toEqual(['Environment not updated. No changes were entered.']);
+    },
+  );
+
+  it('sends only the flags whose values differ from the current settings', async () => {
+    const { updater, sent } = updaterUnderTest({
+      current: { name: 'staging', isStreamingEnabled: true, isContentstackAuthenticationEnabled: false },
+    });
+
+    await expect(
+      updater.update(request({ name: 'staging', resMode: 'streaming', csAuth: 'enable', buildCmd: 'npm run build' })),
+    ).resolves.toBe('updated');
+
+    expect(sent).toEqual([
+      { ...SCOPE, update: { isContentstackAuthenticationEnabled: true, buildCommand: 'npm run build' } },
+    ]);
+  });
+
+  it('checks a changed --server-cmd against the current framework when an unchanged --framework is dropped', async () => {
+    const { updater, sent } = updaterUnderTest({ frameworkPreset: 'NUXT' });
+
+    await expect(updater.update(request({ framework: 'NUXT', serverCmd: 'node server' }))).resolves.toBe('updated');
+
+    expect(sent).toEqual([{ ...SCOPE, update: { serverCommand: 'node server' } }]);
+  });
+
+  it('refuses a changed --server-cmd when an unchanged --framework is dropped and that framework takes none', async () => {
+    const { updater, calls } = updaterUnderTest({ frameworkPreset: 'GATSBY' });
+
+    await expect(updater.update(request({ framework: 'GATSBY', serverCmd: 'node server' }))).rejects.toThrow(
+      '--server-cmd is only supported when --framework is one of ANALOG, ANGULAR, NUXT, ASTRO, REMIX, OTHER; ' +
+        '--framework is GATSBY.',
+    );
+    expect(calls).not.toContain('update');
+  });
+
+  it('sends --res-mode when the environment does not report its current response mode', async () => {
+    const { updater, sent } = updaterUnderTest();
+
+    await updater.update(request({ resMode: 'streaming' }));
+
+    expect(sent).toEqual([{ ...SCOPE, update: { isStreamingEnabled: true } }]);
+  });
+
+  it('still enables password protection that is already on, so its credentials can be rotated', async () => {
+    const { updater, sent } = updaterUnderTest({ passwordProtected: true, answers: { Password: NEW_PASSWORD } });
+
+    await expect(updater.update(request({ passwordProtection: 'enable', username: 'admin2' }))).resolves.toBe('updated');
+
+    expect(sent).toEqual([
+      { ...SCOPE, update: { passwordProtection: { isEnabled: true, username: 'admin2', password: NEW_PASSWORD } } },
+    ]);
+  });
+
   it('reads the project and the environment before sending the update', async () => {
     const { updater, calls } = updaterUnderTest({ projectType: 'FILEUPLOAD' });
 
@@ -257,7 +334,7 @@ describe('EnvironmentUpdater', () => {
   });
 
   it('asks before disabling password protection and sends only isEnabled false once confirmed', async () => {
-    const { updater, questions, sent } = updaterUnderTest();
+    const { updater, questions, sent } = updaterUnderTest({ passwordProtected: true });
 
     await updater.update(request({ passwordProtection: 'disable' }));
 
@@ -266,7 +343,7 @@ describe('EnvironmentUpdater', () => {
   });
 
   it('asks both questions, cache priming first, when both are being disabled', async () => {
-    const { updater, questions } = updaterUnderTest();
+    const { updater, questions } = updaterUnderTest({ passwordProtected: true });
 
     await updater.update(request({ cachePriming: 'disable', passwordProtection: 'disable' }));
 
@@ -279,7 +356,7 @@ describe('EnvironmentUpdater', () => {
   it.each([[[false]], [[true, false]]])(
     'says the environment was not updated and sends nothing when an answer is no (%p)',
     async (confirmations) => {
-      const { updater, calls, lines } = updaterUnderTest({ confirmations });
+      const { updater, calls, lines } = updaterUnderTest({ confirmations, passwordProtected: true });
 
       await expect(
         updater.update(request({ cachePriming: 'disable', passwordProtection: 'disable' })),

@@ -4,7 +4,7 @@ import { readPipedInput } from '../core/piped-input';
 import { requireValueOf } from '../core/rules';
 import type { ServiceContext } from '../core/service-context';
 import type { ResponseMode, ToggleValue } from './environment.inputs';
-import { usernameOf } from './environment.inputs';
+import { responseModeOf, toggleOf, usernameOf } from './environment.inputs';
 import { withoutRepositoryFlags } from './environment.rules';
 import {
   disableQuestion,
@@ -12,10 +12,11 @@ import {
   environmentNotUpdatedLine,
   environmentUpdatedLine,
 } from './environment.presenter';
+import type { EnvironmentChanges } from './environment.update.prompt';
 import { promptForEnvironmentUpdate } from './environment.update.prompt';
 import type { FrameworkPreset } from './frameworks';
 import { SERVER_COMMAND_FRAMEWORKS } from './frameworks';
-import type { EnvironmentUpdate, PasswordProtectionUpdate } from './types';
+import type { Environment, EnvironmentUpdate, PasswordProtectionUpdate } from './types';
 
 export interface EnvironmentUpdateRequest {
   org: string;
@@ -78,6 +79,37 @@ export type UpdateOutcome = 'updated' | 'cancelled' | 'unchanged';
 
 function hasChanges(request: EnvironmentUpdateRequest): boolean {
   return UPDATABLE_FLAGS.some(([field]) => request[field] !== undefined);
+}
+
+// Enabling password protection is never unchanged: enabling it again is how its credentials are rotated.
+function currentValuesOf(existing: Environment): EnvironmentChanges {
+  return {
+    name: existing.name,
+    description: existing.description,
+    branch: existing.gitBranch,
+    framework: existing.frameworkPreset as FrameworkPreset | undefined,
+    buildCmd: existing.buildCommand,
+    serverCmd: existing.serverCommand,
+    outputDir: existing.outputDirectory,
+    resMode: responseModeOf(existing.isStreamingEnabled),
+    autoDeploy: toggleOf(existing.autoDeployOnPush),
+    csAuth: toggleOf(existing.isContentstackAuthenticationEnabled),
+    cachePriming: toggleOf(existing.isCachePrimingEnabled),
+    passwordProtection: existing.passwordProtection?.isEnabled === false ? 'disable' : undefined,
+  };
+}
+
+function withoutCurrentValues(request: EnvironmentUpdateRequest, existing: Environment): EnvironmentUpdateRequest {
+  const current = currentValuesOf(existing);
+  const kept = { ...request };
+
+  for (const field of Object.keys(current) as (keyof EnvironmentChanges)[]) {
+    if (current[field] !== undefined && kept[field] === current[field]) {
+      delete kept[field];
+    }
+  }
+
+  return kept;
 }
 
 function emptyUpdateMessage(): string {
@@ -166,11 +198,9 @@ export class EnvironmentUpdater {
         })),
       }
       : given;
-    const request = withoutRepositoryFlags(
-      answered,
-      current.projectType,
-      this.services.ux,
-      this.services.outputIsTTY === true,
+    const request = withoutCurrentValues(
+      withoutRepositoryFlags(answered, current.projectType, this.services.ux, this.services.outputIsTTY === true),
+      existing,
     );
 
     if (!hasChanges(request)) {

@@ -168,6 +168,22 @@ describe('promptForEnvironmentUpdate', () => {
     expect(asked[1].default).toBe('buffered');
   });
 
+  it.each([
+    [true, 'streaming', {}],
+    [true, 'buffered', { resMode: 'buffered' }],
+    [false, 'buffered', {}],
+  ])(
+    'defaults the response mode to the current one when the API reports it (streaming %p) and drops an unchanged %s',
+    async (isStreamingEnabled, answer, expected) => {
+      const { services, asked } = servicesAnswering({ [SETTINGS_QUESTION]: ['resMode'], 'Response mode': answer });
+
+      await expect(
+        promptForEnvironmentUpdate(services, githubContext({ ...CURRENT, isStreamingEnabled })),
+      ).resolves.toEqual(expected);
+      expect(asked[1].default).toBe(isStreamingEnabled ? 'streaming' : 'buffered');
+    },
+  );
+
   it('skips the server command, saying why, when the framework it would run under takes none', async () => {
     const { services, asked, lines } = servicesAnswering({ [SETTINGS_QUESTION]: ['serverCmd'] });
 

@@ -2,13 +2,14 @@ import { askChoices, askOption, askOptionalText, askText } from '../core/prompt'
 import type { ServiceContext } from '../core/service-context';
 import { askBranch } from '../git/git.prompt';
 import { frameworkLabelOf } from './environment.builder';
-import type { ToggleValue } from './environment.inputs';
 import {
   ENVIRONMENT_DESCRIPTION_MAX_LENGTH,
   ENVIRONMENT_NAME_MAX_LENGTH,
   RESPONSE_MODES,
   TOGGLE_VALUES,
   frameworkPresetOf,
+  responseModeOf,
+  toggleOf,
 } from './environment.inputs';
 import type { ProjectRepository } from './environment.rules';
 import { gitScopeOf } from './environment.rules';
@@ -59,14 +60,6 @@ const SETTINGS: { setting: Setting; label: string; repositoryOnly?: boolean }[] 
   { setting: 'cachePriming', label: 'Cache priming' },
   { setting: 'passwordProtection', label: 'Password protection' },
 ];
-
-function toggleOf(value: boolean | undefined): ToggleValue | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  return value ? 'enable' : 'disable';
-}
 
 function changed<T>(answer: T | undefined, current: T | undefined): T | undefined {
   return answer === current ? undefined : answer;
@@ -128,7 +121,7 @@ class SettingAsker {
     case 'outputDir':
       return this.text(askText(ux, 'Output directory', current.outputDirectory), current.outputDirectory);
     case 'resMode':
-      return askOption(ux, 'Response mode', RESPONSE_MODES.map((value) => ({ name: value, value })), 'buffered');
+      return this.responseMode();
     case 'autoDeploy':
       return this.toggle('Auto deploy', current.autoDeployOnPush);
     case 'csAuth':
@@ -142,6 +135,18 @@ class SettingAsker {
 
   private async text(answer: Promise<string | undefined>, current: string | undefined): Promise<string | undefined> {
     return changed(await answer, current);
+  }
+
+  private async responseMode(): Promise<string | undefined> {
+    const current = responseModeOf(this.context.current.isStreamingEnabled);
+    const answer = await askOption(
+      this.services.ux,
+      'Response mode',
+      RESPONSE_MODES.map((value) => ({ name: value, value })),
+      current ?? 'buffered',
+    );
+
+    return changed(answer, current);
   }
 
   private async framework(): Promise<string | undefined> {

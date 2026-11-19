@@ -46,6 +46,7 @@ export interface Environment {
   serverCommand?: string;
   domains?: EnvironmentDomain[];
   autoDeployOnPush?: boolean;
+  isStreamingEnabled?: boolean;
   isContentstackAuthenticationEnabled?: boolean;
   isCachePrimingEnabled?: boolean;
   passwordProtection?: EnvironmentPasswordProtection;

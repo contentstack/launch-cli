@@ -36,6 +36,22 @@ export const TOGGLE_VALUES = ['enable', 'disable'] as const;
 
 export type ToggleValue = (typeof TOGGLE_VALUES)[number];
 
+export function toggleOf(value: boolean | undefined): ToggleValue | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return value ? 'enable' : 'disable';
+}
+
+export function responseModeOf(streaming: boolean | undefined): ResponseMode | undefined {
+  if (streaming === undefined) {
+    return undefined;
+  }
+
+  return streaming ? 'streaming' : 'buffered';
+}
+
 export function frameworkPresetOf(value: string): FrameworkPreset {
   return FRAMEWORK_PRESET_BY_LABEL[oneOf('framework', value, FRAMEWORK_CHOICES).toLowerCase()];
 }

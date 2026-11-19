@@ -41,12 +41,12 @@ function updateArgs(...extra: string[]): string[] {
   return ['launch:env:update', '--org', ORG_UID, '--project', PROJECT_UID, '--env', ENV_UID, '--data-dir', DATA_DIR, ...extra];
 }
 
-function reads(project: unknown = projectFixture) {
+function reads(project: unknown = projectFixture, environment: unknown = getFixture) {
   projectOwnership(LAUNCH_HUB_URL, ORG_UID, PROJECT_UID);
 
   return [
     nock(LAUNCH_HUB_URL).get(`/manage/projects/${PROJECT_UID}`).reply(200, project as nock.Body),
-    nock(LAUNCH_HUB_URL).get(ENV_PATH).reply(200, getFixture),
+    nock(LAUNCH_HUB_URL).get(ENV_PATH).reply(200, environment as nock.Body),
   ];
 }
 
@@ -107,6 +107,29 @@ describe('integration: launch:env:update on the wire', () => {
     expect(onWire).toEqual([]);
   });
 
+  it('exits 0 saying nothing changed, and never sends the PUT, when every flag matches the current settings', async () => {
+    const [project, environment] = reads();
+    const put = update([]);
+
+    const { error, stdout } = await runCommand(
+      updateArgs(
+        '--name', 'production',
+        '--branch', 'main',
+        '--output-dir', './_site',
+        '--auto-deploy', 'enable',
+        '--cs-auth', 'enable',
+        '--cache-priming', 'disable',
+        '--password-protection', 'disable',
+      ),
+      config,
+    );
+
+    expect(error).toBeUndefined();
+    expect([project.isDone(), environment.isDone(), put.isDone()]).toEqual([true, true, false]);
+    expect(stdout).toBe('Environment not updated. No changes were entered.\n');
+    expect(onWire).toEqual([]);
+  });
+
   it('refuses a password value on the command line with exit 2 before any request, without echoing it', async () => {
     const password = randomBytes(8).toString('hex');
 
@@ -134,7 +157,7 @@ describe('integration: launch:env:update on the wire', () => {
 
   it('exits 2 naming --yes, and never sends the PUT, when disabling cache priming without a terminal', async () => {
     const sent: unknown[] = [];
-    reads();
+    reads(projectFixture, { environment: { ...getFixture.environment, isCachePrimingEnabled: true } });
     const put = update(sent);
 
     const { error } = await runCommand(updateArgs('--cache-priming', 'disable'), config);
