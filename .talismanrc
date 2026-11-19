@@ -127,11 +127,11 @@ fileignoreconfig:
     - filename
   checksum: 8b7e3207630f19170dd08ca639ebca8af6bc0d70db633b98e66eedde6d2ea641
 - filename: src/environments/environment.update.ts
-  checksum: b94619d9a9a70447f7cee8978a014c7b54da820c010f36971dc09cfe779f0d5b
+  checksum: 3c667fee5d8c93de351ab117527acd9170dcb0444228022275fe12849fd70ede
   ignore_detectors:
     - filename
 - filename: src/environments/environment.update.test.ts
-  checksum: 1dd1ace001bb903ca0937964fc022e2c465e81ba33ac6f8b8da12091879bb280
+  checksum: 7e5aa33a6958e9141a2f7215df87dfc8111b9bba03edc5a84407f42601b7213d
   ignore_detectors:
     - filename
 - filename: src/environments/environment.create.ts
@@ -145,11 +145,11 @@ fileignoreconfig:
   ignore_detectors:
     - filename
 - filename: src/environments/environment.update.prompt.ts
-  checksum: a68cca8e5f2544bcb940c45825266b42c92e2d9639dee68dcc6d7a0e9db7270f
+  checksum: 0c93fdf5d542a9ef2e1655a4591d5cea8f0fd5e404d204a999c4d5b6a292e895
   ignore_detectors:
     - filename
 - filename: src/environments/environment.update.prompt.test.ts
-  checksum: 37373e11ff627cf36ae48d08de3418755ec5c2b5d7dd7efc398503e4c23aa6a6
+  checksum: 6130ccd6446fe9dba5736fc53b8ebb8f02dbd3956c68ae2c4aa24e3a22dbe105
   ignore_detectors:
     - filename
 - filename: src/environments/environment.presenter.ts
@@ -325,7 +325,7 @@ fileignoreconfig:
 - filename: src/core/prompt.test.ts
   checksum: 7be5497acf4cee870667751d44aa230e309784df76dc9e95d5ec2c4e6e6a57e0
 - filename: test/integration/environments-update.test.ts
-  checksum: 970201a8562532f7cb5314680e8c49b5613d68b794a80f3cfe792ebcad0c7a41
+  checksum: 312cbf02b41fd9fbfe2c20d78a92129f370753cc7172f0ecc244be3e3dd8eae7
 - filename: src/commands/launch/env/update.ts
   checksum: 981c3267005bca0453131b532c9b62ca501bc67cfd25511c261e99082677882a
 - filename: src/commands/launch/env/update.test.ts

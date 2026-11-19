@@ -90,7 +90,6 @@ function currentValuesOf(existing: Environment): EnvironmentChanges {
     outputDir: existing.outputDirectory,
     resMode: responseModeOf(existing.isStreamingEnabled),
     autoDeploy: toggleOf(existing.autoDeployOnPush),
-    csAuth: toggleOf(existing.isContentstackAuthenticationEnabled),
     cachePriming: toggleOf(existing.isCachePrimingEnabled),
     passwordProtection: existing.passwordProtection?.isEnabled === false ? 'disable' : undefined,
   };
@@ -206,6 +205,15 @@ export class EnvironmentUpdater {
       this.services.ux,
       this.services.outputIsTTY === true,
     );
+    if (supported.serverCmd !== undefined) {
+      requireValueOf(
+        'server-cmd',
+        'framework',
+        SERVER_COMMAND_FRAMEWORKS,
+        supported.framework ?? existing.frameworkPreset ?? 'not set',
+      );
+    }
+
     const request = withoutCurrentValues(supported, existing);
 
     if (!hasChanges(request)) {
@@ -216,10 +224,6 @@ export class EnvironmentUpdater {
           : environmentNoChangesLine(this.services.outputIsTTY === true),
       );
       return 'unchanged';
-    }
-
-    if (request.serverCmd !== undefined && request.framework === undefined) {
-      requireValueOf('server-cmd', 'framework', SERVER_COMMAND_FRAMEWORKS, existing.frameworkPreset ?? 'not set');
     }
 
     if (!(await this.confirmDisabling(request))) {

@@ -117,7 +117,6 @@ describe('integration: launch:env:update on the wire', () => {
         '--branch', 'main',
         '--output-dir', './_site',
         '--auto-deploy', 'enable',
-        '--cs-auth', 'enable',
         '--cache-priming', 'disable',
         '--password-protection', 'disable',
       ),
@@ -127,7 +126,7 @@ describe('integration: launch:env:update on the wire', () => {
     expect(error).toBeUndefined();
     expect([project.isDone(), environment.isDone(), put.isDone()]).toEqual([true, true, false]);
     expect(stdout).toBe(
-      'Environment not updated: --name, --branch, --output-dir, --auto-deploy, --cs-auth, --cache-priming, ' +
+      'Environment not updated: --name, --branch, --output-dir, --auto-deploy, --cache-priming, ' +
         '--password-protection already match the current settings.\n',
     );
     expect(onWire).toEqual([]);

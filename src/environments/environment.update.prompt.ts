@@ -18,6 +18,8 @@ import type { Environment } from './types';
 
 export const SETTINGS_QUESTION = 'Select the fields to update:';
 
+const STREAMING_FIRST = [...RESPONSE_MODES].reverse();
+
 export type EnvironmentChanges = Partial<
   Pick<
     EnvironmentUpdateRequest,
@@ -117,7 +119,7 @@ class SettingAsker {
     case 'autoDeploy':
       return this.toggle('Auto deploy', current.autoDeployOnPush);
     case 'csAuth':
-      return this.toggle('Contentstack Authentication', current.isContentstackAuthenticationEnabled);
+      return this.toggle('Contentstack Authentication', current.isContentstackAuthenticationEnabled, true);
     case 'cachePriming':
       return this.toggle('Cache priming', current.isCachePrimingEnabled);
     default:
@@ -134,8 +136,8 @@ class SettingAsker {
     const answer = await askOption(
       this.services.ux,
       'Response mode',
-      RESPONSE_MODES.map((value) => ({ name: value, value })),
-      current ?? 'buffered',
+      STREAMING_FIRST.map((value) => ({ name: value, value })),
+      current ?? 'streaming',
     );
 
     return changed(answer, current);
@@ -177,7 +179,11 @@ class SettingAsker {
     return answer ?? (current === true ? 'enable' : undefined);
   }
 
-  private async toggle(message: string, current: boolean | null | undefined): Promise<string | undefined> {
+  private async toggle(
+    message: string,
+    current: boolean | null | undefined,
+    sendUnchanged = false,
+  ): Promise<string | undefined> {
     const state = toggleOf(current);
     const answer = await askOption(
       this.services.ux,
@@ -186,6 +192,6 @@ class SettingAsker {
       state,
     );
 
-    return changed(answer, state);
+    return sendUnchanged ? answer : changed(answer, state);
   }
 }

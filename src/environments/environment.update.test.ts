@@ -108,7 +108,7 @@ describe('EnvironmentUpdater', () => {
         request({
           name: 'renamed',
           branch: 'release',
-          framework: 'NEXTJS',
+          framework: 'NUXT',
           buildCmd: 'npm run build',
           serverCmd: 'npm start',
           outputDir: './.next',
@@ -126,7 +126,7 @@ describe('EnvironmentUpdater', () => {
         update: {
           name: 'renamed',
           gitBranch: 'release',
-          frameworkPreset: 'NEXTJS',
+          frameworkPreset: 'NUXT',
           buildCommand: 'npm run build',
           serverCommand: 'npm start',
           outputDirectory: './.next',
@@ -188,7 +188,6 @@ describe('EnvironmentUpdater', () => {
   it.each([
     [{ resMode: 'streaming' as const }, { isStreamingEnabled: true }, '--res-mode already matches'],
     [{ resMode: 'buffered' as const }, { isStreamingEnabled: false }, '--res-mode already matches'],
-    [{ csAuth: 'disable' as const }, { isContentstackAuthenticationEnabled: false }, '--cs-auth already matches'],
     [{ autoDeploy: 'enable' as const }, { autoDeployOnPush: true }, '--auto-deploy already matches'],
     [{ cachePriming: 'disable' as const }, { isCachePrimingEnabled: false }, '--cache-priming already matches'],
     [{ passwordProtection: 'disable' as const }, {}, '--password-protection already matches'],
@@ -197,7 +196,7 @@ describe('EnvironmentUpdater', () => {
       { buildCommand: 'npm run build', outputDirectory: '.next', gitBranch: 'sample', name: 'staging' },
       '--name, --branch, --framework, --build-cmd, --output-dir already match',
     ],
-    [{ serverCmd: 'npm start' }, { serverCommand: 'npm start' }, '--server-cmd already matches'],
+    [{ serverCmd: 'npm start' }, { serverCommand: 'npm start', frameworkPreset: 'NUXT' }, '--server-cmd already matches'],
   ])(
     'names the flags, asks nothing and sends nothing when %p matches the current settings',
     async (fields, current, named) => {
@@ -210,6 +209,27 @@ describe('EnvironmentUpdater', () => {
       expect(lines).toEqual([`Environment not updated: ${named} the current settings.`]);
     },
   );
+
+  it.each([
+    [{ csAuth: 'enable' as const }, true, { isContentstackAuthenticationEnabled: true }],
+    [{ csAuth: 'disable' as const }, false, { isContentstackAuthenticationEnabled: false }],
+  ])('always sends %p, even when it matches, so the server re-applies Contentstack Authentication', async (fields, isEnabled, update) => {
+    const { updater, sent } = updaterUnderTest({ current: { isContentstackAuthenticationEnabled: isEnabled } });
+
+    await expect(updater.update(request(fields))).resolves.toBe('updated');
+
+    expect(sent).toEqual([{ ...SCOPE, update }]);
+  });
+
+  it('refuses an unchanged --server-cmd when the current framework takes no server command, sending nothing', async () => {
+    const { updater, calls } = updaterUnderTest({ current: { frameworkPreset: 'GATSBY', serverCommand: 'npm start' } });
+
+    await expect(updater.update(request({ serverCmd: 'npm start' }))).rejects.toThrow(
+      '--server-cmd is only supported when --framework is one of ANALOG, ANGULAR, NUXT, ASTRO, REMIX, OTHER; ' +
+        '--framework is GATSBY.',
+    );
+    expect(calls).not.toContain('update');
+  });
 
   it('names only the matching flags when a FileUpload project also drops a repository-only flag', async () => {
     const { updater, lines } = updaterUnderTest({ projectType: 'FILEUPLOAD', current: { name: 'staging' } });

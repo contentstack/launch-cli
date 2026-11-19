@@ -156,11 +156,21 @@ describe('promptForEnvironmentUpdate', () => {
     expect(asked[1].default).toBe('NextJs');
   });
 
-  it('asks the response mode and always sends it, since the API never reports the current one', async () => {
+  it('lists streaming first and starts on it when the API does not report the current mode, sending the answer', async () => {
     const { services, asked } = servicesAnswering({ [SETTINGS_QUESTION]: ['resMode'], 'Response mode': 'buffered' });
 
     await expect(promptForEnvironmentUpdate(services, githubContext())).resolves.toEqual({ resMode: 'buffered' });
-    expect(asked[1].default).toBe('buffered');
+    expect(asked[1].choices).toEqual([
+      { name: 'streaming', value: 'streaming' },
+      { name: 'buffered', value: 'buffered' },
+    ]);
+    expect(asked[1].default).toBe('streaming');
+  });
+
+  it('sends the Contentstack Authentication answer even when it matches the current setting', async () => {
+    const { services } = servicesAnswering({ [SETTINGS_QUESTION]: ['csAuth'], 'Contentstack Authentication': 'disable' });
+
+    await expect(promptForEnvironmentUpdate(services, githubContext())).resolves.toEqual({ csAuth: 'disable' });
   });
 
   it.each([
