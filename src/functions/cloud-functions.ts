@@ -22,7 +22,12 @@ import {
   DYNAMIC_ROUTE_SEGMENT,
   ENV_FILE_NAME,
 } from './constants';
-import { FunctionLoadError, FunctionsDirectoryNotFoundError, PortInUseError } from './function.errors';
+import {
+  FunctionLoadError,
+  FunctionsDirectoryNotFoundError,
+  MissingPackageError,
+  PortInUseError,
+} from './function.errors';
 import { walkFileSystem, checkIfDirectoryExists } from './os-helper';
 import type { CloudFunctionResource } from './types';
 
@@ -333,6 +338,14 @@ export class CloudFunctions {
     const bundle = await rollup({
       input: cloudFunctionFilePath,
       plugins: [nodeResolve({ preferBuiltins: true }), commonjs(), json(), recordImporters(importersById)],
+      onwarn: (warning, defaultHandler) => {
+        if (warning.code === 'UNRESOLVED_IMPORT' && warning.id && warning.exporter) {
+          const importer = path.relative(realpathSync(this.pathToSourceCode), realpathSync(warning.id));
+          throw new MissingPackageError(importer, warning.exporter);
+        }
+
+        defaultHandler(warning);
+      },
     });
     outsideImports.report(importersById);
 

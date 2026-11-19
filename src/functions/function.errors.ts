@@ -7,7 +7,8 @@ enum CloudFunctionErrorTypes {
   EXISTING_DYNAMIC_ROUTE_AT_SAME_LEVEL_ERROR = 'ExistingDynamicRouteAtSameLevelError',
   FUNCTIONS_DIRECTORY_NOT_FOUND = 'FunctionsDirectoryNotFound',
   PORT_IN_USE_ERROR = 'PortInUseError',
-  FUNCTION_LOAD_ERROR = 'FunctionLoadError'
+  FUNCTION_LOAD_ERROR = 'FunctionLoadError',
+  MISSING_PACKAGE_ERROR = 'MissingPackageError'
 }
 
 export class TopLevelDynamicRouteError extends Error {
@@ -64,5 +65,12 @@ export class FunctionLoadError extends Error {
   ) {
     super(`Could not load ${functionFile}: ${cause.message}`);
     this.name = CloudFunctionErrorTypes.FUNCTION_LOAD_ERROR;
+  }
+}
+
+export class MissingPackageError extends Error {
+  constructor(importer: string, packageName: string) {
+    super(`${importer} imports "${packageName}", which is not installed. Run npm install in the project.`);
+    this.name = CloudFunctionErrorTypes.MISSING_PACKAGE_ERROR;
   }
 }

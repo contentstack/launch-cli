@@ -629,10 +629,12 @@ describe('CloudFunctions serve failures', () => {
     expect(startedServers).toHaveLength(0);
   });
 
-  it('rejects when a function file cannot be bundled', async () => {
+  it('names the function file when it cannot be bundled', async () => {
     writeFunctionFile('syntax-error.js', 'export default function ( {');
 
-    await expect(new CloudFunctions(workspace).serve(await freePort())).rejects.toThrow();
+    await expect(new CloudFunctions(workspace).serve(await freePort())).rejects.toThrow(
+      `Could not load ${join('functions', 'syntax-error.js')}: `,
+    );
     expect(startedServers).toHaveLength(0);
   });
 
@@ -643,6 +645,20 @@ describe('CloudFunctions serve failures', () => {
       `Could not load ${join('functions', 'api', 'boom.js')}: init`,
     );
     expect(startedServers).toHaveLength(0);
+  });
+
+  it('names the package and the file importing it when a package is not installed, without a bundler warning', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const needs = join('functions', 'api', 'needs.js');
+    writeFunctionFile(
+      join('api', 'needs.js'),
+      'import pkg from "not-installed-pkg"; export default function needs(request, response) { response.send(pkg); }',
+    );
+
+    await expect(new CloudFunctions(workspace).serve(await freePort())).rejects.toThrow(
+      `Could not load ${needs}: ${needs} imports "not-installed-pkg", which is not installed. Run npm install in the project.`,
+    );
+    expect(warn).not.toHaveBeenCalled();
   });
 
   it('rejects when a function file imports a module that cannot be resolved', async () => {
