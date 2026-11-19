@@ -1,4 +1,4 @@
-import { previewUrlOf, siteUrlOf } from './site.url';
+import { siteUrlOf } from './site.url';
 
 describe('siteUrlOf', () => {
   it("chooses the deployment's own url over any domain", () => {
@@ -17,6 +17,12 @@ describe('siteUrlOf', () => {
     expect(url).toBe('https://www.example.com');
   });
 
+  it('treats a whitespace-only deployment url or domain as absent', () => {
+    const url = siteUrlOf({ uid: 'd1', deploymentUrl: '   ' }, [{ url: '  ' }, { url: 'www.example.com' }]);
+
+    expect(url).toBe('https://www.example.com');
+  });
+
   it('adds https:// to a deployment url without a scheme and leaves an http:// one alone', () => {
     const bare = siteUrlOf({ uid: 'd1', deploymentUrl: 'my-site.contentstackapps.com' });
     const plain = siteUrlOf({ uid: 'd1', deploymentUrl: 'http://my-site.example.test' });
@@ -25,10 +31,10 @@ describe('siteUrlOf', () => {
     expect(plain).toBe('http://my-site.example.test');
   });
 
-  it('uses the preview url when the deployment has no deployment url, before any domain', () => {
-    const url = siteUrlOf({ uid: 'd1', previewUrl: 'preview.example.test' }, [{ url: 'https://www.example.com' }]);
+  it('skips the preview url, a screenshot image, and falls back to a domain when the deployment has no deployment url', () => {
+    const url = siteUrlOf({ uid: 'd1', previewUrl: 'images.example.test/preview.png' }, [{ url: 'https://www.example.com' }]);
 
-    expect(url).toBe('https://preview.example.test');
+    expect(url).toBe('https://www.example.com');
   });
 
   it('returns nothing without a deployment, even when the environment has domains', () => {
@@ -45,22 +51,6 @@ describe('siteUrlOf', () => {
 
   it('returns nothing when no domain has a url either', () => {
     const url = siteUrlOf({ uid: 'd1' }, [{}, { url: '' }]);
-
-    expect(url).toBeUndefined();
-  });
-});
-
-describe('previewUrlOf', () => {
-  it('reads the preview url alone, adding the scheme, and ignores the deployment url', () => {
-    const bare = previewUrlOf({ uid: 'd1', deploymentUrl: 'https://my-site.contentstackapps.com', previewUrl: 'preview.example.test' });
-    const plain = previewUrlOf({ uid: 'd1', previewUrl: 'http://preview.example.test' });
-
-    expect(bare).toBe('https://preview.example.test');
-    expect(plain).toBe('http://preview.example.test');
-  });
-
-  it.each([[undefined], [''], ['   ']])('returns nothing for a preview url of %p even with a deployment url', (previewUrl) => {
-    const url = previewUrlOf({ uid: 'd1', deploymentUrl: 'https://my-site.contentstackapps.com', previewUrl });
 
     expect(url).toBeUndefined();
   });

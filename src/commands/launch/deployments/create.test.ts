@@ -31,7 +31,7 @@ function commandUnderTest(resolved: Record<string, unknown>, projectType = 'GITP
             created.push(params);
             return { uid: 'd1', status: 'QUEUED' };
           },
-          get: async () => ({ uid: 'd1', status: 'LIVE' }),
+          get: async () => ({ uid: 'd1', status: 'LIVE', deploymentUrl: 'my-site.example.test' }),
         },
         deploymentLogs: { after: async () => [] },
       },

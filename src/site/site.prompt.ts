@@ -1,21 +1,9 @@
 import type { Choice, UxLike } from '../core/prompt';
 import { askOption } from '../core/prompt';
+import { bareHost, withScheme } from '../core/url';
 import type { SiteDomain } from './site.url';
 
 export const DOMAIN_QUESTION = 'Which domain do you want to open?';
-
-const SCHEME = /^[a-z][a-z\d+.-]*:\/\//i;
-const TRAILING_SLASHES = /\/+$/;
-
-function bareHost(url: string): string {
-  return url.trim().replace(SCHEME, '').replace(TRAILING_SLASHES, '');
-}
-
-function withScheme(url: string): string {
-  const trimmed = url.trim().replace(TRAILING_SLASHES, '');
-
-  return SCHEME.test(trimmed) ? trimmed : `https://${trimmed}`;
-}
 
 export function domainChoices(defaultUrl: string, domains: readonly SiteDomain[] = []): Choice[] {
   const defaultHost = bareHost(defaultUrl);
