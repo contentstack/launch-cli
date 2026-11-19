@@ -126,11 +126,11 @@ describe('integration: retired V1 command names', () => {
     expect(error?.message).not.toContain('was removed in Launch CLI v2');
     const logs = join(projectDir, 'logs');
     const deadline = Date.now() + 5000;
-    while ((!existsSync(logs) || readdirSync(logs).length < 2) && Date.now() < deadline) {
+    while ((!existsSync(logs) || readdirSync(logs).length < 1) && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
 
-    expect(readdirSync(logs).sort()).toEqual(['error.log', 'info.log']);
+    expect(readdirSync(logs).sort()).toEqual(['error.log']);
     rmSync(projectDir, { recursive: true, force: true });
   });
 

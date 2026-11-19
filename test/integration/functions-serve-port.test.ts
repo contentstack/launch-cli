@@ -37,7 +37,7 @@ describe('integration: launch:functions:serve port handling', () => {
   afterEach(async () => {
     const logs = join(projectDir, 'logs');
     const deadline = Date.now() + 4000;
-    while ((!existsSync(logs) || readdirSync(logs).length < 2) && Date.now() < deadline) {
+    while ((!existsSync(logs) || readdirSync(logs).length < 1) && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
 
