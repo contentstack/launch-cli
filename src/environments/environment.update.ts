@@ -22,7 +22,6 @@ export interface EnvironmentUpdateRequest {
   project: string;
   environment: string;
   name?: string;
-  description?: string;
   branch?: string;
   framework?: FrameworkPreset;
   buildCmd?: string;
@@ -61,7 +60,6 @@ function pipedPassword(text: string): string {
 
 const UPDATABLE_FLAGS: [keyof EnvironmentUpdateRequest, string][] = [
   ['name', 'name'],
-  ['description', 'description'],
   ['branch', 'branch'],
   ['framework', 'framework'],
   ['buildCmd', 'build-cmd'],
@@ -96,7 +94,6 @@ function bodyOf(
 ): EnvironmentUpdate {
   const fields: EnvironmentUpdate = {
     name: request.name,
-    description: request.description,
     gitBranch: request.branch,
     frameworkPreset: request.framework,
     buildCommand: request.buildCmd,

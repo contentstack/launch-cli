@@ -5,7 +5,6 @@ import { SETTINGS_QUESTION, promptForEnvironmentUpdate } from './environment.upd
 const CURRENT: Environment = {
   uid: 'env1',
   name: 'production',
-  description: 'the live site',
   gitBranch: 'main',
   frameworkPreset: 'NEXTJS',
   buildCommand: 'npm run build',
@@ -64,7 +63,6 @@ describe('promptForEnvironmentUpdate', () => {
       message: SETTINGS_QUESTION,
       choices: [
         { name: 'Name', value: 'name' },
-        { name: 'Description', value: 'description' },
         { name: 'Branch', value: 'branch' },
         { name: 'Framework preset', value: 'framework' },
         { name: 'Build command', value: 'buildCmd' },
@@ -90,7 +88,7 @@ describe('promptForEnvironmentUpdate', () => {
     const offered = (asked[0].choices as { value: string }[]).map((choice) => choice.value);
     expect(offered).not.toContain('branch');
     expect(offered).not.toContain('autoDeploy');
-    expect(offered).toHaveLength(10);
+    expect(offered).toHaveLength(9);
   });
 
   it('asks nothing more and changes nothing when no setting is ticked', async () => {
@@ -102,21 +100,18 @@ describe('promptForEnvironmentUpdate', () => {
 
   it('asks only the ticked settings, each offering its current value, and keeps only what changed', async () => {
     const { services, asked } = servicesAnswering({
-      [SETTINGS_QUESTION]: ['cachePriming', 'name', 'buildCmd', 'description'],
+      [SETTINGS_QUESTION]: ['cachePriming', 'name', 'buildCmd'],
       Name: 'production',
-      Description: '  pre-release  ',
       'Build command': 'npm run build:prod',
       'Cache priming': 'enable',
     });
 
     await expect(promptForEnvironmentUpdate(services, githubContext())).resolves.toEqual({
-      description: 'pre-release',
       buildCmd: 'npm run build:prod',
       cachePriming: 'enable',
     });
     expect(asked.slice(1).map((question) => [question.message, question.default])).toEqual([
       ['Name', 'production'],
-      ['Description', 'the live site'],
       ['Build command', 'npm run build'],
       ['Cache priming', 'disable'],
     ]);
@@ -190,7 +185,7 @@ describe('promptForEnvironmentUpdate', () => {
   });
 
   it('leaves out a blank answer to an optional text setting', async () => {
-    const { services } = servicesAnswering({ [SETTINGS_QUESTION]: ['description', 'buildCmd'], Description: '  ' });
+    const { services } = servicesAnswering({ [SETTINGS_QUESTION]: ['buildCmd'], 'Build command': '  ' });
 
     await expect(promptForEnvironmentUpdate(services, githubContext())).resolves.toEqual({});
   });
@@ -232,15 +227,5 @@ describe('promptForEnvironmentUpdate', () => {
       promptForEnvironmentUpdate(services, githubContext({ ...CURRENT, passwordProtection: undefined })),
     ).resolves.toEqual({ passwordProtection: 'disable' });
     expect(asked[1].default).toBeUndefined();
-  });
-
-  it('refuses a description over 255 characters at the prompt, so it is asked again rather than sent', async () => {
-    const { services, asked } = servicesAnswering({ [SETTINGS_QUESTION]: ['description'], Description: 'short' });
-
-    await promptForEnvironmentUpdate(services, githubContext());
-
-    const validate = asked[1].validate as (value: string) => true | string;
-    expect(validate('d'.repeat(255))).toBe(true);
-    expect(validate('d'.repeat(256))).toBe('Description must be 255 characters or fewer; that value is 256 characters.');
   });
 });

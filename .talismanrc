@@ -6,7 +6,7 @@ fileignoreconfig:
 - filename: src/commands/launch/logs/get.test.ts
   checksum: d94d390de150956c799f64a84adfe0e02b5b21c66ddcc5cf55a1329aa67ec1a7
 - filename: src/core/failure.test.ts
-  checksum: d8be306f3bde77249360475bbb76093ce67458f3530c3b4c5bd7e6a516a910aa
+  checksum: 3f5c731861dc816d141f6314c32bec55bc5197241447a4375bc76fa9f85339f0
 - filename: test/integration/retired-commands.test.ts
   checksum: c38d6e8dae6bd4d2034ff48bff488e89cc00d950a7417c6df890168ac743ae37
 - filename: test/integration/manage-base-path.test.ts
@@ -116,7 +116,7 @@ fileignoreconfig:
   allowed_patterns:
     - "assertArray\\(response, key, `\\$\\{key\\} response`\\)"
 - filename: src/environments/environment.inputs.ts
-  checksum: 3fc2802c79457f7c7e93cd5f32c00a7986dc6f686fe3c346de4b8436a66cc0b9
+  checksum: fd3a8f925444e44b0477d7c907d77526d5a4315d627bf29768912b6799a45c80
   ignore_detectors:
     - filename
 - filename: src/environments/environment.builder.ts
@@ -127,11 +127,11 @@ fileignoreconfig:
     - filename
   checksum: 8b7e3207630f19170dd08ca639ebca8af6bc0d70db633b98e66eedde6d2ea641
 - filename: src/environments/environment.update.ts
-  checksum: b1e15e174f98a875f97e0683182638f93966ef4c498135d36df620a28338aacb
+  checksum: 85b625c571ef1a4e0c177b78fe5538f6c9506c4b692c6212d9faa63681d77ffe
   ignore_detectors:
     - filename
 - filename: src/environments/environment.update.test.ts
-  checksum: 5e90c3dd231ede1b890f7c750c7063412116a2e4be536d2f290d56d28205ceae
+  checksum: 451f42cd81d25088ec05f5ededc9375bfcac7cda6a29db60ccda792768afdd0e
   ignore_detectors:
     - filename
 - filename: src/environments/environment.create.ts
@@ -145,19 +145,19 @@ fileignoreconfig:
   ignore_detectors:
     - filename
 - filename: src/environments/environment.update.prompt.ts
-  checksum: 5f2da5ae044eda92f9e555c997d23f065b5454cda8a340c12595597795ecfbb9
+  checksum: 992d52bfb924105691c90fbdee53ca66fc0a585bb3273e7bcb23974ec2ef4c5c
   ignore_detectors:
     - filename
 - filename: src/environments/environment.update.prompt.test.ts
-  checksum: 6653e245baac00cef348acfc0aa2f32d03a7ff63ca3c320ee56a0c6250775004
+  checksum: 2be66b5b7a394e0f2440163ee94c46fdd3884e594673b03de9d8c2eef0ca1ed0
   ignore_detectors:
     - filename
 - filename: src/environments/environment.presenter.ts
-  checksum: 3ca3e566a136fb0100cd794e9e973fce70a80c88224b6f93027d8190ac0b6882
+  checksum: 3808d26ca5eb7f345568b56fe48f5756e14f0cdb15ef68b2ae72e9556bc6bab2
   ignore_detectors:
     - filename
 - filename: src/environments/environment.presenter.test.ts
-  checksum: f5f6e5ec469a16ca8e1c9175ec88aa406a24c6318ef95520d534c444fdd3ab88
+  checksum: 3e28f6188a450b47d874453a37e22193d9e5036762d34f55315118ed54a73c0a
   ignore_detectors:
     - filename
 - filename: src/environments/environment.resolver.ts
@@ -311,9 +311,9 @@ fileignoreconfig:
 - filename: test/credential-guard.setup.ts
   checksum: 519ccbeb0552fdb1d5f27308c56477c0258ee6cc0adec8f618e8e5bc047cbf6d
 - filename: src/environments/types.ts
-  checksum: 2825d0e70757022e518465b134878b8cc8f9eccaf4e9ad088d73a31b9a35a826
+  checksum: d5506fb4ea67ef8cac77b43724ad6b0e438503d7198d68db8fb2f6d718e89f00
 - filename: src/commands/launch/env/get.test.ts
-  checksum: 6e739ef12bc0d887e652e23ee54d9fac30dd6a3505cf464cdaefc0e696cf3e51
+  checksum: 6b79822734553c7417c0a8774fae221609d008be22834113661c9925f17017b9
 - filename: test/integration/environments-delete.test.ts
   checksum: a6f002256162971e5f4ace879153454c95199101d2acc853f2a54b39d1d48914
 - filename: src/commands/launch/env/delete.test.ts
@@ -327,11 +327,11 @@ fileignoreconfig:
 - filename: test/integration/environments-update.test.ts
   checksum: 249f27ad679b68f40eac3af90c616229838bceffad57ba508dd298ab053fa51a
 - filename: src/commands/launch/env/update.ts
-  checksum: 06add97108d878eaf415e32160439b8963683e63a0e37ce77a56f66b88383c7a
+  checksum: 981c3267005bca0453131b532c9b62ca501bc67cfd25511c261e99082677882a
 - filename: src/commands/launch/env/update.test.ts
-  checksum: 2da219594e7bdd589adc0eff9ff035252a75aaa51dfa20514b18fd3266d7b752
+  checksum: 82c76af721bfdfd8eb7cf49494ffbe15d98b988e98bca1015b9d34b42b5226bd
 - filename: README.md
-  checksum: fde09d802a9252ef675fe34d0865317631649ff3ad0858b606cbac31bea7ed6a
+  checksum: 6386fbf38075484d6c0eb32bb40ab246a1c94dff41a107e14713f944b4f1d2b5
   allowed_patterns:
     - "password-protection"
     - "-p, --password"
