@@ -9,7 +9,6 @@ const RESOLVED = {
   project: 'proj1',
   env: 'env1',
   name: 'renamed',
-  description: 'the live site',
   branch: 'release',
   framework: 'NUXT',
   'build-cmd': 'npm run build',
@@ -56,7 +55,6 @@ describe('launch:env:update', () => {
         project: 'proj1',
         environment: 'env1',
         name: 'renamed',
-        description: 'the live site',
         branch: 'release',
         framework: 'NUXT',
         buildCmd: 'npm run build',
@@ -102,7 +100,6 @@ describe('launch:env:update', () => {
         'project',
         'env',
         'name',
-        'description',
         'branch',
         'framework',
         'build-cmd',
@@ -125,9 +122,8 @@ describe('launch:env:update', () => {
     expect(EnvironmentsUpdate.rules).toEqual([serverCommandFrameworkGate]);
   });
 
-  it('describes --name and --description as the environment its own, leaving the project wording alone', () => {
+  it('describes --name as the environment its own, leaving the project wording alone', () => {
     expect(EnvironmentsUpdate.flags.name.description).toBe('Environment name (200 characters or fewer)');
-    expect(EnvironmentsUpdate.flags.description.description).toBe('Environment description (255 characters or fewer)');
     expect(catalog.name.description).toBe('Project name (200 characters or fewer)');
     expect(catalog.description.description).toBe('Project description (255 characters or fewer)');
     expect(EnvironmentsUpdate.flags.org).toBe(catalog.org);

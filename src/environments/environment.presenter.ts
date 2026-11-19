@@ -50,7 +50,6 @@ export function environmentDetailRows(environment: Environment, showBranch = tru
   const rows: DetailRow[] = [
     { field: 'ENVIRONMENT UID', value: text(environment.uid) },
     { field: 'NAME', value: text(environment.name) },
-    { field: 'DESCRIPTION', value: text(environment.description) },
     { field: 'BRANCH', value: text(environment.gitBranch) },
     { field: 'FRAMEWORK', value: text(environment.frameworkPreset) },
     { field: 'BUILD COMMAND', value: text(environment.buildCommand) },

@@ -27,7 +27,6 @@ export interface EnvironmentCreateRequest extends EnvironmentRequest {
   dataDir: string;
   configPath: string;
   name?: string;
-  description?: string;
   branch?: string;
   autoDeploy?: ToggleValue;
 }
@@ -78,10 +77,6 @@ export class EnvironmentCreator {
         : await this.fromRepository(request, gitScopeOf(org, current.repository));
 
     const input = await new EnvironmentBuilder(this.services).build(request, name, source, request.autoDeploy);
-
-    if (request.description !== undefined) {
-      input.description = request.description;
-    }
 
     const environment = await this.services.api.environments.create({ org, project, input });
 

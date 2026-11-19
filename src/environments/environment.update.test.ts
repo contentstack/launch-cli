@@ -105,7 +105,6 @@ describe('EnvironmentUpdater', () => {
       updater.update(
         request({
           name: 'renamed',
-          description: 'the live site',
           branch: 'release',
           framework: 'NEXTJS',
           buildCmd: 'npm run build',
@@ -124,7 +123,6 @@ describe('EnvironmentUpdater', () => {
         ...SCOPE,
         update: {
           name: 'renamed',
-          description: 'the live site',
           gitBranch: 'release',
           frameworkPreset: 'NEXTJS',
           buildCommand: 'npm run build',
@@ -149,7 +147,7 @@ describe('EnvironmentUpdater', () => {
 
       expect(failure).toBeInstanceOf(UsageError);
       expect((failure as Error).message).toBe(
-        'Pass at least one of --name, --description, --branch, --framework, --build-cmd, --server-cmd, ' +
+        'Pass at least one of --name, --branch, --framework, --build-cmd, --server-cmd, ' +
           '--output-dir, --res-mode, --auto-deploy, --cs-auth, --cache-priming, --password-protection; ' +
           'none was supplied.',
       );
