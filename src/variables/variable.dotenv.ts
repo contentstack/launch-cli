@@ -34,6 +34,7 @@ function findClosingQuote(text: string, quote: string): number {
 interface ReadValue {
   value: string;
   linesRead: number;
+  tail: string;
 }
 
 function readQuoted(text: string): ReadValue | undefined {
@@ -47,7 +48,7 @@ function readQuoted(text: string): ReadValue | undefined {
   const inner = text.slice(1, closing);
   const value = quote === '"' ? inner.replace(/\\n/g, '\n').replace(/\\r/g, '\r') : inner;
 
-  return { value, linesRead: inner.split('\n').length };
+  return { value, linesRead: inner.split('\n').length, tail: text.slice(closing + 1).split('\n')[0].trim() };
 }
 
 function readValue(raw: string, following: string[]): ReadValue | undefined {
@@ -59,7 +60,7 @@ function readValue(raw: string, following: string[]): ReadValue | undefined {
 
   const comment = INLINE_COMMENT.exec(raw);
 
-  return { value: (comment ? raw.slice(0, comment.index) : raw).trim(), linesRead: 1 };
+  return { value: (comment ? raw.slice(0, comment.index) : raw).trim(), linesRead: 1, tail: '' };
 }
 
 function parse(text: string): Map<string, string> {
@@ -90,6 +91,10 @@ function parse(text: string): Map<string, string> {
 
     if (read === undefined) {
       throw new DotenvLineError(index + 1, `opens a quote for ${key} that is never closed`);
+    }
+
+    if (read.tail !== '' && !read.tail.startsWith('#')) {
+      throw new DotenvLineError(index + 1, `has text after the closing quote of ${key}`);
     }
 
     parsed.set(key, read.value);
