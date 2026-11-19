@@ -14,6 +14,14 @@ describe('variable dotenv', () => {
     });
   });
 
+  it.each([
+    ['COLOR', '#ff0000'],
+    ['URL', 'https://x.test/#/home'],
+    ['PW', 'p@ss#word1'],
+  ])('keeps a # with no space or tab before it in an unquoted value (%s)', (key, value) => {
+    expect(parseDotenv(`${key}=${value}`).variables).toEqual([{ key, value }]);
+  });
+
   it('keeps an equals sign inside a value', () => {
     expect(parseDotenv('TOKEN=a=b').variables).toEqual([{ key: 'TOKEN', value: 'a=b' }]);
   });
