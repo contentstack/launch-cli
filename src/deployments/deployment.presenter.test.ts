@@ -37,10 +37,13 @@ describe('deployment presenter', () => {
   it('leaves an absolute deployment url alone and gives a bare host a scheme', () => {
     expect(deploymentUrlOf({ uid: UID, deploymentUrl: 'https://site.example.test' })).toBe('https://site.example.test');
     expect(deploymentUrlOf({ uid: UID, deploymentUrl: 'site.example.test' })).toBe('https://site.example.test');
+    expect(deploymentUrlOf({ uid: UID, deploymentUrl: 'http-api-ab12.contentstackapps.com' })).toBe(
+      'https://http-api-ab12.contentstackapps.com',
+    );
   });
 
-  it('falls back to the preview url and reports nothing when neither is usable', () => {
-    expect(deploymentUrlOf({ uid: UID, previewUrl: 'preview.example.test' })).toBe('https://preview.example.test');
+  it('reports nothing without a deployment url, never the preview url, which is a screenshot image', () => {
+    expect(deploymentUrlOf({ uid: UID, previewUrl: 'images.example.test/preview.png' })).toBeUndefined();
     expect(deploymentUrlOf({ uid: UID })).toBeUndefined();
     expect(deploymentUrlOf({ uid: UID, deploymentUrl: '', previewUrl: '' })).toBeUndefined();
   });
@@ -366,7 +369,7 @@ describe('deployment table presenter', () => {
     }
   });
 
-  it('falls back to a dash for every absent field and prefers the deployment url over the preview url', () => {
+  it('falls back to a dash for every absent field and shows the deployment url, never the preview url', () => {
     const rows = deploymentDetailRows({ uid: UID }, true, SCOPE);
 
     for (const field of ['BRANCH', 'COMMIT', 'COMMIT MESSAGE', 'URL', 'CREATED AT', 'UPDATED AT']) {

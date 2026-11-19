@@ -7,6 +7,7 @@ import type { LaunchError } from '../core/errors';
 import { UsageError } from '../core/errors';
 import type { ServiceContext } from '../core/service-context';
 import type { ApiSurface } from '../resources';
+import type { SiteDomain } from '../site/site.url';
 import { LaunchApiError } from '../transport/errors';
 import type { CreateDeploymentRequest } from './deployment.create';
 import { DeploymentCreator } from './deployment.create';
@@ -20,6 +21,7 @@ const PROJECT = randomBytes(12).toString('hex');
 const ENVIRONMENT = randomBytes(12).toString('hex');
 const DEPLOYMENT = randomBytes(12).toString('hex');
 const SHA = randomBytes(20).toString('hex');
+const LIVE_URL = 'https://my-site.example.test';
 const MISSING_DIR = join(tmpdir(), `launch-no-such-dir-${randomBytes(6).toString('hex')}`);
 
 const BASE: CreateDeploymentRequest = {
@@ -64,6 +66,7 @@ interface Harness {
   fetched: unknown[];
   watched: { scope: unknown; stop?: AbortSignal }[];
   announced: Deployment[];
+  announcedDomains: (readonly SiteDomain[] | undefined)[];
   picked: unknown[];
   printed: string[];
 }
@@ -76,6 +79,8 @@ function harness(
     createFails?: Error;
     projectFails?: Error;
     announceFails?: Error;
+    domains?: SiteDomain[];
+    environmentFails?: Error;
     pick?: () => Promise<string>;
   } = {},
 ): Harness {
@@ -85,6 +90,7 @@ function harness(
   const fetched: unknown[] = [];
   const watched: { scope: unknown; stop?: AbortSignal }[] = [];
   const announced: Deployment[] = [];
+  const announcedDomains: (readonly SiteDomain[] | undefined)[] = [];
   const picked: unknown[] = [];
   const printed: string[] = [];
   const signals = new FakeSignals();
@@ -99,6 +105,18 @@ function harness(
         }
 
         return { uid: PROJECT, projectType: options.projectType ?? 'GITPROVIDER' };
+      },
+    },
+    environments: {
+      get: async (params: unknown) => {
+        methods.push('environment');
+        fetched.push(params);
+
+        if (options.environmentFails !== undefined) {
+          throw options.environmentFails;
+        }
+
+        return { uid: ENVIRONMENT, domains: options.domains ?? [] };
       },
     },
     deployments: {
@@ -144,16 +162,21 @@ function harness(
         return options.watch(scope, stop);
       }
 
-      const outcome = options.outcome ?? { kind: 'success', status: 'LIVE', deployment: { uid: DEPLOYMENT, status: 'LIVE' } };
+      const outcome = options.outcome ?? {
+        kind: 'success',
+        status: 'LIVE',
+        deployment: { uid: DEPLOYMENT, status: 'LIVE', deploymentUrl: LIVE_URL },
+      };
 
       return typeof outcome === 'function' ? outcome() : outcome;
     },
-    announceLive: async (deployment: Deployment) => {
+    announceLive: async (deployment: Deployment, domains?: readonly SiteDomain[]) => {
       if (options.announceFails !== undefined) {
         throw options.announceFails;
       }
 
       announced.push(deployment);
+      announcedDomains.push(domains);
     },
   };
 
@@ -167,7 +190,19 @@ function harness(
     follower,
   });
 
-  return { creator, signals, created, methods, signedUrlCalls, fetched, watched, announced, picked, printed };
+  return {
+    creator,
+    signals,
+    created,
+    methods,
+    signedUrlCalls,
+    fetched,
+    watched,
+    announced,
+    announcedDomains,
+    picked,
+    printed,
+  };
 }
 
 async function failureOf(run: Promise<unknown>): Promise<Error> {
@@ -192,7 +227,7 @@ describe('DeploymentCreator on a GitHub project', () => {
     expect(watched.map((entry) => entry.scope)).toEqual([
       { org: ORG, project: PROJECT, environment: ENVIRONMENT, deployment: DEPLOYMENT },
     ]);
-    expect(announced).toEqual([{ uid: DEPLOYMENT, status: 'LIVE' }]);
+    expect(announced).toEqual([{ uid: DEPLOYMENT, status: 'LIVE', deploymentUrl: LIVE_URL }]);
     expect(picked).toEqual([]);
     expect(signedUrlCalls).toEqual([]);
     expect(signals.listeners).toEqual([]);
@@ -319,6 +354,34 @@ describe('DeploymentCreator waiting for the outcome', () => {
     await creator.create(BASE);
 
     expect(announced).toEqual([deployment]);
+  });
+
+  it('reads the environment and announces its domains only when the live deployment carries no url', async () => {
+    const domains = [{ url: 'www.example.com' }];
+    const { creator, fetched, announcedDomains } = harness({
+      outcome: { kind: 'success', status: 'LIVE', deployment },
+      domains,
+    });
+
+    await creator.create(BASE);
+
+    expect(fetched).toEqual([
+      { org: ORG, project: PROJECT },
+      { org: ORG, project: PROJECT, environment: ENVIRONMENT },
+    ]);
+    expect(announcedDomains).toEqual([domains]);
+  });
+
+  it('still succeeds, announcing without domains, when that environment read fails after the deployment is live', async () => {
+    const { creator, announced, announcedDomains } = harness({
+      outcome: { kind: 'success', status: 'LIVE', deployment },
+      environmentFails: new LaunchApiError(503, [{ code: 'x', message: 'Service unavailable.' }]),
+    });
+
+    await creator.create(BASE);
+
+    expect(announced).toEqual([deployment]);
+    expect(announcedDomains).toEqual([undefined]);
   });
 
   it.each([['ARCHIVED'], ['SKIPPED'], ['CANCELLED'], ['FAILED']])(

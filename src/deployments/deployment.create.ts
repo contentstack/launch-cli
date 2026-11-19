@@ -2,13 +2,14 @@ import { UsageError } from '../core/errors';
 import type { InterruptSource } from '../core/interruptible-ux';
 import type { ServiceContext } from '../core/service-context';
 import { asSentence, messageOf } from '../core/values';
+import type { SiteDomain } from '../site/site.url';
 import { NoUploadDirectoryError } from '../uploads/upload.errors';
 import { FolderUploader } from '../uploads/upload.folder';
 import { DeploymentUnsuccessfulError, DeploymentWaitInterruptedError } from './deployment.errors';
 import type { DeploymentScope as FollowedDeployment } from './deployment.follower';
 import { DeploymentFollower } from './deployment.follower';
 import { PICK_COMMIT } from './deployment.inputs';
-import { firstDeploymentFailureMessage } from './deployment.presenter';
+import { deploymentUrlOf, firstDeploymentFailureMessage } from './deployment.presenter';
 import type { DeploymentOutcome, WatchTiming } from './deployment.watcher';
 import type { DeploymentScope } from './deployments.api';
 import type { Deployment, IdentifiedDeployment } from './types';
@@ -24,7 +25,7 @@ export interface CreateDeploymentRequest extends DeploymentScope {
 
 export interface DeploymentFollowing {
   watch(scope: FollowedDeployment, stop?: AbortSignal): Promise<DeploymentOutcome>;
-  announceLive(deployment: Deployment): Promise<void>;
+  announceLive(deployment: Deployment, domains?: readonly SiteDomain[]): Promise<void>;
 }
 
 export interface DeploymentCreatorDeps {
@@ -118,11 +119,26 @@ export class DeploymentCreator {
     const outcome = await this.waitFor(followed);
 
     if (outcome.kind === 'success') {
-      await this.follower.announceLive(outcome.deployment);
+      await this.follower.announceLive(outcome.deployment, await this.fallbackDomains(scope, outcome.deployment));
       return;
     }
 
     throw this.unsuccessful(followed, { status: outcome.status, timedOut: outcome.kind === 'timed-out' });
+  }
+
+  private async fallbackDomains(
+    scope: DeploymentScope,
+    deployment: Deployment,
+  ): Promise<readonly SiteDomain[] | undefined> {
+    if (deploymentUrlOf(deployment) !== undefined) {
+      return undefined;
+    }
+
+    try {
+      return (await this.services.api.environments.get(scope)).domains;
+    } catch {
+      return undefined;
+    }
   }
 
   private async waitFor(followed: FollowedDeployment): Promise<DeploymentOutcome> {

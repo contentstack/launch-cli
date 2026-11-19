@@ -24,6 +24,7 @@ export interface Deployment {
   status?: string;
   deploymentNumber?: number;
   deploymentUrl?: string;
+  /** The screenshot image taken once the deployment is live, never a URL for the site itself. */
   previewUrl?: string;
   gitBranch?: string;
   commitHash?: string;
