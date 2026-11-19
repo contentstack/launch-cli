@@ -67,6 +67,13 @@ describe('variable dotenv', () => {
     ]);
   });
 
+  it('reads a quoted value that spans several lines', () => {
+    expect(parseDotenv('KEY="-----BEGIN KEY-----\nabc=\ndef==\n-----END KEY-----"\nB=2').variables).toEqual([
+      { key: 'KEY', value: '-----BEGIN KEY-----\nabc=\ndef==\n-----END KEY-----' },
+      { key: 'B', value: '2' },
+    ]);
+  });
+
   it('keeps an equals sign inside a value', () => {
     expect(parseDotenv('TOKEN=a=b').variables).toEqual([{ key: 'TOKEN', value: 'a=b' }]);
   });
