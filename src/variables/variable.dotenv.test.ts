@@ -84,12 +84,15 @@ describe('variable dotenv', () => {
     ]);
   });
 
-  it('refuses a line with no equals sign, naming its line number', () => {
-    const error = lineErrorOf('A=1\n\nAPI_URL https://x');
+  it.each([
+    ['A=1\n\nAPI_URL https://x', 3, 'has no "="'],
+    ['A=1\n = abc', 2, 'has no key before "="'],
+  ])('refuses a malformed line, naming its line number (%p)', (text, line, problem) => {
+    const error = lineErrorOf(text);
 
     expect(error).toBeInstanceOf(DotenvLineError);
-    expect(error.line).toBe(3);
-    expect(error.problem).toBe('has no "="');
+    expect(error.line).toBe(line);
+    expect(error.problem).toBe(problem);
   });
 
   it('keeps an equals sign inside a value', () => {

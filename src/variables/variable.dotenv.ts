@@ -75,9 +75,15 @@ function parse(text: string): Map<string, string> {
       throw new DotenvLineError(index + 1, 'has no "="');
     }
 
+    const key = statement.slice(0, separator).trim();
+
+    if (key === '') {
+      throw new DotenvLineError(index + 1, 'has no key before "="');
+    }
+
     const { value, linesRead } = readValue(statement.slice(separator + 1), lines.slice(index + 1));
 
-    parsed.set(statement.slice(0, separator).trim(), value);
+    parsed.set(key, value);
     index += linesRead;
   }
 
