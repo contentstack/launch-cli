@@ -86,6 +86,15 @@ describe('function logger', () => {
     expect(stdout).toEqual([]);
   });
 
+  it('has the error on disk by the time flush resolves, so a process exiting straight after keeps it', async () => {
+    const logger = new Logger({ projectBasePath });
+
+    logger.log('Invalid port number.', 'error');
+    await logger.flush();
+
+    expect(read('error.log')).toBe('{"level":"error","message":"Invalid port number."}\n');
+  });
+
   it('writes info and warn to logs/info.log, never to error.log, and drops debug everywhere', async () => {
     const logger = loggerAt(projectBasePath);
 

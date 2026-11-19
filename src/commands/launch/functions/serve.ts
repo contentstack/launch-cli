@@ -40,6 +40,7 @@ export default class Functions extends Command {
     if (!isValidPort(port)) {
       const message = 'Invalid port number. Please provide a valid port number between 0 and 65535.';
       this.log(message, 'error');
+      await logger.flush();
       this.error(message, { exit: EXIT_RUNTIME });
     }
 

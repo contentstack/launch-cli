@@ -155,7 +155,7 @@ describe('launch:functions:serve init', () => {
   });
 
   it.each(['-1', '65536', '3000.5', 'abc', 'NaN', '1e400', '', '   ', '0x10', '1e3', '+3000', ' 3000'])(
-    'rejects the invalid port %p, logging it to error.log and failing with it so it reaches stderr, exiting 1',
+    'rejects the invalid port %p, with it on disk in error.log before failing with it to stderr, exiting 1',
     async (port) => {
       const dataDir = temporaryDirectory();
       const command = commandWithFlags({ 'data-dir': dataDir, port });
@@ -166,7 +166,6 @@ describe('launch:functions:serve init', () => {
       expect(failure).toMatchObject({ message: INVALID_PORT_MESSAGE, oclif: { exit: EXIT_RUNTIME } });
       expect(command['sharedConfig']).toBeUndefined();
       expect(stdout).toEqual([]);
-      await eventually(() => readLog(dataDir, 'error.log') !== '');
       expect(readLog(dataDir, 'error.log')).toBe(`{"level":"error","message":"${INVALID_PORT_MESSAGE}"}\n`);
       expect(readLog(dataDir, 'info.log')).toBe('');
     },

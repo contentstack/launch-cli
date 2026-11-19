@@ -94,6 +94,18 @@ export class Logger {
     });
   }
 
+  async flush(): Promise<void> {
+    const fileTransports = Object.values(this.loggers).flatMap((logger) => {
+      const transports = logger.transports.filter((transport) => transport instanceof winston.transports.File);
+      logger.end();
+      return transports;
+    });
+
+    await Promise.all(
+      fileTransports.map((transport) => new Promise<void>((resolve) => transport.once('finish', () => resolve()))),
+    );
+  }
+
   log(message: unknown, logType?: LoggerType | PrintOptions | undefined): void {
     const logString = this.returnString(message);
 
