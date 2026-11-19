@@ -2,6 +2,7 @@ import { Errors, settings } from '@oclif/core';
 
 import { EXIT_RUNTIME } from './constants';
 import { styled } from './style';
+import { asSentence } from './values';
 
 export interface FailureOutput {
   print: (line: string) => void;
@@ -36,6 +37,18 @@ export function failureOutputOf(fallback: (err: Error) => Promise<unknown>): Fai
   };
 }
 
+const OCLIF_HELP_HINT = '\nSee more help with --help';
+
+const HELP_SENTENCE = 'Run the command with --help to see its flags.';
+
+function asOneSentence(message: string): string {
+  if (!message.endsWith(OCLIF_HELP_HINT)) {
+    return message;
+  }
+
+  return `${asSentence(message.slice(0, -OCLIF_HELP_HINT.length))} ${HELP_SENTENCE}`;
+}
+
 function alreadyReported(err: Error): boolean {
   return (err as Error & { skipOclifErrorHandling?: boolean }).skipOclifErrorHandling === true;
 }
@@ -56,7 +69,7 @@ export async function reportFailure(err: Error, output: FailureOutput): Promise<
   }
 
   if (isOclifError(err)) {
-    return failWith(err.message, err.oclif.exit, output);
+    return failWith(asOneSentence(err.message), err.oclif.exit, output);
   }
 
   if (output.debug) {
