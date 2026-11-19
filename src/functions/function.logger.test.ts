@@ -80,7 +80,7 @@ describe('function logger', () => {
     expect(read('info.log')).toBe('');
   });
 
-  it('writes an error to logs/error.log as a json line and prints it coloured on stdout', async () => {
+  it('writes an error to logs/error.log as a json line without printing it, leaving that to the command', async () => {
     const logger = loggerAt(projectBasePath);
 
     logger.log('Invalid port number.', 'error');
@@ -88,7 +88,7 @@ describe('function logger', () => {
     await eventually(() => read('error.log') !== '');
     expect(read('error.log')).toBe('{"level":"error","message":"Invalid port number."}\n');
     expect(read('info.log')).toBe('');
-    expect(stdout).toEqual(['\u001b[31merror: Invalid port number.\u001b[39m\n']);
+    expect(stdout).toEqual([]);
   });
 
   it('writes info and warn to logs/info.log, never to error.log, and drops debug everywhere', async () => {
@@ -131,7 +131,7 @@ describe('function logger', () => {
     expect(info.levels).toEqual({ warn: 1, info: 2, debug: 3 });
     expect(error.levels).toEqual({ error: 0 });
     expect(consoleTransport(info).level).toBeUndefined();
-    expect(consoleTransport(error).level).toBe('error');
+    expect(consoleTransport(error)).toBeUndefined();
   });
 
   it('normalises a base path containing parent segments', () => {

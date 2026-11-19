@@ -30,8 +30,9 @@ export default class Functions extends Command {
 
     const port = process.env.PORT || flags.port;
     if (!isValidPort(port)) {
-      this.log('Invalid port number. Please provide a valid port number between 0 and 65535.', 'error');
-      this.exit(EXIT_RUNTIME);
+      const message = 'Invalid port number. Please provide a valid port number between 0 and 65535.';
+      this.log(message, 'error');
+      this.error(message, { exit: EXIT_RUNTIME });
     }
 
     this.sharedConfig = {

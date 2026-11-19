@@ -165,18 +165,17 @@ describe('launch:functions:serve init', () => {
   });
 
   it.each(['-1', '65536', '3000.5', 'abc', 'NaN', '1e400', '', '   ', '0x10', '1e3', '+3000', ' 3000'])(
-    'rejects the invalid port %p once through the project logger and exits 1 as v1 did',
+    'rejects the invalid port %p, logging it to error.log and failing with it so it reaches stderr, exiting 1',
     async (port) => {
       const dataDir = temporaryDirectory();
       const command = commandWithFlags({ 'data-dir': dataDir, port });
 
       const failure = await command.init().catch((error: Error & { oclif?: { exit?: number } }) => error);
 
-      expect(failure).toBeInstanceOf(Errors.ExitError);
-      expect(failure).toMatchObject({ oclif: { exit: EXIT_RUNTIME } });
-      expect((failure as Error).message).not.toContain(INVALID_PORT_MESSAGE);
+      expect(failure).toBeInstanceOf(Errors.CLIError);
+      expect(failure).toMatchObject({ message: INVALID_PORT_MESSAGE, oclif: { exit: EXIT_RUNTIME } });
       expect(command['sharedConfig']).toBeUndefined();
-      expect(stdout).toEqual([`\u001b[31merror: ${INVALID_PORT_MESSAGE}\u001b[39m\n`]);
+      expect(stdout).toEqual([]);
       await eventually(() => readLog(dataDir, 'error.log') !== '');
       expect(readLog(dataDir, 'error.log')).toBe(`{"level":"error","message":"${INVALID_PORT_MESSAGE}"}\n`);
       expect(readLog(dataDir, 'info.log')).toBe('');
@@ -308,10 +307,10 @@ describe('launch:functions:serve port precedence', () => {
 
       const failure = await command.init().catch((error: Error & { oclif?: { exit?: number } }) => error);
 
-      expect(failure).toBeInstanceOf(Errors.ExitError);
-      expect(failure).toMatchObject({ oclif: { exit: EXIT_RUNTIME } });
+      expect(failure).toBeInstanceOf(Errors.CLIError);
+      expect(failure).toMatchObject({ message: INVALID_PORT_MESSAGE, oclif: { exit: EXIT_RUNTIME } });
       expect(command['sharedConfig']).toBeUndefined();
-      expect(stdout).toEqual([`\u001b[31merror: ${INVALID_PORT_MESSAGE}\u001b[39m\n`]);
+      expect(stdout).toEqual([]);
     },
   );
 

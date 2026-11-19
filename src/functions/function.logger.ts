@@ -70,19 +70,18 @@ export class Logger {
         /^(\.\.(\/|\\|$))+/,
         '',
       );
+      const fileTransport = new winston.transports.File({
+        ...this.loggerOptions,
+        level: logType,
+        filename,
+      });
       const loggerOptions: winston.LoggerOptions = {
-        transports: [
-          new winston.transports.File({
-            ...this.loggerOptions,
-            level: logType,
-            filename,
-          }),
-          new winston.transports.Console(consoleOptions),
-        ],
+        transports: [fileTransport, new winston.transports.Console(consoleOptions)],
         levels: customLevels.levels,
       };
 
       if (logType === 'error') {
+        loggerOptions.transports = [fileTransport];
         loggerOptions.levels = { error: 0 };
       }
 
