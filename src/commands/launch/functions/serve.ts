@@ -1,5 +1,5 @@
 import { Command } from '@oclif/core';
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 
 import { EXIT_RUNTIME, EXIT_USAGE } from '../../../core/constants';
 import { failureOutputOf, reportFailure } from '../../../core/failure';
@@ -27,6 +27,10 @@ export default class Functions extends Command {
     const projectBasePath = flags['data-dir'] || currentWorkingDirectory;
     if (!existsSync(projectBasePath)) {
       this.error('Provided base path is not valid', { exit: EXIT_RUNTIME });
+    }
+
+    if (!statSync(projectBasePath).isDirectory()) {
+      this.error(`--data-dir ${projectBasePath} is not a directory`, { exit: EXIT_RUNTIME });
     }
 
     const logger = new Logger({ projectBasePath });

@@ -1,6 +1,6 @@
 import { cliux } from '@contentstack/cli-utilities';
 import { Errors, Parser } from '@oclif/core';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -194,6 +194,19 @@ describe('launch:functions:serve init', () => {
     expect(exit).not.toHaveBeenCalled();
     expect(stdout).toEqual([]);
     expect(existsSync(missing)).toBe(false);
+    expect(command['sharedConfig']).toBeUndefined();
+  });
+
+  it('fails naming the path, exiting 1, when the data directory is a file', async () => {
+    const file = join(temporaryDirectory(), 'not-a-dir.txt');
+    writeFileSync(file, 'x');
+    const command = commandWithFlags({ 'data-dir': file, port: '3000' });
+
+    const failure = await command.init().catch((error: Error & { oclif?: { exit?: number } }) => error);
+
+    expect(failure).toBeInstanceOf(Errors.CLIError);
+    expect(failure).toMatchObject({ message: `--data-dir ${file} is not a directory`, oclif: { exit: EXIT_RUNTIME } });
+    expect(stdout).toEqual([]);
     expect(command['sharedConfig']).toBeUndefined();
   });
 
