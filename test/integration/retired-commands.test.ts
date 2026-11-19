@@ -122,15 +122,15 @@ describe('integration: retired V1 command names', () => {
     const { error } = await runCommand(['launch:functions:serve', '--port', '70000', '--data-dir', projectDir], config);
 
     expect(error?.oclif?.exit).toBe(1);
-    expect(error?.message).toBe('EEXIT: 1');
+    expect(error?.message).toBe('Invalid port number. Please provide a valid port number between 0 and 65535.');
     expect(error?.message).not.toContain('was removed in Launch CLI v2');
     const logs = join(projectDir, 'logs');
     const deadline = Date.now() + 5000;
-    while ((!existsSync(logs) || readdirSync(logs).length < 2) && Date.now() < deadline) {
+    while ((!existsSync(logs) || readdirSync(logs).length < 1) && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
 
-    expect(readdirSync(logs).sort()).toEqual(['error.log', 'info.log']);
+    expect(readdirSync(logs).sort()).toEqual(['error.log']);
     rmSync(projectDir, { recursive: true, force: true });
   });
 

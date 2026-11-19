@@ -13,10 +13,10 @@ export const serveFlags = {
 };
 
 export function isValidPort(input: string): boolean {
-  if (typeof input !== 'string' || input.trim() === '') {
+  if (typeof input !== 'string' || !/^\d+$/.test(input)) {
     return false;
   }
 
   const port = Number(input);
-  return Number.isInteger(port) && port >= 0 && port <= 65535;
+  return port <= 65535;
 }

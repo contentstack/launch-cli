@@ -37,8 +37,7 @@ function toText(value: unknown): string {
 }
 
 export class Logger {
-  private infoLogger!: winston.Logger;
-  private errorLogger!: winston.Logger;
+  private loggers: Partial<Record<'info' | 'error', winston.Logger>> = {};
   private config!: LoggerConfig;
 
   get loggerOptions(): winston.transports.FileTransportOptions {
@@ -52,49 +51,59 @@ export class Logger {
 
   constructor(config: LoggerConfig) {
     this.config = config;
-    this.infoLogger = this.getLoggerInstance('info');
-    this.errorLogger = this.getLoggerInstance('error');
+    if (!existsSync(config.projectBasePath)) {
+      winston
+        .createLogger({ transports: [new winston.transports.Console({ format: this.consoleFormat, level: 'error' })] })
+        .error('Provided base path is not valid');
+      process.exit(1);
+    }
+  }
+
+  private get consoleFormat(): winston.Logform.Format {
+    return winston.format.combine(winston.format.simple(), winston.format.colorize({ all: true }));
+  }
+
+  private get infoLogger(): winston.Logger {
+    this.loggers.info ??= this.getLoggerInstance('info');
+    return this.loggers.info;
+  }
+
+  private get errorLogger(): winston.Logger {
+    this.loggers.error ??= this.getLoggerInstance('error');
+    return this.loggers.error;
   }
 
   getLoggerInstance(logType: LoggerType): winston.Logger {
-    const consoleOptions: winston.transports.ConsoleTransportOptions = {
-      format: winston.format.combine(winston.format.simple(), winston.format.colorize({ all: true })),
-    };
+    const filename = normalize(resolve(this.config.projectBasePath, 'logs', `${logType}.log`)).replace(
+      /^(\.\.(\/|\\|$))+/,
+      '',
+    );
+    const fileTransport = new winston.transports.File({
+      ...this.loggerOptions,
+      level: logType,
+      filename,
+    });
 
     if (logType === 'error') {
-      consoleOptions.level = logType;
+      return winston.createLogger({ transports: [fileTransport], levels: { error: 0 } });
     }
 
-    if (existsSync(this.config.projectBasePath)) {
-      const filename = normalize(resolve(this.config.projectBasePath, 'logs', `${logType}.log`)).replace(
-        /^(\.\.(\/|\\|$))+/,
-        '',
-      );
-      const loggerOptions: winston.LoggerOptions = {
-        transports: [
-          new winston.transports.File({
-            ...this.loggerOptions,
-            level: logType,
-            filename,
-          }),
-          new winston.transports.Console(consoleOptions),
-        ],
-        levels: customLevels.levels,
-      };
+    return winston.createLogger({
+      transports: [fileTransport, new winston.transports.Console({ format: this.consoleFormat })],
+      levels: customLevels.levels,
+    });
+  }
 
-      if (logType === 'error') {
-        loggerOptions.levels = { error: 0 };
-      }
+  async flush(): Promise<void> {
+    const fileTransports = Object.values(this.loggers).flatMap((logger) => {
+      const transports = logger.transports.filter((transport) => transport instanceof winston.transports.File);
+      logger.end();
+      return transports;
+    });
 
-      return winston.createLogger(loggerOptions);
-    }
-
-    winston
-      .createLogger({
-        transports: [new winston.transports.Console(consoleOptions)],
-      })
-      .error('Provided base path is not valid');
-    process.exit(1);
+    await Promise.all(
+      fileTransports.map((transport) => new Promise<void>((resolve) => transport.once('finish', () => resolve()))),
+    );
   }
 
   log(message: unknown, logType?: LoggerType | PrintOptions | undefined): void {

@@ -1,12 +1,17 @@
+import { parse as parseCookieHeader } from 'cookie';
 import dotenv from 'dotenv';
 import type {
+  NextFunction,
   Request,
   Response,
 } from 'express';
 import express from 'express';
 import type { Express } from 'express-serve-static-core';
+import { realpathSync } from 'fs';
 import type { Server } from 'http';
+import type { AddressInfo } from 'net';
 import path from 'path';
+import type { Plugin } from 'rollup';
 
 import { styled } from '../core/style';
 import { isRecord } from '../core/values';
@@ -23,8 +28,108 @@ import type { CloudFunctionResource } from './types';
 
 type CloudFunctionHandler = CloudFunctionResource['handler'];
 
+const DEPLOYED_PAYLOAD_LIMIT = '6mb';
+
 function isHandler(value: unknown): value is CloudFunctionHandler {
   return typeof value === 'function';
+}
+
+export type ImportersById = Map<string, readonly string[]>;
+
+function recordImporters(importersById: ImportersById): Plugin {
+  return {
+    name: 'launch-record-importers',
+    buildEnd() {
+      for (const moduleId of this.getModuleIds()) {
+        const moduleInfo = this.getModuleInfo(moduleId);
+        if (moduleInfo) {
+          importersById.set(moduleId, [...moduleInfo.importers, ...moduleInfo.dynamicImporters]);
+        }
+      }
+    },
+  };
+}
+
+export function functionFilesImporting(
+  moduleId: string,
+  importersById: ImportersById,
+  functionsDirectory: string,
+  visited = new Set<string>(),
+): string[] {
+  return (importersById.get(moduleId) ?? []).flatMap((importer) => {
+    if (path.isAbsolute(importer) && !isOutsideDirectory(functionsDirectory, importer)) {
+      return [importer];
+    }
+
+    if (visited.has(importer)) {
+      return [];
+    }
+
+    visited.add(importer);
+    return functionFilesImporting(importer, importersById, functionsDirectory, visited);
+  });
+}
+
+class OutsideImportReporter {
+  private readonly reported = new Set<string>();
+
+  constructor(
+    private readonly projectDirectory: string,
+    private readonly functionsDirectory: string,
+  ) {}
+
+  report(importersById: ImportersById): void {
+    [...importersById.keys()]
+      .filter((moduleId) => path.isAbsolute(moduleId))
+      .filter((moduleId) => isOutsideDirectory(this.functionsDirectory, moduleId))
+      .filter((moduleId) => !moduleId.split(path.sep).includes('node_modules'))
+      .forEach((outsideFile) => {
+        functionFilesImporting(outsideFile, importersById, this.functionsDirectory).forEach((importer) => {
+          this.warnOnce(importer, outsideFile);
+        });
+      });
+  }
+
+  private warnOnce(importer: string, outsideFile: string): void {
+    const pair = `${importer}\0${outsideFile}`;
+    if (this.reported.has(pair)) {
+      return;
+    }
+
+    this.reported.add(pair);
+    const importerPath = path.relative(this.projectDirectory, importer);
+    const outsidePath = path.relative(this.projectDirectory, outsideFile);
+    const warning =
+      `warn: ${importerPath} imports ${outsidePath}, ` +
+      `which is outside ${CLOUD_FUNCTIONS_DIRECTORY}/ and will not be available when deployed.`;
+    console.log(styled(warning, 'yellow', process.stdout.isTTY === true));
+  }
+}
+
+export function isOutsideDirectory(directory: string, file: string, pathApi: path.PlatformPath = path): boolean {
+  const relativePath = pathApi.relative(directory, file);
+  return relativePath === '..' || relativePath.startsWith(`..${pathApi.sep}`) || pathApi.isAbsolute(relativePath);
+}
+
+function attachCookies(request: Request, _response: Response, next: NextFunction): void {
+  request.cookies = request.headers.cookie ? parseCookieHeader(request.headers.cookie) : {};
+  next();
+}
+
+function defaultToNoStore(_request: Request, response: Response, next: NextFunction): void {
+  if (!response.getHeader('cache-control')) {
+    response.setHeader('cache-control', 'no-store');
+  }
+  next();
+}
+
+function applyRequestMiddleware(app: Express): void {
+  app.use(defaultToNoStore);
+  app.use(attachCookies);
+  app.use(express.json({ limit: DEPLOYED_PAYLOAD_LIMIT }));
+  app.use(express.urlencoded({ extended: true, limit: DEPLOYED_PAYLOAD_LIMIT }));
+  app.use(express.text({ limit: DEPLOYED_PAYLOAD_LIMIT }));
+  app.use(express.raw({ limit: DEPLOYED_PAYLOAD_LIMIT }));
 }
 
 import { loadDataURL } from './load-data-url';
@@ -52,6 +157,8 @@ export class CloudFunctions {
     if (!directoryExists) {
       throw new FunctionsDirectoryNotFoundError(this.pathToSourceCode);
     }
+    dotenv.config({ path: path.join(this.pathToSourceCode, ENV_FILE_NAME) });
+
     const cloudFunctionResources = await this.parseCloudFunctionResources();
 
     const hasCloudFunctionResources = cloudFunctionResources.length;
@@ -72,11 +179,9 @@ export class CloudFunctions {
 
     const app = express();
     app.disable('x-powered-by');
-
-    await this.applyAppRouter(exactRouteResources, app);
-    await this.applyAppRouter(dynamicRouteResources, app);
-
-    dotenv.config({ path: path.join(this.pathToSourceCode, ENV_FILE_NAME) });
+    applyRequestMiddleware(app);
+    this.applyAppRouter(exactRouteResources, app);
+    this.applyAppRouter(dynamicRouteResources, app);
 
     return this.startServer(app, servingPort, [
       ...exactRouteResources,
@@ -109,7 +214,7 @@ export class CloudFunctions {
 
       const server = app.listen(servingPort, () => {
         server.off('error', refuse);
-        this.printServing(servingPort, cloudFunctionResources);
+        this.printServing((server.address() as AddressInfo).port, cloudFunctionResources);
         resolve(server);
       });
 
@@ -117,36 +222,17 @@ export class CloudFunctions {
     });
   }
 
-  private async applyAppRouter(
-    cloudFunctionResources: CloudFunctionResource[],
-    app: Express
-  ): Promise<void> {
-    await Promise.all(
-      cloudFunctionResources.map(async (cloudFunctionResource) => {
-
-        app.use(express.json());
-        app.use(express.urlencoded({ extended: true }));
-
-        app.use((_request: Request, response: Response, next) => {
-          if (!response.getHeader('cache-control')) {
-            response.setHeader('cache-control', 'no-store');
-          }
-          next();
-        });
-
-        app.all(
-          cloudFunctionResource.apiResourceURI,
-          async (request: Request, response: Response) => {
-            try {
-              await cloudFunctionResource.handler(request, response);
-            } catch (error) {
-              console.error(error);
-              response.status(500).send();
-            }
-          }
-        );
-      })
-    );
+  private applyAppRouter(cloudFunctionResources: CloudFunctionResource[], app: Express): void {
+    cloudFunctionResources.forEach((cloudFunctionResource) => {
+      app.all(cloudFunctionResource.apiResourceURI, async (request: Request, response: Response) => {
+        try {
+          await cloudFunctionResource.handler(request, response);
+        } catch (error) {
+          console.error(error);
+          response.status(500).send();
+        }
+      });
+    });
   }
 
   private isProxyEdgeFile(filename: string): boolean {
@@ -158,6 +244,10 @@ export class CloudFunctions {
     CloudFunctionResource[]
     > {
     const filePaths = await walkFileSystem(this.cloudFunctionsDirectoryPath);
+    const outsideImports = new OutsideImportReporter(
+      realpathSync(this.pathToSourceCode),
+      realpathSync(this.cloudFunctionsDirectoryPath),
+    );
 
     const cloudFunctionResources: CloudFunctionResource[] = [];
     for await (const filePath of filePaths) {
@@ -169,7 +259,7 @@ export class CloudFunctions {
         continue;
       }
 
-      const handler = await this.buildHandlerForFilepath(filePath);
+      const handler = await this.buildHandlerForFilepath(filePath, outsideImports);
       if (!handler) {
         continue;
       }
@@ -226,17 +316,22 @@ export class CloudFunctions {
     return { exactRouteResources, dynamicRouteResources };
   }
 
-  private async buildHandlerForFilepath(cloudFunctionFilePath: string): Promise<CloudFunctionHandler | null> {
+  private async buildHandlerForFilepath(
+    cloudFunctionFilePath: string,
+    outsideImports: OutsideImportReporter,
+  ): Promise<CloudFunctionHandler | null> {
     const [{ rollup }, { nodeResolve }, { default: commonjs }, { default: json }] = await Promise.all([
       import('rollup'),
       import('@rollup/plugin-node-resolve'),
       import('@rollup/plugin-commonjs'),
       import('@rollup/plugin-json'),
     ]);
+    const importersById: ImportersById = new Map();
     const bundle = await rollup({
       input: cloudFunctionFilePath,
-      plugins: [nodeResolve({ preferBuiltins: true }), commonjs(), json()],
+      plugins: [nodeResolve({ preferBuiltins: true }), commonjs(), json(), recordImporters(importersById)],
     });
+    outsideImports.report(importersById);
 
     const { output } = await bundle.generate({
       format: 'esm',

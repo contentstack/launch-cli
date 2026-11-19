@@ -5,9 +5,9 @@ import { createServer } from 'http';
 import { request as httpRequest } from 'http';
 import type { AddressInfo } from 'net';
 import { tmpdir } from 'os';
-import { dirname, join } from 'path';
+import { dirname, join, win32 } from 'path';
 
-import { CloudFunctions, listenFailure } from './cloud-functions';
+import { CloudFunctions, functionFilesImporting, isOutsideDirectory, listenFailure } from './cloud-functions';
 import { PortInUseError } from './function.errors';
 import { loadDataURL } from './load-data-url';
 
@@ -27,10 +27,14 @@ let loggedLines: string[];
 let loggedErrors: unknown[];
 let exitCodes: (number | undefined)[];
 
-function writeFunctionFile(relativePath: string, source: string): void {
-  const absolutePath = join(workspace, 'functions', relativePath);
+function writeProjectFile(relativePath: string, source: string): void {
+  const absolutePath = join(workspace, relativePath);
   mkdirSync(dirname(absolutePath), { recursive: true });
   writeFileSync(absolutePath, source);
+}
+
+function writeFunctionFile(relativePath: string, source: string): void {
+  writeProjectFile(join('functions', relativePath), source);
 }
 
 function freePort(): Promise<number> {
@@ -43,9 +47,15 @@ function freePort(): Promise<number> {
   });
 }
 
-function sendRequest(port: number, path: string, method = 'GET'): Promise<HttpResponse> {
+interface RequestOptions {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+}
+
+function sendRequest(port: number, path: string, { method = 'GET', headers = {}, body }: RequestOptions = {}): Promise<HttpResponse> {
   return new Promise((resolve, reject) => {
-    const clientRequest = httpRequest({ host: '127.0.0.1', port, path, method }, (response) => {
+    const clientRequest = httpRequest({ host: '127.0.0.1', port, path, method, headers }, (response) => {
       let body = '';
       response.setEncoding('utf8');
       response.on('data', (chunk) => {
@@ -60,7 +70,7 @@ function sendRequest(port: number, path: string, method = 'GET'): Promise<HttpRe
       });
     });
     clientRequest.on('error', reject);
-    clientRequest.end();
+    clientRequest.end(body);
   });
 }
 
@@ -206,6 +216,16 @@ describe('CloudFunctions serve routing', () => {
     ]);
   });
 
+  it('prints the port the server actually listens on when asked for port zero', async () => {
+    writeFunctionFile('hello.js', 'export default function hello(request, response) { response.send("hi"); }');
+
+    const server = (await new CloudFunctions(workspace).serve(0)) as Server;
+    const { port } = server.address() as AddressInfo;
+
+    expect(port).not.toBe(0);
+    expect(loggedLines).toContain(`Serving Cloud Functions at http://localhost:${port}`);
+  });
+
   it('colours the serving url cyan when stdout is a terminal', async () => {
     writeFunctionFile('hello.js', 'export default function hello(request, response) { response.end(); }');
     const port = await freePort();
@@ -267,9 +287,244 @@ describe('CloudFunctions serve routing', () => {
     const port = await freePort();
 
     await new CloudFunctions(workspace).serve(port);
-    const response = await sendRequest(port, '/echo', 'POST');
+    const response = await sendRequest(port, '/echo', { method: 'POST' });
 
     expect(JSON.parse(response.body)).toEqual({ method: 'POST' });
+  });
+
+  it('parses the cookie header into request.cookies', async () => {
+    writeFunctionFile('cookies.js', 'export default function cookies(request, response) { response.json(request.cookies); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/cookies', { headers: { cookie: 'sid=abc; theme=dark%20mode' } });
+
+    expect(JSON.parse(response.body)).toEqual({ sid: 'abc', theme: 'dark mode' });
+  });
+
+  it('gives request.cookies an empty object when no cookie header is sent', async () => {
+    writeFunctionFile('cookies.js', 'export default function cookies(request, response) { response.json(request.cookies); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/cookies');
+
+    expect(JSON.parse(response.body)).toEqual({});
+  });
+
+  it.each([
+    ['application/json', '{"name":"launch","tags":["a","b"]}'],
+    ['application/x-www-form-urlencoded', 'name=launch&tags[]=a&tags[]=b'],
+  ])('hands a %s body to the handler as a parsed object', async (contentType, body) => {
+    writeFunctionFile('body.js', 'export default function body(request, response) { response.json({ body: request.body }); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/body', { method: 'POST', headers: { 'content-type': contentType }, body });
+
+    expect(JSON.parse(response.body)).toEqual({ body: { name: 'launch', tags: ['a', 'b'] } });
+  });
+
+  it.each(['text/plain', 'application/octet-stream'])(
+    'hands a %s body over the 100kb parser default to the handler, as Lambda allows',
+    async (contentType) => {
+      writeFunctionFile('size.js', 'export default function size(request, response) { response.json({ length: request.body.length }); }');
+      const body = 'a'.repeat(200 * 1024);
+      const port = await freePort();
+
+      await new CloudFunctions(workspace).serve(port);
+      const response = await sendRequest(port, '/size', { method: 'POST', headers: { 'content-type': contentType }, body });
+
+      expect(response.status).toBe(200);
+      expect(JSON.parse(response.body)).toEqual({ length: body.length });
+    },
+  );
+
+  it.each([
+    ['application/json', (data: string) => JSON.stringify({ data })],
+    ['application/x-www-form-urlencoded', (data: string) => `data=${data}`],
+  ])('hands a %s body over the 100kb parser default to the handler parsed, as Lambda allows', async (contentType, encode) => {
+    writeFunctionFile('size.js', 'export default function size(request, response) { response.json({ length: request.body.data.length }); }');
+    const data = 'a'.repeat(200 * 1024);
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/size', {
+      method: 'POST',
+      headers: { 'content-type': contentType },
+      body: encode(data),
+    });
+
+    expect(response.status).toBe(200);
+    expect(JSON.parse(response.body)).toEqual({ length: data.length });
+  });
+
+  it('hands a text/plain body to the handler as the raw string', async () => {
+    writeFunctionFile('body.js', 'export default function body(request, response) { response.json({ body: request.body }); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/body', {
+      method: 'POST',
+      headers: { 'content-type': 'text/plain' },
+      body: 'raw text',
+    });
+
+    expect(JSON.parse(response.body)).toEqual({ body: 'raw text' });
+  });
+
+  it('hands an application/octet-stream body to the handler as a buffer', async () => {
+    writeFunctionFile(
+      'binary.js',
+      [
+        'export default function binary(request, response) {',
+        '  response.json({ isBuffer: Buffer.isBuffer(request.body), text: String(request.body) });',
+        '}',
+      ].join('\n'),
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/binary', {
+      method: 'POST',
+      headers: { 'content-type': 'application/octet-stream' },
+      body: 'binary data',
+    });
+
+    expect(JSON.parse(response.body)).toEqual({ isBuffer: true, text: 'binary data' });
+  });
+
+  it('warns about an import from outside the functions directory and still serves the function', async () => {
+    writeProjectFile(join('shared', 'util.js'), 'export const greeting = "shared";');
+    writeFunctionFile(
+      join('api', 'x.js'),
+      'import { greeting } from "../../shared/util.js"; export default function x(request, response) { response.send(greeting); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/api/x');
+
+    expect(response.body).toBe('shared');
+    expect(loggedLines).toContain(
+      'warn: functions/api/x.js imports shared/util.js, which is outside functions/ and will not be available when deployed.',
+    );
+  });
+
+  it('warns once, naming the shared helper that imports the outside file rather than each function using it', async () => {
+    writeProjectFile('config.js', 'export const region = "na";');
+    writeFunctionFile(join('lib', 'db.js'), 'import { region } from "../../config.js"; export const db = `db-${region}`;');
+    writeFunctionFile('a.js', 'import { db } from "./lib/db.js"; export default function a(request, response) { response.send(db); }');
+    writeFunctionFile('b.js', 'import { db } from "./lib/db.js"; export default function b(request, response) { response.send(db); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+
+    expect(loggedLines).toEqual([
+      'warn: functions/lib/db.js imports config.js, which is outside functions/ and will not be available when deployed.',
+      'Detected Serverless Functions:',
+      '  λ /a',
+      '  λ /b',
+      '',
+      `Serving Cloud Functions at http://localhost:${port}`,
+    ]);
+  });
+
+  it('names the function, not an outside file, for an outside file reached through another outside file', async () => {
+    writeProjectFile('config.js', 'export const region = "na";');
+    writeProjectFile('other.js', 'import { region } from "./config.js"; export const label = `other-${region}`;');
+    writeFunctionFile('a.js', 'import { label } from "../other.js"; export default function a(request, response) { response.send(label); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+
+    expect(loggedLines).toEqual([
+      'warn: functions/a.js imports other.js, which is outside functions/ and will not be available when deployed.',
+      'warn: functions/a.js imports config.js, which is outside functions/ and will not be available when deployed.',
+      'Detected Serverless Functions:',
+      '  λ /a',
+      '',
+      `Serving Cloud Functions at http://localhost:${port}`,
+    ]);
+  });
+
+  it('warns about an outside file reached through a dynamic import', async () => {
+    writeProjectFile('config.js', 'export const region = "na";');
+    writeFunctionFile(
+      'dyn.js',
+      'export default async function dyn(request, response) { const { region } = await import("../config.js"); response.send(region); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+
+    expect(loggedLines).toEqual([
+      'warn: functions/dyn.js imports config.js, which is outside functions/ and will not be available when deployed.',
+      'Detected Serverless Functions:',
+      '  λ /dyn',
+      '',
+      `Serving Cloud Functions at http://localhost:${port}`,
+    ]);
+  });
+
+  it('names the commonjs function, not the bundler proxy, when it requires an outside es module', async () => {
+    writeProjectFile('config.js', 'export const region = "na";');
+    writeFunctionFile(
+      'cjs.js',
+      'const { region } = require("../config.js"); module.exports = function cjs(request, response) { response.send(region); };',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+
+    expect(loggedLines).toEqual([
+      'warn: functions/cjs.js imports config.js, which is outside functions/ and will not be available when deployed.',
+      'Detected Serverless Functions:',
+      '  λ /cjs',
+      '',
+      `Serving Cloud Functions at http://localhost:${port}`,
+    ]);
+  });
+
+  it('does not warn about a file in a functions subfolder whose name starts with two dots', async () => {
+    writeFunctionFile(join('..shared', 'util.js'), 'export const greeting = "inside";');
+    writeFunctionFile(
+      'dots.js',
+      'import { greeting } from "./..shared/util.js"; export default function dots(request, response) { response.send(greeting); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/dots');
+
+    expect(response.body).toBe('inside');
+    expect(loggedLines).toEqual([
+      'Detected Serverless Functions:',
+      '  λ /dots',
+      '',
+      `Serving Cloud Functions at http://localhost:${port}`,
+    ]);
+  });
+
+  it('does not warn about a package imported from node_modules', async () => {
+    writeProjectFile(join('node_modules', 'fake-pkg', 'package.json'), '{"name":"fake-pkg","main":"index.js"}');
+    writeProjectFile(join('node_modules', 'fake-pkg', 'index.js'), 'module.exports = { greeting: "from package" };');
+    writeFunctionFile(
+      'pkg.js',
+      'import pkg from "fake-pkg"; export default function usesPkg(request, response) { response.send(pkg.greeting); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/pkg');
+
+    expect(response.body).toBe('from package');
+    expect(loggedLines).toEqual([
+      'Detected Serverless Functions:',
+      '  λ /pkg',
+      '',
+      `Serving Cloud Functions at http://localhost:${port}`,
+    ]);
   });
 
   it('answers 404 for a path no function claims', async () => {
@@ -295,6 +550,21 @@ describe('CloudFunctions serve routing', () => {
     expect((await sendRequest(port, '/cached')).cacheControl).toBe('max-age=60');
   });
 
+  it('defaults cache-control to no-store on the 400 for a malformed json body', async () => {
+    writeFunctionFile('body.js', 'export default function body(request, response) { response.json({ body: request.body }); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/body', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{bad json',
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.cacheControl).toBe('no-store');
+  });
+
   it('answers 500 and logs when a handler throws', async () => {
     writeFunctionFile('broken.js', 'export default function broken() { throw new Error("handler blew up"); }');
     const port = await freePort();
@@ -307,20 +577,45 @@ describe('CloudFunctions serve routing', () => {
     expect((loggedErrors[0] as Error).message).toBe('handler blew up');
   });
 
-  it('loads the env file that sits beside the functions directory', async () => {
+  it('loads the env file beside the functions directory before the functions load', async () => {
     const envValue = randomUUID();
     writeFileSync(join(workspace, '.env'), `LAUNCH_TEST_VALUE=${envValue}\n`);
     writeFunctionFile(
       'env.js',
-      'export default function env(request, response) { response.json({ value: process.env.LAUNCH_TEST_VALUE }); }',
+      [
+        'const atLoad = process.env.LAUNCH_TEST_VALUE;',
+        'export default function env(request, response) {',
+        '  response.json({ atRequest: process.env.LAUNCH_TEST_VALUE, atLoad });',
+        '}',
+      ].join('\n'),
     );
     const port = await freePort();
 
     await new CloudFunctions(workspace).serve(port);
     const response = await sendRequest(port, '/env');
 
-    expect(JSON.parse(response.body)).toEqual({ value: envValue });
+    expect(JSON.parse(response.body)).toEqual({ atRequest: envValue, atLoad: envValue });
     delete process.env.LAUNCH_TEST_VALUE;
+  });
+});
+
+describe('functionFilesImporting', () => {
+  it('follows virtual importers to function files and stops on a cycle between virtual modules', () => {
+    const importersById = new Map<string, readonly string[]>([
+      ['/project/config.js', ['\0config.js?proxy-a']],
+      ['\0config.js?proxy-a', ['\0config.js?proxy-b', '/project/functions/a.js']],
+      ['\0config.js?proxy-b', ['\0config.js?proxy-a']],
+    ]);
+
+    expect(functionFilesImporting('/project/config.js', importersById, '/project/functions')).toEqual([
+      '/project/functions/a.js',
+    ]);
+  });
+});
+
+describe('isOutsideDirectory', () => {
+  it('treats a file on another Windows drive as outside the directory', () => {
+    expect(isOutsideDirectory('C:\\app\\functions', 'D:\\lib\\a.js', win32)).toBe(true);
   });
 });
 
