@@ -37,6 +37,17 @@ describe('variable dotenv', () => {
     ]);
   });
 
+  it.each([['A=1\r\nB=2\r\n'], ['A=1\rB=2']])('reads Windows and old Mac line endings (%p)', (text) => {
+    expect(parseDotenv(text).variables).toEqual([
+      { key: 'A', value: '1' },
+      { key: 'B', value: '2' },
+    ]);
+  });
+
+  it('trims spaces around the key and the value', () => {
+    expect(parseDotenv('  KEY = abc   ').variables).toEqual([{ key: 'KEY', value: 'abc' }]);
+  });
+
   it('keeps an equals sign inside a value', () => {
     expect(parseDotenv('TOKEN=a=b').variables).toEqual([{ key: 'TOKEN', value: 'a=b' }]);
   });

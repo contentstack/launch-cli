@@ -24,7 +24,7 @@ function readValue(raw: string): string {
 function parse(text: string): Map<string, string> {
   const parsed = new Map<string, string>();
 
-  for (const line of text.split('\n')) {
+  for (const line of text.split(/\r\n?|\n/)) {
     const trimmed = line.trim().replace(EXPORT_PREFIX, '');
     const separator = trimmed.indexOf('=');
 
