@@ -53,8 +53,17 @@ describe('variable dotenv', () => {
     ["A='a b'", 'a b'],
     ['A="v" #123', 'v'],
     ["A='v'\t# note", 'v'],
+    ['A=`x y`', 'x y'],
   ])('removes the quotes around a quoted value and keeps a # inside them (%p)', (line, value) => {
     expect(parseDotenv(line).variables).toEqual([{ key: 'A', value }]);
+  });
+
+  it('turns \\n and \\r into line breaks inside double quotes only', () => {
+    expect(parseDotenv('A="a\\nb\\rc"\nB=\'a\\nb\'\nC=a\\nb').variables).toEqual([
+      { key: 'A', value: 'a\nb\rc' },
+      { key: 'B', value: 'a\\nb' },
+      { key: 'C', value: 'a\\nb' },
+    ]);
   });
 
   it('keeps an equals sign inside a value', () => {

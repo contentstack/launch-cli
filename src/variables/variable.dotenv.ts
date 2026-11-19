@@ -7,13 +7,15 @@ export interface ParsedDotenv {
 
 const INLINE_COMMENT = /[ \t]#/;
 const EXPORT_PREFIX = /^export[ \t]+/;
-const QUOTES = ['"', "'"];
+const QUOTES = ['"', "'", '`'];
 
 function readValue(raw: string): string {
   const leading = raw.trimStart();
 
   if (QUOTES.includes(leading[0])) {
-    return leading.slice(1, leading.indexOf(leading[0], 1));
+    const inner = leading.slice(1, leading.indexOf(leading[0], 1));
+
+    return leading[0] === '"' ? inner.replace(/\\n/g, '\n').replace(/\\r/g, '\r') : inner;
   }
 
   const comment = INLINE_COMMENT.exec(raw);
