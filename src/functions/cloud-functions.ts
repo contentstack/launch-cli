@@ -22,7 +22,7 @@ import {
   DYNAMIC_ROUTE_SEGMENT,
   ENV_FILE_NAME,
 } from './constants';
-import { FunctionsDirectoryNotFoundError, PortInUseError } from './function.errors';
+import { FunctionLoadError, FunctionsDirectoryNotFoundError, PortInUseError } from './function.errors';
 import { walkFileSystem, checkIfDirectoryExists } from './os-helper';
 import type { CloudFunctionResource } from './types';
 
@@ -259,7 +259,10 @@ export class CloudFunctions {
         continue;
       }
 
-      const handler = await this.buildHandlerForFilepath(filePath, outsideImports);
+      const handler = await this.buildHandlerForFilepath(filePath, outsideImports).catch((cause: Error) => {
+        const relativeFile = path.relative(this.cloudFunctionsDirectoryPath, filePath);
+        throw new FunctionLoadError(path.join(CLOUD_FUNCTIONS_DIRECTORY, relativeFile), cause);
+      });
       if (!handler) {
         continue;
       }

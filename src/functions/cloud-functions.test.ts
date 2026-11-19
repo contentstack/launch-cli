@@ -636,6 +636,15 @@ describe('CloudFunctions serve failures', () => {
     expect(startedServers).toHaveLength(0);
   });
 
+  it('names the function file when it throws while loading', async () => {
+    writeFunctionFile(join('api', 'boom.js'), 'throw new Error("init"); export default function boom() {}');
+
+    await expect(new CloudFunctions(workspace).serve(await freePort())).rejects.toThrow(
+      `Could not load ${join('functions', 'api', 'boom.js')}: init`,
+    );
+    expect(startedServers).toHaveLength(0);
+  });
+
   it('rejects when a function file imports a module that cannot be resolved', async () => {
     writeFunctionFile('missing-import.js', 'import missing from "../util/cloud-function/not-here.js"; export default missing;');
 
