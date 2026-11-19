@@ -1,11 +1,11 @@
 import { tmpdir } from 'node:os';
 
-import { authHandler, cliux, configHandler } from '@contentstack/cli-utilities';
+import { authHandler, configHandler } from '@contentstack/cli-utilities';
 import type { Interfaces } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
-import { CTRL_C, answerPrompts, onTerminal, pretendTerminal } from '../support/terminal';
+import { answerPrompts, CTRL_C, onTerminal, pretendTerminal, stubPrompts } from '../support/terminal';
 import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
 import { projectOwnership } from '../support/project-ownership';
 
@@ -151,7 +151,7 @@ describe('integration: launch:projects:delete on the wire', () => {
     const removal = nock(LAUNCH_HUB_URL, BODYLESS).delete(`/manage/projects/${PROJECT_UID}`).query({}).reply(204);
     const restore = pretendTerminal();
     const inquired: unknown[] = [];
-    jest.spyOn(cliux, 'inquire').mockImplementation(async (payload: unknown) => {
+    stubPrompts((payload) => {
       inquired.push(payload);
       return false as never;
     });

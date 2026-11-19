@@ -4,12 +4,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 
-import { authHandler, cliux, configHandler } from '@contentstack/cli-utilities';
+import { authHandler, configHandler } from '@contentstack/cli-utilities';
 import type { Interfaces } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
 import { DEFAULT_SECRET_IO } from '../../src/secrets/secret.value';
+import { terminalUx } from '../../src/core/terminal-ux';
 import { projectOwnership } from '../support/project-ownership';
 import { gluedValue } from '../support/glued-value';
 import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
@@ -160,7 +161,7 @@ describe('integration: launch:secrets:set on the wire', () => {
     expect([list.isDone(), write.isDone()]).toEqual([true, true]);
     expect(sent).toEqual([{ method: 'POST', path: COLLECTION_PATH, body: { key: 'API_TOKEN', value } }]);
     expect(onWire).toEqual([]);
-    expect(cliux.inquire).not.toHaveBeenCalled();
+    expect(terminalUx.inquire).not.toHaveBeenCalled();
     expect(stdout).toBe('✔ Secret API_TOKEN added.\n');
     expect(stdout + stderr).not.toContain(value);
   });
@@ -276,7 +277,7 @@ describe('integration: launch:secrets:set on the wire', () => {
     expect(error?.message).toContain('Pass --yes when piping the value');
     expect(reads).toEqual([]);
     expect([list.isDone(), write.isDone()]).toEqual([false, false]);
-    expect(cliux.inquire).not.toHaveBeenCalled();
+    expect(terminalUx.inquire).not.toHaveBeenCalled();
   });
 
   it.each([['NEXT_PUBLIC_API'], ['NUXT_PUBLIC_API'], ['VITE_API'], ['GATSBY_API'], ['PUBLIC_API']])(
@@ -365,7 +366,7 @@ describe('integration: launch:secrets:set on the wire', () => {
     expect(reads).toEqual([]);
     expect([list.isDone(), write.isDone()]).toEqual([false, false]);
     expect(onWire).toEqual([]);
-    expect(cliux.inquire).not.toHaveBeenCalled();
+    expect(terminalUx.inquire).not.toHaveBeenCalled();
   });
 
   it('S5 sends a key with a slash as one encoded segment on a PUT', async () => {
@@ -521,7 +522,7 @@ describe('integration: launch:secrets:set on the wire', () => {
 
     expect(error?.oclif?.exit).toBe(2);
     expect(error?.message).toContain(`Missing required value for ${flag}`);
-    expect(cliux.inquire).not.toHaveBeenCalled();
+    expect(terminalUx.inquire).not.toHaveBeenCalled();
     expect(sent).toEqual([]);
   });
 

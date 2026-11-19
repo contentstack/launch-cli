@@ -1,6 +1,4 @@
-import { cliux } from '@contentstack/cli-utilities';
-
-import { stdinReportingTTY, stdoutOfWidth, stdoutReportingTTY } from './support/terminal';
+import { stdinReportingTTY, stdoutOfWidth, stdoutReportingTTY, stubPrompts } from './support/terminal';
 
 let restoreTerminal: (() => void)[] = [];
 
@@ -10,8 +8,8 @@ beforeEach(() => {
   // and no table truncation that depends on how wide the window happens to be.
   restoreTerminal = [stdinReportingTTY(false), stdoutReportingTTY(false), stdoutOfWidth(undefined)];
 
-  jest.spyOn(cliux, 'inquire').mockImplementation(async (payload: unknown) => {
-    const message = String((payload as Record<string, unknown> | undefined)?.message ?? '');
+  stubPrompts((payload) => {
+    const message = String(payload.message ?? '');
     throw new Error(
       `A test reached a real interactive prompt ("${message}"). Mock it with answerPrompts, or it would ` +
         'block on stdin whenever the suite runs in a real terminal.',

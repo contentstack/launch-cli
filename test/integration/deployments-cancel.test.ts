@@ -1,13 +1,13 @@
 import { tmpdir } from 'node:os';
 
-import { authHandler, cliux, configHandler } from '@contentstack/cli-utilities';
+import { authHandler, configHandler } from '@contentstack/cli-utilities';
 import type { Interfaces } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
 import getFixture from '../fixtures/deployment-get.json';
 import notFoundFixture from '../fixtures/deployment-not-found.json';
-import { CTRL_C, answerPrompts, onTerminal, pretendTerminal } from '../support/terminal';
+import { answerPrompts, CTRL_C, onTerminal, pretendTerminal, stubPrompts } from '../support/terminal';
 import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
 import { projectOwnership } from '../support/project-ownership';
 
@@ -181,7 +181,7 @@ describe('integration: launch:deployments:cancel on the wire', () => {
     const cancel = cancelScope().post(CANCEL_PATH).reply(200, {});
     const restore = pretendTerminal();
     const inquired: unknown[] = [];
-    jest.spyOn(cliux, 'inquire').mockImplementation(async (payload: unknown) => {
+    stubPrompts((payload) => {
       inquired.push(payload);
       return false as never;
     });

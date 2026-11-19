@@ -2,11 +2,12 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { authHandler, cliux, configHandler } from '@contentstack/cli-utilities';
+import { authHandler, configHandler } from '@contentstack/cli-utilities';
 import type { Interfaces } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
+import { terminalUx } from '../../src/core/terminal-ux';
 import { projectOwnership } from '../support/project-ownership';
 import { gluedValue } from '../support/glued-value';
 import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
@@ -116,7 +117,7 @@ describe('integration: launch:secrets:unset on the wire', () => {
     expect([first.isDone(), second.isDone()]).toEqual([true, true]);
     expect(deleted).toEqual([`${COLLECTION_PATH}/DB_PASSWORD`, `${COLLECTION_PATH}/API_TOKEN`]);
     expect(onWire).toEqual([]);
-    expect(cliux.inquire).not.toHaveBeenCalled();
+    expect(terminalUx.inquire).not.toHaveBeenCalled();
     expect(stdout).toBe('✔ Secret DB_PASSWORD removed.\n✔ Secret API_TOKEN removed.\n');
     expect(stderr).toBe('');
   });
@@ -175,7 +176,7 @@ describe('integration: launch:secrets:unset on the wire', () => {
     expect(write.isDone()).toBe(false);
     expect(deleted).toEqual([]);
     expect(onWire).toEqual([]);
-    expect(cliux.inquire).not.toHaveBeenCalled();
+    expect(terminalUx.inquire).not.toHaveBeenCalled();
     expect(stdout).toBe('');
   });
 
@@ -229,7 +230,7 @@ describe('integration: launch:secrets:unset on the wire', () => {
     expect(write.isDone()).toBe(false);
     expect(deleted).toEqual([]);
     expect(onWire).toEqual([]);
-    expect(cliux.inquire).not.toHaveBeenCalled();
+    expect(terminalUx.inquire).not.toHaveBeenCalled();
   });
 
   it('U5 words a 403 as a permission failure for the key and exits 1', async () => {
@@ -263,7 +264,7 @@ describe('integration: launch:secrets:unset on the wire', () => {
     expect(error?.message).toContain('--key');
     expect(write.isDone()).toBe(false);
     expect(onWire).toEqual([]);
-    expect(cliux.inquire).not.toHaveBeenCalled();
+    expect(terminalUx.inquire).not.toHaveBeenCalled();
   });
 
   it('U7 encodes a key with special characters as one path segment', async () => {
@@ -306,7 +307,7 @@ describe('integration: launch:secrets:unset on the wire', () => {
 
     expect(error?.oclif?.exit).toBe(2);
     expect(error?.message).toContain(`Missing required value for ${flag}`);
-    expect(cliux.inquire).not.toHaveBeenCalled();
+    expect(terminalUx.inquire).not.toHaveBeenCalled();
     expect(deleted).toEqual([]);
   });
 

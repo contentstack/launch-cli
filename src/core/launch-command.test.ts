@@ -338,7 +338,7 @@ describe('LaunchCommand.init', () => {
     restoreTTY();
   });
 
-  it('registers the searchable picker on the inquirer cliux prompts with before anything can prompt', async () => {
+  it('registers the searchable picker on the inquirer terminalUx prompts through before anything can prompt', async () => {
     const prompts = promptLibrary().prompt.prompts;
     delete prompts['search-list'];
     const instance = probe();
