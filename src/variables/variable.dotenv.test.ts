@@ -86,7 +86,7 @@ describe('variable dotenv', () => {
     ]);
   });
 
-  it('ends a value at a quote at the end of its own line before looking at later lines', () => {
+  it('falls back to a quote at the end of its own line when reading on would close with stray text', () => {
     expect(parseDotenv('DIR="C:\\temp\\"\nB="x"').variables).toEqual([
       { key: 'DIR', value: 'C:\\temp\\' },
       { key: 'B', value: 'x' },
@@ -107,9 +107,11 @@ describe('variable dotenv', () => {
     ['MY KEY=1', 1, 'has an invalid key before "="'],
     ['q8Xz+/AbCd==', 1, 'has an invalid key before "="'],
     ['PASS="abc\nB=2', 1, 'opens a quote for PASS that is never closed'],
+    ['A=1\nLONE="', 2, 'opens a quote for LONE that is never closed'],
     ['PASS="abc\nB="x"y', 1, 'opens a quote for PASS that closes on line 2 with text after it'],
     ['A="multi\nline" trailing', 1, 'opens a quote for A that closes on line 2 with text after it'],
     ['A=1\nKEY="v"x', 2, 'has text after the closing quote of KEY'],
+    ['NAME="John" Smith # aka "JS"', 1, 'has text after the closing quote of NAME'],
     ['A=1\nB=2\nA=3', 3, 'repeats the key A'],
   ])('refuses a malformed line, naming its line number (%p)', (text, line, problem) => {
     const error = lineErrorOf(text);

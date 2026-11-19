@@ -65,14 +65,14 @@ function readQuoted(text: string): ReadValue | undefined {
 
 function readQuotedToLineEnd(line: string): ReadValue | undefined {
   const quote = line[0];
+  const comment = INLINE_COMMENT.exec(line);
+  const body = (comment ? line.slice(0, comment.index) : line).trimEnd();
 
-  for (let closing = line.lastIndexOf(quote); closing > 0; closing = line.lastIndexOf(quote, closing - 1)) {
-    if (endsLine(line.slice(closing + 1).trim())) {
-      return { value: unquote(line.slice(1, closing), quote), linesRead: 1, tail: '' };
-    }
+  if (body.length < 2 || !body.endsWith(quote)) {
+    return undefined;
   }
 
-  return undefined;
+  return { value: unquote(body.slice(1, -1), quote), linesRead: 1, tail: '' };
 }
 
 function readValue(raw: string, following: string[]): ReadValue | undefined {
