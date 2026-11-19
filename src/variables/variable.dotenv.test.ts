@@ -54,6 +54,7 @@ describe('variable dotenv', () => {
     ['A="v" #123', 'v'],
     ["A='v'\t# note", 'v'],
     ['A=`x y`', 'x y'],
+    ['A="a\\"b"', 'a\\"b'],
   ])('removes the quotes around a quoted value and keeps a # inside them (%p)', (line, value) => {
     expect(parseDotenv(line).variables).toEqual([{ key: 'A', value }]);
   });

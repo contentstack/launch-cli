@@ -9,11 +9,23 @@ const INLINE_COMMENT = /[ \t]#/;
 const EXPORT_PREFIX = /^export[ \t]+/;
 const QUOTES = ['"', "'", '`'];
 
+function findClosingQuote(text: string, quote: string): number {
+  for (let position = 1; position < text.length; position++) {
+    if (text[position] === '\\') {
+      position++;
+    } else if (text[position] === quote) {
+      return position;
+    }
+  }
+
+  return -1;
+}
+
 function readValue(raw: string): string {
   const leading = raw.trimStart();
 
   if (QUOTES.includes(leading[0])) {
-    const inner = leading.slice(1, leading.indexOf(leading[0], 1));
+    const inner = leading.slice(1, findClosingQuote(leading, leading[0]));
 
     return leading[0] === '"' ? inner.replace(/\\n/g, '\n').replace(/\\r/g, '\r') : inner;
   }
