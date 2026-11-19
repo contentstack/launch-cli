@@ -76,6 +76,12 @@ describe('variable files', () => {
     await expect(readEnvFiles(paths, reader)).rejects.toThrow(message);
   });
 
+  it('lets a parse failure that is not a malformed line propagate unchanged', async () => {
+    const reader = { readFile: async () => undefined as unknown as string, readStdin: async () => '' };
+
+    await expect(readEnvFiles(['.env'], reader)).rejects.toThrow(TypeError);
+  });
+
   it('lets any other read failure propagate unchanged', async () => {
     const failure = Object.assign(new Error('EACCES'), { code: 'EACCES' });
 

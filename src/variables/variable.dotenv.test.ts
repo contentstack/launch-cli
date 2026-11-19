@@ -69,6 +69,11 @@ describe('variable dotenv', () => {
     ["A='v'\t# note", 'v'],
     ['A=`x y`', 'x y'],
     ['A="a\\"b"', 'a\\"b'],
+    ['A="C:\\temp\\"', 'C:\\temp\\'],
+    ["A='C:\\temp\\'", 'C:\\temp\\'],
+    ['A="{"a":1}"', '{"a":1}'],
+    ["A='it's here'", "it's here"],
+    ['A="{"a":1}" # c', '{"a":1}'],
   ])('removes the quotes around a quoted value and keeps a # inside them (%p)', (line, value) => {
     expect(parseDotenv(line).variables).toEqual([{ key: 'A', value }]);
   });
@@ -78,6 +83,13 @@ describe('variable dotenv', () => {
       { key: 'A', value: 'a\nb\rc' },
       { key: 'B', value: 'a\\nb' },
       { key: 'C', value: 'a\\nb' },
+    ]);
+  });
+
+  it('ends a value at a quote at the end of its own line before looking at later lines', () => {
+    expect(parseDotenv('DIR="C:\\temp\\"\nB="x"').variables).toEqual([
+      { key: 'DIR', value: 'C:\\temp\\' },
+      { key: 'B', value: 'x' },
     ]);
   });
 
@@ -91,10 +103,12 @@ describe('variable dotenv', () => {
   it.each([
     ['A=1\n\nAPI_URL https://x', 3, 'has no "="'],
     ['A=1\n = abc', 2, 'has no key before "="'],
-    ['1A=x', 1, 'has an invalid key "1A"'],
-    ['MY KEY=1', 1, 'has an invalid key "MY KEY"'],
+    ['1A=x', 1, 'has an invalid key before "="'],
+    ['MY KEY=1', 1, 'has an invalid key before "="'],
+    ['q8Xz+/AbCd==', 1, 'has an invalid key before "="'],
     ['PASS="abc\nB=2', 1, 'opens a quote for PASS that is never closed'],
-    ['PASS="abc\nB="x"y', 1, 'opens a quote for PASS that is never closed'],
+    ['PASS="abc\nB="x"y', 1, 'opens a quote for PASS that closes on line 2 with text after it'],
+    ['A="multi\nline" trailing', 1, 'opens a quote for A that closes on line 2 with text after it'],
     ['A=1\nKEY="v"x', 2, 'has text after the closing quote of KEY'],
     ['A=1\nB=2\nA=3', 3, 'repeats the key A'],
   ])('refuses a malformed line, naming its line number (%p)', (text, line, problem) => {

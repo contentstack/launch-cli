@@ -1,8 +1,8 @@
 import { join } from 'node:path';
 
 import { UsageError } from '../core/errors';
-import { parseDotenv } from './variable.dotenv';
-import type { DotenvLineError, ParsedDotenv } from './variable.dotenv';
+import { DotenvLineError, parseDotenv } from './variable.dotenv';
+import type { ParsedDotenv } from './variable.dotenv';
 
 export const STDIN_PATH = '-';
 
@@ -21,9 +21,11 @@ function parseSource(label: string, text: string): EnvFileSource {
   try {
     return { label, ...parseDotenv(text) };
   } catch (error) {
-    const { line, problem } = error as DotenvLineError;
+    if (!(error instanceof DotenvLineError)) {
+      throw error;
+    }
 
-    throw new UsageError(`Line ${line} of ${label} ${problem}.`);
+    throw new UsageError(`Line ${error.line} of ${label} ${error.problem}.`);
   }
 }
 

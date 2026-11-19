@@ -38,6 +38,14 @@ interface ReadValue {
   tail: string;
 }
 
+function endsLine(tail: string): boolean {
+  return tail === '' || tail.startsWith('#');
+}
+
+function unquote(inner: string, quote: string): string {
+  return quote === '"' ? inner.replace(/\\n/g, '\n').replace(/\\r/g, '\r') : inner;
+}
+
 function readQuoted(text: string): ReadValue | undefined {
   const quote = text[0];
   const closing = findClosingQuote(text, quote);
@@ -47,16 +55,33 @@ function readQuoted(text: string): ReadValue | undefined {
   }
 
   const inner = text.slice(1, closing);
-  const value = quote === '"' ? inner.replace(/\\n/g, '\n').replace(/\\r/g, '\r') : inner;
 
-  return { value, linesRead: inner.split('\n').length, tail: text.slice(closing + 1).split('\n')[0].trim() };
+  return {
+    value: unquote(inner, quote),
+    linesRead: inner.split('\n').length,
+    tail: text.slice(closing + 1).split('\n')[0].trim(),
+  };
+}
+
+function readQuotedToLineEnd(line: string): ReadValue | undefined {
+  const quote = line[0];
+
+  for (let closing = line.lastIndexOf(quote); closing > 0; closing = line.lastIndexOf(quote, closing - 1)) {
+    if (endsLine(line.slice(closing + 1).trim())) {
+      return { value: unquote(line.slice(1, closing), quote), linesRead: 1, tail: '' };
+    }
+  }
+
+  return undefined;
 }
 
 function readValue(raw: string, following: string[]): ReadValue | undefined {
   const leading = raw.trimStart();
 
   if (QUOTES.includes(leading[0])) {
-    return readQuoted([leading, ...following].join('\n'));
+    const read = readQuoted([leading, ...following].join('\n'));
+
+    return read !== undefined && endsLine(read.tail) ? read : (readQuotedToLineEnd(leading) ?? read);
   }
 
   const comment = INLINE_COMMENT.exec(raw);
@@ -89,7 +114,7 @@ function parse(text: string): Map<string, string> {
     }
 
     if (!VALID_KEY.test(key)) {
-      throw new DotenvLineError(index + 1, `has an invalid key "${key}"`);
+      throw new DotenvLineError(index + 1, 'has an invalid key before "="');
     }
 
     if (parsed.has(key)) {
@@ -97,10 +122,17 @@ function parse(text: string): Map<string, string> {
     }
 
     const read = readValue(statement.slice(separator + 1), lines.slice(index + 1));
-    const closesBadly = read !== undefined && read.tail !== '' && !read.tail.startsWith('#');
+    const closesBadly = read !== undefined && !endsLine(read.tail);
 
-    if (read === undefined || (closesBadly && read.linesRead > 1)) {
+    if (read === undefined) {
       throw new DotenvLineError(index + 1, `opens a quote for ${key} that is never closed`);
+    }
+
+    if (closesBadly && read.linesRead > 1) {
+      throw new DotenvLineError(
+        index + 1,
+        `opens a quote for ${key} that closes on line ${index + read.linesRead} with text after it`,
+      );
     }
 
     if (closesBadly) {
