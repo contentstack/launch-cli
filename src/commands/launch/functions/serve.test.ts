@@ -182,18 +182,17 @@ describe('launch:functions:serve init', () => {
     },
   );
 
-  it('exits 1 with the invalid base path error before validating the port when the data directory does not exist', async () => {
-    const exit = jest.spyOn(process, 'exit').mockImplementation(((code: number) => {
-      throw new Error(`exit ${code}`);
-    }) as never);
+  it('fails with the invalid base path error, exiting 1, before validating the port when the data directory does not exist', async () => {
+    const exit = jest.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
     const missing = join(temporaryDirectory(), 'no-such-dir');
     const command = commandWithFlags({ 'data-dir': missing, port: '99999' });
 
-    await expect(command.init()).rejects.toThrow('exit 1');
+    const failure = await command.init().catch((error: Error & { oclif?: { exit?: number } }) => error);
 
-    expect(exit).toHaveBeenCalledTimes(1);
-    expect(exit).toHaveBeenCalledWith(1);
-    expect(stdout).toEqual(['\u001b[31merror: Provided base path is not valid\u001b[39m\n']);
+    expect(failure).toBeInstanceOf(Errors.CLIError);
+    expect(failure).toMatchObject({ message: 'Provided base path is not valid', oclif: { exit: EXIT_RUNTIME } });
+    expect(exit).not.toHaveBeenCalled();
+    expect(stdout).toEqual([]);
     expect(existsSync(missing)).toBe(false);
     expect(command['sharedConfig']).toBeUndefined();
   });
