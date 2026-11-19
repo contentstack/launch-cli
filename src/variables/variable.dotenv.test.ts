@@ -22,18 +22,33 @@ describe('variable dotenv', () => {
     expect(parseDotenv(`${key}=${value}`).variables).toEqual([{ key, value }]);
   });
 
+  it.each([['A=value #123'], ['A=value\t#123'], ['A=value   # note']])(
+    'drops a comment that starts with # after a space or tab (%p)',
+    (line) => {
+      expect(parseDotenv(line).variables).toEqual([{ key: 'A', value: 'value' }]);
+    },
+  );
+
+  it('drops a leading export followed by a space or tab, but not export joined to the key', () => {
+    expect(parseDotenv('export API_URL=https://x\nexport\tB=1\nexportC=2').variables).toEqual([
+      { key: 'API_URL', value: 'https://x' },
+      { key: 'B', value: '1' },
+      { key: 'exportC', value: '2' },
+    ]);
+  });
+
   it('keeps an equals sign inside a value', () => {
     expect(parseDotenv('TOKEN=a=b').variables).toEqual([{ key: 'TOKEN', value: 'a=b' }]);
   });
 
   it('skips a variable with an empty value and names its key instead of its value', () => {
-    const parsed = parseDotenv('A=1\nEMPTY=\nBLANK=   \nB=2');
+    const parsed = parseDotenv('A=1\nEMPTY=\nBLANK=   \nNOTE= #note\nB=2');
 
     expect(parsed.variables).toEqual([
       { key: 'A', value: '1' },
       { key: 'B', value: '2' },
     ]);
-    expect(parsed.skipped).toEqual(['EMPTY', 'BLANK']);
+    expect(parsed.skipped).toEqual(['EMPTY', 'BLANK', 'NOTE']);
   });
 
   it('takes the last occurrence of a repeated key', () => {

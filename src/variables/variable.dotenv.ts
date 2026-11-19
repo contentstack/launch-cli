@@ -7,25 +7,25 @@ export interface ParsedDotenv {
 
 const INLINE_COMMENT = /[ \t]#/;
 const QUOTED = /^(["'])(.*)\1$/;
+const EXPORT_PREFIX = /^export[ \t]+/;
 
 function readValue(raw: string): string {
-  const value = raw.trim();
-  const quoted = QUOTED.exec(value);
+  const quoted = QUOTED.exec(raw.trim());
 
   if (quoted) {
     return quoted[2];
   }
 
-  const comment = INLINE_COMMENT.exec(value);
+  const comment = INLINE_COMMENT.exec(raw);
 
-  return (comment ? value.slice(0, comment.index) : value).trim();
+  return (comment ? raw.slice(0, comment.index) : raw).trim();
 }
 
 function parse(text: string): Map<string, string> {
   const parsed = new Map<string, string>();
 
   for (const line of text.split('\n')) {
-    const trimmed = line.trim();
+    const trimmed = line.trim().replace(EXPORT_PREFIX, '');
     const separator = trimmed.indexOf('=');
 
     if (trimmed === '' || trimmed.startsWith('#') || separator < 0) {
