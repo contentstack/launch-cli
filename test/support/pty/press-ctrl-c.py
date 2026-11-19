@@ -1,10 +1,3 @@
-"""Run a command on a real pseudo-terminal, press Ctrl-C once <marker> is on screen, print its exit code.
-
-Usage: python3 press-ctrl-c.py <marker> <command> [args...]
-
-A signal death prints as a negative number (-2 for SIGINT). 124 means <marker> never appeared,
-125 that the command was still running when the time ran out (it is killed).
-"""
 import os
 import pty
 import select
