@@ -533,6 +533,12 @@ The approved differences from V1 are these, and only these:
   that reads the raw request stream for those two types gets an empty stream.
 - **A function that reaches a file outside `functions/` is warned about, not refused**, naming
   the function file that crosses the boundary.
+- **Errors name the user's file.** A function that fails to bundle or load stops serve with
+  `Could not load functions/<file>.js: <cause>` (`FunctionLoadError`). A package that is not
+  installed is `MissingPackageError`, naming the importing file and the package and saying to
+  run `npm install`. Each function is bundled with a source map into a temporary `.mjs` file
+  and imported by file URL, not from a `data:` URL, and serve enables Node's source-map support,
+  so a handler's stack trace points at `functions/<file>.js:<line>`.
 - **A busy port** raises `PortInUseError` and exits 2 with a clean message (V1 crashed on an
   unhandled `error` event), and **filepath validation is linear-time** (V1's regex took 41
   seconds on a plausible 40-character filename).
