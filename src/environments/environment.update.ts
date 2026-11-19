@@ -79,7 +79,6 @@ function hasChanges(request: EnvironmentUpdateRequest): boolean {
   return UPDATABLE_FLAGS.some(([field]) => request[field] !== undefined);
 }
 
-// Enabling password protection is never unchanged: enabling it again is how its credentials are rotated.
 function currentValuesOf(existing: Environment): EnvironmentChanges {
   return {
     name: existing.name,

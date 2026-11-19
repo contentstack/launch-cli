@@ -210,6 +210,23 @@ describe('EnvironmentUpdater', () => {
     },
   );
 
+  it.each([
+    [{ cachePriming: 'disable' as const }, { isCachePrimingEnabled: null }, { isCachePrimingEnabled: false }],
+    [{ autoDeploy: 'disable' as const }, { autoDeployOnPush: null }, { autoDeployOnPush: false }],
+    [
+      { csAuth: 'disable' as const },
+      { isContentstackAuthenticationEnabled: null },
+      { isContentstackAuthenticationEnabled: false },
+    ],
+    [{ resMode: 'buffered' as const }, { isStreamingEnabled: null }, { isStreamingEnabled: false }],
+  ])('sends %p when the API reports the current setting as null, since null is not a known value', async (fields, current, update) => {
+    const { updater, sent } = updaterUnderTest({ current });
+
+    await expect(updater.update(request(fields))).resolves.toBe('updated');
+
+    expect(sent).toEqual([{ ...SCOPE, update }]);
+  });
+
   it('sends only the flags whose values differ from the current settings', async () => {
     const { updater, sent } = updaterUnderTest({
       current: { name: 'staging', isStreamingEnabled: true, isContentstackAuthenticationEnabled: false },

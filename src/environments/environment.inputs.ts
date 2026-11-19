@@ -33,16 +33,16 @@ export const TOGGLE_VALUES = ['enable', 'disable'] as const;
 
 export type ToggleValue = (typeof TOGGLE_VALUES)[number];
 
-export function toggleOf(value: boolean | undefined): ToggleValue | undefined {
-  if (value === undefined) {
+export function toggleOf(value: boolean | null | undefined): ToggleValue | undefined {
+  if (value === undefined || value === null) {
     return undefined;
   }
 
   return value ? 'enable' : 'disable';
 }
 
-export function responseModeOf(streaming: boolean | undefined): ResponseMode | undefined {
-  if (streaming === undefined) {
+export function responseModeOf(streaming: boolean | null | undefined): ResponseMode | undefined {
+  if (streaming === undefined || streaming === null) {
     return undefined;
   }
 
