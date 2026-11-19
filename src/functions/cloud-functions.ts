@@ -33,9 +33,9 @@ function isHandler(value: unknown): value is CloudFunctionHandler {
   return typeof value === 'function';
 }
 
-function isOutsideDirectory(directory: string, file: string): boolean {
-  const relativePath = path.relative(directory, file);
-  return relativePath === '..' || relativePath.startsWith(`..${path.sep}`);
+export function isOutsideDirectory(directory: string, file: string, pathApi: path.PlatformPath = path): boolean {
+  const relativePath = pathApi.relative(directory, file);
+  return relativePath === '..' || relativePath.startsWith(`..${pathApi.sep}`) || pathApi.isAbsolute(relativePath);
 }
 
 function attachCookies(request: Request, _response: Response, next: NextFunction): void {

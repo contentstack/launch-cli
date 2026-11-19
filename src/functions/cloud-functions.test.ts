@@ -5,9 +5,9 @@ import { createServer } from 'http';
 import { request as httpRequest } from 'http';
 import type { AddressInfo } from 'net';
 import { tmpdir } from 'os';
-import { dirname, join } from 'path';
+import { dirname, join, win32 } from 'path';
 
-import { CloudFunctions, listenFailure } from './cloud-functions';
+import { CloudFunctions, isOutsideDirectory, listenFailure } from './cloud-functions';
 import { PortInUseError } from './function.errors';
 import { loadDataURL } from './load-data-url';
 
@@ -487,6 +487,12 @@ describe('CloudFunctions serve routing', () => {
 
     expect(JSON.parse(response.body)).toEqual({ atRequest: envValue, atLoad: envValue });
     delete process.env.LAUNCH_TEST_VALUE;
+  });
+});
+
+describe('isOutsideDirectory', () => {
+  it('treats a file on another Windows drive as outside the directory', () => {
+    expect(isOutsideDirectory('C:\\app\\functions', 'D:\\lib\\a.js', win32)).toBe(true);
   });
 });
 
