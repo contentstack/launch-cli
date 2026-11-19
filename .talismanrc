@@ -8,7 +8,7 @@ fileignoreconfig:
 - filename: src/core/failure.test.ts
   checksum: 3f5c731861dc816d141f6314c32bec55bc5197241447a4375bc76fa9f85339f0
 - filename: test/integration/retired-commands.test.ts
-  checksum: c38d6e8dae6bd4d2034ff48bff488e89cc00d950a7417c6df890168ac743ae37
+  checksum: 84d9c9ddae05faf49e6bd29e2835051714ed53ac35c8a0283c87679f06902b0a
 - filename: test/integration/manage-base-path.test.ts
   checksum: 79eb9ad420ea47d5bee8045d812c45b010bbeeafcaf5f85d11653140b0cd0db1
 - filename: src/transport/rest-client.ts
@@ -236,7 +236,7 @@ fileignoreconfig:
     - "a project name passed on argv to the project resolver"
     - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
 - filename: AGENTS.md
-  checksum: c20a023e033c6222c645e94bf9fba4bdf884aa75d6c52f5c74ab185b8c335b01
+  checksum: 06abd3d96ec675c81fdeb86bbe571bf027d9426da2c8bf10519dc8bd045dbc9d
   allowed_patterns:
     - "Do not add an exemption to a guard to make a new file pass"
     - "passes its own error wording to `client.request\\(req, MESSAGES\\)`"
@@ -283,7 +283,7 @@ fileignoreconfig:
 - filename: test/integration/projects-list-command.test.ts
   checksum: 5f49dc7f384fb9e33c8fb91f1c67b17ffc2fd3bbde3663f90f820056407e98a0
 - filename: src/functions/cloud-functions.test.ts
-  checksum: 5faf7b0497efc9f620983220019736a0ec2e8c43f22316f888201912bbcb5d62
+  checksum: 2b7d29ca3a8b87bc27e464d00517eb390d70b901ad892c0680bf613cb466920c
 - filename: src/transport/proxy.test.ts
   checksum: 06db291bb40ec55774179b02e3e1a9644bbaa116ec511c163e8d6012aebb3868
 - filename: test/integration/project-upload-proxy.test.ts
@@ -301,7 +301,7 @@ fileignoreconfig:
 - filename: src/transport/auth-strategy.ts
   checksum: 6fe87def1b508cb67203d4445d9bd889570e512ed4194dfc4fdd3182bc8b87b2
 - filename: src/functions/function.logger.test.ts
-  checksum: 840b2b2b7f938e0862881871e8d568112631c58e12cf6c8a5be32e7552b8cf9e
+  checksum: e088ab5844cf4214d03f9c0f0a903b21ec7167e6879fc484d647e46b96f7a100
 - filename: src/transport/cma-client.test.ts
   checksum: 85d62ef350b450cb09f1a840db79bdfb212d4f5fd650789d60d722915a892a59
 - filename: src/core/search-list.test.ts
@@ -487,7 +487,7 @@ fileignoreconfig:
 - filename: src/commands/launch/secrets/list.test.ts
   checksum: 109d1165d7ce16943b50955f60fd8a753a870115fdf5501fb2a5e4a1cf436eaa
 - filename: package.json
-  checksum: ae6f7fdb23fd9476dd4fca5b84d0f3999b578a73b8187af2f94edbb0a2172b16
+  checksum: aa850fff4d587e974f73c1fd734c6798feed147f0dce449b33930ef7190b370c
 - filename: test/integration/secrets-set.test.ts
   checksum: 2527d5d35198cc08e1859ab79941338392b6d4fcbc87506adef6d7b096089963
 - filename: src/secrets/secret.rules.test.ts
