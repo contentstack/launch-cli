@@ -66,6 +66,22 @@ describe('variable files', () => {
     await expect(readEnvFiles(['missing.env'], reader)).rejects.toThrow('--dotenv missing.env was not found.');
   });
 
+  it.each([
+    [['bad.env'], 'Line 2 of bad.env has no "=".'],
+    [['-'], 'Line 2 of standard input has no "=".'],
+  ])('refuses a malformed line as a usage error naming where it is (%p)', async (paths, message) => {
+    const { reader } = deps({ 'bad.env': 'A=1\nAPI_URL https://x' }, 'A=1\nAPI_URL https://x');
+
+    await expect(readEnvFiles(paths, reader)).rejects.toThrow(UsageError);
+    await expect(readEnvFiles(paths, reader)).rejects.toThrow(message);
+  });
+
+  it('lets a parse failure that is not a malformed line propagate unchanged', async () => {
+    const reader = { readFile: async () => undefined as unknown as string, readStdin: async () => '' };
+
+    await expect(readEnvFiles(['.env'], reader)).rejects.toThrow(TypeError);
+  });
+
   it('lets any other read failure propagate unchanged', async () => {
     const failure = Object.assign(new Error('EACCES'), { code: 'EACCES' });
 
