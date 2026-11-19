@@ -8,6 +8,7 @@ import { responseModeOf, toggleOf, usernameOf } from './environment.inputs';
 import { withoutRepositoryFlags } from './environment.rules';
 import {
   disableQuestion,
+  environmentAlreadyMatchesLine,
   environmentNoChangesLine,
   environmentNotUpdatedLine,
   environmentUpdatedLine,
@@ -85,7 +86,7 @@ function currentValuesOf(existing: Environment): EnvironmentChanges {
     branch: existing.gitBranch,
     framework: existing.frameworkPreset as FrameworkPreset | undefined,
     buildCmd: existing.buildCommand,
-    serverCmd: existing.serverCommand,
+    serverCmd: existing.serverCommand ?? undefined,
     outputDir: existing.outputDirectory,
     resMode: responseModeOf(existing.isStreamingEnabled),
     autoDeploy: toggleOf(existing.autoDeployOnPush),
@@ -106,6 +107,12 @@ function withoutCurrentValues(request: EnvironmentUpdateRequest, existing: Envir
   }
 
   return kept;
+}
+
+function flagsMatchingCurrent(before: EnvironmentUpdateRequest, after: EnvironmentUpdateRequest): string[] {
+  return UPDATABLE_FLAGS.filter(([field]) => before[field] !== undefined && after[field] === undefined).map(
+    ([, flag]) => flag,
+  );
 }
 
 function emptyUpdateMessage(): string {
@@ -193,13 +200,21 @@ export class EnvironmentUpdater {
         })),
       }
       : given;
-    const request = withoutCurrentValues(
-      withoutRepositoryFlags(answered, current.projectType, this.services.ux, this.services.outputIsTTY === true),
-      existing,
+    const supported = withoutRepositoryFlags(
+      answered,
+      current.projectType,
+      this.services.ux,
+      this.services.outputIsTTY === true,
     );
+    const request = withoutCurrentValues(supported, existing);
 
     if (!hasChanges(request)) {
-      this.services.ux.print(environmentNoChangesLine(this.services.outputIsTTY === true));
+      const matching = asking ? [] : flagsMatchingCurrent(supported, request);
+      this.services.ux.print(
+        matching.length > 0
+          ? environmentAlreadyMatchesLine(matching, this.services.outputIsTTY === true)
+          : environmentNoChangesLine(this.services.outputIsTTY === true),
+      );
       return 'unchanged';
     }
 

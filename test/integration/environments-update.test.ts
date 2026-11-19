@@ -126,7 +126,10 @@ describe('integration: launch:env:update on the wire', () => {
 
     expect(error).toBeUndefined();
     expect([project.isDone(), environment.isDone(), put.isDone()]).toEqual([true, true, false]);
-    expect(stdout).toBe('Environment not updated. No changes were entered.\n');
+    expect(stdout).toBe(
+      'Environment not updated: --name, --branch, --output-dir, --auto-deploy, --cs-auth, --cache-priming, ' +
+        '--password-protection already match the current settings.\n',
+    );
     expect(onWire).toEqual([]);
   });
 

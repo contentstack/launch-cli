@@ -186,29 +186,41 @@ describe('EnvironmentUpdater', () => {
   });
 
   it.each([
-    [{ resMode: 'streaming' as const }, { isStreamingEnabled: true }],
-    [{ resMode: 'buffered' as const }, { isStreamingEnabled: false }],
-    [{ csAuth: 'disable' as const }, { isContentstackAuthenticationEnabled: false }],
-    [{ autoDeploy: 'enable' as const }, { autoDeployOnPush: true }],
-    [{ cachePriming: 'disable' as const }, { isCachePrimingEnabled: false }],
-    [{ passwordProtection: 'disable' as const }, {}],
+    [{ resMode: 'streaming' as const }, { isStreamingEnabled: true }, '--res-mode already matches'],
+    [{ resMode: 'buffered' as const }, { isStreamingEnabled: false }, '--res-mode already matches'],
+    [{ csAuth: 'disable' as const }, { isContentstackAuthenticationEnabled: false }, '--cs-auth already matches'],
+    [{ autoDeploy: 'enable' as const }, { autoDeployOnPush: true }, '--auto-deploy already matches'],
+    [{ cachePriming: 'disable' as const }, { isCachePrimingEnabled: false }, '--cache-priming already matches'],
+    [{ passwordProtection: 'disable' as const }, {}, '--password-protection already matches'],
     [
       { buildCmd: 'npm run build', outputDir: '.next', framework: 'NEXTJS' as const, branch: 'sample', name: 'staging' },
       { buildCommand: 'npm run build', outputDirectory: '.next', gitBranch: 'sample', name: 'staging' },
+      '--name, --branch, --framework, --build-cmd, --output-dir already match',
     ],
-    [{ serverCmd: 'npm start' }, { serverCommand: 'npm start' }],
+    [{ serverCmd: 'npm start' }, { serverCommand: 'npm start' }, '--server-cmd already matches'],
   ])(
-    'says nothing changed, asks nothing and sends nothing when %p matches the current settings',
-    async (fields, current) => {
+    'names the flags, asks nothing and sends nothing when %p matches the current settings',
+    async (fields, current, named) => {
       const { updater, calls, lines, questions } = updaterUnderTest({ current });
 
       await expect(updater.update(request(fields))).resolves.toBe('unchanged');
 
       expect(calls).not.toContain('update');
       expect(questions).toEqual([]);
-      expect(lines).toEqual(['Environment not updated. No changes were entered.']);
+      expect(lines).toEqual([`Environment not updated: ${named} the current settings.`]);
     },
   );
+
+  it('names only the matching flags when a FileUpload project also drops a repository-only flag', async () => {
+    const { updater, lines } = updaterUnderTest({ projectType: 'FILEUPLOAD', current: { name: 'staging' } });
+
+    await expect(updater.update(request({ name: 'staging', branch: 'release' }))).resolves.toBe('unchanged');
+
+    expect(lines).toEqual([
+      'warn: --branch is not supported for FileUpload projects.',
+      'Environment not updated: --name already matches the current settings.',
+    ]);
+  });
 
   it.each([
     [{ cachePriming: 'disable' as const }, { isCachePrimingEnabled: null }, { isCachePrimingEnabled: false }],

@@ -42,12 +42,12 @@ export interface Environment {
   frameworkPreset?: string;
   buildCommand?: string;
   outputDirectory?: string;
-  serverCommand?: string;
+  serverCommand?: string | null;
   domains?: EnvironmentDomain[];
-  autoDeployOnPush?: boolean;
-  isStreamingEnabled?: boolean;
-  isContentstackAuthenticationEnabled?: boolean;
-  isCachePrimingEnabled?: boolean;
+  autoDeployOnPush?: boolean | null;
+  isStreamingEnabled?: boolean | null;
+  isContentstackAuthenticationEnabled?: boolean | null;
+  isCachePrimingEnabled?: boolean | null;
   passwordProtection?: EnvironmentPasswordProtection;
   environmentVariables?: EnvironmentVariable[];
   organizationUid?: string;

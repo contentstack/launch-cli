@@ -166,7 +166,9 @@ class SettingAsker {
       return undefined;
     }
 
-    return this.text(askOptionalText(this.services.ux, 'Server command', current.serverCommand), current.serverCommand);
+    const serverCommand = current.serverCommand ?? undefined;
+
+    return this.text(askOptionalText(this.services.ux, 'Server command', serverCommand), serverCommand);
   }
 
   private async passwordProtection(current: boolean | undefined): Promise<string | undefined> {
@@ -175,7 +177,7 @@ class SettingAsker {
     return answer ?? (current === true ? 'enable' : undefined);
   }
 
-  private async toggle(message: string, current: boolean | undefined): Promise<string | undefined> {
+  private async toggle(message: string, current: boolean | null | undefined): Promise<string | undefined> {
     const state = toggleOf(current);
     const answer = await askOption(
       this.services.ux,
