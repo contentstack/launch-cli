@@ -54,6 +54,10 @@ describe('variable dotenv', () => {
     ]);
   });
 
+  it('accepts a key with dots, dashes and digits after its first character', () => {
+    expect(parseDotenv('_a.b-c9=1').variables).toEqual([{ key: '_a.b-c9', value: '1' }]);
+  });
+
   it('trims spaces around the key and the value', () => {
     expect(parseDotenv('  KEY = abc   ').variables).toEqual([{ key: 'KEY', value: 'abc' }]);
   });
@@ -87,6 +91,8 @@ describe('variable dotenv', () => {
   it.each([
     ['A=1\n\nAPI_URL https://x', 3, 'has no "="'],
     ['A=1\n = abc', 2, 'has no key before "="'],
+    ['1A=x', 1, 'has an invalid key "1A"'],
+    ['MY KEY=1', 1, 'has an invalid key "MY KEY"'],
     ['PASS="abc\nB=2', 1, 'opens a quote for PASS that is never closed'],
     ['PASS="abc\nB="x"y', 1, 'opens a quote for PASS that is never closed'],
     ['A=1\nKEY="v"x', 2, 'has text after the closing quote of KEY'],

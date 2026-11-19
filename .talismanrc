@@ -357,9 +357,9 @@ fileignoreconfig:
 - filename: src/variables/variable.create.test.ts
   checksum: a2650ca8e081afcf76c801d20e2df4baa96f814d1513080ba24971db0ae3a1bf
 - filename: src/variables/variable.dotenv.test.ts
-  checksum: ec31393e392c7be60db4f0cd6b1d1b96b226e50cf7de647564f4b79c36beb3c7
+  checksum: d0dbf334ead6f34d15a2fb792afbae38b76c611b83e4efe97b966f76972f7c27
 - filename: src/variables/variable.dotenv.ts
-  checksum: 917f755b3f2410f53687699c89a95dac4a4b2691e67b01b36add6e35a9fa00d4
+  checksum: 1d4faf31f30dc6226553d6efb6fdb120d7cffe5c1e053193780beec33ff343dd
 - filename: src/variables/variable.errors.ts
   checksum: f66b960365b83561f70b5fcef521bcc8a00d99b4415fb6a5df5bcf752a91d480
 - filename: src/variables/variable.files.test.ts

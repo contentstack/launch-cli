@@ -17,6 +17,7 @@ export class DotenvLineError extends Error {
 
 const INLINE_COMMENT = /[ \t]#/;
 const EXPORT_PREFIX = /^export[ \t]+/;
+const VALID_KEY = /^[A-Za-z_][A-Za-z0-9_.-]*$/;
 const QUOTES = ['"', "'", '`'];
 
 function findClosingQuote(text: string, quote: string): number {
@@ -85,6 +86,10 @@ function parse(text: string): Map<string, string> {
 
     if (key === '') {
       throw new DotenvLineError(index + 1, 'has no key before "="');
+    }
+
+    if (!VALID_KEY.test(key)) {
+      throw new DotenvLineError(index + 1, `has an invalid key "${key}"`);
     }
 
     if (parsed.has(key)) {
