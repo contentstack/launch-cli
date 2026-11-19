@@ -20,6 +20,8 @@ import type { CmaSession } from './transport/cma-client';
 import type { EventStreamClient } from './transport/event-stream';
 import type { RestApiClient, RestRequest } from './transport/rest-client';
 
+const ORG_UID = 'blt1111111111111111';
+
 const UNUSED_CMA: CmaSession = {
   fetchOrganizations: async () => {
     throw new Error('this test lists no organizations');
@@ -57,7 +59,7 @@ function args() {
     },
   } as unknown as ApiSurface;
 
-  return { services: { api, ux, isTTY: true }, resolved: { org: 'org1' } };
+  return { services: { api, ux, isTTY: true }, resolved: { org: ORG_UID } };
 }
 
 describe('resolution', () => {
@@ -105,7 +107,7 @@ describe('resolution', () => {
 
     await expect(table.project.prompt?.({ input: {}, services, resolved })).resolves.toBe(PROJECT_UID);
 
-    expect(spy).toHaveBeenCalledWith(services, 'org1');
+    expect(spy).toHaveBeenCalledWith(services, ORG_UID);
     spy.mockRestore();
   });
 
@@ -117,7 +119,7 @@ describe('resolution', () => {
       PROJECT_UID,
     );
 
-    expect(spy).toHaveBeenCalledWith('org1', { kind: 'name', name: 'Project One' });
+    expect(spy).toHaveBeenCalledWith(ORG_UID, { kind: 'name', name: 'Project One' });
     spy.mockRestore();
   });
 
@@ -129,7 +131,7 @@ describe('resolution', () => {
       PROJECT_UID,
     );
 
-    expect(spy).toHaveBeenCalledWith('org1', { kind: 'uid', uid: PROJECT_UID });
+    expect(spy).toHaveBeenCalledWith(ORG_UID, { kind: 'uid', uid: PROJECT_UID });
     spy.mockRestore();
   });
 
@@ -141,7 +143,7 @@ describe('resolution', () => {
 
       await expect(table.project.normalize?.('Project One', { services, resolved, source })).resolves.toBe(PROJECT_UID);
 
-      expect(spy).toHaveBeenCalledWith('org1', { kind: 'uid', uid: 'Project One' });
+      expect(spy).toHaveBeenCalledWith(ORG_UID, { kind: 'uid', uid: 'Project One' });
       spy.mockRestore();
     },
   );
@@ -178,13 +180,12 @@ describe('resolution', () => {
     expect(DEPENDENCIES.deployment).toEqual(['org', 'project', 'env']);
   });
 
-  it('delegates the org prompt to the organization picker and normalises nothing', async () => {
+  it('delegates the org prompt to the organization picker and depends on nothing', async () => {
     const spy = jest.spyOn(organizationPrompt, 'promptForOrganization').mockResolvedValue('org9');
     const { services } = args();
 
     await expect(table.org.prompt?.({ input: {}, services, resolved: {} })).resolves.toBe('org9');
     expect(spy).toHaveBeenCalledWith(services);
-    expect(table.org.normalize).toBeUndefined();
     expect(table.org.dependsOn).toBeUndefined();
   });
 });

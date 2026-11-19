@@ -55,12 +55,12 @@ file and line that broke its rule, and each was proven red by reintroducing its 
 
 | Guard | Rule it enforces | Found by |
 |---|---|---|
-| `test/guards/prompt-types.test.ts` | Every prompt call in `src` names a literal `type`, and every such type is registered with the real inquirer `cliux.inquire` uses once `LaunchCommand.init` has run. inquirer silently turns an unregistered type into a plain text box. | D1: `search-list` used, never registered |
+| `test/guards/prompt-types.test.ts` | Every prompt call in `src` names a literal `type`, and every such type is registered with the real inquirer `terminalUx` prompts through once `LaunchCommand.init` has run. inquirer silently turns an unregistered type into a plain text box. | D1: `search-list` used, never registered |
 | `test/integration/transport-content-type.test.ts` | For every method in `HTTP_METHODS`, a bodyless request carries no content type and a request with a body carries `application/json`, asserted on the wire. `withoutDefaultContentType` suppresses the utility client's default, so a bodyless POST, PUT or PATCH (for example `deployments:cancel`) no longer goes out as `application/x-www-form-urlencoded`. Only `utility-http-client.ts` builds an `HttpClient` and only `rest-client.ts` sets the JSON type. | D5: every DELETE sent `Content-Type: application/json` |
 | `test/guards/tty-streams.test.ts` | `stdin.isTTY`, and the `isTTY` it becomes on the service context, are read only to decide whether the CLI may prompt (a read next to a prompt or a refusal to prompt) or on the plumbing lines that carry it there. Anything deciding what to draw reads `outputIsTTY` / `process.stdout.isTTY`. | D6: heartbeat drawn into a redirected file |
 | `test/integration/deployments-request-bodies.test.ts` | A deployments mutation puts on the wire only the fields the management service DTO declares - `{commitHash?, uploadUid?}` for a create, `{deployment, reason?}` for a rollback - and never `environment`, which is the URL path. The service validates with `whitelist` and `forbidNonWhitelisted`, so any other key is a bare 400. | Live harness: `deployments:create` and `:rollback` sent `{environment, ...}` and failed with `Bad request` |
 | `test/integration/retired-commands.test.ts` (named commands) | Every `launch:…` command named anywhere in `src` - a retirement message, a failure hint, an example - is either a registered command or on `PLANNED_COMMANDS` with the ticket that builds it, and a command drops off that list once it ships. | Review: retirement messages and hints pointed at commands the beta does not have |
-| `test/guards/prompt-funnel.test.ts` | Every prompt goes through `LaunchCommand`'s `ux`, built once as `cancelOnInterrupt(cliux)`, so Ctrl-C at any prompt exits 3. The wrapper stays attached to `SIGINT` until the signal has reached every listener (it detaches in a microtask): inquirer's `cli-cursor` loads `signal-exit`, which re-raises `SIGINT` - exit 130 - when it finds itself the only listener, so a `once` listener made every list and checkbox prompt exit 130 (`src/core/interruptible-ux.test.ts` pins it). No source calls `cliux.inquire` / `prompt` / `confirm` under any name, hands `cliux` on as a value, or imports a prompt library; `search-list.ts` may register a type but never prompt. | D2: Ctrl-C exited 130 |
+| `test/guards/prompt-funnel.test.ts` | Every prompt goes through `LaunchCommand`'s `ux`, built once as `cancelOnInterrupt(terminalUx)`, so Ctrl-C at any prompt exits 3. `terminalUx` (`src/core/terminal-ux.ts`) asks cli-utilities' own inquirer instance (`promptLibrary()`) directly, because `cliux.inquire` catches inquirer 12's `ExitPromptError` and calls `process.exit(130)` itself. In raw mode Ctrl-C reaches inquirer as typed input, not as a process `SIGINT`: an `@inquirer/core` prompt (input, list, checkbox, confirm) rejects with `ExitPromptError`, which the wrapper turns into `CancelledError`; the legacy `search-list` rejects with `AbortPromptError` and then raises a real `SIGINT`, so the wrapper cancels on the rejection at once and stays attached only to absorb that signal. The wrapper stays attached to `SIGINT` until the signal has reached every listener (it detaches in a microtask): inquirer's `cli-cursor` loads `signal-exit`, which re-raises `SIGINT` - exit 130 - when it finds itself the only listener, so a `once` listener made every list and checkbox prompt exit 130 (`src/core/interruptible-ux.test.ts` pins it). No source calls `cliux.inquire` / `prompt` / `confirm` under any name, hands `cliux` on as a value, imports a prompt library, uses `promptLibrary` outside `search-list.ts` and `terminal-ux.ts`, or uses `terminalUx` anywhere but that one funnel line; `search-list.ts` may register a type but never prompt. `test/integration/prompt-ctrl-c-on-a-terminal.test.ts` types a real Ctrl-C at each kind of prompt on a pseudo-terminal, because a simulated `SIGINT` is what let CL-8790 through. `test/support/pty/press-ctrl-c.py <marker> <command...>` (Python's stdlib `pty`, so `npm test` needs `python3`) runs the command on a pty, types Ctrl-C once `<marker>` is on screen and prints the exit code: negative for a signal death (-2 is SIGINT), 124 if `<marker>` never appeared, 125 if the command was still running 30 s later (it is killed). `ctrl-c-prompt.fixture.ts` calls `process.exit` with the error's exit code, as oclif's `Errors.handle` does for the CLI. | D2: Ctrl-C exited 130; CL-8790: it did again after cli-utilities 2 |
 
 A new prompt, request, render path or command is covered by these guards without being listed in
 them. Do not add an exemption to a guard to make a new file pass: if a guard is wrong about a file,
@@ -110,8 +110,10 @@ stdin is not a terminal and `LaunchCommand` reads it to decide whether prompting
 descriptor, not by assignment: once another suite in the same process has turned stdin into a real
 stream, `process.stdin.isTTY = true` throws, and jest orders test files by their previous runtime, so
 that shows up as an intermittent failure rather than a stable one. `answerPrompts({ message: answer })`
-installs the `cliux.inquire` spy, records every prompt's message and payload in order, and throws on a
-prompt it was not given an answer for. `projects-create.test.ts` uses the three together to drive all
+installs the `terminalUx.inquire` spy, records every prompt's message and payload in order, and throws on a
+prompt it was not given an answer for; an answer of `CTRL_C` rejects the way a real Ctrl-C does: `ExitPromptError`, or for a
+`search-list` prompt `AbortPromptError` followed by a `SIGINT`. `stubPrompts(handler)` installs the same spy with your own handler, and `test/no-terminal.setup.ts`
+uses it to fail any test that reaches a prompt it did not stub. `projects-create.test.ts` uses the three together to drive all
 eleven GitHub prompts through `launch:projects:create`, asserting their order, their offered defaults
 and the submitted body, and to prove that a flag-supplied value is never asked for.
 
@@ -713,11 +715,15 @@ waits `SITE_OPEN_DELAY_MS` (six seconds, V1's wait, because a site opened the mo
 live can still answer "site not reachable") and opens that url in the browser, terminal or not, as V1
 did. The wait goes through the injected `sleep`, so it is awaited and the browser opens before the
 command returns.
-The first read asks from `DEPLOYMENT_LOGS_FROM` (the epoch) and every later one from the last
-parseable timestamp printed: with a `timestamp` the service returns what came strictly after it in
-ascending order, and without one it returns the newest page in **descending** order, so never let the
-cursor drop the query. The poll that sees the terminal status still reads the logs once more before
-returning, so the last lines of a build are never lost. The logs are auxiliary: a
+The first read asks from `DEPLOYMENT_LOGS_FROM` (the epoch) and every later one from
+`DEPLOYMENT_LOG_LOOKBACK_MS` (10 s) before the newest parseable timestamp printed: with a `timestamp`
+the service returns what came strictly after it in ascending order, and without one it returns the
+newest page in **descending** order, so never let the cursor drop the query. The look-back exists
+because logs become searchable **out of timestamp order** (the logs background-jobs service batches
+its bulk writes every 2 s, and the `deployment-logs` index has two shards that refresh on their own),
+so a cursor at the newest line skips an older line indexed after it (CL-8805). `LogTail` remembers each
+line it printed by timestamp, stage and message with a repeat count, so a re-read prints nothing twice
+and identical lines in one millisecond still all print. The logs are auxiliary: a
 failed read prints nothing, is retried from the same cursor on the next poll, and never changes the
 outcome - the status poll alone decides that.
 
@@ -725,7 +731,14 @@ outcome - the status poll alone decides that.
 reading from the advancing `tail.since()` until `tail.fresh` returns nothing new, at most `MAX_PAGES` reads, so a
 build that wrote more than one page after the last in-flight poll is never cut short. An in-flight poll still makes
 exactly one read. A read that fails mid-drain prints nothing, ends the drain and never changes the
-outcome. `stop` (an `AbortSignal` on `DeploymentWatchDeps`, `DeploymentFollower.watch(scope, stop)`) ends the wait
+outcome. After the drain the watcher **lets the logs settle**: a deployment turns LIVE before its last
+lines are searchable (the agent logs `Build and hosting completed.` after it starts the job that marks
+the site live), so it makes `logSettleMs / pollDelayMs` more reads (`DEPLOYMENT_LOG_SETTLE_MS` 10 s /
+2 s = 5), sleeping the poll delay before each, a failed one simply followed by the next. It settles only
+when the watch saw the deployment in flight or its `updatedAt` is within `logSettleMs`, so `logs:get` on a
+long-finished deployment returns at once; `waitUntilLive` reads no logs and passes `logSettleMs: 0`.
+`logSettleMs` is optional on `WatchTiming` and absent means no settling, so a test timing without it
+keeps its old read count. `stop` (an `AbortSignal` on `DeploymentWatchDeps`, `DeploymentFollower.watch(scope, stop)`) ends the wait
 with `stop.reason` wherever it is noticed: before a poll, after one, during the drain, and at the sleep - a signal
 already aborted when the loop would sleep ends it at once rather than sleeping the full delay, and the default
 `sleep` takes the signal as its second argument and clears its timer on abort, so no timer outlives an interrupt.

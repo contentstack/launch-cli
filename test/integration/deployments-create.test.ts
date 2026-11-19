@@ -164,6 +164,7 @@ describe('integration: launch:deployments:create on the wire', () => {
     jest.spyOn(authHandler, 'compareOAuthExpiry').mockResolvedValue(undefined);
     jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => ({
       ...realWatchTiming(),
+      logSettleMs: 0,
       sleep: async () => undefined,
     }));
   });
@@ -546,6 +547,42 @@ describe('integration: launch:deployments:create on the wire', () => {
     expect(onWire).toEqual([]);
   });
 
+  it('keeps reading the logs after LIVE and prints the lines that became readable late, each once', async () => {
+    jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => ({ ...realWatchTiming(), sleep: async () => undefined }));
+    const edge = { message: 'Deploying edge functions.', timestamp: '2026-09-25T10:00:20.000Z' };
+    const live = { message: 'Site is live', timestamp: '2026-09-25T10:00:23.000Z' };
+    const late = [
+      { message: 'Edge functions deployed successfully.', timestamp: '2026-09-25T10:00:22.198Z' },
+      { message: 'Build and hosting completed.', timestamp: '2026-09-25T10:00:22.201Z' },
+    ];
+    const lookBack = { timestamp: '2026-09-25T10:00:13.000Z' };
+    gitProject();
+    captureCreate();
+    for (const status of ['DEPLOYING', 'LIVE']) {
+      hub()
+        .get(`${DEPLOYMENTS}/${DEPLOYMENT_UID}`)
+        .query({})
+        .reply(200, { deployment: { uid: DEPLOYMENT_UID, status, deploymentUrl: 'my-site.example.test' } });
+    }
+    hub().get(LOGS).query({ timestamp: '1970-01-01T00:00:00.000Z' }).reply(200, { deploymentLogs: [edge] });
+    hub().get(LOGS).query({ timestamp: '2026-09-25T10:00:10.000Z' }).reply(200, { deploymentLogs: [edge, live] });
+    hub().get(LOGS).query(lookBack).reply(200, { deploymentLogs: [] });
+    hub().get(LOGS).query(lookBack).times(5).reply(200, { deploymentLogs: [edge, ...late, live] });
+
+    const { error, stdout } = await runCommand(createArgs('--data-dir', dataDir), config);
+
+    expect(error).toBeUndefined();
+    expect(stdout.split('\n').filter((line) => line.includes(':  '))).toEqual([
+      '2026-09-25 10:00:20.000:  Deploying edge functions.',
+      '2026-09-25 10:00:23.000:  Site is live',
+      '2026-09-25 10:00:22.198:  Edge functions deployed successfully.',
+      '2026-09-25 10:00:22.201:  Build and hosting completed.',
+    ]);
+    expect(stdout).toContain('Deployment URL: https://my-site.example.test');
+    expect(nock.pendingMocks()).toEqual([]);
+    expect(onWire).toEqual([]);
+  });
+
   it('T33: exits 1 on a FAILED deployment, naming FAILED and the logs command with the full scope', async () => {
     gitProject();
     captureCreate();
@@ -566,6 +603,7 @@ describe('integration: launch:deployments:create on the wire', () => {
     followUp(['DEPLOYING']);
     jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => ({
       ...realWatchTiming(),
+      logSettleMs: 0,
       sleep: async () => undefined,
       timeoutMs: 1,
     }));

@@ -6,6 +6,7 @@ import {
   CANCEL_NOT_ALLOWED_RAW_MESSAGE,
   DEPLOYMENT_ERROR_MESSAGES,
   DeploymentUnsuccessfulError,
+  INVALID_DEPLOYMENT_UID_CODE,
   INVALID_DEPLOYMENT_UID_RAW_MESSAGE,
 } from './deployment.errors';
 import { DeploymentsApi } from './deployments.api';
@@ -340,7 +341,7 @@ describe('DeploymentsApi', () => {
     ['the raw message as the code', [{ code: CANCEL_NOT_ALLOWED_RAW_MESSAGE, message: CANCEL_NOT_ALLOWED_RAW_MESSAGE }]],
     ['the raw message alone', [{ message: CANCEL_NOT_ALLOWED_RAW_MESSAGE }]],
     ['an empty error entry', [{}]],
-    ['another message', [{ message: 'something else' }]],
+    ['empty error entries only', [{}, {}]],
   ])('words a cancel refused with %s as the cancel-not-allowed message', async (_name, errors) => {
     const rejection = new LaunchApiError(400, errors, DEPLOYMENT_ERROR_MESSAGES);
     const client = { request: async () => Promise.reject(rejection) } as unknown as RestApiClient;
@@ -367,6 +368,27 @@ describe('DeploymentsApi', () => {
 
     expect(failure.status).toBe(409);
     expect(failure.message).toBe(`Deployment "${DEPLOYMENT}" cannot be cancelled because it is no longer in progress.`);
+  });
+
+  it.each([
+    ['another message', [{ message: 'something else' }]],
+    ['no error entries, as a proxy answers', []],
+    ['an empty entry beside another message', [{}, { message: 'something else' }]],
+    ['a field-only entry', [{ field: 'deployment_uid' }]],
+  ])('leaves a 400 cancel refusal carrying %s untouched', async (_name, errors) => {
+    const rejection = new LaunchApiError(400, errors, DEPLOYMENT_ERROR_MESSAGES);
+    const client = { request: async () => Promise.reject(rejection) } as unknown as RestApiClient;
+
+    await expect(new DeploymentsApi(client).cancel({ ...SCOPE, deployment: DEPLOYMENT })).rejects.toBe(rejection);
+  });
+
+  it('keeps the wording of another known code on a 400 cancel refusal', async () => {
+    const rejection = new LaunchApiError(400, [{ code: INVALID_DEPLOYMENT_UID_CODE }], DEPLOYMENT_ERROR_MESSAGES);
+    const client = { request: async () => Promise.reject(rejection) } as unknown as RestApiClient;
+
+    await expect(new DeploymentsApi(client).cancel({ ...SCOPE, deployment: DEPLOYMENT })).rejects.toThrow(
+      'The deployment UID is invalid. Provide a 24-character hexadecimal deployment UID.',
+    );
   });
 
   it('leaves a non-400 refusal untouched on cancel', async () => {

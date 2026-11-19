@@ -88,6 +88,41 @@ describe('cancelOnInterrupt', () => {
     expect(signals.listenerCount('SIGINT')).toBe(1);
   });
 
+  it('rejects with CancelledError when the prompt itself reports Ctrl-C, as inquirer 12 does in raw mode, then stops listening', async () => {
+    const signals = new EventEmitter();
+    const inner = pendingUx();
+    const loop = recordingHold();
+    const ctrlC = Object.assign(new Error('User force closed the prompt with SIGINT'), { name: 'ExitPromptError' });
+
+    const answer = cancelOnInterrupt(inner.ux, { signals, hold: loop.hold }).inquire<string>(QUESTION);
+    inner.settle({ error: ctrlC });
+
+    await expect(answer).rejects.toBeInstanceOf(CancelledError);
+    expect(signals.listenerCount('SIGINT')).toBe(0);
+    expect(loop.events).toEqual(['held', 'released']);
+  });
+
+  it('cancels as soon as a search-list prompt is aborted, and stays attached only to absorb the SIGINT inquirer raises next', async () => {
+    const signals = new EventEmitter();
+    const inner = pendingUx();
+    const loop = recordingHold();
+    const aborted = Object.assign(new Error('Prompt was aborted'), { name: 'AbortPromptError' });
+
+    const answer = cancelOnInterrupt(inner.ux, { signals, hold: loop.hold }).inquire<string>(QUESTION);
+    inner.settle({ error: aborted });
+    const error = await answer.catch((e: unknown) => e);
+    const listeningBeforeSignal = signals.listenerCount('SIGINT');
+    const loopBeforeSignal = [...loop.events];
+    signals.emit('SIGINT');
+    await new Promise((done) => setImmediate(done));
+
+    expect(error).toBeInstanceOf(CancelledError);
+    expect(listeningBeforeSignal).toBe(1);
+    expect(loopBeforeSignal).toEqual(['held', 'released']);
+    expect(signals.listenerCount('SIGINT')).toBe(0);
+    expect(loop.events).toEqual(['held', 'released']);
+  });
+
   it('propagates the prompt failure unchanged rather than calling it a cancellation, then stops listening', async () => {
     const signals = new EventEmitter();
     const inner = pendingUx();

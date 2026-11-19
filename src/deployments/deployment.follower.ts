@@ -45,6 +45,7 @@ export class DeploymentFollower {
       outputIsTTY: this.services.outputIsTTY === true,
       loader: silentLoader,
       stop,
+      logSettleMs: 0,
       logs: async () => [],
       poll: () => this.services.api.deployments.get(scope),
       until: (deployment) => normalizeStatus(deployment.status) === LIVE_STATUS,

@@ -5,6 +5,8 @@ import type { ApiSurface } from '../../../resources';
 import type { Project } from '../../../projects/types';
 import ProjectsUpdate from './update';
 
+const ORG_UID = 'blt1111111111111111';
+
 const PROJECT_UID = 'a1b2c3d4e5f60718293a4b5c';
 
 interface Terminal {
@@ -37,7 +39,7 @@ function commandUnderTest(
 
   Object.assign(command, {
     ux,
-    resolved: { org: 'org1', project: PROJECT_UID, ...resolved },
+    resolved: { org: ORG_UID, project: PROJECT_UID, ...resolved },
     services: {
       ux,
       isTTY: terminal !== undefined,
@@ -68,7 +70,7 @@ function commandUnderTest(
 
 function fakeServices() {
   const ux: UxLike = { print: () => undefined, inquire: async () => undefined as never };
-  const projects = { get: async () => ({ uid: PROJECT_UID, organizationUid: 'org1' }) };
+  const projects = { get: async () => ({ uid: PROJECT_UID, organizationUid: ORG_UID }) };
   return { api: { projects } as unknown as ApiSurface, ux, isTTY: false };
 }
 
@@ -78,7 +80,7 @@ describe('launch:projects:update', () => {
 
     await command.run();
 
-    expect(sent).toEqual([{ org: 'org1', project: PROJECT_UID, update: { name: 'Renamed Site' } }]);
+    expect(sent).toEqual([{ org: ORG_UID, project: PROJECT_UID, update: { name: 'Renamed Site' } }]);
     expect(lines).toEqual(['✔ Project updated successfully.']);
   });
 
@@ -94,7 +96,7 @@ describe('launch:projects:update', () => {
 
     await command.run();
 
-    expect(sent).toEqual([{ org: 'org1', project: PROJECT_UID, update: { description: 'A new blurb' } }]);
+    expect(sent).toEqual([{ org: ORG_UID, project: PROJECT_UID, update: { description: 'A new blurb' } }]);
     expect(lines).toEqual(['✔ Project updated successfully.']);
   });
 
@@ -111,7 +113,7 @@ describe('launch:projects:update', () => {
     await command.run();
 
     expect(sent).toEqual([
-      { org: 'org1', project: PROJECT_UID, update: { name: 'Renamed Site', description: 'A new blurb' } },
+      { org: ORG_UID, project: PROJECT_UID, update: { name: 'Renamed Site', description: 'A new blurb' } },
     ]);
     expect(lines).toEqual(['✔ Project updated successfully.']);
   });
@@ -159,7 +161,7 @@ describe('launch:projects:update', () => {
     await command.run();
 
     expect(asked).toHaveLength(2);
-    expect(sent).toEqual([{ org: 'org1', project: PROJECT_UID, update: { name: 'test-renamed' } }]);
+    expect(sent).toEqual([{ org: ORG_UID, project: PROJECT_UID, update: { name: 'test-renamed' } }]);
     expect(lines).toEqual(['✔ Project updated successfully.']);
   });
 
@@ -173,7 +175,7 @@ describe('launch:projects:update', () => {
 
     await command.run();
 
-    expect(sent).toEqual([{ org: 'org1', project: PROJECT_UID, update: { description: 'Marketing site for Q4' } }]);
+    expect(sent).toEqual([{ org: ORG_UID, project: PROJECT_UID, update: { description: 'Marketing site for Q4' } }]);
     expect(lines).toEqual(['✔ Project updated successfully.']);
   });
 
@@ -190,7 +192,7 @@ describe('launch:projects:update', () => {
     expect(asked).toEqual([]);
     expect(fetched).toEqual([]);
     expect(sent).toEqual([
-      { org: 'org1', project: PROJECT_UID, update: { name: 'Renamed Site', description: undefined } },
+      { org: ORG_UID, project: PROJECT_UID, update: { name: 'Renamed Site', description: undefined } },
     ]);
     expect(lines).toEqual(['✔ Project updated successfully.']);
   });
@@ -208,7 +210,7 @@ describe('launch:projects:update', () => {
     expect(asked).toEqual([]);
     expect(fetched).toEqual([]);
     expect(sent).toEqual([
-      { org: 'org1', project: PROJECT_UID, update: { name: undefined, description: 'A new blurb' } },
+      { org: ORG_UID, project: PROJECT_UID, update: { name: undefined, description: 'A new blurb' } },
     ]);
     expect(lines).toEqual(['✔ Project updated successfully.']);
   });
@@ -226,7 +228,7 @@ describe('launch:projects:update', () => {
     expect(asked).toEqual([]);
     expect(fetched).toEqual([]);
     expect(sent).toEqual([
-      { org: 'org1', project: PROJECT_UID, update: { name: 'Renamed Site', description: 'A new blurb' } },
+      { org: ORG_UID, project: PROJECT_UID, update: { name: 'Renamed Site', description: 'A new blurb' } },
     ]);
   });
 
@@ -238,7 +240,7 @@ describe('launch:projects:update', () => {
     expect(asked).toEqual([]);
     expect(fetched).toEqual([]);
     expect(sent).toEqual([
-      { org: 'org1', project: PROJECT_UID, update: { name: 'Renamed Site', description: undefined } },
+      { org: ORG_UID, project: PROJECT_UID, update: { name: 'Renamed Site', description: undefined } },
     ]);
   });
 
@@ -288,7 +290,7 @@ describe('launch:projects:update', () => {
   it('accepts a resolution carrying only one of the two updatable fields', async () => {
     await expect(
       resolveInputs(ProjectsUpdate.inputs, {
-        parsed: { org: 'org1', project: PROJECT_UID, description: 'A new blurb' },
+        parsed: { org: ORG_UID, project: PROJECT_UID, description: 'A new blurb' },
         projectConfig: {},
         services: fakeServices(),
       }),
@@ -297,7 +299,7 @@ describe('launch:projects:update', () => {
 
   it('rejects a name over the server limit as a usage error before sending', async () => {
     const error = (await resolveInputs(ProjectsUpdate.inputs, {
-      parsed: { org: 'org1', project: PROJECT_UID, name: 'n'.repeat(201) },
+      parsed: { org: ORG_UID, project: PROJECT_UID, name: 'n'.repeat(201) },
       projectConfig: {},
       services: fakeServices(),
     }).catch((thrown: unknown) => thrown)) as UsageError;

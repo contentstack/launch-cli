@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 
-import { authHandler, cliux, configHandler } from '@contentstack/cli-utilities';
+import { authHandler, configHandler } from '@contentstack/cli-utilities';
 import type { Interfaces } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import nock from 'nock';
 
-import { pretendTerminal } from '../support/terminal';
+import { pretendTerminal, stubPrompts } from '../support/terminal';
 import { loadCliConfig, routeConsoleLogToStdout } from '../support/oclif';
 import { projectOwnership } from '../support/project-ownership';
 
@@ -65,7 +65,7 @@ function answering(answers: unknown[]): unknown[] {
   const inquired: unknown[] = [];
   let index = 0;
 
-  jest.spyOn(cliux, 'inquire').mockImplementation(async (payload: unknown) => {
+  stubPrompts((payload) => {
     inquired.push(payload);
     const answer = answers[index];
     index += 1;
@@ -290,6 +290,21 @@ describe('integration: the organization prompt', () => {
 
     expect(error).toBeUndefined();
     expect(projects.isDone()).toBe(true);
+    expect(inquired).toEqual([]);
+    expect(onWire).toEqual([]);
+  });
+
+  it('exits 2 saying --org takes a UID when it is given an organization name, and sends no request', async () => {
+    useSession(session());
+    const inquired = answering([]);
+    const projects = nock(LAUNCH_HUB_URL).get('/manage/projects').query(true).reply(200, listFixture);
+
+    // runCommand re-splits its argv on spaces, so the shell's quoting is spelled out
+    const { error } = await onTerminal(['launch:projects:list', '--org', '"Acme Production"', '--data-dir', DATA_DIR]);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe('--org accepts an organization UID, not a name.');
+    expect(projects.isDone()).toBe(false);
     expect(inquired).toEqual([]);
     expect(onWire).toEqual([]);
   });

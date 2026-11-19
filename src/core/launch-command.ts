@@ -1,7 +1,7 @@
 import { resolve as resolvePath } from 'node:path';
 
 import { Command } from '@contentstack/cli-command';
-import { cliux, configHandler, isAuthenticated } from '@contentstack/cli-utilities';
+import { configHandler, isAuthenticated } from '@contentstack/cli-utilities';
 
 import { EXIT_RUNTIME, PROJECT_CONFIG_FILE, STDIN_MAX_LISTENERS } from './constants';
 import type { ProjectConfig } from './project-config';
@@ -18,6 +18,7 @@ import { cancelOnInterrupt } from './interruptible-ux';
 import { refusePasswordOnArgv } from './password-argv';
 import type { UxLike } from './prompt';
 import { registerSearchList } from './search-list';
+import { terminalUx } from './terminal-ux';
 import type { FailureOutput } from './failure';
 import { failWith, failureOutputOf, reportFailure } from './failure';
 import type { ServiceContext } from './service-context';
@@ -109,7 +110,7 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
   protected resolved!: Resolved<S>;
   protected dataDir!: string;
   protected configPath!: string;
-  protected ux: UxLike = cancelOnInterrupt(cliux);
+  protected ux: UxLike = cancelOnInterrupt(terminalUx);
 
   protected get launchRegion(): RegionLike | undefined {
     return configHandler.get('region') as RegionLike | undefined;

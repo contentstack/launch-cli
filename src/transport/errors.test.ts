@@ -223,6 +223,20 @@ describe('parseErrorEnvelope', () => {
     },
   );
 
+  it('keeps the errors array exactly as the server sent it, beside the readable entries', () => {
+    const sent = [{}, 'deployment_uid is required', { error_message: 'x' }];
+
+    const error = parseErrorEnvelope(400, { errors: sent }, MESSAGES);
+
+    expect(error.errors).toEqual([{}, {}, {}]);
+    expect(error.rawErrors).toEqual(sent);
+    expect(parseErrorEnvelope(400, { status: 400 }, MESSAGES).rawErrors).toEqual([]);
+  });
+
+  it('treats the entries of a hand-built error as what was sent', () => {
+    expect(new LaunchApiError(400, [{ code: 'x' }]).rawErrors).toEqual([{ code: 'x' }]);
+  });
+
   it('names the error LaunchApiError so it is recognisable once serialised', () => {
     const error = parseErrorEnvelope(404, { errors: [{ code: 'launch.RESOURCE.NOT_FOUND', message: 'x' }] }, MESSAGES);
 

@@ -3,6 +3,8 @@ import { resolveInputs } from '../../../core/resolve';
 import type { UxLike } from '../../../core/prompt';
 import ProjectsGet from './get';
 
+const ORG_UID = 'blt1111111111111111';
+
 function commandUnderTest(project: unknown) {
   const lines: string[] = [];
   const ux: UxLike = {
@@ -16,7 +18,7 @@ function commandUnderTest(project: unknown) {
 
   Object.assign(command, {
     ux,
-    resolved: { org: 'org1', project: 'a'.repeat(24) },
+    resolved: { org: ORG_UID, project: 'a'.repeat(24) },
     services: {
       ux,
       isTTY: false,
@@ -45,7 +47,7 @@ describe('launch:projects:get', () => {
 
     await command.run();
 
-    expect(fetched).toEqual([{ org: 'org1', project: 'a'.repeat(24) }]);
+    expect(fetched).toEqual([{ org: ORG_UID, project: 'a'.repeat(24) }]);
     expect(lines).toEqual([
       '\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510',
       '\u2502  NAME  \u2502  TYPE        \u2502  PROJECT UID               \u2502  DESCRIPTION  \u2502',
@@ -107,7 +109,7 @@ describe('launch:projects:get', () => {
     } as unknown as ApiSurface;
 
     const resolved = await resolveInputs(ProjectsGet.inputs, {
-      parsed: { org: 'org1', project: 'site' },
+      parsed: { org: ORG_UID, project: 'site' },
       projectConfig: {},
       services: { api, ux, isTTY: false },
     });
@@ -117,6 +119,6 @@ describe('launch:projects:get', () => {
     await command.run();
 
     expect(resolved.project).toBe('a'.repeat(24));
-    expect(fetched).toEqual([{ org: 'org1', project: 'a'.repeat(24) }]);
+    expect(fetched).toEqual([{ org: ORG_UID, project: 'a'.repeat(24) }]);
   });
 });

@@ -3,6 +3,7 @@ import { UsageError } from '../../../core/errors';
 import type { UxLike } from '../../../core/prompt';
 import { PICK_COMMIT } from '../../../deployments/deployment.inputs';
 import { firstDeploymentFailureMessage } from '../../../deployments/deployment.presenter';
+import * as watcher from '../../../deployments/deployment.watcher';
 import DeploymentsCreate from './create';
 
 const DATA_DIR = '/work/site';
@@ -40,7 +41,13 @@ function commandUnderTest(resolved: Record<string, unknown>, projectType = 'GITP
   return { command, lines, created };
 }
 
+const realWatchTiming = watcher.defaultWatchTiming;
+
 describe('launch:deployments:create', () => {
+  beforeEach(() => {
+    jest.spyOn(watcher, 'defaultWatchTiming').mockImplementation(() => ({ ...realWatchTiming(), sleep: async () => undefined }));
+  });
+
   it('declares org, project and env as required inputs and commit and last-upload as optional ones', () => {
     expect(DeploymentsCreate.inputs).toEqual({
       org: { required: true },
