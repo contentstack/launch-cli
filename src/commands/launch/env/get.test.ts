@@ -44,7 +44,8 @@ describe('launch:env:get', () => {
     expect(lines[1]).toBe('│  FIELD                        │  VALUE       │');
     expect(lines[3]).toBe('│  ENVIRONMENT UID              │  env1        │');
     expect(lines[5]).toBe('│  NAME                         │  production  │');
-    expect(lines).toHaveLength(39);
+    expect(lines).toHaveLength(37);
+    expect(lines.join('\n')).not.toContain('DESCRIPTION');
   });
 
   it('leaves the branch row out for an environment of a file-upload project', async () => {
@@ -53,7 +54,7 @@ describe('launch:env:get', () => {
     await command.run();
 
     expect(lines.some((line) => line.includes('BRANCH'))).toBe(false);
-    expect(lines).toHaveLength(37);
+    expect(lines).toHaveLength(35);
   });
 
   it('propagates a failed lookup', async () => {

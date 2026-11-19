@@ -1,4 +1,4 @@
-import { Errors } from '@oclif/core';
+import { Errors, Parser } from '@oclif/core';
 
 import { handleStandaloneFailure, reportFailure } from './failure';
 
@@ -35,6 +35,15 @@ describe('reportFailure', () => {
     await outcome;
 
     expect(lines).toEqual(['\u001b[31merror: Nonexistent flag: --json\u001b[39m']);
+  });
+
+  it('words an oclif parse error as a sentence with the --help hint on its own line, keeping its exit code', async () => {
+    const refusal = (await Parser.parse(['--description', 'x'], { flags: {} }).catch((error: unknown) => error)) as Error;
+    const { lines, outcome } = report(refusal);
+    const thrown = await outcome;
+
+    expect(lines).toEqual(['error: Nonexistent flag: --description.\nRun the command with --help to see its flags.']);
+    expect(thrown.oclif.exit).toBe(2);
   });
 
   it('prints an unexpected failure the same way and exits 1', async () => {

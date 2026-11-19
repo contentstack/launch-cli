@@ -153,7 +153,7 @@ describe('EnvironmentCreator', () => {
   it('creates a GitHub environment and follows its first deployment, ending on the live announcement', async () => {
     const { creator, calls, lines, created } = creatorUnderTest();
 
-    await creator.create(request({ description: 'pre-release', csAuth: 'disable' }));
+    await creator.create(request({ csAuth: 'disable' }));
 
     expect(calls).toEqual([
       'project {"org":"org1","project":"proj1"}',
@@ -169,7 +169,6 @@ describe('EnvironmentCreator', () => {
         project: 'proj1',
         input: {
           name: 'staging',
-          description: 'pre-release',
           gitBranch: 'develop',
           buildCommand: 'npm run build',
           outputDirectory: './.next',

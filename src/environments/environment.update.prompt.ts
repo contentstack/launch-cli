@@ -3,7 +3,6 @@ import type { ServiceContext } from '../core/service-context';
 import { askBranch } from '../git/git.prompt';
 import { frameworkLabelOf } from './environment.builder';
 import {
-  ENVIRONMENT_DESCRIPTION_MAX_LENGTH,
   ENVIRONMENT_NAME_MAX_LENGTH,
   RESPONSE_MODES,
   TOGGLE_VALUES,
@@ -23,7 +22,6 @@ export type EnvironmentChanges = Partial<
   Pick<
     EnvironmentUpdateRequest,
     | 'name'
-    | 'description'
     | 'branch'
     | 'framework'
     | 'buildCmd'
@@ -48,7 +46,6 @@ export interface UpdatePromptContext {
 
 const SETTINGS: { setting: Setting; label: string; repositoryOnly?: boolean }[] = [
   { setting: 'name', label: 'Name' },
-  { setting: 'description', label: 'Description' },
   { setting: 'branch', label: 'Branch', repositoryOnly: true },
   { setting: 'framework', label: 'Framework preset' },
   { setting: 'buildCmd', label: 'Build command' },
@@ -102,11 +99,6 @@ class SettingAsker {
     switch (setting) {
     case 'name':
       return this.text(askText(ux, 'Name', current.name, ENVIRONMENT_NAME_MAX_LENGTH), current.name);
-    case 'description':
-      return this.text(
-        askOptionalText(ux, 'Description', current.description, ENVIRONMENT_DESCRIPTION_MAX_LENGTH),
-        current.description,
-      );
     case 'branch':
       return this.text(
         askBranch(this.services, gitScopeOf(this.context.org, this.context.repository), current.gitBranch),

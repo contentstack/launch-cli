@@ -38,7 +38,6 @@ export interface EnvironmentVariable {
 export interface Environment {
   uid?: string;
   name?: string;
-  description?: string;
   gitBranch?: string;
   frameworkPreset?: string;
   buildCommand?: string;
@@ -65,7 +64,6 @@ export interface PasswordProtectionUpdate {
 
 export interface EnvironmentUpdate {
   name?: string;
-  description?: string;
   gitBranch?: string;
   frameworkPreset?: string;
   buildCommand?: string;
@@ -88,7 +86,6 @@ export interface EnvironmentsPage {
 
 export interface CreateEnvironmentInput {
   name: string;
-  description?: string;
   gitBranch?: string;
   uploadUid?: string;
   buildCommand?: string;

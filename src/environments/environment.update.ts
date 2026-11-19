@@ -23,7 +23,6 @@ export interface EnvironmentUpdateRequest {
   project: string;
   environment: string;
   name?: string;
-  description?: string;
   branch?: string;
   framework?: FrameworkPreset;
   buildCmd?: string;
@@ -62,7 +61,6 @@ function pipedPassword(text: string): string {
 
 const UPDATABLE_FLAGS: [keyof EnvironmentUpdateRequest, string][] = [
   ['name', 'name'],
-  ['description', 'description'],
   ['branch', 'branch'],
   ['framework', 'framework'],
   ['buildCmd', 'build-cmd'],
@@ -85,7 +83,6 @@ function hasChanges(request: EnvironmentUpdateRequest): boolean {
 function currentValuesOf(existing: Environment): EnvironmentChanges {
   return {
     name: existing.name,
-    description: existing.description,
     branch: existing.gitBranch,
     framework: existing.frameworkPreset as FrameworkPreset | undefined,
     buildCmd: existing.buildCommand,
@@ -128,7 +125,6 @@ function bodyOf(
 ): EnvironmentUpdate {
   const fields: EnvironmentUpdate = {
     name: request.name,
-    description: request.description,
     gitBranch: request.branch,
     frameworkPreset: request.framework,
     buildCommand: request.buildCmd,

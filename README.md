@@ -317,9 +317,9 @@ Create an environment in a Launch project and follow its first deployment
 ```
 USAGE
   $ csdx launch:env:create [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--name <value>]
-    [--description <value>] [--branch <value>] [--framework <value>] [--build-cmd <value>] [--server-cmd <value>]
-    [--output-dir <value>] [--res-mode <value>] [--auto-deploy <value>] [--cs-auth <value>] [--var <value>...] [--dotenv
-    <value>...] [--from-stack] [-a <value>]
+    [--branch <value>] [--framework <value>] [--build-cmd <value>] [--server-cmd <value>] [--output-dir <value>]
+    [--res-mode <value>] [--auto-deploy <value>] [--cs-auth <value>] [--var <value>...] [--dotenv <value>...]
+    [--from-stack] [-a <value>]
 
 FLAGS
   -a, --alias=<value>        Alias of a delivery token saved with csdx auth:tokens:add, used with --from-stack without a
@@ -330,7 +330,6 @@ FLAGS
       --build-cmd=<value>    Build command
       --config=<value>       Path to the local '.cs-launch.json' file
       --cs-auth=<value>      Contentstack Authentication (enable | disable)
-      --description=<value>  Environment description (255 characters or fewer)
       --dotenv=<value>...    Path to a dotenv file, repeatable. Use - to read dotenv content from standard input
       --framework=<value>    Framework preset (Gatsby | NextJs | CRA | CSR | Analog | Angular | Nuxt | Astro | VueJs |
                              Remix | Other)
@@ -440,9 +439,9 @@ Update an environment of a Launch project
 ```
 USAGE
   $ csdx launch:env:update [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--name
-    <value>] [--description <value>] [--branch <value>] [--framework <value>] [--build-cmd <value>] [--server-cmd
-    <value>] [--output-dir <value>] [--res-mode <value>] [--auto-deploy <value>] [--cs-auth <value>] [--cache-priming
-    <value>] [--password-protection <value>] [-u <value>] [-p] [--yes]
+    <value>] [--branch <value>] [--framework <value>] [--build-cmd <value>] [--server-cmd <value>] [--output-dir
+    <value>] [--res-mode <value>] [--auto-deploy <value>] [--cs-auth <value>] [--cache-priming <value>]
+    [--password-protection <value>] [-u <value>] [-p] [--yes]
 
 FLAGS
   -d, --data-dir=<value>             Current working directory
@@ -455,7 +454,6 @@ FLAGS
       --cache-priming=<value>        Cache priming (enable | disable)
       --config=<value>               Path to the local '.cs-launch.json' file
       --cs-auth=<value>              Contentstack Authentication (enable | disable)
-      --description=<value>          Environment description (255 characters or fewer)
       --env=<value>                  Environment name or UID
       --framework=<value>            Framework preset (Gatsby | NextJs | CRA | CSR | Analog | Angular | Nuxt | Astro |
                                      VueJs | Remix | Other)

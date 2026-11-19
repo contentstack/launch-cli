@@ -12,11 +12,8 @@ import { FRAMEWORK_CHOICES, FRAMEWORK_PRESET_BY_LABEL, SERVER_COMMAND_FRAMEWORKS
 
 export const ENVIRONMENT_NAME_MAX_LENGTH = 200;
 
-export const ENVIRONMENT_DESCRIPTION_MAX_LENGTH = 255;
-
 const ENVIRONMENT_WORDING: Record<string, string> = {
   name: `Environment name (${ENVIRONMENT_NAME_MAX_LENGTH} characters or fewer)`,
-  description: `Environment description (${ENVIRONMENT_DESCRIPTION_MAX_LENGTH} characters or fewer)`,
 };
 
 export function withEnvironmentWording<F extends Record<string, object>>(flags: F): F {
