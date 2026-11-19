@@ -164,7 +164,7 @@ describe('launch:functions:serve init', () => {
     expect(stdout).toEqual([]);
   });
 
-  it.each(['-1', '65536', '3000.5', 'abc', 'NaN', '1e400', '', '   '])(
+  it.each(['-1', '65536', '3000.5', 'abc', 'NaN', '1e400', '', '   ', '0x10', '1e3', '+3000', ' 3000'])(
     'rejects the invalid port %p once through the project logger and exits 1 as v1 did',
     async (port) => {
       const dataDir = temporaryDirectory();
