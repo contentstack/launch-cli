@@ -36,16 +36,21 @@ interface ReadValue {
   linesRead: number;
 }
 
-function readQuoted(text: string): ReadValue {
+function readQuoted(text: string): ReadValue | undefined {
   const quote = text[0];
   const closing = findClosingQuote(text, quote);
+
+  if (closing < 0) {
+    return undefined;
+  }
+
   const inner = text.slice(1, closing);
   const value = quote === '"' ? inner.replace(/\\n/g, '\n').replace(/\\r/g, '\r') : inner;
 
   return { value, linesRead: inner.split('\n').length };
 }
 
-function readValue(raw: string, following: string[]): ReadValue {
+function readValue(raw: string, following: string[]): ReadValue | undefined {
   const leading = raw.trimStart();
 
   if (QUOTES.includes(leading[0])) {
@@ -81,10 +86,14 @@ function parse(text: string): Map<string, string> {
       throw new DotenvLineError(index + 1, 'has no key before "="');
     }
 
-    const { value, linesRead } = readValue(statement.slice(separator + 1), lines.slice(index + 1));
+    const read = readValue(statement.slice(separator + 1), lines.slice(index + 1));
 
-    parsed.set(key, value);
-    index += linesRead;
+    if (read === undefined) {
+      throw new DotenvLineError(index + 1, `opens a quote for ${key} that is never closed`);
+    }
+
+    parsed.set(key, read.value);
+    index += read.linesRead;
   }
 
   return parsed;

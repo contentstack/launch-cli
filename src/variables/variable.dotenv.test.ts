@@ -87,6 +87,7 @@ describe('variable dotenv', () => {
   it.each([
     ['A=1\n\nAPI_URL https://x', 3, 'has no "="'],
     ['A=1\n = abc', 2, 'has no key before "="'],
+    ['PASS="abc\nB=2', 1, 'opens a quote for PASS that is never closed'],
   ])('refuses a malformed line, naming its line number (%p)', (text, line, problem) => {
     const error = lineErrorOf(text);
 
