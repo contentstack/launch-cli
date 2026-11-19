@@ -7,12 +7,12 @@ import type {
 } from 'express';
 import express from 'express';
 import type { Express } from 'express-serve-static-core';
-import { mkdtempSync, realpathSync, writeFileSync } from 'fs';
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'fs';
 import type { Server } from 'http';
 import type { AddressInfo } from 'net';
 import { tmpdir } from 'os';
 import path from 'path';
-import type { Plugin } from 'rollup';
+import type { Plugin, RollupLog } from 'rollup';
 import { pathToFileURL } from 'url';
 
 import { styled } from '../core/style';
@@ -43,7 +43,7 @@ function isHandler(value: unknown): value is CloudFunctionHandler {
 
 export type ImportersById = Map<string, readonly string[]>;
 
-function recordImporters(importersById: ImportersById): Plugin {
+function recordImporters(importersById: ImportersById, staticImportersById: ImportersById): Plugin {
   return {
     name: 'launch-record-importers',
     buildEnd() {
@@ -51,20 +51,21 @@ function recordImporters(importersById: ImportersById): Plugin {
         const moduleInfo = this.getModuleInfo(moduleId);
         if (moduleInfo) {
           importersById.set(moduleId, [...moduleInfo.importers, ...moduleInfo.dynamicImporters]);
+          staticImportersById.set(moduleId, moduleInfo.importers);
         }
       }
     },
   };
 }
 
-export function functionFilesImporting(
+function importersMatching(
   moduleId: string,
   importersById: ImportersById,
-  functionsDirectory: string,
+  accepts: (importer: string) => boolean,
   visited = new Set<string>(),
 ): string[] {
   return (importersById.get(moduleId) ?? []).flatMap((importer) => {
-    if (path.isAbsolute(importer) && !isOutsideDirectory(functionsDirectory, importer)) {
+    if (accepts(importer)) {
       return [importer];
     }
 
@@ -73,8 +74,24 @@ export function functionFilesImporting(
     }
 
     visited.add(importer);
-    return functionFilesImporting(importer, importersById, functionsDirectory, visited);
+    return importersMatching(importer, importersById, accepts, visited);
   });
+}
+
+function realFilesImporting(moduleId: string, importersById: ImportersById): string[] {
+  return importersMatching(moduleId, importersById, (importer) => path.isAbsolute(importer));
+}
+
+export function functionFilesImporting(
+  moduleId: string,
+  importersById: ImportersById,
+  functionsDirectory: string,
+): string[] {
+  return importersMatching(
+    moduleId,
+    importersById,
+    (importer) => path.isAbsolute(importer) && !isOutsideDirectory(functionsDirectory, importer),
+  );
 }
 
 class OutsideImportReporter {
@@ -167,6 +184,7 @@ export class CloudFunctions {
       throw new FunctionsDirectoryNotFoundError(this.pathToSourceCode);
     }
     dotenv.config({ path: path.join(this.pathToSourceCode, ENV_FILE_NAME) });
+    process.setSourceMapsEnabled(true);
 
     const cloudFunctionResources = await this.parseCloudFunctionResources();
 
@@ -249,9 +267,15 @@ export class CloudFunctions {
     return filename === PROXY_EDGE_FILENAME;
   }
 
-  private async parseCloudFunctionResources(): Promise<
-    CloudFunctionResource[]
-    > {
+  private async parseCloudFunctionResources(): Promise<CloudFunctionResource[]> {
+    try {
+      return await this.loadCloudFunctionResources();
+    } finally {
+      this.removeBundleDirectory();
+    }
+  }
+
+  private async loadCloudFunctionResources(): Promise<CloudFunctionResource[]> {
     const filePaths = await walkFileSystem(this.cloudFunctionsDirectoryPath);
     const outsideImports = new OutsideImportReporter(
       realpathSync(this.pathToSourceCode),
@@ -268,9 +292,13 @@ export class CloudFunctions {
         continue;
       }
 
-      const handler = await this.buildHandlerForFilepath(filePath, outsideImports).catch((cause: Error) => {
+      const handler = await this.buildHandlerForFilepath(filePath, outsideImports).catch((cause: unknown) => {
         const relativeFile = path.relative(this.cloudFunctionsDirectoryPath, filePath);
-        throw new FunctionLoadError(path.join(CLOUD_FUNCTIONS_DIRECTORY, relativeFile), cause);
+        throw new FunctionLoadError(
+          path.join(CLOUD_FUNCTIONS_DIRECTORY, relativeFile),
+          cause,
+          this.sourceLocation(cause),
+        );
       });
       if (!handler) {
         continue;
@@ -328,6 +356,38 @@ export class CloudFunctions {
     return { exactRouteResources, dynamicRouteResources };
   }
 
+  private sourceLocation(cause: unknown): ConstructorParameters<typeof FunctionLoadError>[2] {
+    const loc = isRecord(cause) && isRecord(cause.loc) ? cause.loc : undefined;
+    if (!loc || typeof loc.file !== 'string' || typeof loc.line !== 'number' || typeof loc.column !== 'number') {
+      return undefined;
+    }
+
+    const file = path.relative(realpathSync(this.pathToSourceCode), realpathSync(loc.file));
+    return { file, absoluteFile: loc.file, line: loc.line, column: loc.column };
+  }
+
+  private refuseMissingPackages(unresolvedImports: RollupLog[], staticImportersById: ImportersById): void {
+    unresolvedImports.forEach((warning) => {
+      const packageName = String(warning.exporter);
+      const [importer] = realFilesImporting(packageName, staticImportersById);
+      if (importer) {
+        throw new MissingPackageError(
+          path.relative(realpathSync(this.pathToSourceCode), realpathSync(importer)),
+          packageName,
+        );
+      }
+
+      console.warn(warning.message);
+    });
+  }
+
+  private removeBundleDirectory(): void {
+    if (this.bundleDirectoryPath) {
+      rmSync(this.bundleDirectoryPath, { recursive: true, force: true });
+      this.bundleDirectoryPath = undefined;
+    }
+  }
+
   private bundleDirectory(): string {
     this.bundleDirectoryPath ??= mkdtempSync(path.join(tmpdir(), 'launch-functions-'));
     return this.bundleDirectoryPath;
@@ -344,18 +404,26 @@ export class CloudFunctions {
       import('@rollup/plugin-json'),
     ]);
     const importersById: ImportersById = new Map();
+    const staticImportersById: ImportersById = new Map();
+    const unresolvedImports: RollupLog[] = [];
     const bundle = await rollup({
       input: cloudFunctionFilePath,
-      plugins: [nodeResolve({ preferBuiltins: true }), commonjs(), json(), recordImporters(importersById)],
+      plugins: [
+        nodeResolve({ preferBuiltins: true }),
+        commonjs(),
+        json(),
+        recordImporters(importersById, staticImportersById),
+      ],
       onwarn: (warning, defaultHandler) => {
-        if (warning.code === 'UNRESOLVED_IMPORT' && warning.id && warning.exporter) {
-          const importer = path.relative(realpathSync(this.pathToSourceCode), realpathSync(warning.id));
-          throw new MissingPackageError(importer, warning.exporter);
+        if (warning.code === 'UNRESOLVED_IMPORT' && warning.exporter) {
+          unresolvedImports.push(warning);
+          return;
         }
 
         defaultHandler(warning);
       },
     });
+    this.refuseMissingPackages(unresolvedImports, staticImportersById);
     outsideImports.report(importersById);
 
     const bundleFile = path.join(
@@ -366,11 +434,10 @@ export class CloudFunctions {
       format: 'esm',
       inlineDynamicImports: true,
       sourcemap: true,
+      sourcemapExcludeSources: true,
       file: bundleFile,
     });
     writeFileSync(bundleFile, `${output[0].code}\n//# sourceMappingURL=${output[0].map?.toUrl()}\n`);
-    process.setSourceMapsEnabled(true);
-
     const module = await loadDataURL(pathToFileURL(bundleFile).href);
 
     const exported = module.default;

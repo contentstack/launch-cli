@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import fs, { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import type { Server } from 'http';
 import { createServer } from 'http';
 import { request as httpRequest } from 'http';
@@ -565,6 +565,18 @@ describe('CloudFunctions serve routing', () => {
     expect(response.cacheControl).toBe('no-store');
   });
 
+  it('removes its temporary bundles once the functions are loaded, whether loading succeeds or fails', async () => {
+    const mkdtemp = jest.spyOn(fs, 'mkdtempSync');
+    writeFunctionFile('hello.js', 'export default function hello(request, response) { response.send("hi"); }');
+    await new CloudFunctions(workspace).serve(await freePort());
+    writeFunctionFile('zzz-boom.js', 'throw new Error("init"); export default function boom() {}');
+    await new CloudFunctions(workspace).serve(await freePort()).catch(() => undefined);
+
+    const bundleDirectories = mkdtemp.mock.results.map((result) => String(result.value));
+    expect(bundleDirectories).toHaveLength(2);
+    expect(bundleDirectories.filter((directory) => existsSync(directory))).toEqual([]);
+  });
+
   it('logs a handler error with a stack pointing at the function source file and line', async () => {
     const sourceMaps = jest.spyOn(process, 'setSourceMapsEnabled');
     writeFunctionFile('broken.js', ['export default function broken() {', '  throw new Error("handler blew up");', '}'].join('\n'));
@@ -643,6 +655,22 @@ describe('CloudFunctions serve failures', () => {
     expect(startedServers).toHaveLength(0);
   });
 
+  it('gives the file, line and column of a syntax error', async () => {
+    writeFunctionFile('syn.js', ['export default function syn() {', '  const = 1;', '}'].join('\n'));
+
+    await expect(new CloudFunctions(workspace).serve(await freePort())).rejects.toThrow(
+      `(${join('functions', 'syn.js')}:2:`,
+    );
+  });
+
+  it('keeps a thrown non-error value in the load failure message', async () => {
+    writeFunctionFile('str.js', 'throw "plain string"; export default function str() {}');
+
+    await expect(new CloudFunctions(workspace).serve(await freePort())).rejects.toThrow(
+      `Could not load ${join('functions', 'str.js')}: plain string`,
+    );
+  });
+
   it('names the function file when it cannot be bundled', async () => {
     writeFunctionFile('syntax-error.js', 'export default function ( {');
 
@@ -673,6 +701,38 @@ describe('CloudFunctions serve failures', () => {
       `Could not load ${needs}: ${needs} imports "not-installed-pkg", which is not installed. Run npm install in the project.`,
     );
     expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('names the commonjs function file when it requires a package that is not installed', async () => {
+    const cjs = join('functions', 'cjs.js');
+    writeFunctionFile(
+      'cjs.js',
+      'const x = require("not-installed-cjs"); module.exports = function cjs(request, response) { response.send(x); };',
+    );
+
+    await expect(new CloudFunctions(workspace).serve(await freePort())).rejects.toThrow(
+      `Could not load ${cjs}: ${cjs} imports "not-installed-cjs", which is not installed. Run npm install in the project.`,
+    );
+  });
+
+  it('still serves a function that guards a dynamic import of a package that is not installed', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    writeFunctionFile(
+      'opt.js',
+      [
+        'export default async function opt(request, response) {',
+        '  let peer = null;',
+        '  try { peer = await import("optional-peer"); } catch { peer = null; }',
+        '  response.json({ hasPeer: peer !== null });',
+        '}',
+      ].join('\n'),
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/opt');
+
+    expect(JSON.parse(response.body)).toEqual({ hasPeer: false });
   });
 
   it('rejects when a function file imports a module that cannot be resolved', async () => {

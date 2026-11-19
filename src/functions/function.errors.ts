@@ -61,9 +61,16 @@ export class PortInUseError extends Error {
 export class FunctionLoadError extends Error {
   constructor(
     functionFile: string,
-    readonly cause: Error,
+    readonly cause: unknown,
+    location?: { file: string; absoluteFile: string; line: number; column: number },
   ) {
-    super(`Could not load ${functionFile}: ${cause.message}`);
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    super(
+      location
+        ? `Could not load ${functionFile}: ${reason.replace(` in ${location.absoluteFile}`, '')} ` +
+            `(${location.file}:${location.line}:${location.column})`
+        : `Could not load ${functionFile}: ${reason}`,
+    );
     this.name = CloudFunctionErrorTypes.FUNCTION_LOAD_ERROR;
   }
 }
