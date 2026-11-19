@@ -209,6 +209,39 @@ describe('integration: launch:variables:set and :unset driven through oclif runC
     expect(stdout).toContain(`2 variables set \u2014 2 from ${file}, API_URL overridden by --var`);
   });
 
+  it('sends a # with no space before it as part of a dotenv value and drops a comment after a space', async () => {
+    const sent = wire();
+    patchEndpoint(sent);
+    const file = join(workDir, 'hash.env');
+    writeFileSync(file, 'COLOR=#ff0000\nURL=https://x.test/#/home\nPW=p@ss#word1\nNOTE=kept # dropped\n');
+
+    const { error } = await runCommand(['launch:variables:set', ...SCOPE, '--dotenv', file, '--data-dir', workDir], config);
+
+    expect(error).toBeUndefined();
+    expect(sent.patch).toEqual([
+      { set: [{ key: 'COLOR', value: '#ff0000' },
+        { key: 'URL', value: 'https://x.test/#/home' },
+        { key: 'PW', value: 'p@ss#word1' },
+        { key: 'NOTE', value: 'kept' },
+      ],
+      },
+    ]);
+  });
+
+  it('exits 2 naming the file and line of a malformed dotenv line, sending no request', async () => {
+    const sent = wire();
+    const scope = patchEndpoint(sent);
+    const file = join(workDir, 'bad.env');
+    writeFileSync(file, 'A=1\nAPI_URL https://x\n');
+
+    const { error } = await runCommand(['launch:variables:set', ...SCOPE, '--dotenv', file, '--data-dir', workDir], config);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toContain(`Line 2 of ${file} has no "=".`);
+    expect(sent.order).toEqual([]);
+    expect(scope.isDone()).toBe(false);
+  });
+
   it('auto-detects .env.local under --data-dir with no source flag and names the file it chose', async () => {
     const sent = wire();
     patchEndpoint(sent);
