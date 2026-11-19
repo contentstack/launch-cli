@@ -27,6 +27,8 @@ import type { CloudFunctionResource } from './types';
 
 type CloudFunctionHandler = CloudFunctionResource['handler'];
 
+const DEPLOYED_PAYLOAD_LIMIT = '6mb';
+
 function isHandler(value: unknown): value is CloudFunctionHandler {
   return typeof value === 'function';
 }
@@ -47,8 +49,8 @@ function applyRequestMiddleware(app: Express): void {
   app.use(attachCookies);
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
-  app.use(express.text());
-  app.use(express.raw());
+  app.use(express.text({ limit: DEPLOYED_PAYLOAD_LIMIT }));
+  app.use(express.raw({ limit: DEPLOYED_PAYLOAD_LIMIT }));
   app.use(defaultToNoStore);
 }
 

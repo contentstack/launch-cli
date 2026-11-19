@@ -325,6 +325,21 @@ describe('CloudFunctions serve routing', () => {
     expect(JSON.parse(response.body)).toEqual({ body: { name: 'launch', tags: ['a', 'b'] } });
   });
 
+  it.each(['text/plain', 'application/octet-stream'])(
+    'hands a %s body over the 100kb parser default to the handler, as Lambda allows',
+    async (contentType) => {
+      writeFunctionFile('size.js', 'export default function size(request, response) { response.json({ length: request.body.length }); }');
+      const body = 'a'.repeat(200 * 1024);
+      const port = await freePort();
+
+      await new CloudFunctions(workspace).serve(port);
+      const response = await sendRequest(port, '/size', { method: 'POST', headers: { 'content-type': contentType }, body });
+
+      expect(response.status).toBe(200);
+      expect(JSON.parse(response.body)).toEqual({ length: body.length });
+    },
+  );
+
   it('hands a text/plain body to the handler as the raw string', async () => {
     writeFunctionFile('body.js', 'export default function body(request, response) { response.json({ body: request.body }); }');
     const port = await freePort();
