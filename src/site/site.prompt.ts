@@ -1,6 +1,6 @@
 import type { Choice, UxLike } from '../core/prompt';
 import { askOption } from '../core/prompt';
-import { bareHost, withScheme } from '../core/url';
+import { bareHost, webUrlOf } from '../core/url';
 import type { SiteDomain } from './site.url';
 
 export const DOMAIN_QUESTION = 'Which domain do you want to open?';
@@ -12,10 +12,11 @@ export function domainChoices(defaultUrl: string, domains: readonly SiteDomain[]
 
   for (const domain of domains) {
     const host = bareHost(domain.url ?? '');
+    const url = webUrlOf(domain.url);
 
-    if (host !== '' && !seen.has(host.toLowerCase())) {
+    if (url !== undefined && !seen.has(host.toLowerCase())) {
       seen.add(host.toLowerCase());
-      choices.push({ name: host, value: withScheme(domain.url as string) });
+      choices.push({ name: host, value: url });
     }
   }
 

@@ -443,7 +443,7 @@ fileignoreconfig:
 - filename: src/commands/launch/deployments/create.test.ts
   checksum: 9f5c60d5f6367250aa8f932acf0e5a7ece933f3fc1ca173fa908e80724d1d579
 - filename: src/deployments/deployment.create.test.ts
-  checksum: b880edba719b71f388ae04bab474d85e1a81af6346fb9a96a25352d50805366f
+  checksum: aceeba27a10ffe7bcf7f78af4c88cb19e017a46c898f02a07e314f949775841a
 - filename: test/integration/deployments-rollback.test.ts
   checksum: 98a9f7001eb5bf01e0e2f46677eeea61ad5d38c595d17ef27d366c93e603f0d5
 - filename: test/integration/deployments-cancel.test.ts

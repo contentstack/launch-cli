@@ -134,7 +134,11 @@ export class DeploymentCreator {
       return undefined;
     }
 
-    return (await this.services.api.environments.get(scope)).domains;
+    try {
+      return (await this.services.api.environments.get(scope)).domains;
+    } catch {
+      return undefined;
+    }
   }
 
   private async waitFor(followed: FollowedDeployment): Promise<DeploymentOutcome> {

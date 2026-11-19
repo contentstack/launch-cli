@@ -80,6 +80,7 @@ function harness(
     projectFails?: Error;
     announceFails?: Error;
     domains?: SiteDomain[];
+    environmentFails?: Error;
     pick?: () => Promise<string>;
   } = {},
 ): Harness {
@@ -110,6 +111,10 @@ function harness(
       get: async (params: unknown) => {
         methods.push('environment');
         fetched.push(params);
+
+        if (options.environmentFails !== undefined) {
+          throw options.environmentFails;
+        }
 
         return { uid: ENVIRONMENT, domains: options.domains ?? [] };
       },
@@ -365,6 +370,18 @@ describe('DeploymentCreator waiting for the outcome', () => {
       { org: ORG, project: PROJECT, environment: ENVIRONMENT },
     ]);
     expect(announcedDomains).toEqual([domains]);
+  });
+
+  it('still succeeds, announcing without domains, when that environment read fails after the deployment is live', async () => {
+    const { creator, announced, announcedDomains } = harness({
+      outcome: { kind: 'success', status: 'LIVE', deployment },
+      environmentFails: new LaunchApiError(503, [{ code: 'x', message: 'Service unavailable.' }]),
+    });
+
+    await creator.create(BASE);
+
+    expect(announced).toEqual([deployment]);
+    expect(announcedDomains).toEqual([undefined]);
   });
 
   it.each([['ARCHIVED'], ['SKIPPED'], ['CANCELLED'], ['FAILED']])(
