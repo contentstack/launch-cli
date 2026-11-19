@@ -565,6 +565,20 @@ describe('CloudFunctions serve routing', () => {
     expect(response.cacheControl).toBe('no-store');
   });
 
+  it('logs a handler error with a stack pointing at the function source file and line', async () => {
+    const sourceMaps = jest.spyOn(process, 'setSourceMapsEnabled');
+    writeFunctionFile('broken.js', ['export default function broken() {', '  throw new Error("handler blew up");', '}'].join('\n'));
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    await sendRequest(port, '/broken');
+
+    const stack = String((loggedErrors[0] as Error).stack);
+    expect(stack).toContain(`${join('functions', 'broken.js')}:2:`);
+    expect(stack).not.toContain('data:text/javascript');
+    expect(sourceMaps).toHaveBeenCalledWith(true);
+  });
+
   it('answers 500 and logs when a handler throws', async () => {
     writeFunctionFile('broken.js', 'export default function broken() { throw new Error("handler blew up"); }');
     const port = await freePort();

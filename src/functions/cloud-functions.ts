@@ -7,11 +7,13 @@ import type {
 } from 'express';
 import express from 'express';
 import type { Express } from 'express-serve-static-core';
-import { realpathSync } from 'fs';
+import { mkdtempSync, realpathSync, writeFileSync } from 'fs';
 import type { Server } from 'http';
 import type { AddressInfo } from 'net';
+import { tmpdir } from 'os';
 import path from 'path';
 import type { Plugin } from 'rollup';
+import { pathToFileURL } from 'url';
 
 import { styled } from '../core/style';
 import { isRecord } from '../core/values';
@@ -146,6 +148,8 @@ export function listenFailure(error: NodeJS.ErrnoException, servingPort: number)
 export class CloudFunctions {
   private cloudFunctionsDirectoryPath: string;
   private pathToSourceCode: string;
+  private bundleDirectoryPath?: string;
+  private bundleCount = 0;
 
   constructor(pathToSourceCode: string) {
     this.cloudFunctionsDirectoryPath = path.join(
@@ -324,6 +328,11 @@ export class CloudFunctions {
     return { exactRouteResources, dynamicRouteResources };
   }
 
+  private bundleDirectory(): string {
+    this.bundleDirectoryPath ??= mkdtempSync(path.join(tmpdir(), 'launch-functions-'));
+    return this.bundleDirectoryPath;
+  }
+
   private async buildHandlerForFilepath(
     cloudFunctionFilePath: string,
     outsideImports: OutsideImportReporter,
@@ -349,17 +358,20 @@ export class CloudFunctions {
     });
     outsideImports.report(importersById);
 
+    const bundleFile = path.join(
+      this.bundleDirectory(),
+      `${this.bundleCount++}-${path.basename(cloudFunctionFilePath, CLOUD_FUNCTIONS_SUPPORTED_EXTENSION)}.mjs`,
+    );
     const { output } = await bundle.generate({
       format: 'esm',
       inlineDynamicImports: true,
+      sourcemap: true,
+      file: bundleFile,
     });
+    writeFileSync(bundleFile, `${output[0].code}\n//# sourceMappingURL=${output[0].map?.toUrl()}\n`);
+    process.setSourceMapsEnabled(true);
 
-    const builtCode = output[0].code;
-
-    const builtCodeInDataURLFormat =
-      'data:text/javascript;base64,' + Buffer.from(builtCode).toString('base64');
-
-    const module = await loadDataURL(builtCodeInDataURLFormat);
+    const module = await loadDataURL(pathToFileURL(bundleFile).href);
 
     const exported = module.default;
 
