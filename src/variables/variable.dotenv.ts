@@ -6,14 +6,14 @@ export interface ParsedDotenv {
 }
 
 const INLINE_COMMENT = /[ \t]#/;
-const QUOTED = /^(["'])(.*)\1$/;
 const EXPORT_PREFIX = /^export[ \t]+/;
+const QUOTES = ['"', "'"];
 
 function readValue(raw: string): string {
-  const quoted = QUOTED.exec(raw.trim());
+  const leading = raw.trimStart();
 
-  if (quoted) {
-    return quoted[2];
+  if (QUOTES.includes(leading[0])) {
+    return leading.slice(1, leading.indexOf(leading[0], 1));
   }
 
   const comment = INLINE_COMMENT.exec(raw);

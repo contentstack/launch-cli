@@ -48,6 +48,15 @@ describe('variable dotenv', () => {
     expect(parseDotenv('  KEY = abc   ').variables).toEqual([{ key: 'KEY', value: 'abc' }]);
   });
 
+  it.each([
+    ['A="p@ss #1"', 'p@ss #1'],
+    ["A='a b'", 'a b'],
+    ['A="v" #123', 'v'],
+    ["A='v'\t# note", 'v'],
+  ])('removes the quotes around a quoted value and keeps a # inside them (%p)', (line, value) => {
+    expect(parseDotenv(line).variables).toEqual([{ key: 'A', value }]);
+  });
+
   it('keeps an equals sign inside a value', () => {
     expect(parseDotenv('TOKEN=a=b').variables).toEqual([{ key: 'TOKEN', value: 'a=b' }]);
   });
