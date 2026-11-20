@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
-import { renderPagination, renderTable } from './render';
+import { renderPagination, renderTable, wrapCell } from './render';
 import type { UxLike } from './prompt';
 
 const FIRST_UID = randomBytes(12).toString('hex');
@@ -255,7 +255,7 @@ describe('renderTable', () => {
         { uid: FIRST_UID, status: 'LIVE' },
         { uid: SECOND_UID, status: 'FAILED' },
       ],
-      30,
+      40,
     );
 
     expect(lines).toEqual([
@@ -283,6 +283,60 @@ describe('renderTable', () => {
     expect(lines).toEqual([`UID  ${FIRST_UID}`, 'URL  https://staging-site.cont', '     entstackapps.com']);
   });
 
+  it('prints a detail table as plain field-and-value lines, not FIELD/VALUE records, when it cannot fit', () => {
+    const { ux, lines } = fakeUx();
+
+    renderTable(
+      ux,
+      [
+        { header: 'FIELD', value: (row: { field: string; value: string }) => row.field, label: true },
+        { header: 'VALUE', value: (row: { field: string; value: string }) => row.value, minWidth: 24 },
+      ],
+      [
+        { field: 'ENVIRONMENT UID', value: FIRST_UID },
+        { field: 'NAME', value: 'staging' },
+      ],
+      44,
+      true,
+    );
+
+    expect(lines).toEqual([`ENVIRONMENT UID  ${FIRST_UID}`, 'NAME             staging']);
+  });
+
+  it('never shrinks a label column, so a field name is not broken mid-word', () => {
+    const { ux, lines } = fakeUx();
+
+    renderTable(
+      ux,
+      [
+        { header: 'FIELD', value: (row: { field: string; value: string }) => row.field, label: true },
+        { header: 'VALUE', value: (row: { field: string; value: string }) => row.value },
+      ],
+      [{ field: 'CONTENTSTACK AUTH', value: 'enabled for every visitor of the site' }],
+      45,
+    );
+
+    expect(lines[3]).toBe('\u2502  CONTENTSTACK AUTH  \u2502  enabled for every  \u2502');
+    expect(lines.map((line) => [...line].length).every((width) => width === 45)).toBe(true);
+  });
+
+  it('moves a stacked value onto its own indented line when it would not fit beside the label', () => {
+    const { ux, lines } = fakeUx();
+
+    renderTable(
+      ux,
+      [
+        { header: 'ENVIRONMENT UID', value: (row: { uid: string; name: string }) => row.uid, minWidth: 24 },
+        { header: 'NAME', value: (row: { uid: string; name: string }) => row.name, minWidth: 24 },
+      ],
+      [{ uid: FIRST_UID, name: 'staging' }],
+      40,
+    );
+
+    expect(lines).toEqual(['ENVIRONMENT UID', `  ${FIRST_UID}`, 'NAME', '  staging']);
+    expect(lines.every((line) => [...line].length <= 40)).toBe(true);
+  });
+
   it('bolds the stacked labels on a terminal and leaves the values plain', () => {
     const { ux, lines } = fakeUx();
 
@@ -290,7 +344,7 @@ describe('renderTable', () => {
       ux,
       [{ header: 'UID', value: (row: { uid: string }) => row.uid, minWidth: 24 }],
       [{ uid: FIRST_UID }],
-      20,
+      29,
       true,
     );
 
@@ -307,7 +361,7 @@ describe('renderTable', () => {
       15,
     );
 
-    expect(lines).toEqual(['NAME  abcdefghijklmnop']);
+    expect(lines).toEqual(['NAME', '  abcdefghijklmnop']);
   });
 
   it('keeps a column at its header width when that is wider than ten characters', () => {
@@ -418,6 +472,20 @@ describe('renderTable', () => {
     renderTable(ux, [], [{}], 10);
 
     expect(lines).toEqual([]);
+  });
+});
+
+describe('wrapCell', () => {
+  it('starts a continuation line at the next word, dropping the run of spaces it broke on', () => {
+    expect(wrapCell('abcd  ef', 4)).toEqual(['abcd', 'ef']);
+  });
+
+  it('adds no empty line when the text ends in spaces at a break', () => {
+    expect(wrapCell('abcd    ', 4)).toEqual(['abcd']);
+  });
+
+  it('returns one empty line for an empty cell', () => {
+    expect(wrapCell('', 4)).toEqual(['']);
   });
 });
 

@@ -313,7 +313,7 @@ export function deploymentColumns(showGit: boolean): TableColumn<Deployment>[] {
 }
 
 export const DEPLOYMENT_DETAIL_COLUMNS: TableColumn<DeploymentDetailRow>[] = [
-  { header: 'FIELD', value: (row) => row.field },
+  { header: 'FIELD', value: (row) => row.field, label: true },
   { header: 'VALUE', value: (row) => row.value, minWidth: UID_WIDTH },
 ];
 

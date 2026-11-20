@@ -8,7 +8,7 @@ fileignoreconfig:
 - filename: src/core/failure.test.ts
   checksum: 3f5c731861dc816d141f6314c32bec55bc5197241447a4375bc76fa9f85339f0
 - filename: test/integration/retired-commands.test.ts
-  checksum: 0b3394e39f641c186d8b40caf6111109774dbb9947dbc7c4feb030411b541155
+  checksum: 84d9c9ddae05faf49e6bd29e2835051714ed53ac35c8a0283c87679f06902b0a
 - filename: test/integration/manage-base-path.test.ts
   checksum: 79eb9ad420ea47d5bee8045d812c45b010bbeeafcaf5f85d11653140b0cd0db1
 - filename: src/transport/rest-client.ts
@@ -153,11 +153,11 @@ fileignoreconfig:
   ignore_detectors:
     - filename
 - filename: src/environments/environment.presenter.ts
-  checksum: bd2b81063d16b2d8fe79576b8cbbcd7abfebdc99e05dea14a0a2e2efbfa07185
+  checksum: a0bede780ca4e4e95ebef6f4aac9aa9badb88e12beb794062e6be55fe3c6cb24
   ignore_detectors:
     - filename
 - filename: src/environments/environment.presenter.test.ts
-  checksum: 2872058e95579852624ddbeb2688d68e9ee1795c73c725598c245806dba918f1
+  checksum: 6d05bb10a3aca5d55b9526f395efa7f7b5b0c647533c36558bbdc6481c23fae3
   ignore_detectors:
     - filename
 - filename: src/environments/environment.resolver.ts
@@ -236,7 +236,7 @@ fileignoreconfig:
     - "a project name passed on argv to the project resolver"
     - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
 - filename: AGENTS.md
-  checksum: c14d34ea8af9df25bc971ac53223a59cef30deec893337817b17695584d86ad9
+  checksum: 46584ecc6343552c40b96b2b5c76a60c1b87ef454fa82f9c901086bcd408b090
   allowed_patterns:
     - "Do not add an exemption to a guard to make a new file pass"
     - "passes its own error wording to `client.request\\(req, MESSAGES\\)`"
@@ -247,9 +247,9 @@ fileignoreconfig:
     - "a test passes `var`, `env-file` and `from-stack`"
     - "an in-flight secret registry to redact against"
 - filename: src/core/project-config.ts
-  checksum: ac0cc31358713f64d911dacbc64379885e1e04a897e05cca5a64fd169c4c4a17
+  checksum: 9f0c3b2633d311d9f51ea57d3ec6a081b0102c9ebdb3cf37f08f46d00267e069
 - filename: src/core/project-config.test.ts
-  checksum: 5ac6431f914f152c434c80a1a3d2475a830d4d4d74d758b235039c3c80f3b03f
+  checksum: 55746e82d59077579975cf306633a03e6c2471b89fe29ab549c2050113a82c60
 - filename: src/core/resolve.ts
   checksum: a5608d22286efdd4915639faff6e05a588e60e205c74e0398e389822eb8c7292
 - filename: src/core/resolve.test.ts
@@ -271,7 +271,7 @@ fileignoreconfig:
 - filename: src/projects/project.inputs.test.ts
   checksum: 8242f4d40388f1a7f1d08c11d2571cb45a9294069a8248a5272bc5606807bb60
 - filename: test/integration/projects-command-flows.test.ts
-  checksum: 022d03049b69d090c14446cb05f390149422e1cde5390f9f73a3a5f4293cd6b9
+  checksum: ede00ae963c4d64ec41dce31cb59d7d58c22ebff18ae670be55192e43fa94290
 - filename: src/core/redact.test.ts
   checksum: ae497ea8c3a4c3f12217d2c4c028a1da3d1324e18362d68c355ba8120902bcb3
 - filename: src/commands/launch/projects/list.test.ts
@@ -309,7 +309,7 @@ fileignoreconfig:
 - filename: src/core/search-list.test.ts
   checksum: 4e5db3cd6a213db71c51bf5ac8d6a5547ea9ca137d425c00026453e5c3b543b7
 - filename: src/core/catalog.test.ts
-  checksum: e4f77b79f003a0f9e7c6f6dd6e5ca94c2911c3cce8ad9dd41dc0a2d314f6b3ce
+  checksum: 5f79096b43a3b3c6b03f6c86e8f2fbd5c77424e9889a74fd9de12852814620bd
 - filename: test/credential-guard.setup.ts
   checksum: 519ccbeb0552fdb1d5f27308c56477c0258ee6cc0adec8f618e8e5bc047cbf6d
 - filename: src/environments/types.ts

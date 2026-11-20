@@ -3,7 +3,11 @@ import { randomBytes } from 'node:crypto';
 import type { UxLike } from '../../src/core/prompt';
 import type { TableColumn } from '../../src/core/render';
 import { renderTable } from '../../src/core/render';
-import { deploymentColumns } from '../../src/deployments/deployment.presenter';
+import {
+  DEPLOYMENT_DETAIL_COLUMNS,
+  deploymentColumns,
+  deploymentDetailRows,
+} from '../../src/deployments/deployment.presenter';
 import type { Deployment } from '../../src/deployments/types';
 import {
   ENVIRONMENT_DETAIL_COLUMNS,
@@ -17,6 +21,7 @@ import type { Project } from '../../src/projects/types';
 const ENVIRONMENT_UID = randomBytes(12).toString('hex');
 const DEPLOYMENT_UID = randomBytes(12).toString('hex');
 const PROJECT_UID = randomBytes(12).toString('hex');
+const ORG_UID = `blt${randomBytes(8).toString('hex')}`;
 const UPDATED = '2026-11-19T10:15:30.123Z';
 
 const environment: Environment = {
@@ -59,6 +64,12 @@ const CASES: Case[] = [
     uids: [ENVIRONMENT_UID],
   },
   { name: 'deployments:list', columns: deploymentColumns(true) as never, rows: [deployment], uids: [DEPLOYMENT_UID] },
+  {
+    name: 'deployments:get',
+    columns: DEPLOYMENT_DETAIL_COLUMNS as never,
+    rows: deploymentDetailRows(deployment, true, { org: ORG_UID, project: PROJECT_UID, environment: ENVIRONMENT_UID }),
+    uids: [DEPLOYMENT_UID],
+  },
   { name: 'projects:list', columns: PROJECT_COLUMNS as never, rows: [project], uids: [PROJECT_UID] },
   { name: 'projects:get', columns: PROJECT_DETAIL_COLUMNS as never, rows: [project], uids: [PROJECT_UID] },
 ];
@@ -72,8 +83,12 @@ function draw(table: Case, width: number): string[] {
   return lines;
 }
 
+const WIDTHS = [30, 40, 45, 50, 60, 80, 100];
+
+const DETAIL_CASES = CASES.filter((table) => (table.columns[0] as { label?: boolean }).label === true);
+
 describe('guard: tables fit a narrow terminal without cutting a UID', () => {
-  it.each(CASES.flatMap((table) => [60, 80, 100].map((width) => [table.name, width, table] as const)))(
+  it.each(CASES.flatMap((table) => WIDTHS.map((width) => [table.name, width, table] as const)))(
     '%s at %i columns draws no line wider than the terminal and prints every UID whole on one line',
     (_name, width, table) => {
       const lines = draw(table, width);
@@ -82,6 +97,18 @@ describe('guard: tables fit a narrow terminal without cutting a UID', () => {
       expect(tooWide).toEqual([]);
       table.uids.forEach((uid) => expect(lines.some((line) => line.includes(uid))).toBe(true));
       expect(lines.join('\n')).not.toContain('…');
+    },
+  );
+
+  it.each(DETAIL_CASES.flatMap((table) => WIDTHS.map((width) => [table.name, width, table] as const)))(
+    '%s at %i columns prints every field label whole on one line and never as a FIELD/VALUE record',
+    (_name, width, table) => {
+      const lines = draw(table, width);
+
+      (table.rows as { field: string }[]).forEach((row) =>
+        expect(lines.some((line) => line.includes(row.field))).toBe(true),
+      );
+      expect(lines.some((line) => /^FIELD\s/.test(line))).toBe(false);
     },
   );
 });

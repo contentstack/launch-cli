@@ -70,6 +70,20 @@ describe('coreFlags', () => {
     },
   );
 
+  it.each([['9'.repeat(400)], ['1' + '0'.repeat(21)], [String(Number.MAX_SAFE_INTEGER + 1)]])(
+    'rejects a skip too large to send exactly, rather than letting %p reach the API as Infinity or 1e+21',
+    async (skip) => {
+      const failure = await parse(['--skip', skip]).catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(FlagValueError);
+      expect((failure as FlagValueError).detail).toBe(`Invalid --skip value "${skip}". Provide a whole number of 0 or more.`);
+    },
+  );
+
+  it('accepts the largest skip that can be sent exactly', async () => {
+    await expect(parse(['--skip', String(Number.MAX_SAFE_INTEGER)])).resolves.toMatchObject({ skip: Number.MAX_SAFE_INTEGER });
+  });
+
   it('leaves limit and skip absent when neither is passed so the resolution defaults still apply', async () => {
     const flags = await parse([]);
 

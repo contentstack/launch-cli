@@ -167,7 +167,7 @@ export class ProjectConfigStore {
     }
 
     if (typeof read === 'string') {
-      throw new UsageError(`${read} Fix or delete it, or pass --org and --project.`);
+      throw new UsageError(`${read} Fix or delete it, or pass the missing flags.`);
     }
 
     return read;

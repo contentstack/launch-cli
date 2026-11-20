@@ -121,7 +121,7 @@ describe('integration: retired V1 command names', () => {
 
     const { error } = await runCommand(['launch:functions:serve', '--port', '70000', '--data-dir', projectDir], config);
 
-    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.oclif?.exit).toBe(1);
     expect(error?.message).toBe('Invalid port number. Please provide a valid port number between 0 and 65535.');
     expect(error?.message).not.toContain('was removed in Launch CLI v2');
     const logs = join(projectDir, 'logs');

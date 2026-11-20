@@ -12,6 +12,7 @@ export interface TableColumn<T> {
   header: string;
   value: (row: T) => string;
   minWidth?: number;
+  label?: boolean;
 }
 
 export const UID_WIDTH = 24;
@@ -63,6 +64,7 @@ const EDGE_PADDING = 2 + CELL_PADDING;
 const JOIN_PADDING = 1 + CELL_PADDING;
 const READABLE_CELL = 10;
 const STACKED_GAP = '  ';
+const OWN_LINE_INDENT = '  ';
 
 function unitsOf(text: string): string[] {
   return [...text];
@@ -94,9 +96,15 @@ export function wrapCell(text: string, width: number): string[] {
     const cut = breakAt(units.slice(0, width + 1), width);
     lines.push(units.slice(0, cut).join('').trimEnd());
     units = units.slice(cut);
+
+    while (units[0] === ' ') {
+      units.shift();
+    }
   }
 
-  lines.push(units.join(''));
+  if (units.length > 0 || lines.length === 0) {
+    lines.push(units.join(''));
+  }
 
   return lines;
 }
@@ -151,7 +159,39 @@ function fittedWidths(natural: number[], floors: number[], available: number): n
 }
 
 function floorOf<T>(column: TableColumn<T>, natural: number): number {
+  if (column.label === true) {
+    return natural;
+  }
+
   return Math.min(natural, Math.max(widthOf(column.header), column.minWidth ?? READABLE_CELL));
+}
+
+function printLabelled(
+  ux: UxLike,
+  pairs: [string, string][],
+  available: number,
+  boldLabels: boolean,
+): void {
+  const labelWidth = Math.max(...pairs.map(([label]) => widthOf(label)));
+  const indent = ' '.repeat(labelWidth + STACKED_GAP.length);
+  const besideLabel = available - indent.length >= UID_WIDTH;
+
+  pairs.forEach(([label, value]) => {
+    const shownLabel = styled(besideLabel ? padCell(label, labelWidth) : label, 'bold', boldLabels);
+
+    if (besideLabel) {
+      const [first, ...rest] = wrapCell(value, available - indent.length);
+
+      ux.print(`${shownLabel}${STACKED_GAP}${first}`);
+      rest.forEach((line) => ux.print(`${indent}${line}`));
+      return;
+    }
+
+    ux.print(shownLabel);
+    wrapCell(value, Math.max(available - OWN_LINE_INDENT.length, UID_WIDTH)).forEach((line) =>
+      ux.print(`${OWN_LINE_INDENT}${line}`),
+    );
+  });
 }
 
 function renderStacked(
@@ -161,22 +201,27 @@ function renderStacked(
   available: number,
   outputIsTTY: boolean,
 ): void {
-  const labelWidth = Math.max(...headers.map(widthOf));
-  const indent = ' '.repeat(labelWidth + STACKED_GAP.length);
-  const valueWidth = Math.max(available - indent.length, UID_WIDTH);
-
   cells.forEach((rowCells, index) => {
     if (index > 0) {
       ux.print('');
     }
 
-    rowCells.forEach((cell, column) => {
-      const [first, ...rest] = wrapCell(cell, valueWidth);
-
-      ux.print(`${styled(padCell(headers[column], labelWidth), 'bold', outputIsTTY)}${STACKED_GAP}${first}`);
-      rest.forEach((line) => ux.print(`${indent}${line}`));
-    });
+    printLabelled(
+      ux,
+      rowCells.map((cell, column): [string, string] => [headers[column], cell]),
+      available,
+      outputIsTTY,
+    );
   });
+}
+
+function renderDetailLines(ux: UxLike, cells: string[][], available: number): void {
+  printLabelled(
+    ux,
+    cells.map(([label, value]): [string, string] => [label, value]),
+    available,
+    false,
+  );
 }
 
 function drawBox(ux: UxLike, headers: string[], cells: string[][], widths: number[], outputIsTTY: boolean): void {
@@ -227,6 +272,11 @@ export function renderTable<T>(
     columns.map((column, index) => floorOf(column, natural[index])),
     available,
   );
+
+  if (widths === undefined && columns.length === 2 && columns[0].label === true) {
+    renderDetailLines(ux, cells, available);
+    return;
+  }
 
   if (widths === undefined) {
     renderStacked(ux, headers, cells, available, outputIsTTY);

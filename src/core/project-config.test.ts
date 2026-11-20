@@ -100,7 +100,7 @@ describe('ProjectConfigStore.load', () => {
 
       expect(() => new ProjectConfigStore(path, required).load()).toThrow(
         new UsageError(
-          `The config file at '${path}' is not valid JSON. Fix or delete it, or pass --org and --project.`,
+          `The config file at '${path}' is not valid JSON. Fix or delete it, or pass the missing flags.`,
         ),
       );
     },
@@ -205,7 +205,7 @@ describe('ProjectConfigStore.load', () => {
 
       expect(() => store.load()).toThrow(
         new UsageError(
-          `The config file at '${store.path}' does not hold a project config. Fix or delete it, or pass --org and --project.`,
+          `The config file at '${store.path}' does not hold a project config. Fix or delete it, or pass the missing flags.`,
         ),
       );
     },

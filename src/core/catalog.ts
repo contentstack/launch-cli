@@ -16,7 +16,9 @@ export function wholeNumberFlag(name: string, min: number, max: number | undefin
       const value = input.trim();
       const parsed = Number(value);
 
-      if (!WHOLE_NUMBER.test(value) || parsed < min || (max !== undefined && parsed > max)) {
+      const exact = WHOLE_NUMBER.test(value) && Number.isSafeInteger(parsed);
+
+      if (!exact || parsed < min || (max !== undefined && parsed > max)) {
         throw new FlagValueError(`Invalid --${name} value "${input}". Provide a whole number ${rangeOf(min, max)}.`);
       }
 

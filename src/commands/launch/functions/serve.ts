@@ -1,7 +1,7 @@
 import { Command } from '@oclif/core';
 import { existsSync, statSync } from 'node:fs';
 
-import { EXIT_USAGE } from '../../../core/constants';
+import { EXIT_RUNTIME, EXIT_USAGE } from '../../../core/constants';
 import { failureOutputOf, reportFailure } from '../../../core/failure';
 import Contentfly from '../../../functions';
 import { PortInUseError } from '../../../functions/function.errors';
@@ -26,11 +26,11 @@ export default class Functions extends Command {
     const currentWorkingDirectory = process.cwd();
     const projectBasePath = flags['data-dir'] || currentWorkingDirectory;
     if (!existsSync(projectBasePath)) {
-      this.error('Provided base path is not valid', { exit: EXIT_USAGE });
+      this.error('Provided base path is not valid', { exit: EXIT_RUNTIME });
     }
 
     if (!statSync(projectBasePath).isDirectory()) {
-      this.error(`--data-dir ${projectBasePath} is not a directory`, { exit: EXIT_USAGE });
+      this.error(`--data-dir ${projectBasePath} is not a directory`, { exit: EXIT_RUNTIME });
     }
 
     const logger = new Logger({ projectBasePath });
@@ -41,7 +41,7 @@ export default class Functions extends Command {
       const message = 'Invalid port number. Please provide a valid port number between 0 and 65535.';
       this.log(message, 'error');
       await logger.flush();
-      this.error(message, { exit: EXIT_USAGE });
+      this.error(message, { exit: EXIT_RUNTIME });
     }
 
     this.sharedConfig = {

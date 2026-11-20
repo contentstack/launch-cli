@@ -41,7 +41,7 @@ export function environmentColumns(showBranch: boolean): TableColumn<Environment
 }
 
 export const ENVIRONMENT_DETAIL_COLUMNS: TableColumn<DetailRow>[] = [
-  { header: 'FIELD', value: (row) => row.field },
+  { header: 'FIELD', value: (row) => row.field, label: true },
   { header: 'VALUE', value: (row) => row.value, minWidth: UID_WIDTH },
 ];
 

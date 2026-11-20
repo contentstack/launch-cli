@@ -125,7 +125,7 @@ describe('integration: end-to-end command flows', () => {
       expect(error?.oclif?.exit).toBe(2);
       expect(stdout).toBe('');
       expect(stderr).toBe(
-        `error: The config file at '${path}' ${reason} Fix or delete it, or pass --org and --project.\n`,
+        `error: The config file at '${path}' ${reason} Fix or delete it, or pass the missing flags.\n`,
       );
       expect(scope.isDone()).toBe(false);
     },

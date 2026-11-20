@@ -161,13 +161,14 @@ describe('environmentDetailRows', () => {
 });
 
 describe('ENVIRONMENT_DETAIL_COLUMNS', () => {
-  it('draws a FIELD and a VALUE column and keeps the VALUE column wide enough for a whole UID', () => {
+  it('draws a FIELD label column and a VALUE column wide enough for a whole UID', () => {
     expect(ENVIRONMENT_DETAIL_COLUMNS.map((column) => column.header)).toEqual(['FIELD', 'VALUE']);
     expect(ENVIRONMENT_DETAIL_COLUMNS.map((column) => column.value({ field: 'NAME', value: 'production' }))).toEqual([
       'NAME',
       'production',
     ]);
     expect(ENVIRONMENT_DETAIL_COLUMNS.map((column) => column.minWidth)).toEqual([undefined, UID_WIDTH]);
+    expect(ENVIRONMENT_DETAIL_COLUMNS.map((column) => column.label)).toEqual([true, undefined]);
   });
 });
 
