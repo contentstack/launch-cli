@@ -1,6 +1,6 @@
 import { cliux } from '@contentstack/cli-utilities';
 import { randomBytes } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import winston from 'winston';
@@ -45,10 +45,6 @@ function read(name: string): string {
   return existsSync(path) ? readFileSync(path, 'utf8') : '';
 }
 
-function fileNames(): string[] {
-  return readdirSync(join(projectBasePath, 'logs')).sort();
-}
-
 beforeEach(() => {
   projectBasePath = mkdtempSync(join(tmpdir(), 'launch-serve-log-'));
   stdout = [];
@@ -70,17 +66,16 @@ afterEach(async () => {
 });
 
 describe('function logger', () => {
-  it('creates the logs folder at construction and both empty log files without any message being written', async () => {
-    loggerAt(projectBasePath);
+  it('creates no logs folder until a message is written to a log file', () => {
+    jest.spyOn(cliux, 'print').mockImplementation(() => undefined);
+    const logger = loggerAt(projectBasePath);
 
-    expect(existsSync(join(projectBasePath, 'logs'))).toBe(true);
-    await eventually(() => fileNames().length === 2);
-    expect(fileNames()).toEqual(['error.log', 'info.log']);
-    expect(read('error.log')).toBe('');
-    expect(read('info.log')).toBe('');
+    logger.log('printed, not logged');
+
+    expect(existsSync(join(projectBasePath, 'logs'))).toBe(false);
   });
 
-  it('writes an error to logs/error.log as a json line and prints it coloured on stdout', async () => {
+  it('writes an error to logs/error.log as a json line without printing it, leaving that to the command', async () => {
     const logger = loggerAt(projectBasePath);
 
     logger.log('Invalid port number.', 'error');
@@ -88,7 +83,16 @@ describe('function logger', () => {
     await eventually(() => read('error.log') !== '');
     expect(read('error.log')).toBe('{"level":"error","message":"Invalid port number."}\n');
     expect(read('info.log')).toBe('');
-    expect(stdout).toEqual(['\u001b[31merror: Invalid port number.\u001b[39m\n']);
+    expect(stdout).toEqual([]);
+  });
+
+  it('has the error on disk by the time flush resolves, so a process exiting straight after keeps it', async () => {
+    const logger = new Logger({ projectBasePath });
+
+    logger.log('Invalid port number.', 'error');
+    await logger.flush();
+
+    expect(read('error.log')).toBe('{"level":"error","message":"Invalid port number."}\n');
   });
 
   it('writes info and warn to logs/info.log, never to error.log, and drops debug everywhere', async () => {
@@ -131,7 +135,7 @@ describe('function logger', () => {
     expect(info.levels).toEqual({ warn: 1, info: 2, debug: 3 });
     expect(error.levels).toEqual({ error: 0 });
     expect(consoleTransport(info).level).toBeUndefined();
-    expect(consoleTransport(error).level).toBe('error');
+    expect(consoleTransport(error)).toBeUndefined();
   });
 
   it('normalises a base path containing parent segments', () => {

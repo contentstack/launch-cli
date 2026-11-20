@@ -500,27 +500,45 @@ promoting these to `src/core/catalog.ts` now.
 
 `launch:functions:serve` is deliberately a plain oclif `Command` rather than a
 `LaunchCommand`, because it talks to no API and needs no auth gate, and it is **outside**
-this contract on purpose: the product owner's instruction is no functional difference from
-V1 in `serve`. Its port handling is V1's, byte for byte:
+this contract on purpose. It started as V1 byte for byte, on the product owner's instruction;
+CL-8791 (V2 bug bash) then made it match deployed cloud functions and V2's error output. These
+parts are still V1's and must stay so:
 
 - The port is `process.env.PORT || flags.port`, applied by the command after parsing. A set
   `PORT` beats an explicit `--port`, and an empty `PORT` falls through to the flag. The
   `--port` flag therefore does **not** declare `env: 'PORT'` - oclif's precedence (argv
   first) is the opposite of V1's, and restoring it would be a behaviour change.
-- An invalid port prints `Invalid port number. Please provide a valid port number between 0
-  and 65535.` **once**, through the restored V1 logger (`src/functions/function.logger.ts`),
-  which writes every level - `error` included - to **stdout**, as winston's `Console`
-  transport does without `stderrLevels`, and records it in `logs/error.log`. The command
-  then calls `this.exit(EXIT_RUNTIME)`: exit **1**, and nothing on stderr. Do not add a
-  `this.error(...)` after the log line - that was a second print and an exit 2.
+- An invalid port exits **1** (`bf9a139`), not the usage code 2.
 
-Three V1 defects stay fixed and are the only approved differences: an empty or whitespace
-port, from either `--port` or `PORT`, is rejected through that same one-message exit-1 path
-(V1 accepted it because `Number('') === 0` and served on a random port); a busy port raises
-`PortInUseError` and exits 2 with a clean message (V1 crashed on an unhandled `error`
-event); and filepath validation is linear-time (V1's regex took 41 seconds on a plausible
-40-character filename). `test/integration/functions-serve-port.test.ts` pins the port
-precedence and the single message end to end.
+The approved differences from V1 are these, and only these:
+
+- **Errors go to stderr.** An invalid port is recorded in `logs/error.log`, and the command
+  awaits `logger.flush()` so the record is on disk before the process exits. It then calls
+  `this.error(message, { exit: EXIT_RUNTIME })`, so `Invalid port number. Please provide a
+  valid port number between 0 and 65535.` prints **once** on stderr through the shared failure
+  path, coloured only on a TTY. The project error logger (`src/functions/function.logger.ts`)
+  writes only to the file and has no `Console` transport. A `--data-dir` that does not exist,
+  or that is a file, fails the same way before the logger is built.
+- **A port is decimal digits only**, 0-65535. Hex, exponent, signed, space-padded, empty and
+  whitespace values are rejected through that same exit-1 path. V1 read `0x10` as 16 and
+  accepted `''` as 0, a random port.
+- **`logs/` appears only when something is written to it.** V1 created it, empty, on every
+  run.
+- **Requests match AWS deployed functions** (`lambda-node-bridge/cf-sv-with-helpers.ts` in
+  `contentfly-deployment-agent`), as agreed with CL-8791's reporter. JSON and urlencoded
+  bodies are parsed, `text/plain` arrives as the raw string, `application/octet-stream` as a
+  Buffer, all up to Lambda's 6mb cap. `request.cookies` is the parsed `Cookie` header, or `{}`.
+  The project `.env` is loaded before the functions are bundled. Azure and GCP still run the
+  vendored V1 server, which leaves text and octet-stream bodies unparsed; locally a handler
+  that reads the raw request stream for those two types gets an empty stream.
+- **A function that reaches a file outside `functions/` is warned about, not refused**, naming
+  the function file that crosses the boundary.
+- **A busy port** raises `PortInUseError` and exits 2 with a clean message (V1 crashed on an
+  unhandled `error` event), and **filepath validation is linear-time** (V1's regex took 41
+  seconds on a plausible 40-character filename).
+
+`test/integration/functions-serve-port.test.ts` pins the port precedence and the single stderr
+message end to end.
 
 A declined confirmation is a deliberate "no", not a failure, so it does not share code 1 with an
 API 500 - a CI log has to be able to tell those apart. 130 would claim the process was killed by

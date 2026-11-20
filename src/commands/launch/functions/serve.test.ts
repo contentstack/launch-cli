@@ -1,6 +1,6 @@
 import { cliux } from '@contentstack/cli-utilities';
 import { Errors, Parser } from '@oclif/core';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -26,11 +26,6 @@ function temporaryDirectory(): string {
   const dir = mkdtempSync(join(tmpdir(), 'launch-serve-'));
   temporaryDirectories.push(dir);
   return dir;
-}
-
-function logFiles(dir: string): string[] {
-  const logs = join(dir, 'logs');
-  return existsSync(logs) ? readdirSync(logs).sort() : [];
 }
 
 function readLog(dir: string, name: string): string {
@@ -85,7 +80,7 @@ beforeEach(() => {
 afterEach(async () => {
   for (const dir of temporaryDirectories.splice(0)) {
     if (existsSync(join(dir, 'logs'))) {
-      await eventually(() => logFiles(dir).length === 2);
+      await eventually(() => readLog(dir, 'error.log') !== '');
     }
 
     rmSync(dir, { recursive: true, force: true });
@@ -122,7 +117,7 @@ describe('launch:functions:serve flag definitions', () => {
 });
 
 describe('launch:functions:serve init', () => {
-  it('stores the supplied data directory and port and creates the project log files there', async () => {
+  it('stores the supplied data directory and port without creating a logs folder there', async () => {
     const dataDir = temporaryDirectory();
     const command = commandWithFlags({ 'data-dir': dataDir, port: '4000' });
 
@@ -130,10 +125,7 @@ describe('launch:functions:serve init', () => {
 
     expect(Functions.prototype['parse']).toHaveBeenCalledWith(Functions);
     expect(command['sharedConfig']).toEqual({ projectBasePath: dataDir, port: 4000 });
-    expect(existsSync(join(dataDir, 'logs'))).toBe(true);
-    await eventually(() => logFiles(dataDir).length === 2);
-    expect(logFiles(dataDir)).toEqual(['error.log', 'info.log']);
-    expect(readLog(dataDir, 'error.log')).toBe('');
+    expect(existsSync(join(dataDir, 'logs'))).toBe(false);
     expect(stdout).toEqual([]);
   });
 
@@ -149,7 +141,6 @@ describe('launch:functions:serve init', () => {
     await command.init();
 
     expect(command['sharedConfig']).toEqual({ projectBasePath: workingDirectory, port: 3000 });
-    expect(existsSync(join(workingDirectory, 'logs'))).toBe(true);
   });
 
   it.each(['0', '1', '3000', '65535'])('accepts the boundary port %s', async (port) => {
@@ -159,43 +150,52 @@ describe('launch:functions:serve init', () => {
     await command.init();
 
     expect(command['sharedConfig']).toEqual({ projectBasePath: dataDir, port: Number(port) });
-    await eventually(() => logFiles(dataDir).length === 2);
-    expect(readLog(dataDir, 'error.log')).toBe('');
+    expect(existsSync(join(dataDir, 'logs'))).toBe(false);
     expect(stdout).toEqual([]);
   });
 
-  it.each(['-1', '65536', '3000.5', 'abc', 'NaN', '1e400', '', '   '])(
-    'rejects the invalid port %p once through the project logger and exits 1 as v1 did',
+  it.each(['-1', '65536', '3000.5', 'abc', 'NaN', '1e400', '', '   ', '0x10', '1e3', '+3000', ' 3000'])(
+    'rejects the invalid port %p, with it on disk in error.log before failing with it to stderr, exiting 1',
     async (port) => {
       const dataDir = temporaryDirectory();
       const command = commandWithFlags({ 'data-dir': dataDir, port });
 
       const failure = await command.init().catch((error: Error & { oclif?: { exit?: number } }) => error);
 
-      expect(failure).toBeInstanceOf(Errors.ExitError);
-      expect(failure).toMatchObject({ oclif: { exit: EXIT_RUNTIME } });
-      expect((failure as Error).message).not.toContain(INVALID_PORT_MESSAGE);
+      expect(failure).toBeInstanceOf(Errors.CLIError);
+      expect(failure).toMatchObject({ message: INVALID_PORT_MESSAGE, oclif: { exit: EXIT_RUNTIME } });
       expect(command['sharedConfig']).toBeUndefined();
-      expect(stdout).toEqual([`\u001b[31merror: ${INVALID_PORT_MESSAGE}\u001b[39m\n`]);
-      await eventually(() => readLog(dataDir, 'error.log') !== '');
+      expect(stdout).toEqual([]);
       expect(readLog(dataDir, 'error.log')).toBe(`{"level":"error","message":"${INVALID_PORT_MESSAGE}"}\n`);
       expect(readLog(dataDir, 'info.log')).toBe('');
     },
   );
 
-  it('exits 1 with the invalid base path error before validating the port when the data directory does not exist', async () => {
-    const exit = jest.spyOn(process, 'exit').mockImplementation(((code: number) => {
-      throw new Error(`exit ${code}`);
-    }) as never);
+  it('fails with the invalid base path error, exiting 1, before validating the port when the data directory does not exist', async () => {
+    const exit = jest.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
     const missing = join(temporaryDirectory(), 'no-such-dir');
     const command = commandWithFlags({ 'data-dir': missing, port: '99999' });
 
-    await expect(command.init()).rejects.toThrow('exit 1');
+    const failure = await command.init().catch((error: Error & { oclif?: { exit?: number } }) => error);
 
-    expect(exit).toHaveBeenCalledTimes(1);
-    expect(exit).toHaveBeenCalledWith(1);
-    expect(stdout).toEqual(['\u001b[31merror: Provided base path is not valid\u001b[39m\n']);
+    expect(failure).toBeInstanceOf(Errors.CLIError);
+    expect(failure).toMatchObject({ message: 'Provided base path is not valid', oclif: { exit: EXIT_RUNTIME } });
+    expect(exit).not.toHaveBeenCalled();
+    expect(stdout).toEqual([]);
     expect(existsSync(missing)).toBe(false);
+    expect(command['sharedConfig']).toBeUndefined();
+  });
+
+  it('fails naming the path, exiting 1, when the data directory is a file', async () => {
+    const file = join(temporaryDirectory(), 'not-a-dir.txt');
+    writeFileSync(file, 'x');
+    const command = commandWithFlags({ 'data-dir': file, port: '3000' });
+
+    const failure = await command.init().catch((error: Error & { oclif?: { exit?: number } }) => error);
+
+    expect(failure).toBeInstanceOf(Errors.CLIError);
+    expect(failure).toMatchObject({ message: `--data-dir ${file} is not a directory`, oclif: { exit: EXIT_RUNTIME } });
+    expect(stdout).toEqual([]);
     expect(command['sharedConfig']).toBeUndefined();
   });
 
@@ -308,10 +308,10 @@ describe('launch:functions:serve port precedence', () => {
 
       const failure = await command.init().catch((error: Error & { oclif?: { exit?: number } }) => error);
 
-      expect(failure).toBeInstanceOf(Errors.ExitError);
-      expect(failure).toMatchObject({ oclif: { exit: EXIT_RUNTIME } });
+      expect(failure).toBeInstanceOf(Errors.CLIError);
+      expect(failure).toMatchObject({ message: INVALID_PORT_MESSAGE, oclif: { exit: EXIT_RUNTIME } });
       expect(command['sharedConfig']).toBeUndefined();
-      expect(stdout).toEqual([`\u001b[31merror: ${INVALID_PORT_MESSAGE}\u001b[39m\n`]);
+      expect(stdout).toEqual([]);
     },
   );
 

@@ -3,12 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import type { Interfaces } from '@oclif/core';
-import { Errors } from '@oclif/core';
 import { runCommand } from '@oclif/test';
 import { loadCliConfig } from '../support/oclif';
 
-const INVALID_PORT_RECORD =
-  '{"level":"error","message":"Invalid port number. Please provide a valid port number between 0 and 65535."}\n';
+const INVALID_PORT_MESSAGE = 'Invalid port number. Please provide a valid port number between 0 and 65535.';
+const INVALID_PORT_RECORD = `{"level":"error","message":"${INVALID_PORT_MESSAGE}"}\n`;
 const originalPort = process.env.PORT;
 
 let config: Interfaces.Config;
@@ -38,7 +37,7 @@ describe('integration: launch:functions:serve port handling', () => {
   afterEach(async () => {
     const logs = join(projectDir, 'logs');
     const deadline = Date.now() + 4000;
-    while ((!existsSync(logs) || readdirSync(logs).length < 2) && Date.now() < deadline) {
+    while ((!existsSync(logs) || readdirSync(logs).length < 1) && Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
 
@@ -52,41 +51,41 @@ describe('integration: launch:functions:serve port handling', () => {
     process.exitCode = 0;
   });
 
-  it('logs the invalid port once, prints nothing to stderr and exits 1 without a second error message', async () => {
-    const { error, stderr } = await runCommand(
+  it('logs the invalid port to error.log, prints it once to stderr uncoloured and exits 1', async () => {
+    const { error, stdout, stderr } = await runCommand(
       ['launch:functions:serve', '--port', '70000', '--data-dir', projectDir],
       config,
     );
 
-    expect(error).toBeInstanceOf(Errors.ExitError);
     expect(error?.oclif?.exit).toBe(1);
-    expect(stderr).toBe('');
+    expect(stdout).toBe('');
+    expect(stderr).toBe(`error: ${INVALID_PORT_MESSAGE}\n`);
     await expect(errorLog()).resolves.toBe(INVALID_PORT_RECORD);
   });
 
   it('lets an invalid PORT beat a valid --port, so the flag never reaches the server', async () => {
     process.env.PORT = '70000';
 
-    const { error, stderr } = await runCommand(
+    const { error, stdout, stderr } = await runCommand(
       ['launch:functions:serve', '--port', '4000', '--data-dir', projectDir],
       config,
     );
 
-    expect(error).toBeInstanceOf(Errors.ExitError);
     expect(error?.oclif?.exit).toBe(1);
-    expect(stderr).toBe('');
+    expect(stdout).toBe('');
+    expect(stderr).toBe(`error: ${INVALID_PORT_MESSAGE}\n`);
     await expect(errorLog()).resolves.toBe(INVALID_PORT_RECORD);
   });
 
   it('rejects an empty --port through the same invalid port path', async () => {
-    const { error, stderr } = await runCommand(
+    const { error, stdout, stderr } = await runCommand(
       ['launch:functions:serve', '--port', '""', '--data-dir', projectDir],
       config,
     );
 
-    expect(error).toBeInstanceOf(Errors.ExitError);
     expect(error?.oclif?.exit).toBe(1);
-    expect(stderr).toBe('');
+    expect(stdout).toBe('');
+    expect(stderr).toBe(`error: ${INVALID_PORT_MESSAGE}\n`);
     await expect(errorLog()).resolves.toBe(INVALID_PORT_RECORD);
   });
 
