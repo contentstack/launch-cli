@@ -1,14 +1,16 @@
 import { randomUUID } from 'crypto';
-import fs, { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import fs, { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import type { Server } from 'http';
 import { createServer } from 'http';
 import { request as httpRequest } from 'http';
 import type { AddressInfo } from 'net';
-import { tmpdir } from 'os';
+import os, { tmpdir } from 'os';
 import { dirname, join, win32 } from 'path';
+import { pathToFileURL } from 'url';
 
 import { CloudFunctions, functionFilesImporting, isOutsideDirectory, listenFailure } from './cloud-functions';
 import { PortInUseError } from './function.errors';
+import * as loader from './load-data-url';
 import { loadDataURL } from './load-data-url';
 
 interface HttpResponse {
@@ -577,6 +579,21 @@ describe('CloudFunctions serve routing', () => {
     expect(bundleDirectories.filter((directory) => existsSync(directory))).toEqual([]);
   });
 
+  it('imports bundles from the real path of a symlinked temp directory, so mapped stack paths exist', async () => {
+    const realTemp = realpathSync(mkdtempSync(join(tmpdir(), 'launch-real-temp-')));
+    const linkedTemp = join(workspace, 'linked-temp');
+    symlinkSync(realTemp, linkedTemp);
+    jest.spyOn(os, 'tmpdir').mockReturnValue(linkedTemp);
+    const load = jest.spyOn(loader, 'loadDataURL');
+    writeFunctionFile('hello.js', 'export default function hello(request, response) { response.send("hi"); }');
+
+    await new CloudFunctions(workspace).serve(await freePort());
+    rmSync(realTemp, { recursive: true, force: true });
+
+    const loadedFrom = String(load.mock.calls[0][0]);
+    expect(loadedFrom.startsWith(pathToFileURL(realTemp).href)).toBe(true);
+  });
+
   it('logs a handler error with a stack pointing at the function source file and line', async () => {
     const sourceMaps = jest.spyOn(process, 'setSourceMapsEnabled');
     writeFunctionFile('broken.js', ['export default function broken() {', '  throw new Error("handler blew up");', '}'].join('\n'));
@@ -663,6 +680,20 @@ describe('CloudFunctions serve failures', () => {
     );
   });
 
+  it('gives the file, line and column where a function throws while loading', async () => {
+    writeFunctionFile('te.js', ['const cfg = undefined;', 'const value = cfg.value;', 'export default function te() {}'].join('\n'));
+
+    await expect(new CloudFunctions(workspace).serve(await freePort())).rejects.toThrow(
+      `(${join('functions', 'te.js')}:2:`,
+    );
+  });
+
+  it('gives no location rather than a realpath error when the bundler reports a virtual module', () => {
+    const virtualModuleError = Object.assign(new Error('boom'), { loc: { file: '\0virtual-module', line: 1, column: 1 } });
+
+    expect(new CloudFunctions(workspace)['sourceLocation'](virtualModuleError)).toBeUndefined();
+  });
+
   it('keeps a thrown non-error value in the load failure message', async () => {
     writeFunctionFile('str.js', 'throw "plain string"; export default function str() {}');
 
@@ -697,9 +728,9 @@ describe('CloudFunctions serve failures', () => {
       'import pkg from "not-installed-pkg"; export default function needs(request, response) { response.send(pkg); }',
     );
 
-    await expect(new CloudFunctions(workspace).serve(await freePort())).rejects.toThrow(
-      `Could not load ${needs}: ${needs} imports "not-installed-pkg", which is not installed. Run npm install in the project.`,
-    );
+    await expect(new CloudFunctions(workspace).serve(await freePort())).rejects.toMatchObject({
+      message: `${needs} imports "not-installed-pkg", which is not installed. Run npm install in the project.`,
+    });
     expect(warn).not.toHaveBeenCalled();
   });
 
@@ -710,9 +741,22 @@ describe('CloudFunctions serve failures', () => {
       'const x = require("not-installed-cjs"); module.exports = function cjs(request, response) { response.send(x); };',
     );
 
-    await expect(new CloudFunctions(workspace).serve(await freePort())).rejects.toThrow(
-      `Could not load ${cjs}: ${cjs} imports "not-installed-cjs", which is not installed. Run npm install in the project.`,
+    await expect(new CloudFunctions(workspace).serve(await freePort())).rejects.toMatchObject({
+      message: `${cjs} imports "not-installed-cjs", which is not installed. Run npm install in the project.`,
+    });
+  });
+
+  it('serves a function importing a node: builtin missing from builtinModules, such as node:sqlite', async () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    writeFunctionFile(
+      'sq.js',
+      'import { DatabaseSync } from "node:sqlite"; export default function sq(request, response) { response.send(typeof DatabaseSync); }',
     );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+
+    expect((await sendRequest(port, '/sq')).body).toBe('function');
   });
 
   it('still serves a function that guards a dynamic import of a package that is not installed', async () => {

@@ -76,7 +76,10 @@ export class FunctionLoadError extends Error {
 }
 
 export class MissingPackageError extends Error {
-  constructor(importer: string, packageName: string) {
+  constructor(
+    readonly importer: string,
+    packageName: string,
+  ) {
     super(`${importer} imports "${packageName}", which is not installed. Run npm install in the project.`);
     this.name = CloudFunctionErrorTypes.MISSING_PACKAGE_ERROR;
   }

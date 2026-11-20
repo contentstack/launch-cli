@@ -7,13 +7,14 @@ import type {
 } from 'express';
 import express from 'express';
 import type { Express } from 'express-serve-static-core';
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'fs';
 import type { Server } from 'http';
+import { isBuiltin } from 'module';
 import type { AddressInfo } from 'net';
 import { tmpdir } from 'os';
 import path from 'path';
 import type { Plugin, RollupLog } from 'rollup';
-import { pathToFileURL } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 import { styled } from '../core/style';
 import { isRecord } from '../core/values';
@@ -40,6 +41,15 @@ const DEPLOYED_PAYLOAD_LIMIT = '6mb';
 function isHandler(value: unknown): value is CloudFunctionHandler {
   return typeof value === 'function';
 }
+
+interface SourceLocation {
+  file: string;
+  absoluteFile: string;
+  line: number;
+  column: number;
+}
+
+const STACK_FRAME = /\(?((?:file:\/\/)?(?:\/|[A-Za-z]:\\)[^\s():]+):(\d+):(\d+)\)?/g;
 
 export type ImportersById = Map<string, readonly string[]>;
 
@@ -294,11 +304,12 @@ export class CloudFunctions {
 
       const handler = await this.buildHandlerForFilepath(filePath, outsideImports).catch((cause: unknown) => {
         const relativeFile = path.relative(this.cloudFunctionsDirectoryPath, filePath);
-        throw new FunctionLoadError(
-          path.join(CLOUD_FUNCTIONS_DIRECTORY, relativeFile),
-          cause,
-          this.sourceLocation(cause),
-        );
+        const functionFile = path.join(CLOUD_FUNCTIONS_DIRECTORY, relativeFile);
+        if (cause instanceof MissingPackageError && cause.importer === functionFile) {
+          throw cause;
+        }
+
+        throw new FunctionLoadError(functionFile, cause, this.sourceLocation(cause));
       });
       if (!handler) {
         continue;
@@ -356,7 +367,15 @@ export class CloudFunctions {
     return { exactRouteResources, dynamicRouteResources };
   }
 
-  private sourceLocation(cause: unknown): ConstructorParameters<typeof FunctionLoadError>[2] {
+  private sourceLocation(cause: unknown): SourceLocation | undefined {
+    try {
+      return this.bundlerLocation(cause) ?? this.stackLocation(cause);
+    } catch {
+      return undefined;
+    }
+  }
+
+  private bundlerLocation(cause: unknown): SourceLocation | undefined {
     const loc = isRecord(cause) && isRecord(cause.loc) ? cause.loc : undefined;
     if (!loc || typeof loc.file !== 'string' || typeof loc.line !== 'number' || typeof loc.column !== 'number') {
       return undefined;
@@ -366,9 +385,35 @@ export class CloudFunctions {
     return { file, absoluteFile: loc.file, line: loc.line, column: loc.column };
   }
 
+  private stackLocation(cause: unknown): SourceLocation | undefined {
+    if (!(cause instanceof Error) || !cause.stack) {
+      return undefined;
+    }
+
+    const projectDirectory = realpathSync(this.pathToSourceCode);
+    for (const [, frameFile, line, column] of cause.stack.matchAll(STACK_FRAME)) {
+      const absoluteFile = frameFile.startsWith('file:') ? fileURLToPath(frameFile) : frameFile;
+      if (!existsSync(absoluteFile)) {
+        continue;
+      }
+
+      const realFile = realpathSync(absoluteFile);
+      if (!isOutsideDirectory(projectDirectory, realFile) && !realFile.split(path.sep).includes('node_modules')) {
+        const file = path.relative(projectDirectory, realFile);
+        return { file, absoluteFile, line: Number(line), column: Number(column) };
+      }
+    }
+
+    return undefined;
+  }
+
   private refuseMissingPackages(unresolvedImports: RollupLog[], staticImportersById: ImportersById): void {
     unresolvedImports.forEach((warning) => {
       const packageName = String(warning.exporter);
+      if (isBuiltin(packageName)) {
+        return;
+      }
+
       const [importer] = realFilesImporting(packageName, staticImportersById);
       if (importer) {
         throw new MissingPackageError(
@@ -389,7 +434,7 @@ export class CloudFunctions {
   }
 
   private bundleDirectory(): string {
-    this.bundleDirectoryPath ??= mkdtempSync(path.join(tmpdir(), 'launch-functions-'));
+    this.bundleDirectoryPath ??= realpathSync(mkdtempSync(path.join(tmpdir(), 'launch-functions-')));
     return this.bundleDirectoryPath;
   }
 
