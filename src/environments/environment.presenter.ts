@@ -1,4 +1,5 @@
 import type { TableColumn } from '../core/render';
+import { UID_WIDTH } from '../core/render';
 import { styled } from '../core/style';
 import { firstDeploymentFailureMessage } from '../deployments/deployment.presenter';
 import { isAbsent } from '../core/values';
@@ -32,7 +33,7 @@ export const ENVIRONMENT_COLUMNS: TableColumn<Environment>[] = [
   { header: 'BRANCH', value: (environment) => text(environment.gitBranch) },
   { header: 'URL', value: (environment) => text(urlsOf(environment)[0]) },
   { header: 'UPDATED', value: (environment) => text(environment.updatedAt) },
-  { header: 'ENVIRONMENT UID', value: (environment) => text(environment.uid) },
+  { header: 'ENVIRONMENT UID', value: (environment) => text(environment.uid), minWidth: UID_WIDTH },
 ];
 
 export function environmentColumns(showBranch: boolean): TableColumn<Environment>[] {
@@ -40,11 +41,9 @@ export function environmentColumns(showBranch: boolean): TableColumn<Environment
 }
 
 export const ENVIRONMENT_DETAIL_COLUMNS: TableColumn<DetailRow>[] = [
-  { header: 'FIELD', value: (row) => row.field },
-  { header: 'VALUE', value: (row) => row.value },
+  { header: 'FIELD', value: (row) => row.field, label: true },
+  { header: 'VALUE', value: (row) => row.value, minWidth: UID_WIDTH },
 ];
-
-export const ENVIRONMENT_VALUE_COLUMN = 1;
 
 export function environmentDetailRows(environment: Environment, showBranch = true): DetailRow[] {
   const rows: DetailRow[] = [

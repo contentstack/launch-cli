@@ -11,7 +11,11 @@ export interface Pagination {
 export interface TableColumn<T> {
   header: string;
   value: (row: T) => string;
+  minWidth?: number;
+  label?: boolean;
 }
+
+export const UID_WIDTH = 24;
 
 const UNPRINTABLE = '-';
 
@@ -54,13 +58,13 @@ const BOX = {
   bottomRight: '\u2518',
 } as const;
 
-const ELLIPSIS = '\u2026';
 const CELL_PAD = '  ';
 const CELL_PADDING = CELL_PAD.length * 2;
 const EDGE_PADDING = 2 + CELL_PADDING;
 const JOIN_PADDING = 1 + CELL_PADDING;
-const NARROWEST_CELL = 1;
-const FIRST_COLUMN = 0;
+const READABLE_CELL = 10;
+const STACKED_GAP = '  ';
+const OWN_LINE_INDENT = '  ';
 
 function unitsOf(text: string): string[] {
   return [...text];
@@ -74,49 +78,166 @@ function ruleOf(widths: number[], left: string, join: string, right: string, fil
   return left + widths.map((width) => fill.repeat(width + CELL_PADDING)).join(join) + right;
 }
 
-function fitCell(text: string, width: number): string {
-  const units = unitsOf(text);
+function padCell(text: string, width: number): string {
+  return text + ' '.repeat(Math.max(0, width - widthOf(text)));
+}
 
-  if (units.length > width) {
-    return `${units.slice(0, width - 1).join('')}${ELLIPSIS}`;
+function breakAt(units: string[], width: number): number {
+  const space = units.lastIndexOf(' ', width);
+
+  return space > 0 ? space + 1 : width;
+}
+
+export function wrapCell(text: string, width: number): string[] {
+  const lines: string[] = [];
+  let units = unitsOf(text);
+
+  while (units.length > width) {
+    const cut = breakAt(units.slice(0, width + 1), width);
+    lines.push(units.slice(0, cut).join('').trimEnd());
+    units = units.slice(cut);
+
+    while (units[0] === ' ') {
+      units.shift();
+    }
   }
 
-  return text + ' '.repeat(width - units.length);
+  if (units.length > 0 || lines.length === 0) {
+    lines.push(units.join(''));
+  }
+
+  return lines;
 }
 
 function joinCells(fitted: string[]): string {
   return `${BOX.vertical}${CELL_PAD}${fitted.join(`${CELL_PAD}${BOX.vertical}${CELL_PAD}`)}${CELL_PAD}${BOX.vertical}`;
 }
 
-function rowOf(cells: string[], widths: number[]): string {
-  return joinCells(cells.map((cell, index) => fitCell(cell, widths[index])));
+function rowLinesOf(cells: string[], widths: number[]): string[] {
+  const wrapped = cells.map((cell, index) => wrapCell(cell, widths[index]));
+  const height = Math.max(...wrapped.map((lines) => lines.length));
+
+  return Array.from({ length: height }, (_, line) =>
+    joinCells(wrapped.map((lines, index) => padCell(lines[line] ?? '', widths[index]))),
+  );
 }
 
 function headerRowOf(headers: string[], widths: number[], outputIsTTY: boolean): string {
-  return joinCells(headers.map((header, index) => styled(fitCell(header, widths[index]), 'bold', outputIsTTY)));
+  return joinCells(headers.map((header, index) => styled(padCell(header, widths[index]), 'bold', outputIsTTY)));
 }
 
-function fittedWidths(
-  widths: number[],
-  floors: number[],
-  flexible: number,
-  available: number | undefined,
-): number[] {
-  if (available === undefined) {
-    return widths;
+function drawnWidth(widths: number[]): number {
+  return widths.reduce((sum, width) => sum + width, 0) + EDGE_PADDING + (widths.length - 1) * JOIN_PADDING;
+}
+
+function widestShrinkable(widths: number[], floors: number[]): number {
+  let widest = -1;
+
+  widths.forEach((width, index) => {
+    if (width > floors[index] && (widest === -1 || width > widths[widest])) {
+      widest = index;
+    }
+  });
+
+  return widest;
+}
+
+function fittedWidths(natural: number[], floors: number[], available: number): number[] | undefined {
+  const widths = [...natural];
+
+  while (drawnWidth(widths) > available) {
+    const widest = widestShrinkable(widths, floors);
+
+    if (widest === -1) {
+      return undefined;
+    }
+
+    widths[widest] -= 1;
   }
 
-  const chrome = EDGE_PADDING + (widths.length - 1) * JOIN_PADDING;
-  const drawn = widths.reduce((sum, width) => sum + width, 0) + chrome;
+  return widths;
+}
 
-  if (drawn <= available) {
-    return widths;
+function floorOf<T>(column: TableColumn<T>, natural: number): number {
+  if (column.label === true) {
+    return natural;
   }
 
-  const fitted = [...widths];
-  fitted[flexible] = Math.max(NARROWEST_CELL, floors[flexible], widths[flexible] - (drawn - available));
+  return Math.min(natural, Math.max(widthOf(column.header), column.minWidth ?? READABLE_CELL));
+}
 
-  return fitted;
+function printLabelled(
+  ux: UxLike,
+  pairs: [string, string][],
+  available: number,
+  boldLabels: boolean,
+): void {
+  const labelWidth = Math.max(...pairs.map(([label]) => widthOf(label)));
+  const indent = ' '.repeat(labelWidth + STACKED_GAP.length);
+  const besideLabel = available - indent.length >= UID_WIDTH;
+
+  pairs.forEach(([label, value]) => {
+    const shownLabel = styled(besideLabel ? padCell(label, labelWidth) : label, 'bold', boldLabels);
+
+    if (besideLabel) {
+      const [first, ...rest] = wrapCell(value, available - indent.length);
+
+      ux.print(`${shownLabel}${STACKED_GAP}${first}`);
+      rest.forEach((line) => ux.print(`${indent}${line}`));
+      return;
+    }
+
+    ux.print(shownLabel);
+    wrapCell(value, Math.max(available - OWN_LINE_INDENT.length, UID_WIDTH)).forEach((line) =>
+      ux.print(`${OWN_LINE_INDENT}${line}`),
+    );
+  });
+}
+
+function renderStacked(
+  ux: UxLike,
+  headers: string[],
+  cells: string[][],
+  available: number,
+  outputIsTTY: boolean,
+): void {
+  cells.forEach((rowCells, index) => {
+    if (index > 0) {
+      ux.print('');
+    }
+
+    printLabelled(
+      ux,
+      rowCells.map((cell, column): [string, string] => [headers[column], cell]),
+      available,
+      outputIsTTY,
+    );
+  });
+}
+
+function renderDetailLines(ux: UxLike, cells: string[][], available: number): void {
+  printLabelled(
+    ux,
+    cells.map(([label, value]): [string, string] => [label, value]),
+    available,
+    false,
+  );
+}
+
+function drawBox(ux: UxLike, headers: string[], cells: string[][], widths: number[], outputIsTTY: boolean): void {
+  ux.print(ruleOf(widths, BOX.topLeft, BOX.topJoin, BOX.topRight, BOX.horizontal));
+  ux.print(headerRowOf(headers, widths, outputIsTTY));
+  ux.print(ruleOf(widths, BOX.midLeft, BOX.midJoin, BOX.midRight, BOX.horizontal));
+
+  cells.forEach((rowCells, index) => {
+    if (index > 0) {
+      ux.print(ruleOf(widths, BOX.midLeft, BOX.midJoin, BOX.midRight, BOX.dotted));
+    }
+
+    rowLinesOf(rowCells, widths).forEach((line) => ux.print(line));
+  });
+
+  ux.print(ruleOf(widths, BOX.bottomLeft, BOX.bottomJoin, BOX.bottomRight, BOX.horizontal));
 }
 
 export function renderTable<T>(
@@ -124,7 +245,6 @@ export function renderTable<T>(
   columns: TableColumn<T>[],
   rows: T[],
   available?: number,
-  flexible: number = FIRST_COLUMN,
   outputIsTTY = false,
 ): void {
   if (rows.length === 0) {
@@ -141,21 +261,29 @@ export function renderTable<T>(
   const natural = columns.map((column, index) =>
     Math.max(widthOf(column.header), ...cells.map((rowCells) => widthOf(rowCells[index]))),
   );
-  const widths = fittedWidths(natural, headers.map(widthOf), flexible, available);
 
-  ux.print(ruleOf(widths, BOX.topLeft, BOX.topJoin, BOX.topRight, BOX.horizontal));
-  ux.print(headerRowOf(headers, widths, outputIsTTY));
-  ux.print(ruleOf(widths, BOX.midLeft, BOX.midJoin, BOX.midRight, BOX.horizontal));
+  if (available === undefined) {
+    drawBox(ux, headers, cells, natural, outputIsTTY);
+    return;
+  }
 
-  cells.forEach((rowCells, index) => {
-    if (index > 0) {
-      ux.print(ruleOf(widths, BOX.midLeft, BOX.midJoin, BOX.midRight, BOX.dotted));
-    }
+  const widths = fittedWidths(
+    natural,
+    columns.map((column, index) => floorOf(column, natural[index])),
+    available,
+  );
 
-    ux.print(rowOf(rowCells, widths));
-  });
+  if (widths === undefined && columns.length === 2 && columns[0].label === true) {
+    renderDetailLines(ux, cells, available);
+    return;
+  }
 
-  ux.print(ruleOf(widths, BOX.bottomLeft, BOX.bottomJoin, BOX.bottomRight, BOX.horizontal));
+  if (widths === undefined) {
+    renderStacked(ux, headers, cells, available, outputIsTTY);
+    return;
+  }
+
+  drawBox(ux, headers, cells, widths, outputIsTTY);
 }
 
 export function renderPagination(ux: UxLike, pagination: Pagination | undefined, rowsPrinted: number): void {

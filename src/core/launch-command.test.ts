@@ -581,7 +581,7 @@ describe('LaunchCommand.init config file notice', () => {
 
   async function initInFolderHoldingAnOrg(
     flags: Record<string, unknown>,
-  ): Promise<{ printed: string[]; configFile: string }> {
+  ): Promise<{ printed: string[]; stderr: string[]; configFile: string }> {
     const dir = mkdtempSync(join(tmpdir(), 'launch-cli-'));
     tempDirs.push(dir);
     writeFileSync(join(dir, PROJECT_CONFIG_FILE), JSON.stringify({ project: { organizationUid: 'org-from-cwd' } }));
@@ -597,31 +597,39 @@ describe('LaunchCommand.init config file notice', () => {
     const printed: string[] = [];
     const ux: UxLike = { print: (message) => printed.push(message), inquire: async () => undefined as never };
     Object.defineProperty(instance, 'ux', { value: ux, configurable: true });
+    const stderr: string[] = [];
+    jest.spyOn(process.stderr, 'write').mockImplementation((chunk: string | Uint8Array) => {
+      stderr.push(String(chunk));
+      return true;
+    });
 
     await instance.init();
 
-    return { printed, configFile: join(dir, PROJECT_CONFIG_FILE) };
+    return { printed, stderr, configFile: join(dir, PROJECT_CONFIG_FILE) };
   }
 
-  it('prints the notice on stdout when a value came from the config file', async () => {
-    const { printed, configFile } = await initInFolderHoldingAnOrg({});
+  it('writes the notice to stderr, never stdout, when a value came from the config file', async () => {
+    const { printed, stderr, configFile } = await initInFolderHoldingAnOrg({});
 
-    expect(printed).toEqual([`Using the organization UID from ${configFile}.`]);
+    expect(stderr).toEqual([`Using the organization UID from ${configFile}.\n`]);
+    expect(printed).toEqual([]);
   });
 
   it('colours only the config file path cyan when stdout is a terminal', async () => {
     const restore = stdoutReportingTTY(true);
 
-    const { printed, configFile } = await initInFolderHoldingAnOrg({});
+    const { printed, stderr, configFile } = await initInFolderHoldingAnOrg({});
     restore();
 
-    expect(printed).toEqual([`Using the organization UID from \u001b[36m${configFile}\u001b[39m.`]);
+    expect(stderr).toEqual([`Using the organization UID from \u001b[36m${configFile}\u001b[39m.\n`]);
+    expect(printed).toEqual([]);
   });
 
   it('prints nothing when every value came from a flag', async () => {
-    const { printed } = await initInFolderHoldingAnOrg({ org: ORG_FROM_FLAG });
+    const { printed, stderr } = await initInFolderHoldingAnOrg({ org: ORG_FROM_FLAG });
 
     expect(printed).toEqual([]);
+    expect(stderr).toEqual([]);
   });
 });
 

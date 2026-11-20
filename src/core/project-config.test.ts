@@ -92,12 +92,19 @@ describe('ProjectConfigStore.load', () => {
     expect(new ProjectConfigStore('/nope/.cs-launch.json').load()).toEqual({});
   });
 
-  it('returns an empty object when the file is not valid JSON', () => {
-    const path = tempPath();
-    writeFileSync(path, 'not json');
+  it.each([[false], [true]])(
+    'refuses a file that exists but is not valid JSON, naming it, when required is %p',
+    (required) => {
+      const path = tempPath();
+      writeFileSync(path, 'not json');
 
-    expect(new ProjectConfigStore(path).load()).toEqual({});
-  });
+      expect(() => new ProjectConfigStore(path, required).load()).toThrow(
+        new UsageError(
+          `The config file at '${path}' is not valid JSON. Fix or delete it, or pass the missing flags.`,
+        ),
+      );
+    },
+  );
 
   it('uses the shared block when several branch blocks name the same project', () => {
     const store = storeFor({
@@ -180,14 +187,6 @@ describe('ProjectConfigStore.load', () => {
     expect(storeFor({ main: null }).load()).toEqual({});
   });
 
-  it('returns an empty object when the file root is an array', () => {
-    expect(storeFor([{ uid: 'p1', organizationUid: 'org1' }]).load()).toEqual({});
-  });
-
-  it('returns an empty object when the file root is an empty array', () => {
-    expect(storeFor([]).load()).toEqual({});
-  });
-
   it('raises a usage error when every branch block is an array', () => {
     const store = storeFor({ main: [{ uid: 'p1' }], staging: [{ uid: 'p1' }] });
 
@@ -199,9 +198,18 @@ describe('ProjectConfigStore.load', () => {
     expect(storeFor({}).load()).toEqual({});
   });
 
-  it.each([[null], [42], ['string'], [true]])('returns an empty object when the file contains %p', (contents) => {
-    expect(storeFor(contents).load()).toEqual({});
-  });
+  it.each([[[{ uid: 'p1', organizationUid: 'org1' }]], [[]], [null], [42], ['string'], [true]])(
+    'refuses a file whose contents %p are not a project config, naming it',
+    (contents) => {
+      const store = storeFor(contents);
+
+      expect(() => store.load()).toThrow(
+        new UsageError(
+          `The config file at '${store.path}' does not hold a project config. Fix or delete it, or pass the missing flags.`,
+        ),
+      );
+    },
+  );
 });
 
 describe('ProjectConfigStore.save', () => {

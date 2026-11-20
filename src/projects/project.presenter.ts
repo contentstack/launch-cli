@@ -1,5 +1,6 @@
 import type { LaunchError } from '../core/errors';
 import type { TableColumn } from '../core/render';
+import { UID_WIDTH } from '../core/render';
 import { styled } from '../core/style';
 import { firstDeploymentFailureMessage } from '../deployments/deployment.presenter';
 import { LaunchApiError } from '../transport/errors';
@@ -8,15 +9,13 @@ import type { Project } from './types';
 export const PROJECT_COLUMNS: TableColumn<Project>[] = [
   { header: 'NAME', value: (project) => project.name ?? '-' },
   { header: 'TYPE', value: (project) => project.projectType ?? '-' },
-  { header: 'PROJECT UID', value: (project) => project.uid ?? '-' },
+  { header: 'PROJECT UID', value: (project) => project.uid ?? '-', minWidth: UID_WIDTH },
 ];
 
 export const PROJECT_DETAIL_COLUMNS: TableColumn<Project>[] = [
   ...PROJECT_COLUMNS,
   { header: 'DESCRIPTION', value: (project) => project.description ?? '-' },
 ];
-
-export const PROJECT_DESCRIPTION_COLUMN = PROJECT_DETAIL_COLUMNS.length - 1;
 
 export const PROJECT_DELETE_QUESTION = 'Are you sure you want to delete this project?';
 

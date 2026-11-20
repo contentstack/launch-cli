@@ -74,6 +74,63 @@ describe('integration: end-to-end command flows', () => {
     nock.restore();
   });
 
+  it('refuses a --data-dir that does not exist, naming it, instead of reporting a missing --org, and sends nothing', async () => {
+    useSession(basicSession());
+    const missing = join(mkdtempSync(join(tmpdir(), 'launch-flow-')), 'no-such-folder');
+    tempDirs.push(join(missing, '..'));
+    const scope = nock(LAUNCH_HUB_URL).get(/.*/).reply(200, listFixture);
+
+    const { error, stdout, stderr } = await runLaunch(['launch:projects:list', '--data-dir', missing]);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(stdout).toBe('');
+    expect(stderr).toBe(
+      `error: No folder found at '${missing}', so there is no ${PROJECT_CONFIG_FILE} to read. ` +
+        'Pass --data-dir with a folder that exists.\n',
+    );
+    expect(scope.isDone()).toBe(false);
+  });
+
+  it('lets a missing --data-dir pass when the flags already supply everything the config file would', async () => {
+    useSession(basicSession());
+    const missing = join(mkdtempSync(join(tmpdir(), 'launch-flow-')), 'no-such-folder');
+    tempDirs.push(join(missing, '..'));
+    const scope = nock(LAUNCH_HUB_URL)
+      .matchHeader('x-organization-uid', ORG_UID)
+      .get('/manage/projects')
+      .query(true)
+      .reply(200, listFixture);
+
+    const { error } = await runLaunch(['launch:projects:list', '--org', ORG_UID, '--data-dir', missing]);
+
+    expect(error).toBeUndefined();
+    expect(scope.isDone()).toBe(true);
+  });
+
+  it.each([
+    ['not valid JSON', '{ "project": ', 'is not valid JSON.'],
+    ['an array', '[]', 'does not hold a project config.'],
+  ])(
+    'refuses a found %s config file, naming it, instead of reporting a missing --org',
+    async (_kind, contents, reason) => {
+      useSession(basicSession());
+      const dir = mkdtempSync(join(tmpdir(), 'launch-flow-'));
+      tempDirs.push(dir);
+      const path = join(dir, PROJECT_CONFIG_FILE);
+      writeFileSync(path, contents);
+      const scope = nock(LAUNCH_HUB_URL).get(/.*/).reply(200, listFixture);
+
+      const { error, stdout, stderr } = await runLaunch(['launch:projects:list', '--data-dir', dir]);
+
+      expect(error?.oclif?.exit).toBe(2);
+      expect(stdout).toBe('');
+      expect(stderr).toBe(
+        `error: The config file at '${path}' ${reason} Fix or delete it, or pass the missing flags.\n`,
+      );
+      expect(scope.isDone()).toBe(false);
+    },
+  );
+
   it('reads the organization and the project out of a project folder config with no flags but the data dir', async () => {
     useSession(basicSession());
     const { dir } = projectFolder({ project: { organizationUid: ORG_UID, uid: PROJECT_UID } });
@@ -85,13 +142,13 @@ describe('integration: end-to-end command flows', () => {
       .times(2)
       .reply(200, getFixture);
 
-    const { error, stdout } = await runLaunch(['launch:projects:get', '--data-dir', dir]);
+    const { error, stdout, stderr } = await runLaunch(['launch:projects:get', '--data-dir', dir]);
 
     expect(error).toBeUndefined();
     expect(scope.isDone()).toBe(true);
+    expect(stderr).toBe(`Using the organization and project UIDs from ${join(dir, PROJECT_CONFIG_FILE)}.\n`);
     expect(stdout).toBe(
       [
-        `Using the organization and project UIDs from ${join(dir, PROJECT_CONFIG_FILE)}.`,
         '\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510',
         '\u2502  NAME            \u2502  TYPE         \u2502  PROJECT UID               \u2502  DESCRIPTION  \u2502',
         '\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524',

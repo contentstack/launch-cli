@@ -2,11 +2,7 @@ import { UsageError } from '../../../core/errors';
 import { LaunchCommand } from '../../../core/launch-command';
 import { flagsFor, inputs } from '../../../core/inputs';
 import { renderTable } from '../../../core/render';
-import {
-  DEPLOYMENT_DETAIL_COLUMNS,
-  DEPLOYMENT_VALUE_COLUMN,
-  deploymentDetailRows,
-} from '../../../deployments/deployment.presenter';
+import { DEPLOYMENT_DETAIL_COLUMNS, deploymentDetailRows } from '../../../deployments/deployment.presenter';
 import { fetchDeployment } from '../../../deployments/deployment.resolver';
 
 const getInputs = inputs({
@@ -48,7 +44,6 @@ export default class DeploymentsGet extends LaunchCommand<typeof getInputs> {
       DEPLOYMENT_DETAIL_COLUMNS,
       deploymentDetailRows(deployment, project.projectType !== 'FILEUPLOAD', scope),
       process.stdout.columns,
-      DEPLOYMENT_VALUE_COLUMN,
       this.services.outputIsTTY,
     );
   }

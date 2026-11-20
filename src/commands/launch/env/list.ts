@@ -26,7 +26,6 @@ export default class EnvironmentsList extends LaunchCommand<typeof listInputs> {
       environmentColumns(project.projectType !== 'FILEUPLOAD'),
       page.environments,
       process.stdout.columns,
-      undefined,
       this.services.outputIsTTY,
     );
     renderPagination(this.ux, { ...page.pagination, skip: this.resolved.skip }, page.environments.length);

@@ -1,11 +1,7 @@
 import { LaunchCommand } from '../../../core/launch-command';
 import { flagsFor, inputs } from '../../../core/inputs';
 import { renderTable } from '../../../core/render';
-import {
-  ENVIRONMENT_DETAIL_COLUMNS,
-  ENVIRONMENT_VALUE_COLUMN,
-  environmentDetailRows,
-} from '../../../environments/environment.presenter';
+import { ENVIRONMENT_DETAIL_COLUMNS, environmentDetailRows } from '../../../environments/environment.presenter';
 
 const getInputs = inputs({ org: { required: true }, project: { required: true }, env: { required: true } });
 
@@ -30,7 +26,6 @@ export default class EnvironmentsGet extends LaunchCommand<typeof getInputs> {
       ENVIRONMENT_DETAIL_COLUMNS,
       environmentDetailRows({ ...environment, project: this.resolved.project }, project.projectType !== 'FILEUPLOAD'),
       process.stdout.columns,
-      ENVIRONMENT_VALUE_COLUMN,
       this.services.outputIsTTY,
     );
   }
