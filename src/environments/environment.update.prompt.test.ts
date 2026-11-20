@@ -156,12 +156,38 @@ describe('promptForEnvironmentUpdate', () => {
     expect(asked[1].default).toBe('NextJs');
   });
 
-  it('asks the response mode and always sends it, since the API never reports the current one', async () => {
+  it('lists streaming first and starts on it when the API does not report the current mode, sending the answer', async () => {
     const { services, asked } = servicesAnswering({ [SETTINGS_QUESTION]: ['resMode'], 'Response mode': 'buffered' });
 
     await expect(promptForEnvironmentUpdate(services, githubContext())).resolves.toEqual({ resMode: 'buffered' });
-    expect(asked[1].default).toBe('buffered');
+    expect(asked[1].choices).toEqual([
+      { name: 'streaming', value: 'streaming' },
+      { name: 'buffered', value: 'buffered' },
+    ]);
+    expect(asked[1].default).toBe('streaming');
   });
+
+  it('sends the Contentstack Authentication answer even when it matches the current setting', async () => {
+    const { services } = servicesAnswering({ [SETTINGS_QUESTION]: ['csAuth'], 'Contentstack Authentication': 'disable' });
+
+    await expect(promptForEnvironmentUpdate(services, githubContext())).resolves.toEqual({ csAuth: 'disable' });
+  });
+
+  it.each([
+    [true, 'streaming', {}],
+    [true, 'buffered', { resMode: 'buffered' }],
+    [false, 'buffered', {}],
+  ])(
+    'defaults the response mode to the current one when the API reports it (streaming %p) and drops an unchanged %s',
+    async (isStreamingEnabled, answer, expected) => {
+      const { services, asked } = servicesAnswering({ [SETTINGS_QUESTION]: ['resMode'], 'Response mode': answer });
+
+      await expect(
+        promptForEnvironmentUpdate(services, githubContext({ ...CURRENT, isStreamingEnabled })),
+      ).resolves.toEqual(expected);
+      expect(asked[1].default).toBe(isStreamingEnabled ? 'streaming' : 'buffered');
+    },
+  );
 
   it('skips the server command, saying why, when the framework it would run under takes none', async () => {
     const { services, asked, lines } = servicesAnswering({ [SETTINGS_QUESTION]: ['serverCmd'] });

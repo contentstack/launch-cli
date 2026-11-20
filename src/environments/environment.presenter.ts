@@ -9,12 +9,12 @@ export interface DetailRow {
   value: string;
 }
 
-function text(value: string | undefined): string {
-  return value === undefined || isAbsent(value) ? '-' : value;
+function text(value: string | null | undefined): string {
+  return value === undefined || value === null || isAbsent(value) ? '-' : value;
 }
 
-function toggle(value: boolean | undefined): string {
-  if (value === undefined) {
+function toggle(value: boolean | null | undefined): string {
+  if (value === undefined || value === null) {
     return '-';
   }
 
@@ -123,4 +123,11 @@ export function environmentDeploymentFailureMessage(failure: EnvironmentDeployme
 
 export function environmentNoChangesLine(outputIsTTY: boolean): string {
   return styled('Environment not updated. No changes were entered.', 'yellow', outputIsTTY);
+}
+
+export function environmentAlreadyMatchesLine(flags: readonly string[], outputIsTTY: boolean): string {
+  const named = flags.map((flag) => `--${flag}`).join(', ');
+  const verb = flags.length === 1 ? 'matches' : 'match';
+
+  return styled(`Environment not updated: ${named} already ${verb} the current settings.`, 'yellow', outputIsTTY);
 }

@@ -2,12 +2,13 @@ import { askChoices, askOption, askOptionalText, askText } from '../core/prompt'
 import type { ServiceContext } from '../core/service-context';
 import { askBranch } from '../git/git.prompt';
 import { frameworkLabelOf } from './environment.builder';
-import type { ToggleValue } from './environment.inputs';
 import {
   ENVIRONMENT_NAME_MAX_LENGTH,
   RESPONSE_MODES,
   TOGGLE_VALUES,
   frameworkPresetOf,
+  responseModeOf,
+  toggleOf,
 } from './environment.inputs';
 import type { ProjectRepository } from './environment.rules';
 import { gitScopeOf } from './environment.rules';
@@ -16,6 +17,8 @@ import { FRAMEWORK_CHOICES, SERVER_COMMAND_FRAMEWORKS } from './frameworks';
 import type { Environment } from './types';
 
 export const SETTINGS_QUESTION = 'Select the fields to update:';
+
+const STREAMING_FIRST = [...RESPONSE_MODES].reverse();
 
 export type EnvironmentChanges = Partial<
   Pick<
@@ -56,14 +59,6 @@ const SETTINGS: { setting: Setting; label: string; repositoryOnly?: boolean }[] 
   { setting: 'cachePriming', label: 'Cache priming' },
   { setting: 'passwordProtection', label: 'Password protection' },
 ];
-
-function toggleOf(value: boolean | undefined): ToggleValue | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  return value ? 'enable' : 'disable';
-}
 
 function changed<T>(answer: T | undefined, current: T | undefined): T | undefined {
   return answer === current ? undefined : answer;
@@ -120,11 +115,11 @@ class SettingAsker {
     case 'outputDir':
       return this.text(askText(ux, 'Output directory', current.outputDirectory), current.outputDirectory);
     case 'resMode':
-      return askOption(ux, 'Response mode', RESPONSE_MODES.map((value) => ({ name: value, value })), 'buffered');
+      return this.responseMode();
     case 'autoDeploy':
       return this.toggle('Auto deploy', current.autoDeployOnPush);
     case 'csAuth':
-      return this.toggle('Contentstack Authentication', current.isContentstackAuthenticationEnabled);
+      return this.toggle('Contentstack Authentication', current.isContentstackAuthenticationEnabled, true);
     case 'cachePriming':
       return this.toggle('Cache priming', current.isCachePrimingEnabled);
     default:
@@ -134,6 +129,18 @@ class SettingAsker {
 
   private async text(answer: Promise<string | undefined>, current: string | undefined): Promise<string | undefined> {
     return changed(await answer, current);
+  }
+
+  private async responseMode(): Promise<string | undefined> {
+    const current = responseModeOf(this.context.current.isStreamingEnabled);
+    const answer = await askOption(
+      this.services.ux,
+      'Response mode',
+      STREAMING_FIRST.map((value) => ({ name: value, value })),
+      current ?? 'streaming',
+    );
+
+    return changed(answer, current);
   }
 
   private async framework(): Promise<string | undefined> {
@@ -161,7 +168,9 @@ class SettingAsker {
       return undefined;
     }
 
-    return this.text(askOptionalText(this.services.ux, 'Server command', current.serverCommand), current.serverCommand);
+    const serverCommand = current.serverCommand ?? undefined;
+
+    return this.text(askOptionalText(this.services.ux, 'Server command', serverCommand), serverCommand);
   }
 
   private async passwordProtection(current: boolean | undefined): Promise<string | undefined> {
@@ -170,7 +179,11 @@ class SettingAsker {
     return answer ?? (current === true ? 'enable' : undefined);
   }
 
-  private async toggle(message: string, current: boolean | undefined): Promise<string | undefined> {
+  private async toggle(
+    message: string,
+    current: boolean | null | undefined,
+    sendUnchanged = false,
+  ): Promise<string | undefined> {
     const state = toggleOf(current);
     const answer = await askOption(
       this.services.ux,
@@ -179,6 +192,6 @@ class SettingAsker {
       state,
     );
 
-    return changed(answer, state);
+    return sendUnchanged ? answer : changed(answer, state);
   }
 }

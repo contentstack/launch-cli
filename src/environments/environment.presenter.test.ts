@@ -5,6 +5,7 @@ import {
   ENVIRONMENT_VALUE_COLUMN,
   environmentColumns,
   environmentDeletedLine,
+  environmentAlreadyMatchesLine,
   environmentDetailRows,
   environmentNoChangesLine,
   environmentNotDeletedLine,
@@ -94,6 +95,23 @@ describe('environmentDetailRows', () => {
     ]);
   });
 
+  it('renders a placeholder, not "disabled", for a toggle or server command the API reports as null', () => {
+    const rows = environmentDetailRows({
+      serverCommand: null,
+      autoDeployOnPush: null,
+      isCachePrimingEnabled: null,
+      isContentstackAuthenticationEnabled: null,
+    });
+    const valueOf = (field: string) => rows.find((row) => row.field === field)?.value;
+
+    expect(['SERVER COMMAND', 'AUTO DEPLOY', 'CACHE PRIMING', 'CONTENTSTACK AUTHENTICATION'].map(valueOf)).toEqual([
+      '-',
+      '-',
+      '-',
+      '-',
+    ]);
+  });
+
   it('renders a placeholder for every field an environment arrives without, and a zero variable count', () => {
     expect(environmentDetailRows({}).map((row) => row.value)).toEqual([
       '-',
@@ -166,6 +184,23 @@ describe('environment delete wording', () => {
   it('says the environment was not deleted in yellow on a terminal and plain otherwise', () => {
     expect(environmentNotDeletedLine(true)).toBe('\u001b[33mEnvironment not deleted.\u001b[39m');
     expect(environmentNotDeletedLine(false)).toBe('Environment not deleted.');
+  });
+});
+
+describe('environmentAlreadyMatchesLine', () => {
+  it('names one matching flag in the singular, in yellow on a terminal and plain otherwise', () => {
+    expect(environmentAlreadyMatchesLine(['cs-auth'], true)).toBe(
+      '\u001b[33mEnvironment not updated: --cs-auth already matches the current settings.\u001b[39m',
+    );
+    expect(environmentAlreadyMatchesLine(['cs-auth'], false)).toBe(
+      'Environment not updated: --cs-auth already matches the current settings.',
+    );
+  });
+
+  it('names several matching flags in the plural, in the order given', () => {
+    expect(environmentAlreadyMatchesLine(['cs-auth', 'cache-priming'], false)).toBe(
+      'Environment not updated: --cs-auth, --cache-priming already match the current settings.',
+    );
   });
 });
 
