@@ -6,7 +6,9 @@ enum CloudFunctionErrorTypes {
   INDISTINCT_DYNAMIC_ROUTE_NAMES_IN_PATH_ERROR = 'IndistinctDynamicRouteNamesInPathError',
   EXISTING_DYNAMIC_ROUTE_AT_SAME_LEVEL_ERROR = 'ExistingDynamicRouteAtSameLevelError',
   FUNCTIONS_DIRECTORY_NOT_FOUND = 'FunctionsDirectoryNotFound',
-  PORT_IN_USE_ERROR = 'PortInUseError'
+  PORT_IN_USE_ERROR = 'PortInUseError',
+  FUNCTION_LOAD_ERROR = 'FunctionLoadError',
+  MISSING_PACKAGE_ERROR = 'MissingPackageError'
 }
 
 export class TopLevelDynamicRouteError extends Error {
@@ -53,5 +55,32 @@ export class PortInUseError extends Error {
   constructor(port: number) {
     super(`Port ${port} is already in use. Pass --port with a free port, or stop whatever is serving on ${port}.`);
     this.name = CloudFunctionErrorTypes.PORT_IN_USE_ERROR;
+  }
+}
+
+export class FunctionLoadError extends Error {
+  constructor(
+    functionFile: string,
+    readonly cause: unknown,
+    location?: { file: string; absoluteFile: string; line: number; column: number },
+  ) {
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    super(
+      location
+        ? `Could not load ${functionFile}: ${reason.replace(` in ${location.absoluteFile}`, '')} ` +
+            `(${location.file}:${location.line}:${location.column})`
+        : `Could not load ${functionFile}: ${reason}`,
+    );
+    this.name = CloudFunctionErrorTypes.FUNCTION_LOAD_ERROR;
+  }
+}
+
+export class MissingPackageError extends Error {
+  constructor(
+    readonly importer: string,
+    packageName: string,
+  ) {
+    super(`${importer} imports "${packageName}", which is not installed. Run npm install in the project.`);
+    this.name = CloudFunctionErrorTypes.MISSING_PACKAGE_ERROR;
   }
 }
