@@ -166,7 +166,11 @@ export class ProjectConfigStore {
       return this.unusable(`No config file found at '${this.path}'. Pass --config with a path that exists.`);
     }
 
-    return typeof read === 'string' ? this.unusable(read) : read;
+    if (typeof read === 'string') {
+      throw new UsageError(`${read} Fix or delete it, or pass --org and --project.`);
+    }
+
+    return read;
   }
 
   private read(): Blocks | string | undefined {

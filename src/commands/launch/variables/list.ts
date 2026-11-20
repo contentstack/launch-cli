@@ -36,7 +36,6 @@ export default class VariablesList extends LaunchCommand<typeof listInputs> {
       variableColumns(environment.updatedAt),
       page.variables,
       process.stdout.columns,
-      undefined,
       this.services.outputIsTTY,
     );
     renderPagination(this.ux, page.pagination, page.variables.length);

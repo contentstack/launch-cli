@@ -46,7 +46,7 @@ async function askForTyped(services: ServiceContext, io: VariableIo): Promise<En
   const line = await askText(services.ux, TYPED_QUESTION);
   const typed = await completeValues(splitLine(line).map(parseAssignment), { services, readStdin: io.readStdin });
 
-  renderTable(services.ux, pairColumns(), typed, process.stdout.columns, undefined, services.outputIsTTY === true);
+  renderTable(services.ux, pairColumns(), typed, process.stdout.columns, services.outputIsTTY === true);
 
   return typed;
 }

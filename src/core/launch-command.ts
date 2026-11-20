@@ -1,3 +1,4 @@
+import { existsSync, statSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 
 import { Command } from '@contentstack/cli-command';
@@ -20,7 +21,7 @@ import type { UxLike } from './prompt';
 import { registerSearchList } from './search-list';
 import { terminalUx } from './terminal-ux';
 import type { FailureOutput } from './failure';
-import { failWith, failureOutputOf, reportFailure } from './failure';
+import { failWith, failureOutputOf, reportFailure, writeToStderr } from './failure';
 import type { ServiceContext } from './service-context';
 import { buildServiceContext } from './service-context';
 
@@ -48,7 +49,9 @@ export interface ResolveLaunchContextResult<S extends AnyInputs> {
 export async function resolveLaunchContext<S extends AnyInputs>(
   args: ResolveLaunchContextArgs<S>,
 ): Promise<ResolveLaunchContextResult<S>> {
-  const dataDir = stringFlag(args.flags['data-dir']) || process.cwd();
+  const namedDataDir = stringFlag(args.flags['data-dir']);
+  const dataDir = namedDataDir || process.cwd();
+
   const namedConfig = stringFlag(args.flags.config);
   const configPath = namedConfig || resolvePath(dataDir, PROJECT_CONFIG_FILE);
 
@@ -64,7 +67,10 @@ export async function resolveLaunchContext<S extends AnyInputs>(
 
   const { resolved, sources } = await resolveInputsTraced(args.inputs, {
     parsed: args.flags,
-    projectConfig: projectConfigLoader(new ProjectConfigStore(configPath, Boolean(namedConfig)), Boolean(namedConfig)),
+    projectConfig:
+      !namedConfig && namedDataDir && !isFolder(namedDataDir)
+        ? missingDataDir(namedDataDir)
+        : projectConfigLoader(new ProjectConfigStore(configPath, Boolean(namedConfig)), Boolean(namedConfig)),
     services,
     rules: args.rules,
   });
@@ -89,6 +95,19 @@ export function projectConfigLoader(store: ProjectConfigStore, named: boolean): 
     loaded = loaded ?? store.load();
 
     return loaded;
+  };
+}
+
+function isFolder(path: string): boolean {
+  return existsSync(path) && statSync(path).isDirectory();
+}
+
+function missingDataDir(path: string): () => ProjectConfig {
+  return () => {
+    throw new UsageError(
+      `No folder found at '${resolvePath(path)}', so there is no ${PROJECT_CONFIG_FILE} to read. ` +
+        'Pass --data-dir with a folder that exists.',
+    );
   };
 }
 
@@ -156,7 +175,7 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
     this.configPath = configPath;
 
     if (configNotice !== undefined) {
-      this.ux.print(configNotice);
+      writeToStderr(configNotice);
     }
   }
 

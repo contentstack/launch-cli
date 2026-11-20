@@ -51,13 +51,13 @@ describe('integration: launch:functions:serve port handling', () => {
     process.exitCode = 0;
   });
 
-  it('logs the invalid port to error.log, prints it once to stderr uncoloured and exits 1', async () => {
+  it('logs the invalid port to error.log, prints it once to stderr uncoloured and exits 2', async () => {
     const { error, stdout, stderr } = await runCommand(
       ['launch:functions:serve', '--port', '70000', '--data-dir', projectDir],
       config,
     );
 
-    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.oclif?.exit).toBe(2);
     expect(stdout).toBe('');
     expect(stderr).toBe(`error: ${INVALID_PORT_MESSAGE}\n`);
     await expect(errorLog()).resolves.toBe(INVALID_PORT_RECORD);
@@ -71,7 +71,7 @@ describe('integration: launch:functions:serve port handling', () => {
       config,
     );
 
-    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.oclif?.exit).toBe(2);
     expect(stdout).toBe('');
     expect(stderr).toBe(`error: ${INVALID_PORT_MESSAGE}\n`);
     await expect(errorLog()).resolves.toBe(INVALID_PORT_RECORD);
@@ -83,7 +83,7 @@ describe('integration: launch:functions:serve port handling', () => {
       config,
     );
 
-    expect(error?.oclif?.exit).toBe(1);
+    expect(error?.oclif?.exit).toBe(2);
     expect(stdout).toBe('');
     expect(stderr).toBe(`error: ${INVALID_PORT_MESSAGE}\n`);
     await expect(errorLog()).resolves.toBe(INVALID_PORT_RECORD);

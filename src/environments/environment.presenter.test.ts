@@ -2,7 +2,6 @@ import {
   ENVIRONMENT_COLUMNS,
   ENVIRONMENT_DELETE_QUESTION,
   ENVIRONMENT_DETAIL_COLUMNS,
-  ENVIRONMENT_VALUE_COLUMN,
   environmentColumns,
   environmentDeletedLine,
   environmentAlreadyMatchesLine,
@@ -10,6 +9,7 @@ import {
   environmentNoChangesLine,
   environmentNotDeletedLine,
 } from './environment.presenter';
+import { UID_WIDTH } from '../core/render';
 
 const FULL = {
   uid: 'e1',
@@ -161,13 +161,13 @@ describe('environmentDetailRows', () => {
 });
 
 describe('ENVIRONMENT_DETAIL_COLUMNS', () => {
-  it('draws a FIELD and a VALUE column and lets the VALUE column flex', () => {
+  it('draws a FIELD and a VALUE column and keeps the VALUE column wide enough for a whole UID', () => {
     expect(ENVIRONMENT_DETAIL_COLUMNS.map((column) => column.header)).toEqual(['FIELD', 'VALUE']);
     expect(ENVIRONMENT_DETAIL_COLUMNS.map((column) => column.value({ field: 'NAME', value: 'production' }))).toEqual([
       'NAME',
       'production',
     ]);
-    expect(ENVIRONMENT_VALUE_COLUMN).toBe(1);
+    expect(ENVIRONMENT_DETAIL_COLUMNS.map((column) => column.minWidth)).toEqual([undefined, UID_WIDTH]);
   });
 });
 

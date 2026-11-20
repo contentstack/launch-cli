@@ -1,6 +1,7 @@
 import { stripVTControlCharacters } from 'node:util';
 
 import type { TableColumn } from '../core/render';
+import { UID_WIDTH } from '../core/render';
 import { styled } from '../core/style';
 import { webUrlOf } from '../core/url';
 import { isAbsent, withoutControlCharacters } from '../core/values';
@@ -294,7 +295,7 @@ function shortCommit(value: string | undefined): string {
 
 export function deploymentColumns(showGit: boolean): TableColumn<Deployment>[] {
   const columns: TableColumn<Deployment>[] = [
-    { header: 'DEPLOYMENT UID', value: (deployment) => text(deployment.uid) },
+    { header: 'DEPLOYMENT UID', value: (deployment) => text(deployment.uid), minWidth: UID_WIDTH },
     { header: 'STATUS', value: (deployment) => text(deployment.status) },
   ];
 
@@ -313,10 +314,8 @@ export function deploymentColumns(showGit: boolean): TableColumn<Deployment>[] {
 
 export const DEPLOYMENT_DETAIL_COLUMNS: TableColumn<DeploymentDetailRow>[] = [
   { header: 'FIELD', value: (row) => row.field },
-  { header: 'VALUE', value: (row) => row.value },
+  { header: 'VALUE', value: (row) => row.value, minWidth: UID_WIDTH },
 ];
-
-export const DEPLOYMENT_VALUE_COLUMN = 1;
 
 export function deploymentVariablesSummary(deployment: Deployment, scope: DeploymentScope): string {
   const count = Array.isArray(deployment.environmentVariables) ? deployment.environmentVariables.length : 0;

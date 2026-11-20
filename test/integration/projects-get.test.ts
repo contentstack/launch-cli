@@ -2,7 +2,7 @@ import nock from 'nock';
 
 import { buildApi } from '../../src/resources';
 import type { Project } from '../../src/projects/types';
-import { PROJECT_DESCRIPTION_COLUMN, PROJECT_DETAIL_COLUMNS } from '../../src/projects/project.presenter';
+import { PROJECT_DETAIL_COLUMNS } from '../../src/projects/project.presenter';
 import { LaunchApiError } from '../../src/transport/errors';
 import { RestApiClient } from '../../src/transport/rest-client';
 import { renderTable } from '../../src/core/render';
@@ -117,7 +117,7 @@ describe('integration: GET /projects/{project_uid}', () => {
     const { ux, lines } = recordingUx();
 
     const project = await buildApi(buildClient(), UNUSED_CMA, {} as never, {} as never).projects.get({ org: ORG_UID, project: PROJECT_UID });
-    renderTable(ux, PROJECT_DETAIL_COLUMNS, [project], undefined, PROJECT_DESCRIPTION_COLUMN);
+    renderTable(ux, PROJECT_DETAIL_COLUMNS, [project], undefined);
 
     expect(lines).toEqual([
       '\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510',
@@ -147,7 +147,7 @@ describe('integration: GET /projects/{project_uid}', () => {
     const { ux, lines } = recordingUx();
 
     const project = await buildApi(buildClient(), UNUSED_CMA, {} as never, {} as never).projects.get({ org: ORG_UID, project: FILEUPLOAD_PROJECT_UID });
-    renderTable(ux, PROJECT_DETAIL_COLUMNS, [project], undefined, PROJECT_DESCRIPTION_COLUMN);
+    renderTable(ux, PROJECT_DETAIL_COLUMNS, [project], undefined);
 
     expect(lines).toEqual([
       '\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510',

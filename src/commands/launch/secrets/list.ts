@@ -33,13 +33,6 @@ export default class SecretsList extends LaunchCommand<typeof listInputs> {
       return;
     }
 
-    renderTable(
-      this.ux,
-      secretColumns(),
-      secrets,
-      process.stdout.columns,
-      undefined,
-      this.services.outputIsTTY === true,
-    );
+    renderTable(this.ux, secretColumns(), secrets, process.stdout.columns, this.services.outputIsTTY === true);
   }
 }

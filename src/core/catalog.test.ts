@@ -2,6 +2,7 @@ import { Parser } from '@oclif/core';
 
 import { coreFlags } from './catalog';
 import { CLIENT_MAX_LIMIT } from './constants';
+import { FlagValueError } from './errors';
 
 async function parse(argv: string[]): Promise<Record<string, unknown>> {
   const { flags } = await Parser.parse(argv, { flags: coreFlags });
@@ -33,31 +34,41 @@ describe('coreFlags', () => {
     await expect(parse(['-c', './.cs-launch.json'])).rejects.toThrow(/Nonexistent flag: -c/);
   });
 
-  it('advertises the limit range in the flag itself, not only in the help text', () => {
-    expect(coreFlags.limit).toMatchObject({ min: 1, max: CLIENT_MAX_LIMIT });
+  it('advertises the limit range in the help text', () => {
     expect(coreFlags.limit.description).toBe(`Number of records to fetch (1-${CLIENT_MAX_LIMIT})`);
   });
 
-  it('advertises the skip floor in the flag itself', () => {
-    expect(coreFlags.skip).toMatchObject({ min: 0 });
-    expect((coreFlags.skip as unknown as { max?: number }).max).toBeUndefined();
-  });
-
-  it.each([['1'], ['2'], [String(CLIENT_MAX_LIMIT)]])('accepts the in-range limit %s', async (limit) => {
+  it.each([['1'], ['2'], [String(CLIENT_MAX_LIMIT)], [' 7 ']])('accepts the in-range limit %p', async (limit) => {
     await expect(parse(['--limit', limit])).resolves.toMatchObject({ limit: Number(limit) });
   });
 
-  it.each([['0'], ['-1'], [String(CLIENT_MAX_LIMIT + 1)], ['99999']])('rejects the out-of-range limit %s', async (limit) => {
-    await expect(parse(['--limit', limit])).rejects.toThrow(/Expected an integer/);
-  });
+  it.each([['0'], ['-1'], [String(CLIENT_MAX_LIMIT + 1)], ['99999'], ['abc'], ['1.5'], ['1e2'], ['0x10'], [''], [' ']])(
+    'rejects the limit %p with one sentence naming the flag and its range',
+    async (limit) => {
+      const failure = await parse(['--limit', limit]).catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(FlagValueError);
+      expect((failure as FlagValueError).detail).toBe(
+        `Invalid --limit value "${limit}". Provide a whole number from 1 to ${CLIENT_MAX_LIMIT}.`,
+      );
+    },
+  );
 
   it.each([['0'], ['5'], ['1000000']])('accepts the non-negative skip %s', async (skip) => {
     await expect(parse(['--skip', skip])).resolves.toMatchObject({ skip: Number(skip) });
   });
 
-  it.each([['-1'], ['-5']])('rejects the negative skip %s', async (skip) => {
-    await expect(parse(['--skip', skip])).rejects.toThrow(/Expected an integer/);
-  });
+  it.each([['-1'], ['-5'], ['abc'], ['2.5']])(
+    'rejects the skip %p with one sentence naming the flag and its floor',
+    async (skip) => {
+      const failure = await parse(['--skip', skip]).catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(FlagValueError);
+      expect((failure as FlagValueError).detail).toBe(
+        `Invalid --skip value "${skip}". Provide a whole number of 0 or more.`,
+      );
+    },
+  );
 
   it('leaves limit and skip absent when neither is passed so the resolution defaults still apply', async () => {
     const flags = await parse([]);

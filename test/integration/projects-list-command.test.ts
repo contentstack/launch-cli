@@ -176,6 +176,25 @@ describe('integration: shipped commands driven through oclif runCommand', () => 
     expect(scope.isDone()).toBe(false);
   });
 
+  it('words a non-numeric --limit as one sentence on stderr, with no oclif "Parsing" text, and exits 2 before any request', async () => {
+    const scope = nock(LAUNCH_HUB_URL).get('/manage/projects').query(true).reply(200, listFixture);
+
+    const { error, stdout, stderr } = await runLaunch([
+      'launch:projects:list',
+      '--org',
+      ORG_UID,
+      '--limit',
+      'abc',
+      '--data-dir',
+      DATA_DIR,
+    ]);
+
+    expect(error?.oclif?.exit).toBe(2);
+    expect(stdout).toBe('');
+    expect(stderr).toBe('error: Invalid --limit value "abc". Provide a whole number from 1 to 1000.\n');
+    expect(scope.isDone()).toBe(false);
+  });
+
   it('sends --limit 1, the smallest page it accepts', async () => {
     const scope = nock(LAUNCH_HUB_URL).get('/manage/projects').query({ limit: '1', skip: '0' }).reply(200, listFixture);
 

@@ -39,7 +39,6 @@ export default class DeploymentsList extends LaunchCommand<typeof listInputs> {
       deploymentColumns(project.projectType !== 'FILEUPLOAD'),
       deployments,
       process.stdout.columns,
-      undefined,
       this.services.outputIsTTY,
     );
     renderPagination(this.ux, { ...page.pagination, skip: this.resolved.skip }, deployments.length);

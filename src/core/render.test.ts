@@ -1,5 +1,10 @@
+import { randomBytes } from 'node:crypto';
+
 import { renderPagination, renderTable } from './render';
 import type { UxLike } from './prompt';
+
+const FIRST_UID = randomBytes(12).toString('hex');
+const SECOND_UID = randomBytes(12).toString('hex');
 
 function fakeUx() {
   const lines: string[] = [];
@@ -50,7 +55,7 @@ describe('renderTable', () => {
   it('prints the no-rows placeholder in yellow when the output is a terminal', () => {
     const { ux, lines } = fakeUx();
 
-    renderTable(ux, [{ header: 'UID', value: (row: { uid: string }) => row.uid }], [], undefined, undefined, true);
+    renderTable(ux, [{ header: 'UID', value: (row: { uid: string }) => row.uid }], [], undefined, true);
 
     expect(lines).toEqual(['\u001b[33mNo records found.\u001b[39m']);
   });
@@ -162,39 +167,161 @@ describe('renderTable', () => {
     expect(lines[5]).toBe('\u2502  a2  \u2502  b2                       \u2502  c2  \u2502');
   });
 
-  it('shrinks only the first column, with an ellipsis, when the box is wider than the terminal', () => {
+  it('shrinks the widest column first and wraps its text onto extra lines rather than cutting it', () => {
     const { ux, lines } = fakeUx();
 
     renderTable(
       ux,
       [
-        { header: 'NAME', value: (row: { name: string; uid: string }) => row.name },
-        { header: 'UID', value: (row: { name: string; uid: string }) => row.uid },
+        { header: 'NAME', value: (row: { name: string; url: string }) => row.name },
+        { header: 'URL', value: (row: { name: string; url: string }) => row.url },
       ],
-      [{ name: 'a-long-project-name', uid: 'p1' }],
-      24,
+      [{ name: 'staging', url: 'https://staging-site.contentstackapps.com' }],
+      44,
     );
 
-    expect(lines[1]).toBe('\u2502  NAME        \u2502  UID  \u2502');
-    expect(lines[3]).toBe('\u2502  a-long-pr\u2026  \u2502  p1   \u2502');
-    expect(lines.every((line) => [...line].length === 24)).toBe(true);
+    expect(lines.slice(3, 5)).toEqual([
+      '\u2502  staging  \u2502  https://staging-site.conte  \u2502',
+      '\u2502           \u2502  ntstackapps.com             \u2502',
+    ]);
+    expect(lines.map((line) => [...line].length)).toEqual([44, 44, 44, 44, 44, 44]);
+    expect(lines.join('')).not.toContain('\u2026');
   });
 
-  it('stops shrinking at the first header, drawing wider than the terminal rather than erasing the column', () => {
+  it('breaks a wrapped cell at the last space that fits, and only hard-breaks a word longer than the cell', () => {
+    const { ux, lines } = fakeUx();
+
+    renderTable(
+      ux,
+      [{ header: 'NOTE', value: (row: { note: string }) => row.note }],
+      [{ note: 'one two three abcdefghijklmnop' }],
+      16,
+    );
+
+    expect(lines.slice(3, -1)).toEqual([
+      '\u2502  one two     \u2502',
+      '\u2502  three       \u2502',
+      '\u2502  abcdefghij  \u2502',
+      '\u2502  klmnop      \u2502',
+    ]);
+  });
+
+  it('shares the shrinking out, so the long URL gives way before the short name is touched', () => {
     const { ux, lines } = fakeUx();
 
     renderTable(
       ux,
       [
-        { header: 'NAME', value: (row: { name: string; uid: string }) => row.name },
-        { header: 'UID', value: (row: { name: string; uid: string }) => row.uid },
+        { header: 'NAME', value: (row: { name: string; url: string }) => row.name },
+        { header: 'URL', value: (row: { name: string; url: string }) => row.url },
       ],
-      [{ name: 'a-long-project-name', uid: 'p1' }],
-      8,
+      [{ name: 'production-eu', url: 'https://production-eu.contentstackapps.com' }],
+      50,
     );
 
-    expect(lines[1]).toBe('\u2502  NAME  \u2502  UID  \u2502');
-    expect(lines[3]).toBe('\u2502  a-l\u2026  \u2502  p1   \u2502');
+    expect(lines[3]).toContain('\u2502  production-eu  \u2502');
+  });
+
+  it('never narrows a column below its minWidth, so a UID stays whole on one line', () => {
+    const { ux, lines } = fakeUx();
+    const uid = FIRST_UID;
+
+    renderTable(
+      ux,
+      [
+        { header: 'UID', value: (row: { uid: string; note: string }) => row.uid, minWidth: 24 },
+        { header: 'NOTE', value: (row: { uid: string; note: string }) => row.note },
+      ],
+      [{ uid, note: 'a note long enough to need wrapping' }],
+      50,
+    );
+
+    expect(lines[3]).toContain(`\u2502  ${uid}  \u2502`);
+    expect(lines.slice(4, -1).every((line) => line.startsWith(`\u2502  ${' '.repeat(24)}  \u2502`))).toBe(true);
+    expect(lines.map((line) => [...line].length).every((width) => width === 50)).toBe(true);
+  });
+
+  it('prints each record as a stacked list of labelled lines when the columns cannot fit even at their floors', () => {
+    const { ux, lines } = fakeUx();
+    const columns = [
+      { header: 'DEPLOYMENT UID', value: (row: { uid: string; status: string }) => row.uid, minWidth: 24 },
+      { header: 'STATUS', value: (row: { uid: string; status: string }) => row.status },
+    ];
+
+    renderTable(
+      ux,
+      columns,
+      [
+        { uid: FIRST_UID, status: 'LIVE' },
+        { uid: SECOND_UID, status: 'FAILED' },
+      ],
+      30,
+    );
+
+    expect(lines).toEqual([
+      `DEPLOYMENT UID  ${FIRST_UID}`,
+      'STATUS          LIVE',
+      '',
+      `DEPLOYMENT UID  ${SECOND_UID}`,
+      'STATUS          FAILED',
+    ]);
+  });
+
+  it('wraps a long stacked value under itself, indented past the labels, so no line outgrows the terminal', () => {
+    const { ux, lines } = fakeUx();
+
+    renderTable(
+      ux,
+      [
+        { header: 'UID', value: (row: { uid: string; url: string }) => row.uid, minWidth: 24 },
+        { header: 'URL', value: (row: { uid: string; url: string }) => row.url, minWidth: 24 },
+      ],
+      [{ uid: FIRST_UID, url: 'https://staging-site.contentstackapps.com' }],
+      30,
+    );
+
+    expect(lines).toEqual([`UID  ${FIRST_UID}`, 'URL  https://staging-site.cont', '     entstackapps.com']);
+  });
+
+  it('bolds the stacked labels on a terminal and leaves the values plain', () => {
+    const { ux, lines } = fakeUx();
+
+    renderTable(
+      ux,
+      [{ header: 'UID', value: (row: { uid: string }) => row.uid, minWidth: 24 }],
+      [{ uid: FIRST_UID }],
+      20,
+      true,
+    );
+
+    expect(lines).toEqual([`\u001b[1mUID\u001b[22m  ${FIRST_UID}`]);
+  });
+
+  it('stops shrinking a plain column at ten characters and stacks rather than squeezing it further', () => {
+    const { ux, lines } = fakeUx();
+
+    renderTable(
+      ux,
+      [{ header: 'NAME', value: (row: { name: string }) => row.name }],
+      [{ name: 'abcdefghijklmnop' }],
+      15,
+    );
+
+    expect(lines).toEqual(['NAME  abcdefghijklmnop']);
+  });
+
+  it('keeps a column at its header width when that is wider than ten characters', () => {
+    const { ux, lines } = fakeUx();
+
+    renderTable(
+      ux,
+      [{ header: 'ENVIRONMENT NAME', value: (row: { name: string }) => row.name }],
+      [{ name: 'a-very-long-environment-name' }],
+      22,
+    );
+
+    expect(lines[1]).toBe('\u2502  ENVIRONMENT NAME  \u2502');
+    expect(lines.slice(3, -1)).toEqual(['\u2502  a-very-long-envi  \u2502', '\u2502  ronment-name      \u2502']);
   });
 
   it.each([
@@ -229,35 +356,29 @@ describe('renderTable', () => {
     expect(lines[3]).toBe('\u2502  a-long-project-name  \u2502');
   });
 
-  it('measures and truncates by character, so an astral cell never splits into a replacement glyph', () => {
+  it('measures and wraps by character, so an astral cell never splits into a replacement glyph', () => {
     const { ux, lines } = fakeUx();
 
-    renderTable(ux, [{ header: 'NAME', value: (row: { name: string }) => row.name }], [{ name: '\u{1f600}'.repeat(6) }], 10);
+    renderTable(
+      ux,
+      [{ header: 'NAME', value: (row: { name: string }) => row.name }],
+      [{ name: '\u{1f600}'.repeat(12) }],
+      16,
+    );
 
-    expect(lines[3]).toBe('\u2502  \u{1f600}\u{1f600}\u{1f600}\u2026  \u2502');
-    expect(lines.map((line) => [...line].length)).toEqual([10, 10, 10, 10, 10]);
+    expect(lines.slice(3, -1)).toEqual([
+      `\u2502  ${'\u{1f600}'.repeat(10)}  \u2502`,
+      `\u2502  ${'\u{1f600}'.repeat(2)}          \u2502`,
+    ]);
+    expect(lines.map((line) => [...line].length).every((width) => width === 16)).toBe(true);
     expect(lines.join('')).not.toContain('\ufffd');
-  });
-
-  it('shrinks the column it is told to and leaves every other one whole', () => {
-    const { ux, lines } = fakeUx();
-    const columns = [
-      { header: 'UID', value: (row: { uid: string; note: string }) => row.uid },
-      { header: 'NOTE', value: (row: { uid: string; note: string }) => row.note },
-    ];
-    const rows = [{ uid: 'project-uid-of-24-chars!', note: 'a note long enough to need trimming' }];
-
-    renderTable(ux, columns, rows, 50, 1);
-
-    expect(lines[3]).toBe('\u2502  project-uid-of-24-chars!  \u2502  a note long en\u2026  \u2502');
-    expect(lines.map((line) => [...line].length)).toEqual([50, 50, 50, 50, 50]);
   });
 
   it('bolds the header cells on a terminal, after padding them, and leaves the data rows alone', () => {
     const { ux, lines } = fakeUx();
     const columns = [{ header: 'NAME', value: (row: { name: string }) => row.name }];
 
-    renderTable(ux, columns, [{ name: 'a-long-name' }], undefined, undefined, true);
+    renderTable(ux, columns, [{ name: 'a-long-name' }], undefined, true);
 
     expect(lines[1]).toBe('\u2502  \u001b[1mNAME       \u001b[22m  \u2502');
     expect(lines[3]).toBe('\u2502  a-long-name  \u2502');

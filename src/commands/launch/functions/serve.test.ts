@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { EXIT_RUNTIME, EXIT_USAGE } from '../../../core/constants';
+import { EXIT_USAGE } from '../../../core/constants';
 import Contentfly from '../../../functions/index';
 import { PortInUseError } from '../../../functions/function.errors';
 import Functions from './serve';
@@ -155,7 +155,7 @@ describe('launch:functions:serve init', () => {
   });
 
   it.each(['-1', '65536', '3000.5', 'abc', 'NaN', '1e400', '', '   ', '0x10', '1e3', '+3000', ' 3000'])(
-    'rejects the invalid port %p, with it on disk in error.log before failing with it to stderr, exiting 1',
+    'rejects the invalid port %p, with it on disk in error.log before failing with it to stderr, exiting 2',
     async (port) => {
       const dataDir = temporaryDirectory();
       const command = commandWithFlags({ 'data-dir': dataDir, port });
@@ -163,7 +163,7 @@ describe('launch:functions:serve init', () => {
       const failure = await command.init().catch((error: Error & { oclif?: { exit?: number } }) => error);
 
       expect(failure).toBeInstanceOf(Errors.CLIError);
-      expect(failure).toMatchObject({ message: INVALID_PORT_MESSAGE, oclif: { exit: EXIT_RUNTIME } });
+      expect(failure).toMatchObject({ message: INVALID_PORT_MESSAGE, oclif: { exit: EXIT_USAGE } });
       expect(command['sharedConfig']).toBeUndefined();
       expect(stdout).toEqual([]);
       expect(readLog(dataDir, 'error.log')).toBe(`{"level":"error","message":"${INVALID_PORT_MESSAGE}"}\n`);
@@ -171,7 +171,7 @@ describe('launch:functions:serve init', () => {
     },
   );
 
-  it('fails with the invalid base path error, exiting 1, before validating the port when the data directory does not exist', async () => {
+  it('fails with the invalid base path error, exiting 2, before validating the port when the data directory does not exist', async () => {
     const exit = jest.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
     const missing = join(temporaryDirectory(), 'no-such-dir');
     const command = commandWithFlags({ 'data-dir': missing, port: '99999' });
@@ -179,14 +179,14 @@ describe('launch:functions:serve init', () => {
     const failure = await command.init().catch((error: Error & { oclif?: { exit?: number } }) => error);
 
     expect(failure).toBeInstanceOf(Errors.CLIError);
-    expect(failure).toMatchObject({ message: 'Provided base path is not valid', oclif: { exit: EXIT_RUNTIME } });
+    expect(failure).toMatchObject({ message: 'Provided base path is not valid', oclif: { exit: EXIT_USAGE } });
     expect(exit).not.toHaveBeenCalled();
     expect(stdout).toEqual([]);
     expect(existsSync(missing)).toBe(false);
     expect(command['sharedConfig']).toBeUndefined();
   });
 
-  it('fails naming the path, exiting 1, when the data directory is a file', async () => {
+  it('fails naming the path, exiting 2, when the data directory is a file', async () => {
     const file = join(temporaryDirectory(), 'not-a-dir.txt');
     writeFileSync(file, 'x');
     const command = commandWithFlags({ 'data-dir': file, port: '3000' });
@@ -194,7 +194,7 @@ describe('launch:functions:serve init', () => {
     const failure = await command.init().catch((error: Error & { oclif?: { exit?: number } }) => error);
 
     expect(failure).toBeInstanceOf(Errors.CLIError);
-    expect(failure).toMatchObject({ message: `--data-dir ${file} is not a directory`, oclif: { exit: EXIT_RUNTIME } });
+    expect(failure).toMatchObject({ message: `--data-dir ${file} is not a directory`, oclif: { exit: EXIT_USAGE } });
     expect(stdout).toEqual([]);
     expect(command['sharedConfig']).toBeUndefined();
   });
@@ -309,7 +309,7 @@ describe('launch:functions:serve port precedence', () => {
       const failure = await command.init().catch((error: Error & { oclif?: { exit?: number } }) => error);
 
       expect(failure).toBeInstanceOf(Errors.CLIError);
-      expect(failure).toMatchObject({ message: INVALID_PORT_MESSAGE, oclif: { exit: EXIT_RUNTIME } });
+      expect(failure).toMatchObject({ message: INVALID_PORT_MESSAGE, oclif: { exit: EXIT_USAGE } });
       expect(command['sharedConfig']).toBeUndefined();
       expect(stdout).toEqual([]);
     },
