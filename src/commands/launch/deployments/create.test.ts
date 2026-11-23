@@ -126,3 +126,9 @@ describe('launch:deployments:create', () => {
     expect(created).toEqual([{ org: 'org1', project: 'proj1', environment: 'env1' }]);
   });
 });
+
+describe('launch:deployments:create help text', () => {
+  it('keeps the space after the colon in its description', () => {
+    expect(DeploymentsCreate.description).toMatch(/^Deploy a Launch environment: the branch tip /);
+  });
+});

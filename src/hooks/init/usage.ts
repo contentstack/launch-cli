@@ -23,21 +23,22 @@ export function usageProblem(
   argv: string[],
   known: (id: string) => boolean,
 ): string | undefined {
-  if (id === 'help') {
-    const target = argv[0];
+  const asksHelpFor = id === 'help' ? argv[0] : undefined;
+  const target = id === 'help' ? asksHelpFor : id;
 
-    return target !== undefined && LAUNCH_ID.test(target) ? forHelp(target) : undefined;
-  }
-
-  if (id === undefined || !LAUNCH_ID.test(id)) {
+  if (target === undefined || !LAUNCH_ID.test(target)) {
     return undefined;
   }
 
-  if (argv[0] === 'help' || beforeEndOfFlags(argv).includes('-h')) {
-    return forHelp(id);
+  if (!known(target)) {
+    return UNKNOWN_COMMAND_MESSAGE;
   }
 
-  return known(id) ? undefined : UNKNOWN_COMMAND_MESSAGE;
+  if (asksHelpFor !== undefined || argv[0] === 'help' || beforeEndOfFlags(argv).includes('-h')) {
+    return forHelp(target);
+  }
+
+  return undefined;
 }
 
 const usage: Hook.Init = async function ({ id, argv, config }) {

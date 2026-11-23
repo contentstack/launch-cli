@@ -14,10 +14,10 @@ describe('PROJECT_COLUMNS', () => {
   });
 
   it.each([
-    ['GITPROVIDER', 'GitHub'],
+    ['GITPROVIDER', 'GitProvider'],
     ['FILEUPLOAD', 'FileUpload'],
     [undefined, '-'],
-  ] as const)('shows a %s project as %s, the name --type takes', (projectType, shown) => {
+  ] as const)('shows a %s project as %s, as the readable project type', (projectType, shown) => {
     const type = PROJECT_COLUMNS.find((column) => column.header === 'TYPE');
 
     expect(type?.value({ uid: 'p1', name: 'site', projectType })).toBe(shown);

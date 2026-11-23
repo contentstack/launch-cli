@@ -4,11 +4,15 @@ import { UID_WIDTH } from '../core/render';
 import { styled } from '../core/style';
 import { firstDeploymentFailureMessage } from '../deployments/deployment.presenter';
 import { LaunchApiError } from '../transport/errors';
-import { PROJECT_TYPE_CHOICES, PROJECT_TYPE_BY_CHOICE } from './project.inputs';
-import type { Project } from './types';
+import type { Project, ProjectType } from './types';
+
+const PROJECT_TYPE_NAMES: Record<ProjectType, string> = {
+  GITPROVIDER: 'GitProvider',
+  FILEUPLOAD: 'FileUpload',
+};
 
 function projectTypeName(project: Project): string {
-  return PROJECT_TYPE_CHOICES.find((choice) => PROJECT_TYPE_BY_CHOICE[choice] === project.projectType) ?? '-';
+  return project.projectType === undefined ? '-' : (PROJECT_TYPE_NAMES[project.projectType] ?? '-');
 }
 
 export const PROJECT_COLUMNS: TableColumn<Project>[] = [

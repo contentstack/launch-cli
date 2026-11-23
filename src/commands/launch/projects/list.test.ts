@@ -93,10 +93,10 @@ describe('launch:projects:list', () => {
 
     await command.run();
 
-    expect(lines[1]).toBe(`\u2502  NAME            \u2502  TYPE        \u2502  PROJECT UID${' '.repeat(15)}\u2502`);
-    expect(lines[3]).toBe(`\u2502  marketing-site  \u2502  GitHub      \u2502  ${'a'.repeat(24)}  \u2502`);
-    expect(lines[5]).toBe(`\u2502  docs            \u2502  FileUpload  \u2502  ${'b'.repeat(24)}  \u2502`);
-    expect(lines[7]).toBe(`\u2502  x               \u2502  FileUpload  \u2502  ${'c'.repeat(24)}  \u2502`);
+    expect(lines[1]).toBe(`\u2502  NAME            \u2502  TYPE         \u2502  PROJECT UID${' '.repeat(15)}\u2502`);
+    expect(lines[3]).toBe(`\u2502  marketing-site  \u2502  GitProvider  \u2502  ${'a'.repeat(24)}  \u2502`);
+    expect(lines[5]).toBe(`\u2502  docs            \u2502  FileUpload   \u2502  ${'b'.repeat(24)}  \u2502`);
+    expect(lines[7]).toBe(`\u2502  x               \u2502  FileUpload   \u2502  ${'c'.repeat(24)}  \u2502`);
     expect(lines[9]).toBe('Showing 1-3 of 3');
   });
 

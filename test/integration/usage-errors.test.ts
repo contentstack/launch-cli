@@ -55,6 +55,9 @@ describe('integration: one short line for a command typed wrong', () => {
     [['launch:projects', 'help'], 'For help, run csdx launch:projects --help.'],
     [['launch:foo'], 'Run csdx launch --help to see all commands.'],
     [['launch:projects:lst'], 'Run csdx launch --help to see all commands.'],
+    [['launch:projects:lst', '-h'], 'Run csdx launch --help to see all commands.'],
+    [['launch:projects:lst', 'help'], 'Run csdx launch --help to see all commands.'],
+    [['help', 'launch:projcts:list'], 'Run csdx launch --help to see all commands.'],
   ])('answers %p with one line pointing at --help, exiting 2', async (argv, message) => {
     const { stderr, stdout, error } = await runCommand(argv, config);
 
