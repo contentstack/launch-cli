@@ -34,6 +34,10 @@ describe('coreFlags', () => {
     await expect(parse(['-c', './.cs-launch.json'])).rejects.toThrow(/Nonexistent flag: -c/);
   });
 
+  it('describes --data-dir by what it is for, not just its default', () => {
+    expect(coreFlags['data-dir'].description).toBe('Path to the project folder');
+  });
+
   it('advertises the limit range in the help text', () => {
     expect(coreFlags.limit.description).toBe(`Number of records to fetch (1-${CLIENT_MAX_LIMIT})`);
   });

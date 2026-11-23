@@ -98,12 +98,12 @@ afterEach(async () => {
 
 describe('launch:functions:serve flag definitions', () => {
   it('describes the command and its examples', () => {
-    expect(Functions.description).toBe('Serve cloud functions');
+    expect(Functions.description).toBe('Serve cloud functions locally');
     expect(Functions.examples).toEqual([
       '$ csdx launch:functions:serve',
       '$ csdx launch:functions:serve --port <port-number>',
-      '$ csdx launch:functions:serve --data-dir <path/of/current/working/dir>',
-      '$ csdx launch:functions:serve --data-dir <path/of/current/working/dir> --port <port-number>',
+      '$ csdx launch:functions:serve --data-dir <project-folder>',
+      '$ csdx launch:functions:serve --data-dir <project-folder> --port <port-number>',
     ]);
   });
 
@@ -111,7 +111,7 @@ describe('launch:functions:serve flag definitions', () => {
     expect(Functions.flags.port).toMatchObject({ default: '3000', description: 'Port number' });
     expect(Functions.flags.port.char).toBeUndefined();
     expect(Functions.flags.port.env).toBeUndefined();
-    expect(Functions.flags['data-dir']).toMatchObject({ char: 'd', description: 'Current working directory' });
+    expect(Functions.flags['data-dir']).toMatchObject({ char: 'd', description: 'Path to the project folder' });
     expect(Functions.flags['data-dir'].default).toBeUndefined();
   });
 });

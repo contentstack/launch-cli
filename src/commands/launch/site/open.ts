@@ -24,6 +24,8 @@ function notFoundAsUsage(error: unknown): never {
 }
 
 export default class SiteOpen extends LaunchCommand<typeof openInputs> {
+  static summary = 'Open the live site of an environment';
+
   static description =
     "Open an environment's live site in your browser, or print its URL when there is no terminal. " +
     'On a terminal, when the environment has more than one domain, you choose which one to open.';

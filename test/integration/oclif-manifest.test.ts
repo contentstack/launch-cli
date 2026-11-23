@@ -32,12 +32,17 @@ const manifest = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'u
 
 describe('integration: the oclif manifest in package.json', () => {
   it('describes the launch topic itself rather than letting a leaf command describe it', () => {
-    expect(manifest.oclif.topics?.launch?.description).toBe('Manage Contentstack Launch projects and cloud functions');
+    expect(manifest.oclif.topics?.launch?.description).toBe('Manage Contentstack Launch projects, environments and deployments');
   });
 
   it('describes the launch:projects and launch:functions subtopics', () => {
     expect(manifest.oclif.topics?.['launch:projects']?.description).toBe('Manage Launch projects');
-    expect(manifest.oclif.topics?.['launch:functions']?.description).toBe('Run Launch cloud functions locally');
+    expect(manifest.oclif.topics?.['launch:functions']?.description).toBe('Run cloud functions locally');
+  });
+
+  it('describes the launch:deployments and launch:logs subtopics in one short line', () => {
+    expect(manifest.oclif.topics?.['launch:deployments']?.description).toBe('Create, view, roll back and cancel deployments');
+    expect(manifest.oclif.topics?.['launch:logs']?.description).toBe('Read deployment, server and live logs');
   });
 
   it('describes the launch:env subtopic', () => {

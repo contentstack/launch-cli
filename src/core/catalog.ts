@@ -32,5 +32,5 @@ export const coreFlags = {
   skip: wholeNumberFlag('skip', 0, undefined, 'Number of records to skip'),
   yes: Flags.boolean({ description: 'Skip the confirmation prompt' }),
   config: Flags.string({ description: `Path to the local '${PROJECT_CONFIG_FILE}' file` }),
-  'data-dir': Flags.string({ char: 'd', description: 'Current working directory' }),
+  'data-dir': Flags.string({ char: 'd', description: 'Path to the project folder' }),
 };

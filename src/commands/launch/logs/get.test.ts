@@ -513,4 +513,11 @@ describe('LogsGet', () => {
     expect(release).toHaveBeenCalledTimes(1);
     expect(watch).not.toHaveBeenCalled();
   });
+
+  it('names the three log types --type takes, in its description and its examples', () => {
+    expect(LogsGet.description).toBe('Read deployment, server or live logs');
+    expect(LogsGet.examples.join('\n')).toContain('--type live');
+    expect(LogsGet.examples.join('\n')).toContain('--search');
+    expect(LogsGet.examples.join('\n')).toContain('--cursor');
+  });
 });

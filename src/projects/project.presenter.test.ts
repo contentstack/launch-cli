@@ -12,6 +12,16 @@ describe('PROJECT_COLUMNS', () => {
   it('labels the uid column as the project uid', () => {
     expect(PROJECT_COLUMNS.map((column) => column.header)).toEqual(['NAME', 'TYPE', 'PROJECT UID']);
   });
+
+  it.each([
+    ['GITPROVIDER', 'GitHub'],
+    ['FILEUPLOAD', 'FileUpload'],
+    [undefined, '-'],
+  ] as const)('shows a %s project as %s, the name --type takes', (projectType, shown) => {
+    const type = PROJECT_COLUMNS.find((column) => column.header === 'TYPE');
+
+    expect(type?.value({ uid: 'p1', name: 'site', projectType })).toBe(shown);
+  });
 });
 
 describe('PROJECT_DELETE_QUESTION', () => {

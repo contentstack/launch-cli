@@ -1,9 +1,5 @@
-import { RetiredCommand } from '../../../core/retired-command';
+import { RetiredCommand, V1_COMMAND_MESSAGE } from '../../../core/retired-command';
 
 export default class EnvironmentsRetired extends RetiredCommand {
-  static description = 'Removed in v2 - list environments with launch:env:list';
-
-  static retiredName = 'launch:environments';
-
-  static replacements = ['launch:env:list'];
+  static summary = V1_COMMAND_MESSAGE;
 }

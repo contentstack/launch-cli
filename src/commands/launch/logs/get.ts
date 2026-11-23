@@ -56,12 +56,17 @@ interface LogScope {
 }
 
 export default class LogsGet extends LaunchCommand<typeof getInputs> {
-  static description = 'Read the build or server logs of a deployment of a Launch environment';
+  static description = 'Read deployment, server or live logs';
 
   static examples = [
     '$ csdx launch:logs:get --org <org-uid> --project <name-or-uid> --env <name-or-uid>',
     '$ csdx launch:logs:get --org <org-uid> --project <name-or-uid> --env <name-or-uid> ' +
       '--deployment <deployment-uid> --type server --since 2h',
+    '$ csdx launch:logs:get --org <org-uid> --project <name-or-uid> --env <name-or-uid> --type live',
+    '$ csdx launch:logs:get --org <org-uid> --project <name-or-uid> --env <name-or-uid> ' +
+      '--type server --search "timeout"',
+    '$ csdx launch:logs:get --org <org-uid> --project <name-or-uid> --env <name-or-uid> ' +
+      '--type server --cursor <cursor>',
   ];
 
   static inputs = getInputs;

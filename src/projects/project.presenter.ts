@@ -4,11 +4,16 @@ import { UID_WIDTH } from '../core/render';
 import { styled } from '../core/style';
 import { firstDeploymentFailureMessage } from '../deployments/deployment.presenter';
 import { LaunchApiError } from '../transport/errors';
+import { PROJECT_TYPE_CHOICES, PROJECT_TYPE_BY_CHOICE } from './project.inputs';
 import type { Project } from './types';
+
+function projectTypeName(project: Project): string {
+  return PROJECT_TYPE_CHOICES.find((choice) => PROJECT_TYPE_BY_CHOICE[choice] === project.projectType) ?? '-';
+}
 
 export const PROJECT_COLUMNS: TableColumn<Project>[] = [
   { header: 'NAME', value: (project) => project.name ?? '-' },
-  { header: 'TYPE', value: (project) => project.projectType ?? '-' },
+  { header: 'TYPE', value: projectTypeName },
   { header: 'PROJECT UID', value: (project) => project.uid ?? '-', minWidth: UID_WIDTH },
 ];
 

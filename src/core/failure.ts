@@ -9,6 +9,7 @@ export interface FailureOutput {
   colour: boolean;
   debug: boolean;
   fallback: (err: Error) => Promise<unknown>;
+  command?: string;
 }
 
 /** Prints `error: <message>` once, as V1 did, then throws an error oclif exits on without printing it again. */
@@ -28,12 +29,13 @@ export function writeToStderr(line: string): void {
   process.stderr.write(`${line}\n`);
 }
 
-export function failureOutputOf(fallback: (err: Error) => Promise<unknown>): FailureOutput {
+export function failureOutputOf(fallback: (err: Error) => Promise<unknown>, command?: string): FailureOutput {
   return {
     print: writeToStderr,
     colour: Boolean(process.stdout.isTTY),
     debug: Boolean(settings.debug),
     fallback,
+    command,
   };
 }
 
@@ -47,6 +49,28 @@ function withHelpSentence(message: string): string {
   }
 
   return `${asSentence(message.slice(0, -OCLIF_HELP_HINT.length))}\n${HELP_SENTENCE}`;
+}
+
+const MISSING_VALUE = /^Flag (--[\w-]+) expects a value$/;
+
+const WRONG_INPUT = /^(Nonexistent flags?|Unexpected arguments?): /;
+
+function parseRefusalMessage(message: string, command: string | undefined): string {
+  const missingValue = MISSING_VALUE.exec(message);
+
+  if (missingValue) {
+    return `${missingValue[1]} needs a value.`;
+  }
+
+  if (command === undefined || !message.endsWith(OCLIF_HELP_HINT) || !WRONG_INPUT.test(message)) {
+    return withHelpSentence(message);
+  }
+
+  if (message === `Unexpected argument: help${OCLIF_HELP_HINT}`) {
+    return `For help, run csdx ${command} --help.`;
+  }
+
+  return `Run csdx ${command} --help to see its flags.`;
 }
 
 function alreadyReported(err: Error): boolean {
@@ -69,7 +93,7 @@ export async function reportFailure(err: Error, output: FailureOutput): Promise<
   }
 
   if (isOclifError(err)) {
-    return failWith(withHelpSentence(err.message), err.oclif.exit, output);
+    return failWith(parseRefusalMessage(err.message, output.command), err.oclif.exit, output);
   }
 
   if (output.debug) {

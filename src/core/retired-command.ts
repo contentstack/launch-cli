@@ -3,23 +3,13 @@ import { Command } from '@oclif/core';
 import { EXIT_USAGE } from './constants';
 import { failureOutputOf, reportFailure } from './failure';
 
-export function retirementMessage(name: string, replacements: readonly string[]): string {
-  const named = replacements.map((replacement) => `csdx ${replacement}`);
-  const last = named[named.length - 1];
-  const listed = named.length === 1 ? last : `${named.slice(0, -1).join(', ')} or ${last}`;
-
-  return `csdx ${name} was removed in Launch CLI v2. Use ${listed} instead.`;
-}
+export const V1_COMMAND_MESSAGE = 'Launch CLI v2 has new commands. Run csdx launch --help to see them.';
 
 export abstract class RetiredCommand extends Command {
-  static retiredName = '';
-
-  static replacements: readonly string[] = [];
+  static hidden = true;
 
   async run(): Promise<void> {
-    const contract = this.constructor as typeof RetiredCommand;
-
-    this.error(retirementMessage(contract.retiredName, contract.replacements), { exit: EXIT_USAGE });
+    this.error(V1_COMMAND_MESSAGE, { exit: EXIT_USAGE });
   }
 
   protected async catch(err: Error): Promise<unknown> {
