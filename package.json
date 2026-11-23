@@ -64,10 +64,13 @@
     "plugins": [
       "@oclif/plugin-help"
     ],
+    "hooks": {
+      "init": "./dist/hooks/init/usage"
+    },
     "topicSeparator": ":",
     "topics": {
       "launch": {
-        "description": "Manage Contentstack Launch projects and cloud functions"
+        "description": "Manage Contentstack Launch projects, environments and deployments"
       },
       "launch:projects": {
         "description": "Manage Launch projects"
@@ -79,13 +82,13 @@
         "description": "Purge the CDN cache of a Launch environment"
       },
       "launch:deployments": {
-        "description": "Create, inspect, roll back and cancel the deployments of a Launch environment"
+        "description": "Create, view, roll back and cancel deployments"
       },
       "launch:site": {
         "description": "Open the live site of a Launch environment"
       },
       "launch:logs": {
-        "description": "Read Launch deployment, server and live logs"
+        "description": "Read deployment, server and live logs"
       },
       "launch:variables": {
         "description": "List, set and remove the environment variables of a Launch environment"
@@ -94,7 +97,7 @@
         "description": "List, set and remove the secrets of a Launch environment"
       },
       "launch:functions": {
-        "description": "Run Launch cloud functions locally"
+        "description": "Run cloud functions locally"
       }
     },
     "additionalHelpFlags": [

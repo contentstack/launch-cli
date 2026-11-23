@@ -14,6 +14,8 @@ const createInputs = inputs({
 });
 
 export default class DeploymentsCreate extends LaunchCommand<typeof createInputs> {
+  static summary = 'Deploy a Launch environment';
+
   static description =
     'Deploy a Launch environment: the branch tip or a chosen commit on a GitHub project, ' +
     'the project directory or the last uploaded bundle on a FileUpload project';

@@ -4,11 +4,20 @@ import { UID_WIDTH } from '../core/render';
 import { styled } from '../core/style';
 import { firstDeploymentFailureMessage } from '../deployments/deployment.presenter';
 import { LaunchApiError } from '../transport/errors';
-import type { Project } from './types';
+import type { Project, ProjectType } from './types';
+
+const PROJECT_TYPE_NAMES: Record<ProjectType, string> = {
+  GITPROVIDER: 'GitProvider',
+  FILEUPLOAD: 'FileUpload',
+};
+
+function projectTypeName(project: Project): string {
+  return project.projectType === undefined ? '-' : (PROJECT_TYPE_NAMES[project.projectType] ?? '-');
+}
 
 export const PROJECT_COLUMNS: TableColumn<Project>[] = [
   { header: 'NAME', value: (project) => project.name ?? '-' },
-  { header: 'TYPE', value: (project) => project.projectType ?? '-' },
+  { header: 'TYPE', value: projectTypeName },
   { header: 'PROJECT UID', value: (project) => project.uid ?? '-', minWidth: UID_WIDTH },
 ];
 

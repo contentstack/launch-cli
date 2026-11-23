@@ -1,10 +1,10 @@
-import { Errors, Parser } from '@oclif/core';
+import { Errors, Flags, Parser } from '@oclif/core';
 
 import { handleStandaloneFailure, reportFailure } from './failure';
 
 type Reported = Errors.CLIError & { skipOclifErrorHandling?: boolean };
 
-function report(err: Error, options: { colour?: boolean; debug?: boolean } = {}) {
+function report(err: Error, options: { colour?: boolean; debug?: boolean; command?: string } = {}) {
   const lines: string[] = [];
   const fallback = jest.fn(async (original: Error) => {
     throw original;
@@ -14,6 +14,7 @@ function report(err: Error, options: { colour?: boolean; debug?: boolean } = {})
     colour: options.colour ?? false,
     debug: options.debug ?? false,
     fallback,
+    command: options.command,
   }).catch((failure: unknown) => failure) as Promise<Reported>;
 
   return { lines, fallback, outcome };
@@ -44,6 +45,27 @@ describe('reportFailure', () => {
 
     expect(lines).toEqual(['error: Nonexistent flag: --description.\nRun the command with --help to see its flags.']);
     expect(thrown.oclif.exit).toBe(2);
+  });
+
+  it.each([
+    [['--foo'], 'Run csdx launch:projects:list --help to see its flags.'],
+    [['--foo', '--bar'], 'Run csdx launch:projects:list --help to see its flags.'],
+    [['staging'], 'Run csdx launch:projects:list --help to see its flags.'],
+    [['help'], 'For help, run csdx launch:projects:list --help.'],
+  ])('points a parse refusal of %p at the command its own --help, exiting 2', async (argv, message) => {
+    const refusal = (await Parser.parse(argv, { flags: {} }).catch((error: unknown) => error)) as Error;
+    const { lines, outcome } = report(refusal, { command: 'launch:projects:list' });
+    const thrown = await outcome;
+
+    expect(lines).toEqual([`error: ${message}`]);
+    expect(thrown.oclif.exit).toBe(2);
+  });
+
+  it('says only that a flag given no value needs one', async () => {
+    const refusal = (await Parser.parse(['--org'], { flags: { org: Flags.string() } }).catch((error: unknown) => error)) as Error;
+    const { lines } = report(refusal, { command: 'launch:projects:list' });
+
+    expect(lines).toEqual(['error: --org needs a value.']);
   });
 
   it('prints an unexpected failure the same way and exits 1', async () => {

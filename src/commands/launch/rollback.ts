@@ -1,9 +1,5 @@
-import { RetiredCommand } from '../../core/retired-command';
+import { RetiredCommand, V1_COMMAND_MESSAGE } from '../../core/retired-command';
 
 export default class RollbackRetired extends RetiredCommand {
-  static description = 'Removed in v2 - roll back with launch:deployments:rollback';
-
-  static retiredName = 'launch:rollback';
-
-  static replacements = ['launch:deployments:rollback'];
+  static summary = V1_COMMAND_MESSAGE;
 }

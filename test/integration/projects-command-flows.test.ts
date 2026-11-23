@@ -152,7 +152,7 @@ describe('integration: end-to-end command flows', () => {
         '\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u252c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510',
         '\u2502  NAME            \u2502  TYPE         \u2502  PROJECT UID               \u2502  DESCRIPTION  \u2502',
         '\u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u253c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524',
-        '\u2502  sample-project  \u2502  GITPROVIDER  \u2502  a1b2c3d4e5f60718293a4b5c  \u2502  -            \u2502',
+        '\u2502  sample-project  \u2502  GitProvider  \u2502  a1b2c3d4e5f60718293a4b5c  \u2502  -            \u2502',
         '\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518',
         '',
       ].join('\n'),
@@ -174,7 +174,7 @@ describe('integration: end-to-end command flows', () => {
 
     expect(error).toBeUndefined();
     expect(scope.isDone()).toBe(true);
-    expect(stdout).toContain('\u2502  sample-project  \u2502  GITPROVIDER  \u2502  a1b2c3d4e5f60718293a4b5c  \u2502  -            \u2502');
+    expect(stdout).toContain('\u2502  sample-project  \u2502  GitProvider  \u2502  a1b2c3d4e5f60718293a4b5c  \u2502  -            \u2502');
   });
 
   it('reads a config file at a path the --config flag names', async () => {
@@ -233,7 +233,7 @@ describe('integration: end-to-end command flows', () => {
 
     expect(error).toBeUndefined();
     expect(scope.isDone()).toBe(true);
-    expect(stdout).toContain('\u2502  sample-project  \u2502  GITPROVIDER  \u2502  a1b2c3d4e5f60718293a4b5c  \u2502  -            \u2502');
+    expect(stdout).toContain('\u2502  sample-project  \u2502  GitProvider  \u2502  a1b2c3d4e5f60718293a4b5c  \u2502  -            \u2502');
   });
 
   it('never sends an authtoken header on an OAUTH session', async () => {
@@ -306,7 +306,7 @@ describe('integration: end-to-end command flows', () => {
     expect(stale.isDone()).toBe(true);
     expect(fresh.isDone()).toBe(true);
     expect(expirySpy).toHaveBeenCalledWith(true);
-    expect(stdout).toContain('\u2502  sample-project  \u2502  GITPROVIDER  \u2502  a1b2c3d4e5f60718293a4b5c  \u2502  -            \u2502');
+    expect(stdout).toContain('\u2502  sample-project  \u2502  GitProvider  \u2502  a1b2c3d4e5f60718293a4b5c  \u2502  -            \u2502');
   });
 
   it('offers the interactive project picker on a terminal and fetches whatever was chosen', async () => {
@@ -339,7 +339,7 @@ describe('integration: end-to-end command flows', () => {
         ],
       },
     ]);
-    expect(stdout).toContain('\u2502  sample-project  \u2502  GITPROVIDER  \u2502  a1b2c3d4e5f60718293a4b5c  \u2502  -            \u2502');
+    expect(stdout).toContain('\u2502  sample-project  \u2502  GitProvider  \u2502  a1b2c3d4e5f60718293a4b5c  \u2502  -            \u2502');
   });
 
   it('exits 3 when the picker comes back with nothing chosen', async () => {

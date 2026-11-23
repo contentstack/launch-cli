@@ -9,14 +9,14 @@ import { isValidPort, serveFlags } from '../../../functions/function.inputs';
 import { Logger } from '../../../functions/function.logger';
 
 export default class Functions extends Command {
-  static description = 'Serve cloud functions';
+  static description = 'Serve cloud functions locally';
   private sharedConfig!: { projectBasePath: string; port: number };
 
   static examples = [
     '$ csdx launch:functions:serve',
     '$ csdx launch:functions:serve --port <port-number>',
-    '$ csdx launch:functions:serve --data-dir <path/of/current/working/dir>',
-    '$ csdx launch:functions:serve --data-dir <path/of/current/working/dir> --port <port-number>',
+    '$ csdx launch:functions:serve --data-dir <project-folder>',
+    '$ csdx launch:functions:serve --data-dir <project-folder> --port <port-number>',
   ];
 
   static flags = serveFlags;

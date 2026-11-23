@@ -231,6 +231,6 @@ export abstract class LaunchCommand<S extends AnyInputs = AnyInputs> extends Com
   }
 
   protected failureOutput(): FailureOutput {
-    return failureOutputOf((original) => super.catch(original));
+    return failureOutputOf((original) => super.catch(original), this.id);
   }
 }

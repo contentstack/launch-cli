@@ -4,7 +4,7 @@ import { join, posix } from 'node:path';
 import { SRC, filesUnder, productionSources } from '../support/sources';
 
 const LAYERS = ['core', 'transport'];
-const NOT_RESOURCES = [...LAYERS, 'commands'];
+const NOT_RESOURCES = [...LAYERS, 'commands', 'hooks'];
 const RESOURCES = readdirSync(SRC, { withFileTypes: true })
   .filter((entry) => entry.isDirectory() && !NOT_RESOURCES.includes(entry.name))
   .map((entry) => entry.name);

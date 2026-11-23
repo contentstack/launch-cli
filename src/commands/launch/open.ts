@@ -1,9 +1,5 @@
-import { RetiredCommand } from '../../core/retired-command';
+import { RetiredCommand, V1_COMMAND_MESSAGE } from '../../core/retired-command';
 
 export default class OpenRetired extends RetiredCommand {
-  static description = 'Removed in v2 - open the site with launch:site:open';
-
-  static retiredName = 'launch:open';
-
-  static replacements = ['launch:site:open'];
+  static summary = V1_COMMAND_MESSAGE;
 }

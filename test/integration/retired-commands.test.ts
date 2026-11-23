@@ -28,6 +28,18 @@ const CONFIG: Record<string, unknown> = {
 
 let config: Interfaces.Config;
 
+const V1_COMMAND_MESSAGE = 'Launch CLI v2 has new commands. Run csdx launch --help to see them.';
+
+const RETIRED_NAMES = [
+  'launch',
+  'launch:deployments',
+  'launch:environments',
+  'launch:open',
+  'launch:logs',
+  'launch:rollback',
+  'launch:functions',
+];
+
 const PLANNED_COMMANDS: Record<string, string> = {
 };
 
@@ -57,63 +69,21 @@ describe('integration: retired V1 command names', () => {
   it('prints a retired name once as a lowercase error line, the same shape as every other error', async () => {
     const { stderr } = await runCommand(['launch:environments'], config);
 
-    expect(stderr).toBe('error: csdx launch:environments was removed in Launch CLI v2. Use csdx launch:env:list instead.\n');
+    expect(stderr).toBe(`error: ${V1_COMMAND_MESSAGE}\n`);
   });
 
-  it('exits 2 naming the three V2 create commands for the bare launch name', async () => {
-    const { error } = await runCommand(['launch'], config);
-
-    expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toBe(
-      'csdx launch was removed in Launch CLI v2. Use csdx launch:projects:create, ' +
-        'csdx launch:env:create or csdx launch:deployments:create instead.',
-    );
-  });
-
-  it.each([
-    [
-      'launch:deployments',
-      'csdx launch:deployments was removed in Launch CLI v2. Use csdx launch:deployments:list instead.',
-    ],
-    [
-      'launch:environments',
-      'csdx launch:environments was removed in Launch CLI v2. Use csdx launch:env:list instead.',
-    ],
-    ['launch:open', 'csdx launch:open was removed in Launch CLI v2. Use csdx launch:site:open instead.'],
-    ['launch:logs', 'csdx launch:logs was removed in Launch CLI v2. Use csdx launch:logs:get instead.'],
-    [
-      'launch:rollback',
-      'csdx launch:rollback was removed in Launch CLI v2. Use csdx launch:deployments:rollback instead.',
-    ],
-    ['launch:functions', 'csdx launch:functions was removed in Launch CLI v2. Use csdx launch:functions:serve instead.'],
-  ])('exits 2 with the CLI its own migration message for %s', async (name, message) => {
+  it.each(RETIRED_NAMES)('exits 2 with the one message every retired V1 name shares, for %s', async (name) => {
     const { error } = await runCommand([name], config);
 
     expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toBe(message);
-  });
-
-  it.each([
-    ['launch'],
-    ['launch:deployments'],
-    ['launch:environments'],
-    ['launch:open'],
-    ['launch:logs'],
-    ['launch:rollback'],
-    ['launch:functions'],
-  ])('answers %s with its own message rather than oclif command-not-found', async (name) => {
-    const { error } = await runCommand([name], config);
-
-    expect(error?.message).toContain('was removed in Launch CLI v2');
-    expect(error?.message).not.toContain('command not found');
-    expect(error?.oclif?.exit).toBe(2);
+    expect(error?.message).toBe(V1_COMMAND_MESSAGE);
   });
 
   it('keeps the retired names refusing even when V1 flags are passed alongside them', async () => {
     const { error } = await runCommand(['launch:logs', '--type', 'deployment', '--data-dir', DATA_DIR], config);
 
     expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toContain('csdx launch:logs:get');
+    expect(error?.message).toBe(V1_COMMAND_MESSAGE);
   });
 
   it('leaves the live child of the retired functions topic reachable', async () => {
@@ -123,7 +93,7 @@ describe('integration: retired V1 command names', () => {
 
     expect(error?.oclif?.exit).toBe(1);
     expect(error?.message).toBe('Invalid port number. Please provide a valid port number between 0 and 65535.');
-    expect(error?.message).not.toContain('was removed in Launch CLI v2');
+    expect(error?.message).not.toBe(V1_COMMAND_MESSAGE);
     const logs = join(projectDir, 'logs');
     const deadline = Date.now() + 5000;
     while ((!existsSync(logs) || readdirSync(logs).length < 1) && Date.now() < deadline) {
@@ -143,7 +113,7 @@ describe('integration: retired V1 command names', () => {
     expect(PLANNED_COMMANDS['launch:logs:get']).toBeUndefined();
     expect(error?.oclif?.exit).toBe(2);
     expect(error?.message).toBe('--type must be one of deployment, server, live; "build" is not.');
-    expect(error?.message).not.toContain('was removed in Launch CLI v2');
+    expect(error?.message).not.toBe(V1_COMMAND_MESSAGE);
   });
 
   it('shows --type and never --log-type in launch:logs:get --help', async () => {
@@ -181,9 +151,7 @@ describe('integration: retired V1 command names', () => {
     expect(PLANNED_COMMANDS['launch:deployments:get']).toBeUndefined();
     expect(PLANNED_COMMANDS['launch:deployments:create']).toBeUndefined();
     expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toBe(
-      'csdx launch:deployments was removed in Launch CLI v2. Use csdx launch:deployments:list instead.',
-    );
+    expect(error?.message).toBe(V1_COMMAND_MESSAGE);
   });
 
   it('registers deployments:rollback and deployments:cancel as real commands while launch:rollback stays retired', async () => {
@@ -195,9 +163,7 @@ describe('integration: retired V1 command names', () => {
     expect(PLANNED_COMMANDS['launch:deployments:rollback']).toBeUndefined();
     expect(PLANNED_COMMANDS['launch:deployments:cancel']).toBeUndefined();
     expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toBe(
-      'csdx launch:rollback was removed in Launch CLI v2. Use csdx launch:deployments:rollback instead.',
-    );
+    expect(error?.message).toBe(V1_COMMAND_MESSAGE);
   });
 
   it('lists the V2 topics under launch --help', async () => {
@@ -206,6 +172,33 @@ describe('integration: retired V1 command names', () => {
     expect(stdout).toContain('launch:projects');
     expect(stdout).toContain('launch:functions');
     expect(stdout).toContain('launch:site');
+  });
+
+  it.each([
+    ['launch', 'Manage Contentstack Launch projects, environments and deployments'],
+    ['launch:deployments', 'Create, view, roll back and cancel deployments'],
+    ['launch:logs', 'Read deployment, server and live logs'],
+    ['launch:functions', 'Run cloud functions locally'],
+  ])('opens %s --help with its topic line alone, saying nothing about the retired command', async (name, topic) => {
+    const { stdout } = await runCommand([name, '--help'], config);
+
+    expect(stdout.split('\n')[0]).toBe(topic);
+    expect(stdout).not.toContain('DESCRIPTION');
+    expect(stdout).not.toContain('removed');
+  });
+
+  it('lists no retired command under launch --help', async () => {
+    const { stdout } = await runCommand(['launch', '--help'], config);
+
+    expect(stdout).not.toContain('COMMANDS');
+  });
+
+  it.each([
+    ['launch:site', 'launch:site:open', 'Open the live site of an environment'],
+    ['launch:deployments', 'launch:deployments:create', 'Deploy a Launch environment'],
+  ])('lists %s with a one-line summary for %s', async (topic, command, summary) => {
+    const { stdout } = await runCommand([topic, '--help'], config);
+    expect(stdout).toMatch(new RegExp(`\\n\\s+${command}\\s+${summary}\\n`));
   });
 
   it('registers launch:site:open and no launch:site:view', () => {
@@ -219,7 +212,7 @@ describe('integration: retired V1 command names', () => {
     const { stdout } = await runCommand(['launch', '--help'], config);
 
     expect(stdout).toContain('launch:logs');
-    expect(stdout).toContain('Read Launch deployment, server and live logs');
+    expect(stdout).toContain('Read deployment, server and live logs');
   });
 
   it("lists the logs resource's verb under launch:logs --help", async () => {

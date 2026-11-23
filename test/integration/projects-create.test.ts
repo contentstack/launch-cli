@@ -808,7 +808,7 @@ describe('integration: launch:projects:create on the wire', () => {
     const { error } = await runCommand([...gitFlags(), '--no-vars'], config);
 
     expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toContain('--no-vars');
+    expect(error?.message).toBe('Run csdx launch:projects:create --help to see its flags.');
     expect(onWire).toEqual([]);
   });
 

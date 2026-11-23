@@ -298,7 +298,7 @@ describe('integration: launch:site:open on the wire', () => {
     const { error } = await runOpen(openArgs('--env', ENV_UID, flag, value));
 
     expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toContain('Nonexistent flag');
+    expect(error?.message).toBe('Run csdx launch:site:open --help to see its flags.');
     expect(sent).toEqual([]);
     expect(onWire).toEqual([]);
     expect(open).not.toHaveBeenCalled();

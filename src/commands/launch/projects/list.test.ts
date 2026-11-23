@@ -43,7 +43,7 @@ describe('launch:projects:list', () => {
 
     expect(listed).toEqual([{ org: 'org1', limit: 50, skip: 0 }]);
     expect(lines[1]).toBe('\u2502  NAME  \u2502  TYPE        \u2502  PROJECT UID  \u2502');
-    expect(lines[3]).toBe('\u2502  site  \u2502  FILEUPLOAD  \u2502  p1           \u2502');
+    expect(lines[3]).toBe('\u2502  site  \u2502  FileUpload  \u2502  p1           \u2502');
     expect(lines[5]).toBe('Showing 1-1 of 1');
   });
 
@@ -94,9 +94,9 @@ describe('launch:projects:list', () => {
     await command.run();
 
     expect(lines[1]).toBe(`\u2502  NAME            \u2502  TYPE         \u2502  PROJECT UID${' '.repeat(15)}\u2502`);
-    expect(lines[3]).toBe(`\u2502  marketing-site  \u2502  GITPROVIDER  \u2502  ${'a'.repeat(24)}  \u2502`);
-    expect(lines[5]).toBe(`\u2502  docs            \u2502  FILEUPLOAD   \u2502  ${'b'.repeat(24)}  \u2502`);
-    expect(lines[7]).toBe(`\u2502  x               \u2502  FILEUPLOAD   \u2502  ${'c'.repeat(24)}  \u2502`);
+    expect(lines[3]).toBe(`\u2502  marketing-site  \u2502  GitProvider  \u2502  ${'a'.repeat(24)}  \u2502`);
+    expect(lines[5]).toBe(`\u2502  docs            \u2502  FileUpload   \u2502  ${'b'.repeat(24)}  \u2502`);
+    expect(lines[7]).toBe(`\u2502  x               \u2502  FileUpload   \u2502  ${'c'.repeat(24)}  \u2502`);
     expect(lines[9]).toBe('Showing 1-3 of 3');
   });
 
