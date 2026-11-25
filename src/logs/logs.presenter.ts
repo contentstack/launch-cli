@@ -96,8 +96,8 @@ export function serverLogsExpiredLine(outputIsTTY: boolean, search?: string): st
   return styled(line, 'yellow', outputIsTTY);
 }
 
-export function serverLogsRetentionLine(outputIsTTY: boolean): string {
-  const line = `Server logs are kept for ${RETENTION_HOURS} hours; anything older may be missing.`;
+export function serverLogsRetentionLine(clampedFrom: number, outputIsTTY: boolean): string {
+  const line = `Server logs are kept for ${RETENTION_HOURS} hours; showing from ${isoOf(clampedFrom)}.`;
 
   return styled(line, 'yellow', outputIsTTY);
 }

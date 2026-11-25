@@ -168,7 +168,7 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
     let last: ServerLogsPage | undefined;
 
     if (clampedFrom !== undefined) {
-      this.ux.print(serverLogsRetentionLine(outputIsTTY));
+      this.ux.print(serverLogsRetentionLine(clampedFrom, outputIsTTY));
     }
 
     for await (const page of this.services.api.serverLogs.pages({ ...scope, startTime, endTime, search, cursor })) {

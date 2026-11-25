@@ -673,7 +673,7 @@ describe('integration: launch:logs:get on the wire', () => {
 
     expect(error).toBeUndefined();
     expect(outputLines(stdout)).toEqual([
-      'Server logs are kept for 24 hours; anything older may be missing.',
+      'Server logs are kept for 24 hours; showing from 2026-10-27T12:00:00.000Z.',
       '2026-10-27 13:00:00.000:  old',
     ]);
   });
