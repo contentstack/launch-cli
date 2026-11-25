@@ -556,6 +556,26 @@ describe('CloudFunctions serve routing', () => {
     expect((await sendRequest(port, '/cached')).cacheControl).toBe('max-age=60');
   });
 
+  it('sends the number given to res.send as the body with a 200 status, as deployed functions do', async () => {
+    writeFunctionFile('count.js', 'export default function count(request, response) { response.send(42); }');
+    writeFunctionFile('zero.js', 'export default function zero(request, response) { response.send(0); }');
+    writeFunctionFile('teapot.js', 'export default function teapot(request, response) { response.status(201).send(418); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const count = await sendRequest(port, '/count');
+    const zero = await sendRequest(port, '/zero');
+    const teapot = await sendRequest(port, '/teapot');
+
+    expect(count.status).toBe(200);
+    expect(count.body).toBe('42');
+    expect(zero.status).toBe(200);
+    expect(zero.body).toBe('0');
+    expect(teapot.status).toBe(201);
+    expect(teapot.body).toBe('418');
+    expect(loggedErrors).toEqual([]);
+  });
+
   it('answers res.redirect(url) with a bare 307 and the location exactly as given, as deployed functions do', async () => {
     writeFunctionFile('go.js', 'export default function go(request, response) { response.redirect("/target?from=a b"); }');
     const port = await freePort();
