@@ -153,11 +153,6 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
     let printed = 0;
     let last: ServerLogsPage | undefined;
 
-    if (window.expired) {
-      this.ux.print(serverLogsExpiredLine(outputIsTTY));
-      return;
-    }
-
     if (clampedFrom !== undefined) {
       this.ux.print(serverLogsRetentionLine(clampedFrom, outputIsTTY));
     }
@@ -177,7 +172,9 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
     }
 
     if (printed === 0) {
-      this.ux.print(noServerLogsLine(startTime, endTime, outputIsTTY, search));
+      this.ux.print(
+        window.expired ? serverLogsExpiredLine(outputIsTTY) : noServerLogsLine(startTime, endTime, outputIsTTY, search),
+      );
     }
 
     if (last !== undefined && !isRecord(last.pageInfo) && last.logs.length === SERVER_LOGS_PAGE_CAP) {

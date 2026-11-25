@@ -130,6 +130,12 @@ describe('onlyWithValueOf', () => {
     );
   });
 
+  it('fails on an undeclared gate on every run, even when the gated flag was not supplied', () => {
+    const rule = onlyWithValueOf('server-cmd', 'framework', SUPPORTED);
+
+    expect(() => rule({}, {})).toThrow(InputDependencyError);
+  });
+
   it('still leaves a declared but absent gate to the command', () => {
     const rule = onlyWithValueOf('server-cmd', 'framework', SUPPORTED);
 
@@ -140,7 +146,7 @@ describe('onlyWithValueOf', () => {
     const rule = onlyWithValueOf('server-cmd', 'framework', SUPPORTED);
 
     expect(() => rule(...typed({ framework: 'NEXTJS' }))).not.toThrow();
-    expect(() => rule({}, {})).not.toThrow();
+    expect(() => rule({ framework: undefined }, {})).not.toThrow();
   });
 
   it('passes when the gated value came only from a default, whatever the gate says', () => {

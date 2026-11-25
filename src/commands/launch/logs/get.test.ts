@@ -335,16 +335,27 @@ describe('LogsGet', () => {
     expect(walkCalls).toEqual([expect.objectContaining({ startTime: NOW - 172_800_000, endTime: NOW })]);
   });
 
-  it('prints only the expired notice and sends nothing for a window that ends more than 24 hours ago', async () => {
+  it('still asks the server for a window that ended more than 24 hours ago, and says none are left when it is empty', async () => {
     const { command, lines, walkCalls } = commandUnderTest({
       resolved: { 'log-type': 'server', until: '2d' },
-      serverLogs: [{ message: 'never fetched' }],
+      serverLogs: [],
     });
 
     await command.run();
 
     expect(lines).toEqual(['Server logs are kept for 24 hours, so this window has none left.']);
-    expect(walkCalls).toEqual([]);
+    expect(walkCalls).toEqual([expect.objectContaining({ startTime: NOW - 172_800_000 - 3_600_000, endTime: NOW - 172_800_000 })]);
+  });
+
+  it('prints what the server still has for an expired window, with no notice, when its clock disagrees', async () => {
+    const { command, lines } = commandUnderTest({
+      resolved: { 'log-type': 'server', until: '2d' },
+      serverLogs: [{ timestamp: '2026-10-26T11:30:00.000Z', message: 'still there' }],
+    });
+
+    await command.run();
+
+    expect(lines).toEqual(['2026-10-26 11:30:00.000:  still there']);
   });
 
   it('prints no notice for a window of exactly 24 hours', async () => {

@@ -224,6 +224,17 @@ describe('parseLogWindow', () => {
     expect(bothPast).toEqual({ startTime: NOW - 3 * DAY, endTime: NOW - 2 * DAY, expired: true });
   });
 
+  it('marks a window ending exactly 24 hours ago as expired, and one ending a millisecond later as clamped', () => {
+    const atEdge = parseLogWindow({ until: '24h' }, clock);
+    const justInside = parseLogWindow(
+      { since: new Date(NOW - DAY - HOUR).toISOString(), until: new Date(NOW - DAY + 1).toISOString() },
+      clock,
+    );
+
+    expect(atEdge).toEqual({ startTime: NOW - DAY - HOUR, endTime: NOW - DAY, expired: true });
+    expect(justInside).toEqual({ startTime: NOW - DAY - HOUR, endTime: NOW - DAY + 1, clampedFrom: NOW - DAY });
+  });
+
   it('keeps the clamp, not expired, for a window that still ends inside the 24 hours', () => {
     const window = parseLogWindow({ since: '2d', until: '12h' }, clock);
 

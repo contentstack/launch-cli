@@ -133,7 +133,7 @@ export function parseLogWindow({ since, until }: LogWindowInput, now: () => numb
 
   const oldest = current - SERVER_LOG_RETENTION_MS;
 
-  if (endTime < oldest) {
+  if (endTime <= oldest) {
     return { startTime, endTime, expired: true };
   }
 

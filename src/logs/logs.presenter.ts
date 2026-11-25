@@ -4,7 +4,10 @@ import { clockOf, deploymentLogLine } from '../deployments/deployment.presenter'
 import type { Deployment } from '../deployments/types';
 import { styled } from '../core/style';
 import { isRecord } from '../core/values';
+import { SERVER_LOG_RETENTION_MS } from './log-window';
 import { SERVER_LOGS_PAGE_CAP, type ServerLog } from './types';
+
+const RETENTION_HOURS = SERVER_LOG_RETENTION_MS / 3_600_000;
 
 const MS_PER_MINUTE = 60_000;
 
@@ -85,11 +88,15 @@ export function serverLogsResumeLine(resume: ServerLogsResume): string {
 }
 
 export function serverLogsExpiredLine(outputIsTTY: boolean): string {
-  return styled('Server logs are kept for 24 hours, so this window has none left.', 'yellow', outputIsTTY);
+  const line = `Server logs are kept for ${RETENTION_HOURS} hours, so this window has none left.`;
+
+  return styled(line, 'yellow', outputIsTTY);
 }
 
 export function serverLogsRetentionLine(clampedFrom: number, outputIsTTY: boolean): string {
-  return styled(`Server logs are kept for 24 hours; showing from ${isoOf(clampedFrom)}.`, 'yellow', outputIsTTY);
+  const line = `Server logs are kept for ${RETENTION_HOURS} hours; showing from ${isoOf(clampedFrom)}.`;
+
+  return styled(line, 'yellow', outputIsTTY);
 }
 
 export function stoppedFollowingLine(outputIsTTY: boolean): string {

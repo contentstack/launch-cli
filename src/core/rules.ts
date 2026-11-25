@@ -53,14 +53,14 @@ export function requireValueOf(flag: string, gate: string, allowed: readonly str
 
 export function onlyWithValueOf(flag: FlagKey, gate: FlagKey, allowed: readonly string[]): Rule {
   return (resolved, sources) => {
-    if (!isSupplied(resolved[flag], sources[flag])) {
-      return;
-    }
-
     if (!(gate in resolved)) {
       throw new InputDependencyError(
         `--${flag} cannot be checked without --${gate}: declare ${gate} in the command inputs.`,
       );
+    }
+
+    if (!isSupplied(resolved[flag], sources[flag])) {
+      return;
     }
 
     const value = resolved[gate];
