@@ -1,6 +1,6 @@
 fileignoreconfig:
 - filename: src/logs/logs.inputs.test.ts
-  checksum: a7cce0361a75e2730c749e0297f275383ac8d41b22be9c8b6a9ca2797f08f191
+  checksum: 45cc7a1783306773b552fecb7bf66f9af20f9d75290d8dc21fd6c7925d77ec5d
 - filename: test/integration/logs-get.test.ts
   checksum: b608797028bb0191d53630d2ff95d096b8a2b83019fed2aa096754dc5c50b1bb
 - filename: src/commands/launch/logs/get.test.ts
@@ -236,7 +236,7 @@ fileignoreconfig:
     - "a project name passed on argv to the project resolver"
     - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
 - filename: AGENTS.md
-  checksum: 46584ecc6343552c40b96b2b5c76a60c1b87ef454fa82f9c901086bcd408b090
+  checksum: 1e753521d4e87a675de81578d4e54568a43595d326d66f1ca5e03d62f93e62a6
   allowed_patterns:
     - "Do not add an exemption to a guard to make a new file pass"
     - "passes its own error wording to `client.request\\(req, MESSAGES\\)`"
@@ -333,7 +333,7 @@ fileignoreconfig:
 - filename: src/commands/launch/env/update.test.ts
   checksum: 82c76af721bfdfd8eb7cf49494ffbe15d98b988e98bca1015b9d34b42b5226bd
 - filename: README.md
-  checksum: 1e2474738623a2510b5e7b8214e44cef0960ddc99d3a23057a9a2d87a5cb7ca4
+  checksum: 734469e9b254d929e67d93e333fe36c20228073fb88204a237235635d30c9bab
   allowed_patterns:
     - "password-protection"
     - "-p, --password"

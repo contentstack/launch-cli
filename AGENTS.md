@@ -170,7 +170,7 @@ src/
   logs/         logs:get: the server-log window parser, the server-log repository and its cursor walk,
                 the live log API over SSE, and the LiveLogFollower that reconnects it; the build-log
                 follow is deployments'. It reaches deployments only
-  cache/        the CDN cache purge behind launch:cache:purge: CacheApi, the --path / --prefix / --tags / --hosts
+  cache/        the CDN cache purge behind launch:cache:purge: CacheApi, the --path / --tags / --hosts
                 inputs and their normalisation, the criterion prompt and the success lines
   site/         the URL choice for an environment's live site (`siteUrlOf`, shared with the deployment follower),
                 the opening and not-found lines, behind launch:site:open
@@ -506,13 +506,16 @@ this contract on purpose. It started as V1 byte for byte, on the product owner's
 CL-8791 (V2 bug bash) then made it match deployed cloud functions and V2's error output. These
 parts are still V1's and must stay so:
 
-- The port is `process.env.PORT || flags.port`, applied by the command after parsing. A set
-  `PORT` beats an explicit `--port`, and an empty `PORT` falls through to the flag. The
-  `--port` flag therefore does **not** declare `env: 'PORT'` - oclif's precedence (argv
-  first) is the opposite of V1's, and restoring it would be a behaviour change.
 - An invalid port exits **1** (`bf9a139`), not the usage code 2.
 
 The approved differences from V1 are these, and only these:
+
+- **An explicit `--port` beats `PORT`** (CL-8965, approved by the product owner, reversing
+  `bf9a139`'s precedence). The `--port` flag declares `env: 'PORT'`, so oclif applies the
+  order every other flag has - the flag, then `PORT`, then 3000 - and `--help` shows
+  `[default: 3000, env: PORT]`. An empty `PORT` falls through to 3000; a whitespace or
+  out-of-range `PORT` is refused through the invalid-port path below. V1 read
+  `process.env.PORT || flags.port`, so a `PORT` left in the shell silently overrode the flag.
 
 - **Errors go to stderr.** An invalid port is recorded in `logs/error.log`, and the command
   awaits `logger.flush()` so the record is on disk before the process exits. It then calls
@@ -599,8 +602,9 @@ quota 429 is sent once and an ordinary 429 is sent `maxRetries + 1` times. `laun
 the purge whatever its code (`asPurgeFailure`), and a 404 from its environment read as the usage error `No
 environment with UID "<uid>" found in this project.` (exit 2), so a foreign environment is refused before any POST.
 
-`launch:cache:purge` takes `--path`, `--tags` or `--hosts`, and `--prefix` with `--path` (the flag form of ending the path
-in `/*`; `--prefix` without `--path` is `onlyWithFlag('prefix', 'path')`, exit 2 `--prefix is only used with --path.`).
+`launch:cache:purge` takes `--path`, `--tags` or `--hosts`. A trailing `/*` on `--path` is the only prefix form - it is
+sent as one request, `{ path: "/blog", isPrefix: true }` - and there is no `--prefix` flag (removed in CL-8965 so no flag
+works only alongside another); oclif refuses it as an unknown flag, exit 2.
 Two or three criteria are refused by `atMostOneOf` in the resolution chain. **None** supplied is not a rule: a rule
 runs in `init()`, before the command can read the environment's domains or prompt, so `run()` refuses it with the
 same `Pass exactly one of ...; none was supplied.` wording (`oneOfMessage`) when there is no terminal, before any
@@ -608,7 +612,7 @@ request, and on a terminal asks `What do you want to purge?` (`promptForCriterio
 (then the path, then `Purge everything under this path? (prefix match)`, default no, skipped for a typed `/*`), Cache
 tags (the `--tags` normaliser, no maximum) or Hostnames (a checkbox of the environment's own domains as bare hostnames,
 left out when it has none). The domains come from the environment `run()` reads first, so the prompt costs no request.
-`--prefix` alone never reaches the prompt. The success line is one `✔ Cache purge initiated for ...` line.
+The success line is one `✔ Cache purge initiated for ...` line.
 
 A proxy URL shown in a diagnostic has its `user:…@` part removed first (`withoutCredentials`), and
 `https_proxy`/`http_proxy` are read as well as the uppercase names.
@@ -940,7 +944,7 @@ checklist and nothing else; the create summary says `ready to set` because the e
 oclif's native `exclusive` / `relationships` on the flag definition, where it also shows in `--help` -
 and a simple range does too: `limit` and `skip` carry oclif's own `min`/`max` rather than being
 checked later. A rule that must read a *resolved* value (one that config, a prompt or a default may
-have supplied) belongs in `src/core/rules.ts` - there are five: `atMostOneOf` and `onlyWithFlag` (used by `cache:purge`), `exactlyOneOf` and `atLeastOneOf` (no consumer yet;
+have supplied) belongs in `src/core/rules.ts` - there are four: `atMostOneOf` (used by `cache:purge`), `exactlyOneOf` and `atLeastOneOf` (no consumer yet;
 see "Built ahead of use" below) and `onlyWithValueOf` (used by `projects:create`) - declared as a `static rules = [...]` array on the command. `resolveInputs` evaluates them after resolution,
 and a failing rule is a usage error (exit 2).
 

@@ -8,7 +8,9 @@ const WILDCARD_SUFFIX = '/*';
 
 export const cacheFlags = {
   path: Flags.string({
-    description: 'Path to purge, for example /blog. To also purge everything beneath it, end the path with /*',
+    description:
+      'Path to purge, for example /blog. To also purge everything beneath it, end the path with /* and quote it ' +
+      'so your shell leaves it alone, for example "/blog/*"',
   }),
   tags: Flags.string({ description: 'Comma-separated cache tags to purge' }),
   hosts: Flags.string({ description: 'Comma-separated hostnames to purge' }),

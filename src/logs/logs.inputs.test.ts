@@ -67,13 +67,13 @@ describe('logs inputs', () => {
     expect(logsFlags.until.required).toBeFalsy();
   });
 
-  it('tells --since users that server logs are kept for 24 hours, and lists only window formats within it', () => {
+  it('tells --since users that server logs are kept for 24 hours, and lists the same units the parser accepts', () => {
     expect(logsFlags.since.description).toBe(
-      'Server logs only: start of the window, relative (45s, 30m, 12hr) or an ISO 8601 timestamp with an offset. ' +
-        'Defaults to one hour before --until. Server logs are kept for 24 hours; an earlier start is moved up to 24 hours ago',
+      'Server logs only: start of the window, relative (45s, 30m, 12hr, 1d) or an ISO 8601 timestamp with an offset. ' +
+        'Defaults to one hour before --until. Server logs are kept for 24 hours, so an earlier start returns only the last 24 hours',
     );
     expect(logsFlags.until.description).toBe(
-      'Server logs only: end of the window, relative (45s, 30m, 12hr) or an ISO 8601 timestamp with an offset. Defaults to now',
+      'Server logs only: end of the window, relative (45s, 30m, 12hr, 1d) or an ISO 8601 timestamp with an offset. Defaults to now',
     );
   });
 

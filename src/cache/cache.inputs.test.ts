@@ -29,9 +29,10 @@ describe('cache inputs', () => {
     }
   });
 
-  it('describes --path with the /* prefix form and without a whole-site /*', () => {
+  it('describes --path with the quoted /* prefix form and without a whole-site /*', () => {
     expect(cacheFlags.path.description).toBe(
-      'Path to purge, for example /blog. To also purge everything beneath it, end the path with /*',
+      'Path to purge, for example /blog. To also purge everything beneath it, end the path with /* and quote it ' +
+        'so your shell leaves it alone, for example "/blog/*"',
     );
   });
 
