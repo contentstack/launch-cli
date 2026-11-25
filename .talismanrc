@@ -333,7 +333,7 @@ fileignoreconfig:
 - filename: src/commands/launch/env/update.test.ts
   checksum: 82c76af721bfdfd8eb7cf49494ffbe15d98b988e98bca1015b9d34b42b5226bd
 - filename: README.md
-  checksum: 734469e9b254d929e67d93e333fe36c20228073fb88204a237235635d30c9bab
+  checksum: f55eb64f0e8846f183387de8c7ade30e8336dc92f364a27186e45117bdb2bf5b
   allowed_patterns:
     - "password-protection"
     - "-p, --password"

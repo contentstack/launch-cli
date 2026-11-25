@@ -43,7 +43,9 @@ with exit code 2 and name their V2 replacements. `launch:functions:serve` is liv
 
 <!-- commands -->
 * [`csdx help [COMMAND]`](#csdx-help-command)
+* [`csdx launch`](#csdx-launch)
 * [`csdx launch:cache:purge`](#csdx-launchcachepurge)
+* [`csdx launch:deployments`](#csdx-launchdeployments)
 * [`csdx launch:deployments:cancel`](#csdx-launchdeploymentscancel)
 * [`csdx launch:deployments:create`](#csdx-launchdeploymentscreate)
 * [`csdx launch:deployments:get`](#csdx-launchdeploymentsget)
@@ -54,13 +56,18 @@ with exit code 2 and name their V2 replacements. `launch:functions:serve` is liv
 * [`csdx launch:env:get`](#csdx-launchenvget)
 * [`csdx launch:env:list`](#csdx-launchenvlist)
 * [`csdx launch:env:update`](#csdx-launchenvupdate)
+* [`csdx launch:environments`](#csdx-launchenvironments)
+* [`csdx launch:functions`](#csdx-launchfunctions)
 * [`csdx launch:functions:serve`](#csdx-launchfunctionsserve)
+* [`csdx launch:logs`](#csdx-launchlogs)
 * [`csdx launch:logs:get`](#csdx-launchlogsget)
+* [`csdx launch:open`](#csdx-launchopen)
 * [`csdx launch:projects:create`](#csdx-launchprojectscreate)
 * [`csdx launch:projects:delete`](#csdx-launchprojectsdelete)
 * [`csdx launch:projects:get`](#csdx-launchprojectsget)
 * [`csdx launch:projects:list`](#csdx-launchprojectslist)
 * [`csdx launch:projects:update`](#csdx-launchprojectsupdate)
+* [`csdx launch:rollback`](#csdx-launchrollback)
 * [`csdx launch:secrets:list`](#csdx-launchsecretslist)
 * [`csdx launch:secrets:set`](#csdx-launchsecretsset)
 * [`csdx launch:secrets:unset`](#csdx-launchsecretsunset)
@@ -88,6 +95,20 @@ DESCRIPTION
 ```
 
 _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/6.2.53/src/commands/help.ts)_
+
+## `csdx launch`
+
+Removed in v2 - create a project, environment or deployment with its own command
+
+```
+USAGE
+  $ csdx launch
+
+DESCRIPTION
+  Removed in v2 - create a project, environment or deployment with its own command
+```
+
+_See code: [src/commands/launch/index.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/index.ts)_
 
 ## `csdx launch:cache:purge`
 
@@ -124,6 +145,20 @@ EXAMPLES
 
 _See code: [src/commands/launch/cache/purge.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/cache/purge.ts)_
 
+## `csdx launch:deployments`
+
+Removed in v2 - list deployments with launch:deployments:list
+
+```
+USAGE
+  $ csdx launch:deployments
+
+DESCRIPTION
+  Removed in v2 - list deployments with launch:deployments:list
+```
+
+_See code: [src/commands/launch/deployments/index.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/deployments/index.ts)_
+
 ## `csdx launch:deployments:cancel`
 
 Cancel a deployment of a Launch environment that is still in progress
@@ -134,7 +169,7 @@ USAGE
     [--deployment <value>] [--yes]
 
 FLAGS
-  -d, --data-dir=<value>    Path to the project folder
+  -d, --data-dir=<value>    Current working directory
       --config=<value>      Path to the local '.cs-launch.json' file
       --deployment=<value>  Deployment UID
       --env=<value>         Environment name or UID
@@ -155,7 +190,7 @@ _See code: [src/commands/launch/deployments/cancel.ts](https://github.com/conten
 
 ## `csdx launch:deployments:create`
 
-Deploy a Launch environment
+Deploy a Launch environment: the branch tip or a chosen commit on a GitHub project, the project directory or the last uploaded bundle on a FileUpload project
 
 ```
 USAGE
@@ -163,7 +198,7 @@ USAGE
     [--commit <value> | --last-upload]
 
 FLAGS
-  -d, --data-dir=<value>  Path to the project folder
+  -d, --data-dir=<value>  Current working directory
       --commit=<value>    GitHub projects: deploy this commit. Pass --commit with no value to pick one from the recent
                           commits
       --config=<value>    Path to the local '.cs-launch.json' file
@@ -173,8 +208,6 @@ FLAGS
       --project=<value>   Project name or UID
 
 DESCRIPTION
-  Deploy a Launch environment
-
   Deploy a Launch environment: the branch tip or a chosen commit on a GitHub project, the project directory or the last
   uploaded bundle on a FileUpload project
 
@@ -198,7 +231,7 @@ USAGE
     [--deployment <value>]
 
 FLAGS
-  -d, --data-dir=<value>    Path to the project folder
+  -d, --data-dir=<value>    Current working directory
       --config=<value>      Path to the local '.cs-launch.json' file
       --deployment=<value>  Deployment UID
       --env=<value>         Environment name or UID
@@ -226,7 +259,7 @@ USAGE
     <value>] [--skip <value>]
 
 FLAGS
-  -d, --data-dir=<value>  Path to the project folder
+  -d, --data-dir=<value>  Current working directory
       --config=<value>    Path to the local '.cs-launch.json' file
       --env=<value>       Environment name or UID
       --limit=<value>     Number of records to fetch (1-1000)
@@ -253,7 +286,7 @@ USAGE
     [--deployment <value>] [--reason <value>] [--yes]
 
 FLAGS
-  -d, --data-dir=<value>    Path to the project folder
+  -d, --data-dir=<value>    Current working directory
       --config=<value>      Path to the local '.cs-launch.json' file
       --deployment=<value>  Deployment UID
       --env=<value>         Environment name or UID
@@ -287,7 +320,7 @@ USAGE
 FLAGS
   -a, --alias=<value>        Alias of a delivery token saved with csdx auth:tokens:add, used with --from-stack without a
                              prompt
-  -d, --data-dir=<value>     Path to the project folder
+  -d, --data-dir=<value>     Current working directory
       --auto-deploy=<value>  Deploy on every push, GitHub projects only (enable | disable)
       --branch=<value>       Git branch name, GitHub projects only
       --build-cmd=<value>    Build command
@@ -327,7 +360,7 @@ USAGE
   $ csdx launch:env:delete [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--yes]
 
 FLAGS
-  -d, --data-dir=<value>  Path to the project folder
+  -d, --data-dir=<value>  Current working directory
       --config=<value>    Path to the local '.cs-launch.json' file
       --env=<value>       Environment name or UID
       --org=<value>       Organization UID
@@ -354,7 +387,7 @@ USAGE
   $ csdx launch:env:get [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>]
 
 FLAGS
-  -d, --data-dir=<value>  Path to the project folder
+  -d, --data-dir=<value>  Current working directory
       --config=<value>    Path to the local '.cs-launch.json' file
       --env=<value>       Environment name or UID
       --org=<value>       Organization UID
@@ -379,7 +412,7 @@ USAGE
     [--skip <value>]
 
 FLAGS
-  -d, --data-dir=<value>  Path to the project folder
+  -d, --data-dir=<value>  Current working directory
       --config=<value>    Path to the local '.cs-launch.json' file
       --limit=<value>     Number of records to fetch (1-1000)
       --org=<value>       Organization UID
@@ -407,7 +440,7 @@ USAGE
     [--password-protection <value>] [-u <value>] [-p] [--yes]
 
 FLAGS
-  -d, --data-dir=<value>             Path to the project folder
+  -d, --data-dir=<value>             Current working directory
   -p, --password                     With --password-protection enable: read the password from standard input when there
                                      is no terminal (on a terminal it is asked at a hidden prompt)
   -u, --username=<value>             Password protection username, with --password-protection enable
@@ -444,6 +477,34 @@ EXAMPLES
 
 _See code: [src/commands/launch/env/update.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/env/update.ts)_
 
+## `csdx launch:environments`
+
+Removed in v2 - list environments with launch:env:list
+
+```
+USAGE
+  $ csdx launch:environments
+
+DESCRIPTION
+  Removed in v2 - list environments with launch:env:list
+```
+
+_See code: [src/commands/launch/environments/index.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/environments/index.ts)_
+
+## `csdx launch:functions`
+
+Removed in v2 - serve cloud functions with launch:functions:serve
+
+```
+USAGE
+  $ csdx launch:functions
+
+DESCRIPTION
+  Removed in v2 - serve cloud functions with launch:functions:serve
+```
+
+_See code: [src/commands/launch/functions/index.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/functions/index.ts)_
+
 ## `csdx launch:functions:serve`
 
 Serve cloud functions locally
@@ -470,6 +531,20 @@ EXAMPLES
 ```
 
 _See code: [src/commands/launch/functions/serve.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/functions/serve.ts)_
+
+## `csdx launch:logs`
+
+Removed in v2 - read logs with launch:logs:get
+
+```
+USAGE
+  $ csdx launch:logs
+
+DESCRIPTION
+  Removed in v2 - read logs with launch:logs:get
+```
+
+_See code: [src/commands/launch/logs/index.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/logs/index.ts)_
 
 ## `csdx launch:logs:get`
 
@@ -513,6 +588,20 @@ EXAMPLES
 
 _See code: [src/commands/launch/logs/get.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/logs/get.ts)_
 
+## `csdx launch:open`
+
+Removed in v2 - open the site with launch:site:open
+
+```
+USAGE
+  $ csdx launch:open
+
+DESCRIPTION
+  Removed in v2 - open the site with launch:site:open
+```
+
+_See code: [src/commands/launch/open.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/open.ts)_
+
 ## `csdx launch:projects:create`
 
 Create a Launch project, its first environment, and its first deployment
@@ -527,7 +616,7 @@ USAGE
 FLAGS
   -a, --alias=<value>        Alias of a delivery token saved with csdx auth:tokens:add, used with --from-stack without a
                              prompt
-  -d, --data-dir=<value>     Path to the project folder
+  -d, --data-dir=<value>     Current working directory
       --auto-deploy=<value>  Deploy on every push, GitHub projects only (enable | disable)
       --branch=<value>       Git branch name, GitHub projects only
       --build-cmd=<value>    Build command
@@ -571,7 +660,7 @@ USAGE
   $ csdx launch:projects:delete [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--yes]
 
 FLAGS
-  -d, --data-dir=<value>  Path to the project folder
+  -d, --data-dir=<value>  Current working directory
       --config=<value>    Path to the local '.cs-launch.json' file
       --org=<value>       Organization UID
       --project=<value>   Project name or UID
@@ -597,7 +686,7 @@ USAGE
   $ csdx launch:projects:get [--config <value>] [-d <value>] [--org <value>] [--project <value>]
 
 FLAGS
-  -d, --data-dir=<value>  Path to the project folder
+  -d, --data-dir=<value>  Current working directory
       --config=<value>    Path to the local '.cs-launch.json' file
       --org=<value>       Organization UID
       --project=<value>   Project name or UID
@@ -620,7 +709,7 @@ USAGE
   $ csdx launch:projects:list [--config <value>] [-d <value>] [--org <value>] [--limit <value>] [--skip <value>]
 
 FLAGS
-  -d, --data-dir=<value>  Path to the project folder
+  -d, --data-dir=<value>  Current working directory
       --config=<value>    Path to the local '.cs-launch.json' file
       --limit=<value>     Number of records to fetch (1-1000)
       --org=<value>       Organization UID
@@ -645,7 +734,7 @@ USAGE
     [--description <value>]
 
 FLAGS
-  -d, --data-dir=<value>     Path to the project folder
+  -d, --data-dir=<value>     Current working directory
       --config=<value>       Path to the local '.cs-launch.json' file
       --description=<value>  Project description (255 characters or fewer)
       --name=<value>         Project name (200 characters or fewer)
@@ -665,6 +754,20 @@ EXAMPLES
 
 _See code: [src/commands/launch/projects/update.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/projects/update.ts)_
 
+## `csdx launch:rollback`
+
+Removed in v2 - roll back with launch:deployments:rollback
+
+```
+USAGE
+  $ csdx launch:rollback
+
+DESCRIPTION
+  Removed in v2 - roll back with launch:deployments:rollback
+```
+
+_See code: [src/commands/launch/rollback.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/rollback.ts)_
+
 ## `csdx launch:secrets:list`
 
 List the secrets of an environment by key and update time; values are never shown
@@ -674,7 +777,7 @@ USAGE
   $ csdx launch:secrets:list [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>]
 
 FLAGS
-  -d, --data-dir=<value>  Path to the project folder
+  -d, --data-dir=<value>  Current working directory
       --config=<value>    Path to the local '.cs-launch.json' file
       --env=<value>       Environment name or UID
       --org=<value>       Organization UID
@@ -699,7 +802,7 @@ USAGE
     <value>...] [--yes]
 
 FLAGS
-  -d, --data-dir=<value>  Path to the project folder
+  -d, --data-dir=<value>  Current working directory
       --config=<value>    Path to the local '.cs-launch.json' file
       --env=<value>       Environment name or UID
       --key=<value>...    Secret key
@@ -729,7 +832,7 @@ USAGE
     <value>...] [--yes]
 
 FLAGS
-  -d, --data-dir=<value>  Path to the project folder
+  -d, --data-dir=<value>  Current working directory
       --config=<value>    Path to the local '.cs-launch.json' file
       --env=<value>       Environment name or UID
       --key=<value>...    Secret key, repeatable
@@ -751,22 +854,20 @@ _See code: [src/commands/launch/secrets/unset.ts](https://github.com/contentstac
 
 ## `csdx launch:site:open`
 
-Open the live site of an environment
+Open an environment's live site in your browser, or print its URL when there is no terminal. On a terminal, when the environment has more than one domain, you choose which one to open.
 
 ```
 USAGE
   $ csdx launch:site:open [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>]
 
 FLAGS
-  -d, --data-dir=<value>  Path to the project folder
+  -d, --data-dir=<value>  Current working directory
       --config=<value>    Path to the local '.cs-launch.json' file
       --env=<value>       Environment name or UID
       --org=<value>       Organization UID
       --project=<value>   Project name or UID
 
 DESCRIPTION
-  Open the live site of an environment
-
   Open an environment's live site in your browser, or print its URL when there is no terminal. On a terminal, when the
   environment has more than one domain, you choose which one to open.
 
@@ -788,7 +889,7 @@ USAGE
     <value>] [--skip <value>]
 
 FLAGS
-  -d, --data-dir=<value>  Path to the project folder
+  -d, --data-dir=<value>  Current working directory
       --config=<value>    Path to the local '.cs-launch.json' file
       --env=<value>       Environment name or UID
       --limit=<value>     Number of records to fetch (1-1000)
@@ -817,7 +918,7 @@ USAGE
 FLAGS
   -a, --alias=<value>      Alias of a delivery token saved with csdx auth:tokens:add, used with --from-stack without a
                            prompt
-  -d, --data-dir=<value>   Path to the project folder
+  -d, --data-dir=<value>   Current working directory
       --config=<value>     Path to the local '.cs-launch.json' file
       --dotenv=<value>...  Path to a dotenv file, repeatable. Use - to read dotenv content from standard input
       --env=<value>        Environment name or UID
@@ -851,7 +952,7 @@ USAGE
     <value>...] [--yes]
 
 FLAGS
-  -d, --data-dir=<value>  Path to the project folder
+  -d, --data-dir=<value>  Current working directory
       --config=<value>    Path to the local '.cs-launch.json' file
       --env=<value>       Environment name or UID
       --key=<value>...    Environment variable key, repeatable
