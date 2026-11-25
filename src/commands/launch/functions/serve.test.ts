@@ -107,10 +107,9 @@ describe('launch:functions:serve flag definitions', () => {
     ]);
   });
 
-  it('declares a port flag defaulting to 3000 with no short flag, and a data-dir flag', () => {
-    expect(Functions.flags.port).toMatchObject({ default: '3000', description: 'Port number' });
+  it('declares a port flag defaulting to 3000 and read from PORT, with no short flag, and a data-dir flag', () => {
+    expect(Functions.flags.port).toMatchObject({ default: '3000', env: 'PORT', description: 'Port number' });
     expect(Functions.flags.port.char).toBeUndefined();
-    expect(Functions.flags.port.env).toBeUndefined();
     expect(Functions.flags['data-dir']).toMatchObject({ char: 'd', description: 'Path to the project folder' });
     expect(Functions.flags['data-dir'].default).toBeUndefined();
   });
@@ -269,57 +268,65 @@ describe('launch:functions:serve run', () => {
 });
 
 describe('launch:functions:serve port precedence', () => {
-  it('lets the PORT environment variable beat an explicit --port as v1 did', async () => {
-    const dataDir = temporaryDirectory();
+  it('lets an explicit --port beat the PORT environment variable', async () => {
     process.env.PORT = '4557';
-    const command = commandWithFlags({ 'data-dir': dataDir, port: '4558' });
 
-    await command.init();
+    const { flags } = await Parser.parse(['--port', '4558'], { flags: Functions.flags });
 
-    expect(command['sharedConfig']).toEqual({ projectBasePath: dataDir, port: 4557 });
+    expect(flags.port).toBe('4558');
   });
 
-  it('falls through to --port when PORT is set to an empty string', async () => {
-    const dataDir = temporaryDirectory();
-    process.env.PORT = '';
-    const command = commandWithFlags({ 'data-dir': dataDir, port: '4559' });
-
-    await command.init();
-
-    expect(command['sharedConfig']).toEqual({ projectBasePath: dataDir, port: 4559 });
-    expect(stdout).toEqual([]);
-  });
-
-  it('uses --port when PORT is not set', async () => {
-    const dataDir = temporaryDirectory();
-    const command = commandWithFlags({ 'data-dir': dataDir, port: '4560' });
-
-    await command.init();
-
-    expect(command['sharedConfig']).toEqual({ projectBasePath: dataDir, port: 4560 });
-  });
-
-  it.each(['70000', 'abc', '   '])(
-    'rejects an invalid PORT %p even when --port is valid, because PORT wins',
-    async (env) => {
-      const dataDir = temporaryDirectory();
-      process.env.PORT = env;
-      const command = commandWithFlags({ 'data-dir': dataDir, port: '4000' });
-
-      const failure = await command.init().catch((error: Error & { oclif?: { exit?: number } }) => error);
-
-      expect(failure).toBeInstanceOf(Errors.CLIError);
-      expect(failure).toMatchObject({ message: INVALID_PORT_MESSAGE, oclif: { exit: EXIT_RUNTIME } });
-      expect(command['sharedConfig']).toBeUndefined();
-      expect(stdout).toEqual([]);
-    },
-  );
-
-  it('leaves the PORT environment variable out of flag parsing so the command alone applies it', async () => {
+  it('reads PORT when --port is not given', async () => {
     process.env.PORT = '4711';
 
     const { flags } = await Parser.parse([], { flags: Functions.flags });
 
+    expect(flags.port).toBe('4711');
+  });
+
+  it.each([[undefined], ['']])('defaults to 3000 when --port is not given and PORT is %p', async (env) => {
+    if (env !== undefined) {
+      process.env.PORT = env;
+    }
+
+    const { flags } = await Parser.parse([], { flags: Functions.flags });
+
     expect(flags.port).toBe('3000');
+  });
+
+  it('serves on the parsed port, so an explicit --port wins over PORT end to end', async () => {
+    const dataDir = temporaryDirectory();
+    process.env.PORT = '4557';
+    const { flags } = await Parser.parse(['--port', '4558', '--data-dir', dataDir], { flags: Functions.flags });
+    const command = commandWithFlags(flags);
+
+    await command.init();
+
+    expect(command['sharedConfig']).toEqual({ projectBasePath: dataDir, port: 4558 });
+  });
+
+  it.each(['70000', 'abc', '   '])('rejects an invalid PORT %p when --port is not given', async (env) => {
+    const dataDir = temporaryDirectory();
+    process.env.PORT = env;
+    const { flags } = await Parser.parse(['--data-dir', dataDir], { flags: Functions.flags });
+    const command = commandWithFlags(flags);
+
+    const failure = await command.init().catch((error: Error & { oclif?: { exit?: number } }) => error);
+
+    expect(failure).toBeInstanceOf(Errors.CLIError);
+    expect(failure).toMatchObject({ message: INVALID_PORT_MESSAGE, oclif: { exit: EXIT_RUNTIME } });
+    expect(command['sharedConfig']).toBeUndefined();
+    expect(stdout).toEqual([]);
+  });
+
+  it('ignores an invalid PORT when a valid --port is given', async () => {
+    const dataDir = temporaryDirectory();
+    process.env.PORT = '70000';
+    const { flags } = await Parser.parse(['--port', '4000', '--data-dir', dataDir], { flags: Functions.flags });
+    const command = commandWithFlags(flags);
+
+    await command.init();
+
+    expect(command['sharedConfig']).toEqual({ projectBasePath: dataDir, port: 4000 });
   });
 });

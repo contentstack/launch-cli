@@ -63,13 +63,10 @@ describe('integration: launch:functions:serve port handling', () => {
     await expect(errorLog()).resolves.toBe(INVALID_PORT_RECORD);
   });
 
-  it('lets an invalid PORT beat a valid --port, so the flag never reaches the server', async () => {
+  it('rejects an invalid PORT through the same invalid port path when --port is not given', async () => {
     process.env.PORT = '70000';
 
-    const { error, stdout, stderr } = await runCommand(
-      ['launch:functions:serve', '--port', '4000', '--data-dir', projectDir],
-      config,
-    );
+    const { error, stdout, stderr } = await runCommand(['launch:functions:serve', '--data-dir', projectDir], config);
 
     expect(error?.oclif?.exit).toBe(1);
     expect(stdout).toBe('');
