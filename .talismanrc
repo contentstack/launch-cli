@@ -1,6 +1,6 @@
 fileignoreconfig:
 - filename: src/logs/logs.inputs.test.ts
-  checksum: 7b4df8790179c7dc4385acd1d380bb91397523bab111593742e2fc53c94da375
+  checksum: a7cce0361a75e2730c749e0297f275383ac8d41b22be9c8b6a9ca2797f08f191
 - filename: test/integration/logs-get.test.ts
   checksum: b608797028bb0191d53630d2ff95d096b8a2b83019fed2aa096754dc5c50b1bb
 - filename: src/commands/launch/logs/get.test.ts
@@ -26,7 +26,7 @@ fileignoreconfig:
 - filename: src/core/service-context.test.ts
   checksum: 495972ae75e7ef1b62632c8d099fc589b023976a17d77caaebb049d974edd1bc
 - filename: src/core/rules.test.ts
-  checksum: addfdcffa45491accbc861f28cc2f17528a7e9d77d4c852b302a75cd68d7bdee
+  checksum: 718e9596bc6eb94166dddfed3d234549427372a25fb169064a8e95f2884ecbcf
 - filename: src/core/inputs.test.ts
   checksum: c5b4be7a0aa2f0878153f062e1500b2bdbd53bdd2d84bb7c13c731db3c3699c4
 - filename: .github/workflows/secrets-scan.yml
@@ -223,7 +223,7 @@ fileignoreconfig:
     - "b2c3d4e5f60718293a4b5c6d"
     - "c3d4e5f60718293a4b5c6d7e"
 - filename: src/core/rules.ts
-  checksum: e76ecc51f119782824f465e2d30109cdde4a8b8f1464f2569f77f660dc28d0a7
+  checksum: e602e43c9be518c608fcc155d3ff5aaede478239071bab35dfc1aad908e40bbe
   allowed_patterns:
     - "FlagKey"
 - filename: src/resources.ts
@@ -333,7 +333,7 @@ fileignoreconfig:
 - filename: src/commands/launch/env/update.test.ts
   checksum: 82c76af721bfdfd8eb7cf49494ffbe15d98b988e98bca1015b9d34b42b5226bd
 - filename: README.md
-  checksum: 3ec134160b8ba10ad28c9fe0dc7f2b264461033a1d62c0d7d466a1c84d347000
+  checksum: 1e2474738623a2510b5e7b8214e44cef0960ddc99d3a23057a9a2d87a5cb7ca4
   allowed_patterns:
     - "password-protection"
     - "-p, --password"
