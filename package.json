@@ -114,6 +114,7 @@
     "tmp": "^0.2.4",
     "serialize-javascript": "^7.1.0",
     "diff": "^8.0.3",
+    "papaparse": "^5.7.1",
     "@oclif/core": {
       "minimatch": "^11.0.1"
     }
