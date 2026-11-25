@@ -157,6 +157,21 @@ function defaultToNoStore(_request: Request, response: Response, next: NextFunct
   next();
 }
 
+export function answerRequestError(
+  error: Error & { status?: number; type?: string },
+  _request: Request,
+  response: Response,
+  next: NextFunction,
+): void {
+  if (response.headersSent) {
+    next(error);
+    return;
+  }
+  const status = error.status ?? 500;
+  console.error(`Request rejected before the function ran: ${status} ${error.type ?? error.name}`);
+  response.status(status).end();
+}
+
 function applyRequestMiddleware(app: Express): void {
   app.use(defaultToNoStore);
   app.use(attachCookies);
@@ -219,6 +234,7 @@ export class CloudFunctions {
     applyRequestMiddleware(app);
     this.applyAppRouter(exactRouteResources, app);
     this.applyAppRouter(dynamicRouteResources, app);
+    app.use(answerRequestError);
 
     return this.startServer(app, servingPort, [
       ...exactRouteResources,
