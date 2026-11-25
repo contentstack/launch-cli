@@ -6,6 +6,7 @@ import type { Rule } from '../core/rules';
 import { requireValueOf } from '../core/rules';
 import { isAbsent, oneOf, withinLength } from '../core/values';
 import type { FlagKey } from '../resources';
+import { SERVER_LOG_RETENTION_HOURS } from './log-window';
 
 export const LOG_TYPES = ['deployment', 'server', 'live'] as const;
 
@@ -19,17 +20,21 @@ export const SERVER_ONLY_LOG_TYPES: readonly LogType[] = ['server'];
 
 export const MAX_SEARCH_LENGTH = 256;
 
-const WINDOW_FORMATS = 'relative (45s, 30m, 12hr, 2d) or an ISO 8601 timestamp with an offset';
+const SINCE_FORMATS = 'relative (45s, 30m, 12hr, 1d) or an ISO 8601 timestamp with an offset';
+
+const UNTIL_FORMATS = 'relative (45s, 30m, 12hr) or an ISO 8601 timestamp with an offset';
 
 export const logsFlags = {
   'log-type': Flags.string({
     description: `Kind of logs to read (${LOG_TYPES.join(' | ')}). Defaults to ${DEFAULT_LOG_TYPE}`,
   }),
   since: Flags.string({
-    description: `Server logs only: start of the window, ${WINDOW_FORMATS}. Defaults to one hour before --until`,
+    description:
+      `Server logs only: start of the window, ${SINCE_FORMATS}. Defaults to one hour before --until. ` +
+      `Server logs are kept for ${SERVER_LOG_RETENTION_HOURS} hours, so nothing older than that is returned`,
   }),
   until: Flags.string({
-    description: `Server logs only: end of the window, ${WINDOW_FORMATS}. Defaults to now`,
+    description: `Server logs only: end of the window, ${UNTIL_FORMATS}. Defaults to now`,
   }),
   search: Flags.string({
     description: `Server logs only: show only lines containing this text, up to ${MAX_SEARCH_LENGTH} characters`,
@@ -56,16 +61,16 @@ export const logsResolution = {
 
 export function onlyWithServer(flag: FlagKey): Rule {
   return (resolved) => {
-    if (isAbsent(resolved[flag])) {
-      return;
-    }
-
     const type = resolved['log-type'];
 
     if (typeof type !== 'string') {
       throw new InputDependencyError(
         `--${flag} cannot be checked without --${LOG_TYPE_FLAG}: declare log-type in the command inputs.`,
       );
+    }
+
+    if (isAbsent(resolved[flag])) {
+      return;
     }
 
     requireValueOf(flag, LOG_TYPE_FLAG, SERVER_ONLY_LOG_TYPES, type);

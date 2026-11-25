@@ -3,7 +3,9 @@ import { isAbsent } from '../core/values';
 
 export const DEFAULT_LOG_WINDOW_MS = 3_600_000;
 
-export const SERVER_LOG_RETENTION_MS = 86_400_000;
+export const SERVER_LOG_RETENTION_HOURS = 24;
+
+export const SERVER_LOG_RETENTION_MS = SERVER_LOG_RETENTION_HOURS * 3_600_000;
 
 const MAX_DATE_MS = 8.64e15;
 
@@ -31,6 +33,7 @@ export interface LogWindow {
   startTime: number;
   endTime: number;
   clampedFrom?: number;
+  expired?: true;
 }
 
 type Kind = 'relative' | 'absolute';
@@ -40,9 +43,13 @@ interface Reading {
   value: number;
 }
 
+const UNITS_BY_FLAG: Record<string, string> = { since: 's, m, h, d', until: 's, m, h' };
+
 function badValue(flag: string, value: string): UsageError {
+  const units = UNITS_BY_FLAG[flag] ?? 's, m, h, d';
+
   return new UsageError(
-    `--${flag} must be a relative time like 12hr (units s, m, h, d) or an ISO 8601 timestamp ` +
+    `--${flag} must be a relative time like 12hr (units ${units}) or an ISO 8601 timestamp ` +
       `with an offset like 2025-01-15T10:00:00Z; "${value}" is not.`,
   );
 }
@@ -127,6 +134,10 @@ export function parseLogWindow({ since, until }: LogWindowInput, now: () => numb
   }
 
   const oldest = current - SERVER_LOG_RETENTION_MS;
+
+  if (endTime <= oldest) {
+    return { startTime, endTime, expired: true };
+  }
 
   return { startTime, endTime, ...(startTime < oldest && { clampedFrom: oldest }) };
 }

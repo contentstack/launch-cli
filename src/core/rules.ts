@@ -1,4 +1,4 @@
-import { UsageError } from './errors';
+import { InputDependencyError, UsageError } from './errors';
 import type { InputSource } from './resolution';
 import { isAbsent } from './values';
 import type { FlagKey } from '../resources';
@@ -43,14 +43,6 @@ export function atMostOneOf(...keys: FlagKey[]): Rule {
   };
 }
 
-export function onlyWithFlag(flag: FlagKey, partner: FlagKey): Rule {
-  return (resolved, sources) => {
-    if (isSupplied(resolved[flag], sources[flag]) && !isSupplied(resolved[partner], sources[partner])) {
-      throw new UsageError(`--${flag} is only used with --${partner}.`);
-    }
-  };
-}
-
 export function requireValueOf(flag: string, gate: string, allowed: readonly string[], value: string): void {
   if (!allowed.includes(value)) {
     throw new UsageError(
@@ -61,6 +53,12 @@ export function requireValueOf(flag: string, gate: string, allowed: readonly str
 
 export function onlyWithValueOf(flag: FlagKey, gate: FlagKey, allowed: readonly string[]): Rule {
   return (resolved, sources) => {
+    if (!(gate in resolved)) {
+      throw new InputDependencyError(
+        `--${flag} cannot be checked without --${gate}: declare ${gate} in the command inputs.`,
+      );
+    }
+
     if (!isSupplied(resolved[flag], sources[flag])) {
       return;
     }

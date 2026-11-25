@@ -36,7 +36,7 @@ export default class Functions extends Command {
     const logger = new Logger({ projectBasePath });
     this.log = logger.log.bind(logger);
 
-    const port = process.env.PORT || flags.port;
+    const port = flags.port;
     if (!isValidPort(port)) {
       const message = 'Invalid port number. Please provide a valid port number between 0 and 65535.';
       this.log(message, 'error');

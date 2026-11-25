@@ -67,6 +67,16 @@ describe('logs inputs', () => {
     expect(logsFlags.until.required).toBeFalsy();
   });
 
+  it('tells --since users that server logs are kept for 24 hours, lists 1d for --since only, since an --until a day back returns nothing', () => {
+    expect(logsFlags.since.description).toBe(
+      'Server logs only: start of the window, relative (45s, 30m, 12hr, 1d) or an ISO 8601 timestamp with an offset. ' +
+        'Defaults to one hour before --until. Server logs are kept for 24 hours, so nothing older than that is returned',
+    );
+    expect(logsFlags.until.description).toBe(
+      'Server logs only: end of the window, relative (45s, 30m, 12hr) or an ISO 8601 timestamp with an offset. Defaults to now',
+    );
+  });
+
   it.each([
     [' Server ', 'server'],
     ['LIVE', 'live'],
@@ -190,6 +200,13 @@ describe('logs inputs', () => {
     const run = resolveInputs(bare, { parsed: { since: '1h' }, projectConfig: {}, services, rules });
 
     await expect(run).rejects.toBeInstanceOf(InputDependencyError);
+    await expect(run).rejects.toThrow('--since cannot be checked without --type');
+  });
+
+  it('refuses an undeclared log type on every run, even when no window flag was given', async () => {
+    const bare = inputs({ since: {} });
+    const run = resolveInputs(bare, { parsed: {}, projectConfig: {}, services, rules });
+
     await expect(run).rejects.toThrow('--since cannot be checked without --type');
   });
 

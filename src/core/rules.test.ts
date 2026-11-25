@@ -1,7 +1,7 @@
-import { UsageError } from './errors';
+import { InputDependencyError, UsageError } from './errors';
 import type { InputSource } from './resolution';
 import type { InputSources, ResolvedValues } from './rules';
-import { atLeastOneOf, atMostOneOf, exactlyOneOf, onlyWithFlag, onlyWithValueOf, requireValueOf } from './rules';
+import { atLeastOneOf, atMostOneOf, exactlyOneOf, onlyWithValueOf, requireValueOf } from './rules';
 
 function from(source: InputSource, values: ResolvedValues): InputSources {
   return Object.fromEntries(Object.keys(values).map((key) => [key, source]));
@@ -121,11 +121,35 @@ describe('atLeastOneOf', () => {
 describe('onlyWithValueOf', () => {
   const SUPPORTED = ['ANALOG', 'ANGULAR', 'NUXT', 'ASTRO', 'REMIX', 'OTHER'];
 
+  it('fails loudly when the command never declared the gate input, rather than letting it through', () => {
+    const rule = onlyWithValueOf('server-cmd', 'framework', SUPPORTED);
+
+    expect(() => rule({ 'server-cmd': 'npm start' }, { 'server-cmd': 'flag' })).toThrow(InputDependencyError);
+    expect(() => rule({ 'server-cmd': 'npm start' }, { 'server-cmd': 'flag' })).toThrow(
+      '--server-cmd cannot be checked without --framework: declare framework in the command inputs.',
+    );
+  });
+
+  it('fails on an undeclared gate on every run, even when the gated flag was not supplied', () => {
+    const rule = onlyWithValueOf('server-cmd', 'framework', SUPPORTED);
+
+    expect(() => rule({}, {})).toThrow(InputDependencyError);
+    expect(() => rule({}, {})).toThrow(
+      '--server-cmd cannot be checked without --framework: declare framework in the command inputs.',
+    );
+  });
+
+  it('still leaves a declared but absent gate to the command', () => {
+    const rule = onlyWithValueOf('server-cmd', 'framework', SUPPORTED);
+
+    expect(() => rule({ 'server-cmd': 'npm start', framework: undefined }, { 'server-cmd': 'flag' })).not.toThrow();
+  });
+
   it('passes when the gated flag was not supplied at all, whatever the gate says', () => {
     const rule = onlyWithValueOf('server-cmd', 'framework', SUPPORTED);
 
     expect(() => rule(...typed({ framework: 'NEXTJS' }))).not.toThrow();
-    expect(() => rule({}, {})).not.toThrow();
+    expect(() => rule({ framework: undefined }, {})).not.toThrow();
   });
 
   it('passes when the gated value came only from a default, whatever the gate says', () => {
@@ -168,7 +192,6 @@ describe('onlyWithValueOf', () => {
   it('leaves the decision to the command when the gate has not been decided yet, because it may be prompted or detected later', () => {
     const rule = onlyWithValueOf('server-cmd', 'framework', SUPPORTED);
 
-    expect(() => rule(...typed({ 'server-cmd': 'npm start' }))).not.toThrow();
     expect(() => rule(...typed({ 'server-cmd': 'npm start', framework: undefined }))).not.toThrow();
     expect(() => rule(...typed({ 'server-cmd': 'npm start', framework: null }))).not.toThrow();
     expect(() => rule(...typed({ 'server-cmd': 'npm start', framework: '' }))).not.toThrow();
@@ -188,36 +211,6 @@ describe('requireValueOf', () => {
     expect(() => requireValueOf('branch', 'type', ['GitHub'], 'FileUpload')).toThrow(UsageError);
     expect(() => requireValueOf('branch', 'type', ['GitHub'], 'FileUpload')).toThrow(
       '--branch is only supported when --type is one of GitHub; --type is FileUpload.',
-    );
-  });
-});
-
-describe('onlyWithFlag', () => {
-  it('fails naming both flags when the flag was supplied and its partner was not', () => {
-    const rule = onlyWithFlag('prefix', 'path');
-
-    expect(() => rule(...typed({ prefix: true }))).toThrow(UsageError);
-    expect(() => rule(...typed({ prefix: true }))).toThrow('--prefix is only used with --path.');
-    expect(() => rule(...typed({ prefix: true, tags: ['a'] }))).toThrow('--prefix is only used with --path.');
-  });
-
-  it('passes when the partner was supplied too', () => {
-    const rule = onlyWithFlag('prefix', 'path');
-
-    expect(() => rule(...typed({ prefix: true, path: '/blog' }))).not.toThrow();
-  });
-
-  it.each([[false], [undefined], [null], ['']])('does not count %p as a supplied flag', (value) => {
-    const rule = onlyWithFlag('prefix', 'path');
-
-    expect(() => rule(...typed({ prefix: value, tags: ['a'] }))).not.toThrow();
-  });
-
-  it('does not count a partner that came from a default as supplied', () => {
-    const rule = onlyWithFlag('prefix', 'path');
-
-    expect(() => rule({ prefix: true, path: '/blog' }, { prefix: 'flag', path: 'default' })).toThrow(
-      '--prefix is only used with --path.',
     );
   });
 });

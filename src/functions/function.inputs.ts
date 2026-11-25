@@ -7,6 +7,7 @@ export const DEFAULT_SERVE_PORT = '3000';
 export const serveFlags = {
   port: Flags.string({
     default: DEFAULT_SERVE_PORT,
+    env: 'PORT',
     description: 'Port number',
   }),
   'data-dir': coreFlags['data-dir'],

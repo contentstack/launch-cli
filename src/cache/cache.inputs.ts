@@ -9,10 +9,8 @@ const WILDCARD_SUFFIX = '/*';
 export const cacheFlags = {
   path: Flags.string({
     description:
-      'Path to purge, for example /blog. End it with /* to purge everything beneath it, or pass /* for the whole site',
-  }),
-  prefix: Flags.boolean({
-    description: 'With --path, purge everything beneath the path as well (a prefix match, like ending it with /*)',
+      'Path to purge, for example /blog. To also purge everything beneath it, end the path with /* and quote it ' +
+      'so your shell leaves it alone, for example "/blog/*"',
   }),
   tags: Flags.string({ description: 'Comma-separated cache tags to purge' }),
   hosts: Flags.string({ description: 'Comma-separated hostnames to purge' }),
@@ -49,14 +47,13 @@ function listNormalizer(flag: string) {
 
 export const cacheResolution = {
   path: { normalize: normalizePath } satisfies ResolutionSpec<string | CachePath, never, CachePath>,
-  prefix: {} satisfies ResolutionSpec<boolean>,
   tags: { normalize: listNormalizer('tags') } satisfies ResolutionSpec<string | string[], never, string[]>,
   hosts: { normalize: listNormalizer('hosts') } satisfies ResolutionSpec<string | string[], never, string[]>,
 };
 
-export function criterionOf({ path, prefix, tags, hosts }: PurgeTarget): CacheCriterion {
+export function criterionOf({ path, tags, hosts }: PurgeTarget): CacheCriterion {
   return {
-    ...(path && { cachePath: { path: path.path, isPrefix: path.isPrefix || prefix === true } }),
+    ...(path && { cachePath: { path: path.path, isPrefix: path.isPrefix } }),
     ...(tags && { cacheTags: tags }),
     ...(hosts && { hostnames: hosts }),
   };

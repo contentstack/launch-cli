@@ -193,15 +193,6 @@ describe('launch:cache:purge', () => {
     expect(lines).toEqual([]);
   });
 
-  it('purges a typed path as a prefix when --prefix was passed', async () => {
-    const { command, purged, lines } = commandUnderTest({ resolved: { prefix: true } });
-
-    await command.run();
-
-    expect(purged).toEqual([{ ...SCOPE, criterion: { cachePath: { path: '/blog', isPrefix: true } } }]);
-    expect(lines).toEqual(['✔ Cache purge initiated for /blog.']);
-  });
-
   it('does not ask anything when a criterion was supplied, on a terminal or not', async () => {
     for (const resolved of [{ path: BLOG }, { path: undefined, tags: ['a'] }, { path: undefined, hosts: ['h'] }]) {
       const { command, asked } = commandUnderTest({ resolved, isTTY: true });
@@ -222,13 +213,6 @@ describe('launch:cache:purge', () => {
     expect((error as UsageError).message).toBe(`${ONE_OF}; none was supplied.`);
     expect(calls).toEqual([]);
     expect(asked).toEqual([]);
-  });
-
-  it('does not let --prefix alone count as a criterion, so nothing is asked and nothing is read', async () => {
-    const { command, calls } = commandUnderTest({ resolved: { path: undefined, prefix: true }, isTTY: false });
-
-    await expect(command.run()).rejects.toThrow(`${ONE_OF}; none was supplied.`);
-    expect(calls).toEqual([]);
   });
 
   it('reads the environment, then asks what to purge, offering its domains as bare hostnames', async () => {
@@ -304,13 +288,12 @@ describe('launch:cache:purge', () => {
     expect(calls).toEqual(['get']);
   });
 
-  it('declares org, project and env as required, the criteria and --prefix as optional, and its two rules', () => {
+  it('declares org, project and env as required, the three criteria as optional, no --prefix, and one rule', () => {
     expect(Purge.inputs).toEqual({
       org: { required: true },
       project: { required: true },
       env: { required: true },
       path: {},
-      prefix: {},
       tags: {},
       hosts: {},
     });
@@ -319,19 +302,17 @@ describe('launch:cache:purge', () => {
       'hosts',
       'org',
       'path',
-      'prefix',
       'project',
       'tags',
     ]);
-    expect(Purge.flags.prefix.type).toBe('boolean');
-    expect(Purge.flags.prefix.required).toBeFalsy();
-    expect(Purge.rules).toHaveLength(2);
+    expect(Purge.rules).toHaveLength(1);
+    expect(Purge.examples.some((example) => example.includes('--prefix'))).toBe(false);
     expect(Purge.examples).toContain(
-      '$ csdx launch:cache:purge --org <org-uid> --project <name-or-uid> --env <name-or-uid> --path /blog --prefix',
+      '$ csdx launch:cache:purge --org <org-uid> --project <name-or-uid> --env <name-or-uid> --path "/blog/*"',
     );
   });
 
-  it('refuses two and three criteria, and --prefix without --path, through its rules, and lets none through to the prompt', () => {
+  it('refuses two and three criteria through its rule, and lets none through to the prompt', () => {
     const run = (resolved: Record<string, unknown>, sources: Record<string, 'flag'>) =>
       (Purge.rules ?? []).forEach((rule) => rule(resolved, sources));
     const supplied = { path: 'flag', tags: 'flag', hosts: 'flag' } as const;
@@ -342,13 +323,5 @@ describe('launch:cache:purge', () => {
       `${ONE_OF}; --path, --tags, --hosts were supplied.`,
     );
     expect(() => run({ tags: ['a'] }, supplied)).not.toThrow();
-    expect(() => run({ prefix: true }, { prefix: 'flag' })).toThrow('--prefix is only used with --path.');
-    expect(() => run({ prefix: true, tags: ['a'] }, { prefix: 'flag', tags: 'flag' })).toThrow(
-      '--prefix is only used with --path.',
-    );
-    expect(() => run({ prefix: true, hosts: ['h'] }, { prefix: 'flag', hosts: 'flag' })).toThrow(
-      '--prefix is only used with --path.',
-    );
-    expect(() => run({ prefix: true, path: BLOG }, { prefix: 'flag', path: 'flag' })).not.toThrow();
   });
 });
