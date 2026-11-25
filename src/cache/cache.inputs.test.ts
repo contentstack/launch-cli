@@ -22,12 +22,17 @@ function normalize(flag: 'path' | 'tags' | 'hosts', value: string): Promise<unkn
 const purgeInputs = inputs({ path: {}, tags: {}, hosts: {} });
 
 describe('cache inputs', () => {
-  it('names the purge criteria and --prefix and declares none of them required', () => {
-    expect(Object.entries(cacheFlags).map(([flag]) => flag)).toEqual(['path', 'prefix', 'tags', 'hosts']);
-    expect(cacheFlags.prefix.type).toBe('boolean');
+  it('names the three purge criteria, no --prefix, and declares none of them required', () => {
+    expect(Object.entries(cacheFlags).map(([flag]) => flag)).toEqual(['path', 'tags', 'hosts']);
     for (const flag of Object.values(cacheFlags)) {
       expect((flag as { required?: boolean }).required).toBeFalsy();
     }
+  });
+
+  it('describes --path with the /* prefix form and without a whole-site /*', () => {
+    expect(cacheFlags.path.description).toBe(
+      'Path to purge, for example /blog. To also purge everything beneath it, end the path with /*',
+    );
   });
 
   it('gives no criterion a default or a prompt, so exactlyOneOf only ever sees what the user supplied', () => {
@@ -127,27 +132,13 @@ describe('criterionOf', () => {
   it('sends hosts as hostnames and nothing else', () => {
     expect(criterionOf({ hosts: ['example.com'] })).toStrictEqual({ hostnames: ['example.com'] });
   });
-});
 
-describe('criterionOf with a prefix', () => {
-  it('sends the path as a prefix match when --prefix was passed', () => {
-    expect(criterionOf({ path: { path: '/blog', isPrefix: false, typed: '/blog' }, prefix: true })).toStrictEqual({
-      cachePath: { path: '/blog', isPrefix: true },
-    });
-  });
-
-  it('keeps a typed /* a prefix match when --prefix was passed too, without stripping twice', () => {
-    expect(criterionOf({ path: { path: '/blog', isPrefix: true, typed: '/blog/*' }, prefix: true })).toStrictEqual({
-      cachePath: { path: '/blog', isPrefix: true },
-    });
-    expect(criterionOf({ path: { path: '/', isPrefix: true, typed: '/*' }, prefix: true })).toStrictEqual({
-      cachePath: { path: '/', isPrefix: true },
-    });
-  });
-
-  it.each([[false], [undefined]])('leaves an exact path exact when prefix is %p', (prefix) => {
-    expect(criterionOf({ path: { path: '/blog', isPrefix: false, typed: '/blog' }, prefix })).toStrictEqual({
+  it('leaves an exact path exact and sends a typed /* as a prefix match', () => {
+    expect(criterionOf({ path: { path: '/blog', isPrefix: false, typed: '/blog' } })).toStrictEqual({
       cachePath: { path: '/blog', isPrefix: false },
+    });
+    expect(criterionOf({ path: { path: '/', isPrefix: true, typed: '/*' } })).toStrictEqual({
+      cachePath: { path: '/', isPrefix: true },
     });
   });
 });

@@ -43,14 +43,6 @@ export function atMostOneOf(...keys: FlagKey[]): Rule {
   };
 }
 
-export function onlyWithFlag(flag: FlagKey, partner: FlagKey): Rule {
-  return (resolved, sources) => {
-    if (isSupplied(resolved[flag], sources[flag]) && !isSupplied(resolved[partner], sources[partner])) {
-      throw new UsageError(`--${flag} is only used with --${partner}.`);
-    }
-  };
-}
-
 export function requireValueOf(flag: string, gate: string, allowed: readonly string[], value: string): void {
   if (!allowed.includes(value)) {
     throw new UsageError(

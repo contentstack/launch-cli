@@ -209,57 +209,16 @@ describe('integration: launch:cache:purge on the wire', () => {
     expect(onWire).toEqual([]);
   });
 
-  it('sends --path with --prefix as a prefix match and prints the path as entered', async () => {
-    const { purge } = lookupAndPurge({ cachePath: { path: '/blog', isPrefix: true } });
-
-    const { error, stdout } = await runCommand(purgeArgs('--env', ENV_UID, '--path', '/blog', '--prefix'), config);
-
-    expect(error).toBeUndefined();
-    expect(purge.isDone()).toBe(true);
-    expect(stdout).toBe('✔ Cache purge initiated for /blog.\n');
-    expect(onWire).toEqual([]);
-  });
-
   it.each([
-    ['/blog/*', { cachePath: { path: '/blog', isPrefix: true } }, '/blog.'],
-    ['/*', { cachePath: { path: '/', isPrefix: true } }, '/.'],
-  ])('sends %s with --prefix as one prefix match, without stripping twice', async (typed, body, named) => {
-    const { purge } = lookupAndPurge(body);
-
-    const { error, stdout } = await runCommand(purgeArgs('--env', ENV_UID, '--path', typed, '--prefix'), config);
-
-    expect(error).toBeUndefined();
-    expect(purge.isDone()).toBe(true);
-    expect(stdout).toBe(`✔ Cache purge initiated for ${named}\n`);
-  });
-
-  it.each([
-    ['--tags', 'a'],
-    ['--hosts', 'example.com'],
-  ])('exits 2 for --prefix with %s, naming --prefix and --path, with no lookup and no POST', async (flag, value) => {
+    ['with --path', ['--path', '/blog', '--prefix']],
+    ['alone', ['--prefix']],
+  ])('exits 2 for the removed --prefix %s as an unknown flag, with no lookup and no POST', async (_label, extra) => {
     const { lookup, purge } = lookupAndPurge({});
 
-    const { error } = await runCommand(purgeArgs('--env', ENV_UID, '--prefix', flag, value), config);
+    const { error } = await runCommand(purgeArgs('--env', ENV_UID, ...extra), config);
 
     expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toBe('--prefix is only used with --path.');
-    expect([lookup.isDone(), purge.isDone()]).toEqual([false, false]);
-    expect(onWire).toEqual([]);
-  });
-
-  it.each([
-    ['off a terminal', false],
-    ['on a terminal', true],
-  ])('exits 2 for --prefix alone %s, without asking anything or sending a request', async (_label, terminal) => {
-    const { lookup, purge } = lookupAndPurge({});
-    const prompts = answerPrompts({});
-    const args = purgeArgs('--env', ENV_UID, '--prefix');
-
-    const { error } = await (terminal ? onTerminal(() => runCommand(args, config)) : runCommand(args, config));
-
-    expect(error?.oclif?.exit).toBe(2);
-    expect(error?.message).toBe('--prefix is only used with --path.');
-    expect(prompts.messages).toEqual([]);
+    expect(error?.message).toBe('Run csdx launch:cache:purge --help to see its flags.');
     expect([lookup.isDone(), purge.isDone()]).toEqual([false, false]);
     expect(onWire).toEqual([]);
   });
