@@ -1,4 +1,4 @@
-import { UsageError } from './errors';
+import { InputDependencyError, UsageError } from './errors';
 import type { InputSource } from './resolution';
 import type { InputSources, ResolvedValues } from './rules';
 import { atLeastOneOf, atMostOneOf, exactlyOneOf, onlyWithValueOf, requireValueOf } from './rules';
@@ -121,6 +121,21 @@ describe('atLeastOneOf', () => {
 describe('onlyWithValueOf', () => {
   const SUPPORTED = ['ANALOG', 'ANGULAR', 'NUXT', 'ASTRO', 'REMIX', 'OTHER'];
 
+  it('fails loudly when the command never declared the gate input, rather than letting it through', () => {
+    const rule = onlyWithValueOf('server-cmd', 'framework', SUPPORTED);
+
+    expect(() => rule({ 'server-cmd': 'npm start' }, { 'server-cmd': 'flag' })).toThrow(InputDependencyError);
+    expect(() => rule({ 'server-cmd': 'npm start' }, { 'server-cmd': 'flag' })).toThrow(
+      '--server-cmd cannot be checked without --framework: declare framework in the command inputs.',
+    );
+  });
+
+  it('still leaves a declared but absent gate to the command', () => {
+    const rule = onlyWithValueOf('server-cmd', 'framework', SUPPORTED);
+
+    expect(() => rule({ 'server-cmd': 'npm start', framework: undefined }, { 'server-cmd': 'flag' })).not.toThrow();
+  });
+
   it('passes when the gated flag was not supplied at all, whatever the gate says', () => {
     const rule = onlyWithValueOf('server-cmd', 'framework', SUPPORTED);
 
@@ -168,7 +183,6 @@ describe('onlyWithValueOf', () => {
   it('leaves the decision to the command when the gate has not been decided yet, because it may be prompted or detected later', () => {
     const rule = onlyWithValueOf('server-cmd', 'framework', SUPPORTED);
 
-    expect(() => rule(...typed({ 'server-cmd': 'npm start' }))).not.toThrow();
     expect(() => rule(...typed({ 'server-cmd': 'npm start', framework: undefined }))).not.toThrow();
     expect(() => rule(...typed({ 'server-cmd': 'npm start', framework: null }))).not.toThrow();
     expect(() => rule(...typed({ 'server-cmd': 'npm start', framework: '' }))).not.toThrow();

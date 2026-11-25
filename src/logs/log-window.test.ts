@@ -88,6 +88,15 @@ describe('parseLogWindow', () => {
     );
   });
 
+  it('lists only s, m and h in the --until error, matching its help', () => {
+    const failure = failureOf({ until: '1x' });
+
+    expect(failure).toBeInstanceOf(UsageError);
+    expect(failure.message).toBe(
+      '--until must be a relative time like 12hr (units s, m, h) or an ISO 8601 timestamp with an offset like 2025-01-15T10:00:00Z; "1x" is not.',
+    );
+  });
+
   it.each([
     [{ since: '2025-06-15T10:00:00Z', until: '12h' }],
     [{ since: '12h', until: '2025-06-15T10:00:00Z' }],
@@ -205,5 +214,19 @@ describe('parseLogWindow', () => {
     expect(pastLimit.startTime).toBe(NOW - DAY - 1);
     expect(pastLimit.clampedFrom).toBe(NOW - DAY);
     expect(twoDays).toEqual({ startTime: NOW - 2 * DAY, endTime: NOW, clampedFrom: NOW - DAY });
+  });
+
+  it('marks a window that ends more than 24 hours ago as expired, with no clamp', () => {
+    const untilTwoDays = parseLogWindow({ until: '2d' }, clock);
+    const bothPast = parseLogWindow({ since: '3d', until: '2d' }, clock);
+
+    expect(untilTwoDays).toEqual({ startTime: NOW - 2 * DAY - HOUR, endTime: NOW - 2 * DAY, expired: true });
+    expect(bothPast).toEqual({ startTime: NOW - 3 * DAY, endTime: NOW - 2 * DAY, expired: true });
+  });
+
+  it('keeps the clamp, not expired, for a window that still ends inside the 24 hours', () => {
+    const window = parseLogWindow({ since: '2d', until: '12h' }, clock);
+
+    expect(window).toEqual({ startTime: NOW - 2 * DAY, endTime: NOW - 12 * HOUR, clampedFrom: NOW - DAY });
   });
 });

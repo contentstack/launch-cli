@@ -11,6 +11,7 @@ import {
   serverLogsCapLine,
   serverLogsPageCapLine,
   serverLogsResumeLine,
+  serverLogsExpiredLine,
   serverLogsRetentionLine,
   stoppedFollowingLine,
 } from './logs.presenter';
@@ -101,6 +102,11 @@ describe('logs presenter', () => {
       'Server logs are kept for 24 hours; showing from 2026-10-27T10:00:00.000Z.',
     );
     expect(serverLogsRetentionLine(from, true)).toBe(yellow(serverLogsRetentionLine(from, false)));
+  });
+
+  it('words the expired-window notice short, yellow only on a terminal', () => {
+    expect(serverLogsExpiredLine(false)).toBe('Server logs are kept for 24 hours, so this window has none left.');
+    expect(serverLogsExpiredLine(true)).toBe(yellow(serverLogsExpiredLine(false)));
   });
 
   it('words the interrupt line in yellow on a terminal and plain on a pipe', () => {

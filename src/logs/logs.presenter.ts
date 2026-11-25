@@ -84,6 +84,10 @@ export function serverLogsResumeLine(resume: ServerLogsResume): string {
   );
 }
 
+export function serverLogsExpiredLine(outputIsTTY: boolean): string {
+  return styled('Server logs are kept for 24 hours, so this window has none left.', 'yellow', outputIsTTY);
+}
+
 export function serverLogsRetentionLine(clampedFrom: number, outputIsTTY: boolean): string {
   return styled(`Server logs are kept for 24 hours; showing from ${isoOf(clampedFrom)}.`, 'yellow', outputIsTTY);
 }

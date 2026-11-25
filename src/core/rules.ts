@@ -1,4 +1,4 @@
-import { UsageError } from './errors';
+import { InputDependencyError, UsageError } from './errors';
 import type { InputSource } from './resolution';
 import { isAbsent } from './values';
 import type { FlagKey } from '../resources';
@@ -55,6 +55,12 @@ export function onlyWithValueOf(flag: FlagKey, gate: FlagKey, allowed: readonly 
   return (resolved, sources) => {
     if (!isSupplied(resolved[flag], sources[flag])) {
       return;
+    }
+
+    if (!(gate in resolved)) {
+      throw new InputDependencyError(
+        `--${flag} cannot be checked without --${gate}: declare ${gate} in the command inputs.`,
+      );
     }
 
     const value = resolved[gate];

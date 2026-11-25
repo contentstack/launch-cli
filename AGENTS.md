@@ -959,6 +959,8 @@ the resolved values and, beside them, the source of every present value (`flag`,
 by the resolver's own `isAbsent` (in `src/core/values.ts`, shared by both), and it is not `false`.
 Without that, `skip`'s default of 0 made `exactlyOneOf('limit', 'skip')` reject `--limit 10` alone. `onlyWithValueOf`
 applies the same test to its gate: a defaulted gate is skipped (`src/core/rules.ts`, since `17bef75`).
+A gate the command never declared is an `InputDependencyError`, so a forgotten input cannot make the rule
+silently pass.
 `onlyWithServer` (`src/logs/logs.inputs.ts`) deliberately differs - it reads a defaulted `log-type`, so
 `--since` with the default deployment type is refused. Write the next rule when a command needs it; a rule
 kept alive only by its own test proves nothing.

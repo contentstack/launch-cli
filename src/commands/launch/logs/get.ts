@@ -21,6 +21,7 @@ import {
   serverLogsCapLine,
   serverLogsPageCapLine,
   serverLogsResumeLine,
+  serverLogsExpiredLine,
   serverLogsRetentionLine,
   stoppedFollowingLine,
 } from '../../../logs/logs.presenter';
@@ -151,6 +152,11 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
     const { search, cursor } = this.resolved;
     let printed = 0;
     let last: ServerLogsPage | undefined;
+
+    if (window.expired) {
+      this.ux.print(serverLogsExpiredLine(outputIsTTY));
+      return;
+    }
 
     if (clampedFrom !== undefined) {
       this.ux.print(serverLogsRetentionLine(clampedFrom, outputIsTTY));
