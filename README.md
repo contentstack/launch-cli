@@ -117,7 +117,7 @@ Purge an environment's CDN cache by path, cache tags or hostnames
 ```
 USAGE
   $ csdx launch:cache:purge [--config <value>] [-d <value>] [--org <value>] [--project <value>] [--env <value>] [--path
-    <value>] [--prefix] [--tags <value>] [--hosts <value>]
+    <value>] [--tags <value>] [--hosts <value>]
 
 FLAGS
   -d, --data-dir=<value>  Current working directory
@@ -125,10 +125,7 @@ FLAGS
       --env=<value>       Environment name or UID
       --hosts=<value>     Comma-separated hostnames to purge
       --org=<value>       Organization UID
-      --path=<value>      Path to purge, for example /blog. End it with /* to purge everything beneath it, or pass /*
-                          for the whole site
-      --prefix            With --path, purge everything beneath the path as well (a prefix match, like ending it with
-                          /*)
+      --path=<value>      Path to purge, for example /blog. To also purge everything beneath it, end the path with /*
       --project=<value>   Project name or UID
       --tags=<value>      Comma-separated cache tags to purge
 
@@ -137,8 +134,6 @@ DESCRIPTION
 
 EXAMPLES
   $ csdx launch:cache:purge --org <org-uid> --project <name-or-uid> --env <name-or-uid> --path /blog
-
-  $ csdx launch:cache:purge --org <org-uid> --project <name-or-uid> --env <name-or-uid> --path /blog --prefix
 
   $ csdx launch:cache:purge --org <org-uid> --project <name-or-uid> --env <name-or-uid> --path "/blog/*"
 
@@ -511,7 +506,7 @@ _See code: [src/commands/launch/functions/index.ts](https://github.com/contentst
 
 ## `csdx launch:functions:serve`
 
-Serve cloud functions
+Serve cloud functions locally
 
 ```
 USAGE
@@ -519,19 +514,19 @@ USAGE
 
 FLAGS
   -d, --data-dir=<value>  Current working directory
-      --port=<value>      [default: 3000] Port number
+      --port=<value>      [default: 3000, env: PORT] Port number
 
 DESCRIPTION
-  Serve cloud functions
+  Serve cloud functions locally
 
 EXAMPLES
   $ csdx launch:functions:serve
 
   $ csdx launch:functions:serve --port <port-number>
 
-  $ csdx launch:functions:serve --data-dir <path/of/current/working/dir>
+  $ csdx launch:functions:serve --data-dir <project-folder>
 
-  $ csdx launch:functions:serve --data-dir <path/of/current/working/dir> --port <port-number>
+  $ csdx launch:functions:serve --data-dir <project-folder> --port <port-number>
 ```
 
 _See code: [src/commands/launch/functions/serve.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/functions/serve.ts)_
@@ -552,7 +547,7 @@ _See code: [src/commands/launch/logs/index.ts](https://github.com/contentstack/l
 
 ## `csdx launch:logs:get`
 
-Read the build or server logs of a deployment of a Launch environment
+Read deployment, server or live logs
 
 ```
 USAGE
@@ -568,19 +563,26 @@ FLAGS
       --org=<value>         Organization UID
       --project=<value>     Project name or UID
       --search=<value>      Server logs only: show only lines containing this text, up to 256 characters
-      --since=<value>       Server logs only: start of the window, relative (45s, 30m, 12hr, 2d) or an ISO 8601
-                            timestamp with an offset. Defaults to one hour before --until
+      --since=<value>       Server logs only: start of the window, relative (45s, 30m, 12hr) or an ISO 8601 timestamp
+                            with an offset. Defaults to one hour before --until. Server logs are kept for 24 hours; an
+                            earlier start is moved up to 24 hours ago
       --type=<value>        Kind of logs to read (deployment | server | live). Defaults to deployment
-      --until=<value>       Server logs only: end of the window, relative (45s, 30m, 12hr, 2d) or an ISO 8601 timestamp
-                            with an offset. Defaults to now
+      --until=<value>       Server logs only: end of the window, relative (45s, 30m, 12hr) or an ISO 8601 timestamp with
+                            an offset. Defaults to now
 
 DESCRIPTION
-  Read the build or server logs of a deployment of a Launch environment
+  Read deployment, server or live logs
 
 EXAMPLES
   $ csdx launch:logs:get --org <org-uid> --project <name-or-uid> --env <name-or-uid>
 
   $ csdx launch:logs:get --org <org-uid> --project <name-or-uid> --env <name-or-uid> --deployment <deployment-uid> --type server --since 2h
+
+  $ csdx launch:logs:get --org <org-uid> --project <name-or-uid> --env <name-or-uid> --type live
+
+  $ csdx launch:logs:get --org <org-uid> --project <name-or-uid> --env <name-or-uid> --type server --search "timeout"
+
+  $ csdx launch:logs:get --org <org-uid> --project <name-or-uid> --env <name-or-uid> --type server --cursor <cursor>
 ```
 
 _See code: [src/commands/launch/logs/get.ts](https://github.com/contentstack/launch-cli/blob/v2.0.0-beta.0/src/commands/launch/logs/get.ts)_
