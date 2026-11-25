@@ -3,7 +3,9 @@ import { isAbsent } from '../core/values';
 
 export const DEFAULT_LOG_WINDOW_MS = 3_600_000;
 
-export const SERVER_LOG_RETENTION_MS = 86_400_000;
+export const SERVER_LOG_RETENTION_HOURS = 24;
+
+export const SERVER_LOG_RETENTION_MS = SERVER_LOG_RETENTION_HOURS * 3_600_000;
 
 const MAX_DATE_MS = 8.64e15;
 

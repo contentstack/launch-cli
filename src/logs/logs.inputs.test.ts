@@ -203,6 +203,13 @@ describe('logs inputs', () => {
     await expect(run).rejects.toThrow('--since cannot be checked without --type');
   });
 
+  it('refuses an undeclared log type on every run, even when no window flag was given', async () => {
+    const bare = inputs({ since: {} });
+    const run = resolveInputs(bare, { parsed: {}, projectConfig: {}, services, rules });
+
+    await expect(run).rejects.toThrow('--since cannot be checked without --type');
+  });
+
   it('parses --since and --until as plain strings', async () => {
     const parsed = await Parser.parse(['--since', '12hr', '--until=2025-06-15T10:00:00Z'], {
       flags: { since: catalog.since, until: catalog.until },

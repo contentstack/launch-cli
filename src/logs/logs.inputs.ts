@@ -6,6 +6,7 @@ import type { Rule } from '../core/rules';
 import { requireValueOf } from '../core/rules';
 import { isAbsent, oneOf, withinLength } from '../core/values';
 import type { FlagKey } from '../resources';
+import { SERVER_LOG_RETENTION_HOURS } from './log-window';
 
 export const LOG_TYPES = ['deployment', 'server', 'live'] as const;
 
@@ -30,7 +31,7 @@ export const logsFlags = {
   since: Flags.string({
     description:
       `Server logs only: start of the window, ${SINCE_FORMATS}. Defaults to one hour before --until. ` +
-      'Server logs are kept for 24 hours, so nothing older than that is returned',
+      `Server logs are kept for ${SERVER_LOG_RETENTION_HOURS} hours, so nothing older than that is returned`,
   }),
   until: Flags.string({
     description: `Server logs only: end of the window, ${UNTIL_FORMATS}. Defaults to now`,
@@ -60,16 +61,16 @@ export const logsResolution = {
 
 export function onlyWithServer(flag: FlagKey): Rule {
   return (resolved) => {
-    if (isAbsent(resolved[flag])) {
-      return;
-    }
-
     const type = resolved['log-type'];
 
     if (typeof type !== 'string') {
       throw new InputDependencyError(
         `--${flag} cannot be checked without --${LOG_TYPE_FLAG}: declare log-type in the command inputs.`,
       );
+    }
+
+    if (isAbsent(resolved[flag])) {
+      return;
     }
 
     requireValueOf(flag, LOG_TYPE_FLAG, SERVER_ONLY_LOG_TYPES, type);

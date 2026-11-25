@@ -116,7 +116,7 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
           const current = Date.now();
           shown = { startTime: current - SERVER_LOG_RETENTION_MS, endTime: current };
           resume.cursor = undefined;
-          this.ux.print(serverLogsExpiredLine(this.services.outputIsTTY === true));
+          this.ux.print(serverLogsExpiredLine(this.services.outputIsTTY === true, this.resolved.search));
           await this.printServerLogs(scope, shown, stop, resume, undefined);
         },
         () => (resume.cursor === undefined ? [] : [this.resumeLine(scope, shown, resume.cursor)]),
@@ -168,7 +168,7 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
     let last: ServerLogsPage | undefined;
 
     if (clampedFrom !== undefined) {
-      this.ux.print(serverLogsRetentionLine(clampedFrom, outputIsTTY));
+      this.ux.print(serverLogsRetentionLine(outputIsTTY));
     }
 
     for await (const page of this.services.api.serverLogs.pages({ ...scope, startTime, endTime, search, cursor })) {

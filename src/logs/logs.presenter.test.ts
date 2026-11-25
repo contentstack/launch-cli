@@ -95,13 +95,9 @@ describe('logs presenter', () => {
     expect(line).toContain(` --search 'can'\\''t connect' --cursor '[1,"a"]'`);
   });
 
-  it('words the 24 hour notice from the clamped start', () => {
-    const from = Date.parse('2026-10-27T10:00:00.000Z');
-
-    expect(serverLogsRetentionLine(from, false)).toBe(
-      'Server logs are kept for 24 hours; showing from 2026-10-27T10:00:00.000Z.',
-    );
-    expect(serverLogsRetentionLine(from, true)).toBe(yellow(serverLogsRetentionLine(from, false)));
+  it('words the 24 hour notice without promising where the output starts', () => {
+    expect(serverLogsRetentionLine(false)).toBe('Server logs are kept for 24 hours; anything older may be missing.');
+    expect(serverLogsRetentionLine(true)).toBe(yellow(serverLogsRetentionLine(false)));
   });
 
   it('words the expired-window notice short, yellow only on a terminal', () => {
@@ -109,6 +105,9 @@ describe('logs presenter', () => {
       'This window is older than 24 hours and has no server logs; showing the last 24 hours instead.',
     );
     expect(serverLogsExpiredLine(true)).toBe(yellow(serverLogsExpiredLine(false)));
+    expect(serverLogsExpiredLine(false, 'timeout')).toBe(
+      'This window is older than 24 hours and has no server logs matching "timeout"; showing the last 24 hours instead.',
+    );
   });
 
   it('words the interrupt line in yellow on a terminal and plain on a pipe', () => {

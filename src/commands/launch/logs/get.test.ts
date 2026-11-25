@@ -333,7 +333,7 @@ describe('LogsGet', () => {
     await command.run();
 
     expect(lines).toEqual([
-      'Server logs are kept for 24 hours; showing from 2026-10-27T12:00:00.000Z.',
+      'Server logs are kept for 24 hours; anything older may be missing.',
       '2026-10-27 11:00:00.000:  old',
     ]);
     expect(walkCalls).toEqual([expect.objectContaining({ startTime: NOW - 172_800_000, endTime: NOW })]);
@@ -371,6 +371,21 @@ describe('LogsGet', () => {
     ]);
   });
 
+  it('names the search term in the fallback notice and keeps searching the last 24 hours', async () => {
+    const { command, lines, walkCalls } = commandUnderTest({
+      resolved: { 'log-type': 'server', until: '2d', search: 'timeout' },
+      serverLogsByCall: [[], []],
+    });
+
+    await command.run();
+
+    expect(lines).toEqual([
+      'This window is older than 24 hours and has no server logs matching "timeout"; showing the last 24 hours instead.',
+      'No server logs matched "timeout" between 2026-10-27T12:00:00.000Z and 2026-10-28T12:00:00.000Z.',
+    ]);
+    expect(walkCalls[1]).toEqual(expect.objectContaining({ search: 'timeout', startTime: NOW - 86_400_000 }));
+  });
+
   it('drops a --cursor for the fallback, since it belongs to the expired window', async () => {
     const { command, walkCalls } = commandUnderTest({
       resolved: { 'log-type': 'server', until: '2d', cursor: 'old-window-cursor' },
@@ -384,7 +399,7 @@ describe('LogsGet', () => {
   });
 
   it('prints what the server still has for an expired window, with no notice, when its clock disagrees', async () => {
-    const { command, lines } = commandUnderTest({
+    const { command, lines, walkCalls } = commandUnderTest({
       resolved: { 'log-type': 'server', until: '2d' },
       serverLogs: [{ timestamp: '2026-10-26T11:30:00.000Z', message: 'still there' }],
     });
@@ -392,6 +407,9 @@ describe('LogsGet', () => {
     await command.run();
 
     expect(lines).toEqual(['2026-10-26 11:30:00.000:  still there']);
+    expect(walkCalls).toEqual([
+      expect.objectContaining({ startTime: NOW - 172_800_000 - 3_600_000, endTime: NOW - 172_800_000 }),
+    ]);
   });
 
   it('prints no notice for a window of exactly 24 hours', async () => {

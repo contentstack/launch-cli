@@ -1,10 +1,10 @@
 fileignoreconfig:
 - filename: src/logs/logs.inputs.test.ts
-  checksum: a38586dbf015bdd29b7ce5d9b096076a494c08f87d73fc7dd9f7c32531bea132
+  checksum: 0cff0288003a5ef8aeefe7175f3b46232f97215925b62498ef610225cbee9fa4
 - filename: test/integration/logs-get.test.ts
-  checksum: b608797028bb0191d53630d2ff95d096b8a2b83019fed2aa096754dc5c50b1bb
+  checksum: d9e2e38e7f61b957a79f14aa3cfd5b6b364acf656df583af6d0e02ad592cc3bb
 - filename: src/commands/launch/logs/get.test.ts
-  checksum: 9ec0ce676f6eb55debd98cf0d230fd52efd3a5223e5648a9303d54ab1232215b
+  checksum: 17e8f1fef8a4e0b4bb812b56f78c3410251dccb8f276ff0727caf24ca6186813
 - filename: src/core/failure.test.ts
   checksum: 98ce2e3fbb4f6730cd7e295ec753d083f8483ff2c47bbde148f69dcc10771327
 - filename: test/integration/retired-commands.test.ts
@@ -26,7 +26,7 @@ fileignoreconfig:
 - filename: src/core/service-context.test.ts
   checksum: 495972ae75e7ef1b62632c8d099fc589b023976a17d77caaebb049d974edd1bc
 - filename: src/core/rules.test.ts
-  checksum: 1223bdd04280d0a6c5b3022db4c9b6d6e90edbed24a2b94f9bc41e49e933104c
+  checksum: 3a299be915d0a1163200e046c49fe4866f0ed9701ef3fd424636bca55796e3a6
 - filename: src/core/inputs.test.ts
   checksum: c5b4be7a0aa2f0878153f062e1500b2bdbd53bdd2d84bb7c13c731db3c3699c4
 - filename: .husky/secrets-scan.sh

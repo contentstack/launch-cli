@@ -134,6 +134,9 @@ describe('onlyWithValueOf', () => {
     const rule = onlyWithValueOf('server-cmd', 'framework', SUPPORTED);
 
     expect(() => rule({}, {})).toThrow(InputDependencyError);
+    expect(() => rule({}, {})).toThrow(
+      '--server-cmd cannot be checked without --framework: declare framework in the command inputs.',
+    );
   });
 
   it('still leaves a declared but absent gate to the command', () => {

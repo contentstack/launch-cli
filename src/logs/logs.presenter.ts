@@ -4,10 +4,10 @@ import { clockOf, deploymentLogLine } from '../deployments/deployment.presenter'
 import type { Deployment } from '../deployments/types';
 import { styled } from '../core/style';
 import { isRecord } from '../core/values';
-import { SERVER_LOG_RETENTION_MS } from './log-window';
+import { SERVER_LOG_RETENTION_HOURS } from './log-window';
 import { SERVER_LOGS_PAGE_CAP, type ServerLog } from './types';
 
-const RETENTION_HOURS = SERVER_LOG_RETENTION_MS / 3_600_000;
+const RETENTION_HOURS = SERVER_LOG_RETENTION_HOURS;
 
 const MS_PER_MINUTE = 60_000;
 
@@ -87,16 +87,17 @@ export function serverLogsResumeLine(resume: ServerLogsResume): string {
   );
 }
 
-export function serverLogsExpiredLine(outputIsTTY: boolean): string {
+export function serverLogsExpiredLine(outputIsTTY: boolean, search?: string): string {
+  const matching = search === undefined ? '' : ` matching "${search}"`;
   const line =
-    `This window is older than ${RETENTION_HOURS} hours and has no server logs; ` +
+    `This window is older than ${RETENTION_HOURS} hours and has no server logs${matching}; ` +
     `showing the last ${RETENTION_HOURS} hours instead.`;
 
   return styled(line, 'yellow', outputIsTTY);
 }
 
-export function serverLogsRetentionLine(clampedFrom: number, outputIsTTY: boolean): string {
-  const line = `Server logs are kept for ${RETENTION_HOURS} hours; showing from ${isoOf(clampedFrom)}.`;
+export function serverLogsRetentionLine(outputIsTTY: boolean): string {
+  const line = `Server logs are kept for ${RETENTION_HOURS} hours; anything older may be missing.`;
 
   return styled(line, 'yellow', outputIsTTY);
 }
