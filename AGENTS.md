@@ -957,9 +957,10 @@ A rule asks what the **user supplied**, never what a default filled in. `resolve
 the resolved values and, beside them, the source of every present value (`flag`, `config`, `prompt` or
 `default`). An input counts as supplied only when its source is not `default`, its value is not absent
 by the resolver's own `isAbsent` (in `src/core/values.ts`, shared by both), and it is not `false`.
-Without that, `skip`'s default of 0 made `exactlyOneOf('limit', 'skip')` reject `--limit 10` alone. The
-gate value `onlyWithValueOf` reads is a value, not a "was it supplied?" question, so it is read
-wherever it came from. Write the next rule when a command needs it; a rule
+Without that, `skip`'s default of 0 made `exactlyOneOf('limit', 'skip')` reject `--limit 10` alone. `onlyWithValueOf`
+applies the same test to its gate: a defaulted gate is skipped (`src/core/rules.ts`, since `17bef75`).
+`onlyWithServer` (`src/logs/logs.inputs.ts`) deliberately differs - it reads a defaulted `log-type`, so
+`--since` with the default deployment type is refused. Write the next rule when a command needs it; a rule
 kept alive only by its own test proves nothing.
 
 **Built ahead of use.** Four pieces of production code have no caller yet, on purpose, each held
