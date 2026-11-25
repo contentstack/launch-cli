@@ -37,6 +37,10 @@ import type { CloudFunctionResource } from './types';
 type CloudFunctionHandler = CloudFunctionResource['handler'];
 
 const DEPLOYED_PAYLOAD_LIMIT = '6mb';
+const DEPLOYED_REDIRECT_STATUS = 307;
+const INVALID_REDIRECT_MESSAGE =
+  "Invalid redirect arguments. Please use a single argument URL, e.g. res.redirect('/destination') " +
+  "or use a status code and URL, e.g. res.redirect(307, '/destination').";
 
 function isHandler(value: unknown): value is CloudFunctionHandler {
   return typeof value === 'function';
@@ -157,6 +161,18 @@ function defaultToNoStore(_request: Request, response: Response, next: NextFunct
   next();
 }
 
+function redirectLikeDeployedFunctions(_request: Request, response: Response, next: NextFunction): void {
+  response.redirect = ((statusOrUrl: unknown, url?: unknown): void => {
+    const [status, location] =
+      typeof statusOrUrl === 'string' ? [DEPLOYED_REDIRECT_STATUS, statusOrUrl] : [statusOrUrl, url];
+    if (typeof status !== 'number' || typeof location !== 'string') {
+      throw new Error(INVALID_REDIRECT_MESSAGE);
+    }
+    response.writeHead(status, { Location: location }).end();
+  }) as Response['redirect'];
+  next();
+}
+
 export function answerRequestError(
   error: Error & { status?: number; type?: string },
   _request: Request,
@@ -175,6 +191,7 @@ export function answerRequestError(
 function applyRequestMiddleware(app: Express): void {
   app.use(defaultToNoStore);
   app.use(attachCookies);
+  app.use(redirectLikeDeployedFunctions);
   app.use(express.json({ limit: DEPLOYED_PAYLOAD_LIMIT }));
   app.use(express.urlencoded({ extended: true, limit: DEPLOYED_PAYLOAD_LIMIT }));
   app.use(express.text({ limit: DEPLOYED_PAYLOAD_LIMIT }));

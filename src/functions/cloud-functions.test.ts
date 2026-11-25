@@ -18,6 +18,7 @@ interface HttpResponse {
   body: string;
   cacheControl: string | undefined;
   contentType: string | undefined;
+  location: string | undefined;
 }
 
 const originalStartServer = (CloudFunctions.prototype as never as Record<string, unknown>).startServer as (
@@ -70,6 +71,7 @@ function sendRequest(port: number, path: string, { method = 'GET', headers = {},
           body,
           cacheControl: response.headers['cache-control'],
           contentType: response.headers['content-type'],
+          location: response.headers.location,
         });
       });
     });
@@ -552,6 +554,60 @@ describe('CloudFunctions serve routing', () => {
 
     expect((await sendRequest(port, '/plain')).cacheControl).toBe('no-store');
     expect((await sendRequest(port, '/cached')).cacheControl).toBe('max-age=60');
+  });
+
+  it('answers res.redirect(url) with a bare 307 and the location exactly as given, as deployed functions do', async () => {
+    writeFunctionFile('go.js', 'export default function go(request, response) { response.redirect("/target?from=a b"); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/go');
+
+    expect(response.status).toBe(307);
+    expect(response.location).toBe('/target?from=a b');
+    expect(response.body).toBe('');
+    expect(response.contentType).toBeUndefined();
+    expect(response.cacheControl).toBe('no-store');
+  });
+
+  it('answers res.redirect(status, url) with that status and no body', async () => {
+    writeFunctionFile('moved.js', 'export default function moved(request, response) { response.redirect(301, "/new-home"); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/moved');
+
+    expect(response.status).toBe(301);
+    expect(response.location).toBe('/new-home');
+    expect(response.body).toBe('');
+    expect(response.contentType).toBeUndefined();
+  });
+
+  it('keeps 307 when a status follows the url, as deployed functions ignore it', async () => {
+    writeFunctionFile('late.js', 'export default function late(request, response) { response.redirect("/after", 301); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/late');
+
+    expect(response.status).toBe(307);
+    expect(response.location).toBe('/after');
+    expect(response.body).toBe('');
+  });
+
+  it('answers 500 and logs the deployed error message when res.redirect has no url', async () => {
+    writeFunctionFile('nowhere.js', 'export default function nowhere(request, response) { response.redirect(301); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/nowhere');
+
+    expect(response.status).toBe(500);
+    expect(response.location).toBeUndefined();
+    expect(loggedErrors).toHaveLength(1);
+    expect((loggedErrors[0] as Error).message).toBe(
+      "Invalid redirect arguments. Please use a single argument URL, e.g. res.redirect('/destination') or use a status code and URL, e.g. res.redirect(307, '/destination').",
+    );
   });
 
   it('answers a malformed json body with a bare 400, no error page, and logs the rejection without the body', async () => {
