@@ -20,6 +20,7 @@ interface Options {
   get?: () => Promise<unknown>;
   serverLogs?: unknown[];
   serverPages?: unknown[];
+  serverLogsByCall?: unknown[][];
   outputIsTTY?: boolean;
 }
 
@@ -57,7 +58,10 @@ function commandUnderTest(options: Options = {}) {
         serverLogs: {
           async *pages(params: unknown) {
             walkCalls.push(params);
-            yield* options.serverPages ?? [{ logs: options.serverLogs ?? [], pageInfo: { hasNewer: false } }];
+            const byCall = options.serverLogsByCall?.[walkCalls.length - 1];
+            yield* byCall !== undefined
+              ? [{ logs: byCall, pageInfo: { hasNewer: false } }]
+              : options.serverPages ?? [{ logs: options.serverLogs ?? [], pageInfo: { hasNewer: false } }];
           },
         },
       },
@@ -335,16 +339,48 @@ describe('LogsGet', () => {
     expect(walkCalls).toEqual([expect.objectContaining({ startTime: NOW - 172_800_000, endTime: NOW })]);
   });
 
-  it('still asks the server for a window that ended more than 24 hours ago, and says none are left when it is empty', async () => {
+  it('falls back to the last 24 hours when an expired window comes back empty, saying so first', async () => {
     const { command, lines, walkCalls } = commandUnderTest({
       resolved: { 'log-type': 'server', until: '2d' },
-      serverLogs: [],
+      serverLogsByCall: [[], [{ timestamp: '2026-10-28T09:00:00.000Z', message: 'recent' }]],
     });
 
     await command.run();
 
-    expect(lines).toEqual(['Server logs are kept for 24 hours, so this window has none left.']);
-    expect(walkCalls).toEqual([expect.objectContaining({ startTime: NOW - 172_800_000 - 3_600_000, endTime: NOW - 172_800_000 })]);
+    expect(lines).toEqual([
+      'This window is older than 24 hours and has no server logs; showing the last 24 hours instead.',
+      '2026-10-28 09:00:00.000:  recent',
+    ]);
+    expect(walkCalls).toEqual([
+      expect.objectContaining({ startTime: NOW - 172_800_000 - 3_600_000, endTime: NOW - 172_800_000 }),
+      expect.objectContaining({ startTime: NOW - 86_400_000, endTime: NOW }),
+    ]);
+  });
+
+  it('says the last 24 hours are empty too when the fallback finds nothing', async () => {
+    const { command, lines } = commandUnderTest({
+      resolved: { 'log-type': 'server', until: '2d' },
+      serverLogsByCall: [[], []],
+    });
+
+    await command.run();
+
+    expect(lines).toEqual([
+      'This window is older than 24 hours and has no server logs; showing the last 24 hours instead.',
+      'No server logs found between 2026-10-27T12:00:00.000Z and 2026-10-28T12:00:00.000Z.',
+    ]);
+  });
+
+  it('drops a --cursor for the fallback, since it belongs to the expired window', async () => {
+    const { command, walkCalls } = commandUnderTest({
+      resolved: { 'log-type': 'server', until: '2d', cursor: 'old-window-cursor' },
+      serverLogsByCall: [[], []],
+    });
+
+    await command.run();
+
+    expect(walkCalls[0]).toEqual(expect.objectContaining({ cursor: 'old-window-cursor' }));
+    expect(walkCalls[1]).toEqual(expect.objectContaining({ cursor: undefined }));
   });
 
   it('prints what the server still has for an expired window, with no notice, when its clock disagrees', async () => {

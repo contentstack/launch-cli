@@ -105,7 +105,9 @@ describe('logs presenter', () => {
   });
 
   it('words the expired-window notice short, yellow only on a terminal', () => {
-    expect(serverLogsExpiredLine(false)).toBe('Server logs are kept for 24 hours, so this window has none left.');
+    expect(serverLogsExpiredLine(false)).toBe(
+      'This window is older than 24 hours and has no server logs; showing the last 24 hours instead.',
+    );
     expect(serverLogsExpiredLine(true)).toBe(yellow(serverLogsExpiredLine(false)));
   });
 

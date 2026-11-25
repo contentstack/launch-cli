@@ -88,7 +88,9 @@ export function serverLogsResumeLine(resume: ServerLogsResume): string {
 }
 
 export function serverLogsExpiredLine(outputIsTTY: boolean): string {
-  const line = `Server logs are kept for ${RETENTION_HOURS} hours, so this window has none left.`;
+  const line =
+    `This window is older than ${RETENTION_HOURS} hours and has no server logs; ` +
+    `showing the last ${RETENTION_HOURS} hours instead.`;
 
   return styled(line, 'yellow', outputIsTTY);
 }

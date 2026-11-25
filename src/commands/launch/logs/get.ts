@@ -26,7 +26,7 @@ import {
   stoppedFollowingLine,
 } from '../../../logs/logs.presenter';
 import { LiveLogFollower } from '../../../logs/live-log.follower';
-import { parseLogWindow, type LogWindow } from '../../../logs/log-window';
+import { parseLogWindow, SERVER_LOG_RETENTION_MS, type LogWindow } from '../../../logs/log-window';
 import { nextCursorOf } from '../../../logs/server-logs.api';
 import { SERVER_LOGS_PAGE_CAP, type ServerLogsPage } from '../../../logs/types';
 import { isRecord } from '../../../core/values';
@@ -103,10 +103,23 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
       const window = parseLogWindow({ since: this.resolved.since, until: this.resolved.until }, () => Date.now());
       const scope = await this.verifiedDeployment({ org, project, environment });
       const resume: ServerResume = {};
+      let shown = window;
 
       await this.untilInterrupted(
-        (stop) => this.printServerLogs(scope, window, stop, resume),
-        () => (resume.cursor === undefined ? [] : [this.resumeLine(scope, window, resume.cursor)]),
+        async (stop) => {
+          const printed = await this.printServerLogs(scope, window, stop, resume, this.resolved.cursor);
+
+          if (printed > 0 || !window.expired) {
+            return;
+          }
+
+          const current = Date.now();
+          shown = { startTime: current - SERVER_LOG_RETENTION_MS, endTime: current };
+          resume.cursor = undefined;
+          this.ux.print(serverLogsExpiredLine(this.services.outputIsTTY === true));
+          await this.printServerLogs(scope, shown, stop, resume, undefined);
+        },
+        () => (resume.cursor === undefined ? [] : [this.resumeLine(scope, shown, resume.cursor)]),
       );
       return;
     }
@@ -146,10 +159,11 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
     window: LogWindow,
     stop: AbortSignal,
     resume: ServerResume,
-  ): Promise<void> {
+    cursor: string | undefined,
+  ): Promise<number> {
     const outputIsTTY = this.services.outputIsTTY === true;
     const { startTime, endTime, clampedFrom } = window;
-    const { search, cursor } = this.resolved;
+    const { search } = this.resolved;
     let printed = 0;
     let last: ServerLogsPage | undefined;
 
@@ -171,10 +185,8 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
       }
     }
 
-    if (printed === 0) {
-      this.ux.print(
-        window.expired ? serverLogsExpiredLine(outputIsTTY) : noServerLogsLine(startTime, endTime, outputIsTTY, search),
-      );
+    if (printed === 0 && !window.expired) {
+      this.ux.print(noServerLogsLine(startTime, endTime, outputIsTTY, search));
     }
 
     if (last !== undefined && !isRecord(last.pageInfo) && last.logs.length === SERVER_LOGS_PAGE_CAP) {
@@ -185,6 +197,8 @@ export default class LogsGet extends LaunchCommand<typeof getInputs> {
       this.ux.print(serverLogsPageCapLine(outputIsTTY));
       this.ux.print(this.resumeLine(scope, window, resume.cursor));
     }
+
+    return printed;
   }
 
   private async untilInterrupted(
