@@ -8,7 +8,7 @@ import os, { tmpdir } from 'os';
 import { dirname, join, win32 } from 'path';
 import { pathToFileURL } from 'url';
 
-import { CloudFunctions, functionFilesImporting, isOutsideDirectory, listenFailure } from './cloud-functions';
+import { answerRequestError, CloudFunctions, functionFilesImporting, isOutsideDirectory, listenFailure } from './cloud-functions';
 import { PortInUseError } from './function.errors';
 import * as loader from './load-data-url';
 import { loadDataURL } from './load-data-url';
@@ -17,6 +17,7 @@ interface HttpResponse {
   status: number;
   body: string;
   cacheControl: string | undefined;
+  contentType: string | undefined;
 }
 
 const originalStartServer = (CloudFunctions.prototype as never as Record<string, unknown>).startServer as (
@@ -68,6 +69,7 @@ function sendRequest(port: number, path: string, { method = 'GET', headers = {},
           status: response.statusCode as number,
           body,
           cacheControl: response.headers['cache-control'],
+          contentType: response.headers['content-type'],
         });
       });
     });
@@ -552,19 +554,68 @@ describe('CloudFunctions serve routing', () => {
     expect((await sendRequest(port, '/cached')).cacheControl).toBe('max-age=60');
   });
 
-  it('defaults cache-control to no-store on the 400 for a malformed json body', async () => {
+  it('answers a malformed json body with a bare 400, no error page, and logs the rejection without the body', async () => {
+    writeFunctionFile('body.js', 'export default function body(request, response) { response.json({ body: request.body }); }');
+    const port = await freePort();
+    const requestBody = `not-json-${randomUUID()}`;
+
+    await new CloudFunctions(workspace).serve(port);
+    const response = await sendRequest(port, '/body', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: requestBody,
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toBe('');
+    expect(response.contentType).toBeUndefined();
+    expect(response.cacheControl).toBe('no-store');
+    expect(loggedErrors).toEqual(['Request rejected before the function ran: 400 entity.parse.failed']);
+    expect(String(loggedErrors)).not.toContain(requestBody);
+  });
+
+  it('answers a body over the deployed payload limit with a bare 413 and no error page', async () => {
     writeFunctionFile('body.js', 'export default function body(request, response) { response.json({ body: request.body }); }');
     const port = await freePort();
 
     await new CloudFunctions(workspace).serve(port);
     const response = await sendRequest(port, '/body', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: '{bad json',
+      headers: { 'content-type': 'text/plain' },
+      body: 'x'.repeat(6 * 1024 * 1024 + 1),
     });
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(413);
+    expect(response.body).toBe('');
+    expect(response.contentType).toBeUndefined();
     expect(response.cacheControl).toBe('no-store');
+    expect(loggedErrors).toEqual(['Request rejected before the function ran: 413 entity.too.large']);
+  });
+
+  it('answers a request error that carries no status with a bare 500', () => {
+    const end = jest.fn();
+    const status = jest.fn(() => ({ end }));
+    const next = jest.fn();
+    const error = new Error('no status');
+
+    answerRequestError(error, {} as never, { headersSent: false, status } as never, next);
+
+    expect(status).toHaveBeenCalledWith(500);
+    expect(end).toHaveBeenCalledWith();
+    expect(next).not.toHaveBeenCalled();
+    expect(loggedErrors).toEqual(['Request rejected before the function ran: 500 Error']);
+  });
+
+  it('hands a request error to express once the response has started', () => {
+    const status = jest.fn();
+    const next = jest.fn();
+    const error = Object.assign(new Error('late'), { status: 400 });
+
+    answerRequestError(error, {} as never, { headersSent: true, status } as never, next);
+
+    expect(next).toHaveBeenCalledWith(error);
+    expect(status).not.toHaveBeenCalled();
+    expect(loggedErrors).toEqual([]);
   });
 
   it('removes its temporary bundles once the functions are loaded, whether loading succeeds or fails', async () => {

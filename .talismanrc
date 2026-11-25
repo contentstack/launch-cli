@@ -6,9 +6,9 @@ fileignoreconfig:
 - filename: src/commands/launch/logs/get.test.ts
   checksum: d94d390de150956c799f64a84adfe0e02b5b21c66ddcc5cf55a1329aa67ec1a7
 - filename: src/core/failure.test.ts
-  checksum: 3f5c731861dc816d141f6314c32bec55bc5197241447a4375bc76fa9f85339f0
+  checksum: 98ce2e3fbb4f6730cd7e295ec753d083f8483ff2c47bbde148f69dcc10771327
 - filename: test/integration/retired-commands.test.ts
-  checksum: 84d9c9ddae05faf49e6bd29e2835051714ed53ac35c8a0283c87679f06902b0a
+  checksum: c1019c8477b25323206b675d883818452220477131369cd5e37ffceff088128b
 - filename: test/integration/manage-base-path.test.ts
   checksum: 79eb9ad420ea47d5bee8045d812c45b010bbeeafcaf5f85d11653140b0cd0db1
 - filename: src/transport/rest-client.ts
@@ -93,7 +93,7 @@ fileignoreconfig:
     - "'SECRET=hunter2'"
     - "formFieldKey"
 - filename: test/integration/projects-create.test.ts
-  checksum: 7fe9bd2822624f634e3a83907c327223249cbb132d3591d7ae517b38d4fee161
+  checksum: 170c15fbbd467f25723e0820081d584efab98193878402651989300e2a833038
 - filename: test/fixtures/README.md
   checksum: d801c84c8b7d7f38f967573e9a3a70da4405b7cbcbf10d2a6e5be3d65fb3daa1
   allowed_patterns:
@@ -257,7 +257,7 @@ fileignoreconfig:
 - filename: src/git/local-repository.ts
   checksum: b9091ed135dfebdf590a5412bbfba2b2f96d4a177cf944a20909b93405268e9f
 - filename: test/guards/layering.test.ts
-  checksum: 55893e6e919b1e462afc989110cb9360e38aa18d06de932587beaa9006042639
+  checksum: 7bac022f4db5bd85e05cc8949bd60a90ff53edeee9cc9246fe7bf9124d8356cf
 - filename: src/commands/launch/projects/create.test.ts
   checksum: 2c407c366f2a1da2647fc6eb7e6ad1bb8cbe3c7f901090432ab0e27df2e5d4d6
 - filename: src/commands/launch/projects/delete.test.ts
@@ -265,25 +265,25 @@ fileignoreconfig:
 - filename: test/integration/projects-delete.test.ts
   checksum: 19784ba572daac76e6ef0b004c19cdb9c3f9cb22f738b3ab0e22c694e049026c
 - filename: src/core/launch-command.ts
-  checksum: 2d08f5559ad8700462e7dd0b2768305a47f5b0b87f43b961bdbf1767a0e2540b
+  checksum: 769b224dd09f12c7fe530ff16b2c3cf0b2b18fd09262f3c72205a78424bb0d5b
 - filename: src/core/launch-command.test.ts
   checksum: d0ba482a3e05a3e73ed4d3f8087af6de52e692d0105d064982ba11dd8072df1b
 - filename: src/projects/project.inputs.test.ts
   checksum: 8242f4d40388f1a7f1d08c11d2571cb45a9294069a8248a5272bc5606807bb60
 - filename: test/integration/projects-command-flows.test.ts
-  checksum: ede00ae963c4d64ec41dce31cb59d7d58c22ebff18ae670be55192e43fa94290
+  checksum: 8346d9738fb7feabe9c199806ba3e13443dff1cdfb8165fa4ef95c65723d80b6
 - filename: src/core/redact.test.ts
   checksum: ae497ea8c3a4c3f12217d2c4c028a1da3d1324e18362d68c355ba8120902bcb3
 - filename: src/commands/launch/projects/list.test.ts
-  checksum: ba1876fb42b3031d3ae2eb23fd6591f827d3dc552a5edba765a7983c11fb3ba8
+  checksum: 90d2ed6f3170e7da64241116d20b2f3ff4e83e277f33be8fcfcba24096a604c3
 - filename: src/commands/launch/env/list.test.ts
   checksum: f5de16e0fd37a85ceb31a7fbc8e9058347ccc072f53c95d4f49ef15e923f4e95
 - filename: src/commands/launch/projects/get.test.ts
-  checksum: 3aeffc4e4742ea9c5b3d9e6c5ea2248ced1d19a273bbc7d7948d471774b0d739
+  checksum: 914afb97915df7afdaa3a5d2d1c276454407f008a3f012aeb8f9856a9180dba0
 - filename: test/integration/projects-list-command.test.ts
-  checksum: 6e294022573c525a0788f99bbea5cd6cfda3140079190e6fb078bd2c52ea1c6b
+  checksum: 038f5cd182e1fd0105e6e10dde7f5068a0c15883222450f72ea3904890a56c0c
 - filename: src/functions/cloud-functions.test.ts
-  checksum: a9d4515bdc953808a1dda094b62dd19af4eed432a553d9f14773b85f1c5346cc
+  checksum: 43756cd82a2dc8444a65c8339a9ba370d5cf02e168382b1654267ef3cb0abba8
 - filename: src/functions/function.errors.ts
   checksum: a24194bef73c8db8c28b8ac104955f2f22abdc8c8d0608fa36a39032055bda57
 - filename: src/transport/proxy.test.ts
@@ -309,7 +309,7 @@ fileignoreconfig:
 - filename: src/core/search-list.test.ts
   checksum: 4e5db3cd6a213db71c51bf5ac8d6a5547ea9ca137d425c00026453e5c3b543b7
 - filename: src/core/catalog.test.ts
-  checksum: 5f79096b43a3b3c6b03f6c86e8f2fbd5c77424e9889a74fd9de12852814620bd
+  checksum: 630e2635f0db27ab0d71406a96ea923558d6572aacb55c492154b8a96d158679
 - filename: test/credential-guard.setup.ts
   checksum: 519ccbeb0552fdb1d5f27308c56477c0258ee6cc0adec8f618e8e5bc047cbf6d
 - filename: src/environments/types.ts
@@ -443,7 +443,7 @@ fileignoreconfig:
 - filename: src/deployments/deployment.create.ts
   checksum: ca64f3b29a68c4a2755a88a141e2cd9dbd6fa851a2776876d78c40f3168492e3
 - filename: src/commands/launch/deployments/create.test.ts
-  checksum: 9f5c60d5f6367250aa8f932acf0e5a7ece933f3fc1ca173fa908e80724d1d579
+  checksum: 5d6812f3f7aadf3be311827a292088306ed39f9267dae3650840fab28af204ab
 - filename: src/deployments/deployment.create.test.ts
   checksum: aceeba27a10ffe7bcf7f78af4c88cb19e017a46c898f02a07e314f949775841a
 - filename: test/integration/deployments-rollback.test.ts
@@ -489,7 +489,7 @@ fileignoreconfig:
 - filename: src/commands/launch/secrets/list.test.ts
   checksum: 109d1165d7ce16943b50955f60fd8a753a870115fdf5501fb2a5e4a1cf436eaa
 - filename: package.json
-  checksum: aa850fff4d587e974f73c1fd734c6798feed147f0dce449b33930ef7190b370c
+  checksum: 0b0b5e1591470d46665b0f06f7cc422e87a438064a9aa3967b52778e3a994268
 - filename: test/integration/secrets-set.test.ts
   checksum: 2527d5d35198cc08e1859ab79941338392b6d4fcbc87506adef6d7b096089963
 - filename: src/secrets/secret.rules.test.ts
@@ -524,4 +524,6 @@ fileignoreconfig:
   checksum: df87a19d09ff07b95d8118dd7e6bae5a13a86f0ecb8dce97e6022481d1e11256
 - filename: test/integration/prompt-ctrl-c-on-a-terminal.test.ts
   checksum: f712885cded1bef4d64a8e1d7532f95b6696e7d7522dfeba55edf211d07fb837
+- filename: test/integration/usage-errors.test.ts
+  checksum: 6cbb2c552e3c9a08a91474ffe907c67926343c2f2cb9297125163b765ec53e60
 version: "1.0"
