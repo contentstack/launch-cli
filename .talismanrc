@@ -4,7 +4,7 @@ fileignoreconfig:
 - filename: test/integration/logs-get.test.ts
   checksum: b608797028bb0191d53630d2ff95d096b8a2b83019fed2aa096754dc5c50b1bb
 - filename: src/commands/launch/logs/get.test.ts
-  checksum: d94d390de150956c799f64a84adfe0e02b5b21c66ddcc5cf55a1329aa67ec1a7
+  checksum: edaf100ffc007e83de373163ac32a36778760761079dd0732bf82200554c1bd5
 - filename: src/core/failure.test.ts
   checksum: 98ce2e3fbb4f6730cd7e295ec753d083f8483ff2c47bbde148f69dcc10771327
 - filename: test/integration/retired-commands.test.ts
@@ -26,11 +26,9 @@ fileignoreconfig:
 - filename: src/core/service-context.test.ts
   checksum: 495972ae75e7ef1b62632c8d099fc589b023976a17d77caaebb049d974edd1bc
 - filename: src/core/rules.test.ts
-  checksum: 718e9596bc6eb94166dddfed3d234549427372a25fb169064a8e95f2884ecbcf
+  checksum: b4bd629a9fb0b815ebad4a28e2437f3a845a63b512c4a97e0b479f4b34c588c0
 - filename: src/core/inputs.test.ts
   checksum: c5b4be7a0aa2f0878153f062e1500b2bdbd53bdd2d84bb7c13c731db3c3699c4
-- filename: .github/workflows/secrets-scan.yml
-  checksum: 84da8e208ace349bd6eb2b3eef1d6aa17a85cda0feaa127b0282de52814e37bb
 - filename: .husky/secrets-scan.sh
   checksum: 5a44edca8d209ca4b7f6eefc4ce2caab838679f8916ef6136ad68584c0705cb6
 - filename: package-lock.json
@@ -223,7 +221,7 @@ fileignoreconfig:
     - "b2c3d4e5f60718293a4b5c6d"
     - "c3d4e5f60718293a4b5c6d7e"
 - filename: src/core/rules.ts
-  checksum: e602e43c9be518c608fcc155d3ff5aaede478239071bab35dfc1aad908e40bbe
+  checksum: 6e8280e6074d4f485df45ae429368dd07f51a9436ef187e6c7df79e129b29d03
   allowed_patterns:
     - "FlagKey"
 - filename: src/resources.ts
@@ -236,7 +234,7 @@ fileignoreconfig:
     - "a project name passed on argv to the project resolver"
     - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
 - filename: AGENTS.md
-  checksum: 6d59df8ee8485bfd34208c84e936c3537452271f784a2d8d8913458cce567717
+  checksum: f5d6ea83004c5b7187512e86e4e9635511792dd292e861db18e16982d2d27539
   allowed_patterns:
     - "Do not add an exemption to a guard to make a new file pass"
     - "passes its own error wording to `client.request\\(req, MESSAGES\\)`"
@@ -441,7 +439,7 @@ fileignoreconfig:
 - filename: src/deployments/deployment.watcher.test.ts
   checksum: b04213c987716247cfb4f1ccac37ba96f0c9a73b4564bd45b4da8ee5def0b9ca
 - filename: src/deployments/deployment.create.ts
-  checksum: ca64f3b29a68c4a2755a88a141e2cd9dbd6fa851a2776876d78c40f3168492e3
+  checksum: a5750a68956ec1f561866cc13a26247b3542c758cc219b852487afd5c626dde4
 - filename: src/commands/launch/deployments/create.test.ts
   checksum: 5d6812f3f7aadf3be311827a292088306ed39f9267dae3650840fab28af204ab
 - filename: src/deployments/deployment.create.test.ts
