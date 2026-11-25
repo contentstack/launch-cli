@@ -19,7 +19,9 @@ export const SERVER_ONLY_LOG_TYPES: readonly LogType[] = ['server'];
 
 export const MAX_SEARCH_LENGTH = 256;
 
-const WINDOW_FORMATS = 'relative (45s, 30m, 12hr, 1d) or an ISO 8601 timestamp with an offset';
+const SINCE_FORMATS = 'relative (45s, 30m, 12hr, 1d) or an ISO 8601 timestamp with an offset';
+
+const UNTIL_FORMATS = 'relative (45s, 30m, 12hr) or an ISO 8601 timestamp with an offset';
 
 export const logsFlags = {
   'log-type': Flags.string({
@@ -27,11 +29,11 @@ export const logsFlags = {
   }),
   since: Flags.string({
     description:
-      `Server logs only: start of the window, ${WINDOW_FORMATS}. Defaults to one hour before --until. ` +
-      'Server logs are kept for 24 hours, so an earlier start returns only the last 24 hours',
+      `Server logs only: start of the window, ${SINCE_FORMATS}. Defaults to one hour before --until. ` +
+      'Server logs are kept for 24 hours, so nothing older than that is returned',
   }),
   until: Flags.string({
-    description: `Server logs only: end of the window, ${WINDOW_FORMATS}. Defaults to now`,
+    description: `Server logs only: end of the window, ${UNTIL_FORMATS}. Defaults to now`,
   }),
   search: Flags.string({
     description: `Server logs only: show only lines containing this text, up to ${MAX_SEARCH_LENGTH} characters`,

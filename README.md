@@ -566,10 +566,10 @@ FLAGS
       --search=<value>      Server logs only: show only lines containing this text, up to 256 characters
       --since=<value>       Server logs only: start of the window, relative (45s, 30m, 12hr, 1d) or an ISO 8601
                             timestamp with an offset. Defaults to one hour before --until. Server logs are kept for 24
-                            hours, so an earlier start returns only the last 24 hours
+                            hours, so nothing older than that is returned
       --type=<value>        Kind of logs to read (deployment | server | live). Defaults to deployment
-      --until=<value>       Server logs only: end of the window, relative (45s, 30m, 12hr, 1d) or an ISO 8601 timestamp
-                            with an offset. Defaults to now
+      --until=<value>       Server logs only: end of the window, relative (45s, 30m, 12hr) or an ISO 8601 timestamp with
+                            an offset. Defaults to now
 
 DESCRIPTION
   Read deployment, server or live logs

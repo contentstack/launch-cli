@@ -524,8 +524,9 @@ The approved differences from V1 are these, and only these:
   path, coloured only on a TTY. The project error logger (`src/functions/function.logger.ts`)
   writes only to the file and has no `Console` transport. A `--data-dir` that does not exist,
   or that is a file, fails the same way before the logger is built.
-- **A port is decimal digits only**, 0-65535. Hex, exponent, signed, space-padded, empty and
-  whitespace values are rejected through that same exit-1 path. V1 read `0x10` as 16 and
+- **A port is decimal digits only**, 0-65535. A `--port` that is hex, exponent, signed,
+  space-padded, empty or whitespace, and a whitespace `PORT`, are rejected through that same
+  exit-1 path; an empty `PORT` counts as unset and falls through to 3000. V1 read `0x10` as 16 and
   accepted `''` as 0, a random port.
 - **`logs/` appears only when something is written to it.** V1 created it, empty, on every
   run.
@@ -548,8 +549,10 @@ The approved differences from V1 are these, and only these:
   unhandled `error` event), and **filepath validation is linear-time** (V1's regex took 41
   seconds on a plausible 40-character filename).
 
-`test/integration/functions-serve-port.test.ts` pins the port precedence and the single stderr
-message end to end.
+`src/commands/launch/functions/serve.test.ts` pins the port precedence through oclif's own parser
+(flag over `PORT`, `PORT` without the flag, an empty `PORT` falling through to 3000), and
+`test/integration/functions-serve-port.test.ts` pins an invalid port and its single stderr message
+end to end.
 
 A declined confirmation is a deliberate "no", not a failure, so it does not share code 1 with an
 API 500 - a CI log has to be able to tell those apart. 130 would claim the process was killed by
@@ -943,9 +946,11 @@ checklist and nothing else; the create summary says `ready to set` because the e
 **Cross-flag rules.** A rule that is pure flag-versus-flag and evaluable from argv alone belongs in
 oclif's native `exclusive` / `relationships` on the flag definition, where it also shows in `--help` -
 and a simple range does too: `limit` and `skip` carry oclif's own `min`/`max` rather than being
-checked later. A rule that must read a *resolved* value (one that config, a prompt or a default may
+checked later. A shared rule that must read a *resolved* value (one that config, a prompt or a default may
 have supplied) belongs in `src/core/rules.ts` - there are four: `atMostOneOf` (used by `cache:purge`), `exactlyOneOf` and `atLeastOneOf` (no consumer yet;
-see "Built ahead of use" below) and `onlyWithValueOf` (used by `projects:create`) - declared as a `static rules = [...]` array on the command. `resolveInputs` evaluates them after resolution,
+see "Built ahead of use" below) and `onlyWithValueOf` (used by `projects:create`, `env:create` and `env:update` through
+`serverCommandFrameworkGate`). Rules that belong to one domain live with it instead - `onlyWithServer` in
+`src/logs/logs.inputs.ts`, `aliasRequiresFromStack` in `src/variables/variable.rules.ts`. All are declared as a `static rules = [...]` array on the command. `resolveInputs` evaluates them after resolution,
 and a failing rule is a usage error (exit 2).
 
 A rule asks what the **user supplied**, never what a default filled in. `resolveInputs` hands each rule
