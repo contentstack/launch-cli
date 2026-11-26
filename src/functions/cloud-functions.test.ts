@@ -556,27 +556,33 @@ describe('CloudFunctions serve routing', () => {
     expect((await sendRequest(port, '/cached')).cacheControl).toBe('max-age=60');
   });
 
-  it('sends the number given to res.send as the body with a 200 status, as deployed functions do', async () => {
+  it('sends a number given to res.send as JSON with the current status, as deployed functions do', async () => {
     writeFunctionFile('count.js', 'export default function count(request, response) { response.send(42); }');
     writeFunctionFile('zero.js', 'export default function zero(request, response) { response.send(0); }');
     writeFunctionFile('teapot.js', 'export default function teapot(request, response) { response.status(201).send(418); }');
+    writeFunctionFile('nan.js', 'export default function nan(request, response) { response.send(Number.NaN); }');
+    writeFunctionFile(
+      'typed.js',
+      'export default function typed(request, response) { response.setHeader("content-type", "text/plain"); response.send(7); }',
+    );
     const port = await freePort();
 
     await new CloudFunctions(workspace).serve(port);
     const count = await sendRequest(port, '/count');
     const zero = await sendRequest(port, '/zero');
     const teapot = await sendRequest(port, '/teapot');
+    const nan = await sendRequest(port, '/nan');
+    const typed = await sendRequest(port, '/typed');
 
-    expect(count.status).toBe(200);
-    expect(count.body).toBe('42');
-    expect(zero.status).toBe(200);
-    expect(zero.body).toBe('0');
-    expect(teapot.status).toBe(201);
-    expect(teapot.body).toBe('418');
+    expect(count).toMatchObject({ status: 200, body: '42', contentType: 'application/json; charset=utf-8' });
+    expect(zero).toMatchObject({ status: 200, body: '0', contentType: 'application/json; charset=utf-8' });
+    expect(teapot).toMatchObject({ status: 201, body: '418', contentType: 'application/json; charset=utf-8' });
+    expect(nan).toMatchObject({ status: 200, body: 'null', contentType: 'application/json; charset=utf-8' });
+    expect(typed).toMatchObject({ status: 200, body: '7', contentType: 'text/plain; charset=utf-8' });
     expect(loggedErrors).toEqual([]);
   });
 
-  it('keeps the status of the two-argument res.send forms, as Express does', async () => {
+  it('ignores a second argument to res.send, as deployed functions do', async () => {
     writeFunctionFile('missing.js', 'export default function missing(request, response) { response.send(404, "Not here"); }');
     writeFunctionFile('gone.js', 'export default function gone(request, response) { response.send("gone", 410); }');
     const port = await freePort();
@@ -585,10 +591,8 @@ describe('CloudFunctions serve routing', () => {
     const missing = await sendRequest(port, '/missing');
     const gone = await sendRequest(port, '/gone');
 
-    expect(missing.status).toBe(404);
-    expect(missing.body).toBe('Not here');
-    expect(gone.status).toBe(410);
-    expect(gone.body).toBe('gone');
+    expect(missing).toMatchObject({ status: 200, body: '404', contentType: 'application/json; charset=utf-8' });
+    expect(gone).toMatchObject({ status: 200, body: 'gone', contentType: 'text/html; charset=utf-8' });
     expect(loggedErrors).toEqual([]);
   });
 
