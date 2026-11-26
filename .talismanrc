@@ -1,4 +1,10 @@
 fileignoreconfig:
+- filename: src/uploads/upload.archive.test.ts
+  checksum: acb351da519f0882e49c776bc80309d238ab2c8a7c78b67e7c8e60f050466f13
+- filename: .husky/pre-commit
+  checksum: 3218c6bfcee49d16217ea6d6348845cf242c9a69f90e3404570e17c9b0bd6940
+- filename: .husky/pre-push
+  checksum: 99ff9e76815cab7d7789118492e57d225f3490d11aea30b199464b5a6e0fb073
 - filename: src/logs/logs.inputs.test.ts
   checksum: 0cff0288003a5ef8aeefe7175f3b46232f97215925b62498ef610225cbee9fa4
 - filename: test/integration/logs-get.test.ts
@@ -487,7 +493,7 @@ fileignoreconfig:
 - filename: src/commands/launch/secrets/list.test.ts
   checksum: 109d1165d7ce16943b50955f60fd8a753a870115fdf5501fb2a5e4a1cf436eaa
 - filename: package.json
-  checksum: 0b0b5e1591470d46665b0f06f7cc422e87a438064a9aa3967b52778e3a994268
+  checksum: e063972c712cf5d0a50d090e09218362e303273817b4544fa884912b0e392d93
 - filename: test/integration/secrets-set.test.ts
   checksum: 2527d5d35198cc08e1859ab79941338392b6d4fcbc87506adef6d7b096089963
 - filename: src/secrets/secret.rules.test.ts

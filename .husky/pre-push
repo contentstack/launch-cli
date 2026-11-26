@@ -1,1 +1,11 @@
-sh .husky/secrets-scan.sh pre-push "$@" && npm run test
+PUSH_REFS=$(cat)
+
+if [ -z "${CI:-}" ]; then
+  if ! command -v ggshield >/dev/null 2>&1; then
+    echo "ggshield is not installed - secret scanning is skipped. Setup: https://contentstack.atlassian.net/wiki/x/FIDVEwE" >&2
+  else
+    printf '%s\n' "$PUSH_REFS" | ggshield secret scan pre-push "$@" || exit 1
+  fi
+fi
+
+printf '%s\n' "$PUSH_REFS" | sh .husky/secrets-scan.sh pre-push "$@" && npm run test
