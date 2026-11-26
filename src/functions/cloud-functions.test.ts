@@ -603,16 +603,22 @@ describe('CloudFunctions serve routing', () => {
       'created.js',
       'export default function created(request, response) { response.status(201).json({ id: "a1" }); }',
     );
+    writeFunctionFile(
+      'plain.js',
+      'export default function plain(request, response) { response.type("text/plain").json({ a: 1 }); }',
+    );
     const port = await freePort();
 
     await new CloudFunctions(workspace).serve(port);
     const missing = await sendRequest(port, '/missing');
     const failed = await sendRequest(port, '/failed');
     const created = await sendRequest(port, '/created');
+    const plain = await sendRequest(port, '/plain');
 
     expect(missing).toMatchObject({ status: 200, body: '404', contentType: 'application/json; charset=utf-8' });
     expect(failed).toMatchObject({ status: 200, body: '{"ok":false}', contentType: 'application/json; charset=utf-8' });
     expect(created).toMatchObject({ status: 201, body: '{"id":"a1"}', contentType: 'application/json; charset=utf-8' });
+    expect(plain).toMatchObject({ status: 200, body: '{"a":1}', contentType: 'text/plain; charset=utf-8' });
     expect(loggedErrors).toEqual([]);
   });
 
