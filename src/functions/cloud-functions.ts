@@ -175,6 +175,8 @@ function redirectLikeDeployedFunctions(_request: Request, response: Response, ne
 
 function sendLikeDeployedFunctions(_request: Request, response: Response, next: NextFunction): void {
   const send = response.send.bind(response);
+  const json = response.json.bind(response);
+  response.json = ((body?: unknown): Response => json(body)) as Response['json'];
   response.send = ((body?: unknown): Response =>
     typeof body === 'number' ? response.json(body) : send(body)) as Response['send'];
   next();

@@ -540,10 +540,13 @@ The approved differences from V1 are these, and only these:
   `res.redirect(url)` answers a bare 307 with the location as given (CL-8970). `res.send`
   takes one argument, as on AWS and Vercel (CL-8970, chosen by the ticket owner): a number
   is sent as JSON with the current status (`res.send(42)` → `42`,
-  `application/json; charset=utf-8`; `NaN` → `null`), and a second argument is ignored, so Express's `res.send(status, body)` and `res.send(body, status)` forms
-  do not set the status. Azure and GCP (V1, Express 4) still answer `res.redirect(url)` with a
-  302 and a body, treat `res.send(404)` as a 404 status and an invalid one such as
-  `res.send(42)` as a 500, and honour the two-argument forms.
+  `application/json; charset=utf-8`; `NaN` → `null`), and a second argument is ignored, so
+  Express's `res.send(status, body)` and `res.send(body, status)` forms do not set the status.
+  `res.json` takes one argument too and keeps the current status, so `res.json(404, body)` and
+  `res.json(body, 500)` answer 200 (CL-8970). Azure and GCP (V1, Express 4) still answer
+  `res.redirect(url)` with a 302 and a body, treat `res.send(404)` as a 404 status and an
+  invalid one such as `res.send(42)` as a 500, and honour the two-argument forms of `res.send`
+  and `res.json`.
 - **A function that reaches a file outside `functions/` is warned about, not refused**, naming
   the function file that crosses the boundary.
 - **Errors name the user's file.** A function that fails to bundle or load stops serve with

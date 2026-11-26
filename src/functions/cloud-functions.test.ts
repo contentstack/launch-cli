@@ -596,6 +596,26 @@ describe('CloudFunctions serve routing', () => {
     expect(loggedErrors).toEqual([]);
   });
 
+  it('ignores a second argument to res.json and keeps the current status, as deployed functions do', async () => {
+    writeFunctionFile('missing.js', 'export default function missing(request, response) { response.json(404, { error: "missing" }); }');
+    writeFunctionFile('failed.js', 'export default function failed(request, response) { response.json({ ok: false }, 500); }');
+    writeFunctionFile(
+      'created.js',
+      'export default function created(request, response) { response.status(201).json({ id: "a1" }); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const missing = await sendRequest(port, '/missing');
+    const failed = await sendRequest(port, '/failed');
+    const created = await sendRequest(port, '/created');
+
+    expect(missing).toMatchObject({ status: 200, body: '404', contentType: 'application/json; charset=utf-8' });
+    expect(failed).toMatchObject({ status: 200, body: '{"ok":false}', contentType: 'application/json; charset=utf-8' });
+    expect(created).toMatchObject({ status: 201, body: '{"id":"a1"}', contentType: 'application/json; charset=utf-8' });
+    expect(loggedErrors).toEqual([]);
+  });
+
   it('answers res.redirect(url) with a bare 307 and the location exactly as given, as deployed functions do', async () => {
     writeFunctionFile('go.js', 'export default function go(request, response) { response.redirect("/target?from=a b"); }');
     const port = await freePort();
