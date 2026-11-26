@@ -173,6 +173,13 @@ function redirectLikeDeployedFunctions(_request: Request, response: Response, ne
   next();
 }
 
+function sendLikeDeployedFunctions(_request: Request, response: Response, next: NextFunction): void {
+  const send = response.send.bind(response);
+  response.send = ((body?: unknown): Response =>
+    typeof body === 'number' ? response.json(body) : send(body)) as Response['send'];
+  next();
+}
+
 export function answerRequestError(
   error: Error & { status?: number; type?: string },
   _request: Request,
@@ -192,6 +199,7 @@ function applyRequestMiddleware(app: Express): void {
   app.use(defaultToNoStore);
   app.use(attachCookies);
   app.use(redirectLikeDeployedFunctions);
+  app.use(sendLikeDeployedFunctions);
   app.use(express.json({ limit: DEPLOYED_PAYLOAD_LIMIT }));
   app.use(express.urlencoded({ extended: true, limit: DEPLOYED_PAYLOAD_LIMIT }));
   app.use(express.text({ limit: DEPLOYED_PAYLOAD_LIMIT }));
