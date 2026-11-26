@@ -22,6 +22,8 @@ function namesIn(buffer: Buffer): string[] {
     .sort();
 }
 
+const itUnlessRoot = process.getuid?.() === 0 ? it.skip : it;
+
 describe('project archive', () => {
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'launch-archive-'));
@@ -200,7 +202,7 @@ describe('project archive', () => {
     );
   });
 
-  it('refuses with a usage error naming a file it could not read', () => {
+  itUnlessRoot('refuses with a usage error naming a file it could not read', () => {
     file('index.html');
     file('secret.txt');
     chmodSync(join(root, 'secret.txt'), 0o000);
@@ -222,7 +224,7 @@ describe('project archive', () => {
     expect((failure as UsageError).message).toContain('cannot be read');
   });
 
-  it('refuses with a usage error naming a directory it could not list', () => {
+  itUnlessRoot('refuses with a usage error naming a directory it could not list', () => {
     file('index.html');
     mkdirSync(join(root, 'locked'));
     file('locked/a.txt');

@@ -87,16 +87,17 @@ function buildClient(http: ReturnType<typeof fakeHttpClient>, overrides = {}) {
   });
 }
 
+const PROXY_ENV_KEYS = ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy'];
+
 function withoutProxy(): () => void {
   const configSpy = jest.spyOn(configHandler, 'get').mockImplementation(() => undefined);
-  const savedHttps = process.env.HTTPS_PROXY;
-  const savedHttp = process.env.HTTP_PROXY;
-  delete process.env.HTTPS_PROXY;
-  delete process.env.HTTP_PROXY;
+  const saved = PROXY_ENV_KEYS.map((key) => [key, process.env[key]] as const);
+  PROXY_ENV_KEYS.forEach((key) => delete process.env[key]);
 
   return () => {
-    if (savedHttps !== undefined) process.env.HTTPS_PROXY = savedHttps;
-    if (savedHttp !== undefined) process.env.HTTP_PROXY = savedHttp;
+    saved.forEach(([key, value]) => {
+      if (value !== undefined) process.env[key] = value;
+    });
     configSpy.mockRestore();
   };
 }
