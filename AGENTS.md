@@ -538,9 +538,9 @@ The approved differences from V1 are these, and only these:
   vendored V1 server, which leaves text and octet-stream bodies unparsed; locally a handler
   that reads the raw request stream for those two types gets an empty stream.
   `res.redirect(url)` answers a bare 307 with the location as given (CL-8970). `res.send`
-  takes one argument, as on AWS and Vercel (CL-8970, chosen by the ticket owner): a number is sent as JSON with the current status
-  (`res.send(42)` → `42`, `application/json; charset=utf-8`; `NaN` → `null`), and a second
-  argument is ignored, so Express's `res.send(status, body)` and `res.send(body, status)` forms
+  takes one argument, as on AWS and Vercel (CL-8970, chosen by the ticket owner): a number
+  is sent as JSON with the current status (`res.send(42)` → `42`,
+  `application/json; charset=utf-8`; `NaN` → `null`), and a second argument is ignored, so Express's `res.send(status, body)` and `res.send(body, status)` forms
   do not set the status. Azure and GCP (V1, Express 4) still answer `res.redirect(url)` with a
   302 and a body, treat `res.send(404)` as a 404 status and an invalid one such as
   `res.send(42)` as a 500, and honour the two-argument forms.
