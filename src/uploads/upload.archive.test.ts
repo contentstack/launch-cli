@@ -1,4 +1,5 @@
 import AdmZip from 'adm-zip';
+import fs from 'node:fs';
 import { chmodSync, mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -22,12 +23,36 @@ function namesIn(buffer: Buffer): string[] {
     .sort();
 }
 
+function permissionDenied(path: string): NodeJS.ErrnoException {
+  return Object.assign(new Error(`EACCES: permission denied, '${path}'`), { code: 'EACCES', errno: -13, path });
+}
+
+function denyAccessTo(method: 'readFileSync' | 'readdirSync', denied: string): jest.SpyInstance {
+  const real = fs[method] as (...args: unknown[]) => unknown;
+  return jest.spyOn(fs, method).mockImplementation(((path: unknown, ...rest: unknown[]) => {
+    if (path === denied) {
+      throw permissionDenied(denied);
+    }
+    return real(path, ...rest);
+  }) as never);
+}
+
+function thrownBy(run: () => unknown): unknown {
+  try {
+    run();
+    return undefined;
+  } catch (error) {
+    return error;
+  }
+}
+
 describe('project archive', () => {
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'launch-archive-'));
   });
 
   afterEach(() => {
+    jest.restoreAllMocks();
     rmSync(root, { recursive: true, force: true });
   });
 
@@ -203,19 +228,12 @@ describe('project archive', () => {
   it('refuses with a usage error naming a file it could not read', () => {
     file('index.html');
     file('secret.txt');
-    chmodSync(join(root, 'secret.txt'), 0o000);
+    const secret = join(root, 'secret.txt');
+    const readFile = denyAccessTo('readFileSync', secret);
 
-    const failure = (() => {
-      try {
-        archiveDirectory(root);
-        return undefined;
-      } catch (error) {
-        return error;
-      }
-    })();
+    const failure = thrownBy(() => archiveDirectory(root));
 
-    chmodSync(join(root, 'secret.txt'), 0o644);
-
+    expect(readFile).toHaveBeenCalledWith(secret);
     expect(failure).toBeInstanceOf(UsageError);
     expect((failure as UsageError).exitCode).toBe(2);
     expect((failure as UsageError).message).toContain('secret.txt');
@@ -224,22 +242,15 @@ describe('project archive', () => {
 
   it('refuses with a usage error naming a directory it could not list', () => {
     file('index.html');
-    mkdirSync(join(root, 'locked'));
     file('locked/a.txt');
-    chmodSync(join(root, 'locked'), 0o000);
+    const locked = join(root, 'locked');
+    const readDirectory = denyAccessTo('readdirSync', locked);
 
-    const failure = (() => {
-      try {
-        archiveDirectory(root);
-        return undefined;
-      } catch (error) {
-        return error;
-      }
-    })();
+    const failure = thrownBy(() => archiveDirectory(root));
 
-    chmodSync(join(root, 'locked'), 0o755);
-
+    expect(readDirectory).toHaveBeenCalledWith(locked);
     expect(failure).toBeInstanceOf(UsageError);
+    expect((failure as UsageError).exitCode).toBe(2);
     expect((failure as UsageError).message).toContain('locked');
     expect((failure as UsageError).message).toContain('cannot be read');
   });

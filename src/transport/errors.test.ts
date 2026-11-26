@@ -271,7 +271,7 @@ describe('LaunchApiError exit code', () => {
 });
 
 describe('diagnoseTransportError', () => {
-  const PROXY_ENV_KEYS = ['HTTPS_PROXY', 'HTTP_PROXY'];
+  const PROXY_ENV_KEYS = ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy'];
   let saved: Record<string, string | undefined>;
 
   beforeEach(() => {

@@ -14,7 +14,7 @@ fileignoreconfig:
 - filename: src/transport/rest-client.ts
   checksum: 3e44b756be0647422309cb14137bc18f5707cd42de6dd638abd2e0b625fda894
 - filename: src/transport/rest-client.test.ts
-  checksum: 8f08eb868bb8d608a0d31800c103f7b257f8f414d0fdc6b06ef4ab62acfffd85
+  checksum: 17bc7bde3433ca57a787917be15ff15ef36ab48f0a20b41a1f668f6ac0796a7b
 - filename: src/transport/cma-client.ts
   checksum: 87b8399a9b84ea60fe322802c2e5270772858ba85ac33c436941fe7cf40afc38
 - filename: src/transport/auth-strategy.test.ts
@@ -297,7 +297,7 @@ fileignoreconfig:
 - filename: src/functions/function.errors.test.ts
   checksum: ac0a55e5bee974fefa9fb95541adba63e9a2c2c6e6c47b87c8ca1022542e75f0
 - filename: src/transport/errors.test.ts
-  checksum: 72bd1e9af33dbb9dd4e86803534ebadbda37af5f0aeeefb4f99734cf027c7f39
+  checksum: 75f4d651c4dc1889309e3016fd2b1d1431bd4e7e92e186635c61cf5e1344c310
 - filename: src/transport/auth-strategy.ts
   checksum: 6fe87def1b508cb67203d4445d9bd889570e512ed4194dfc4fdd3182bc8b87b2
 - filename: src/functions/function.logger.test.ts
