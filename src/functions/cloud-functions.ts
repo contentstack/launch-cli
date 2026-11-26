@@ -175,8 +175,10 @@ function redirectLikeDeployedFunctions(_request: Request, response: Response, ne
 
 function sendNumbersAsBody(_request: Request, response: Response, next: NextFunction): void {
   const send = response.send.bind(response);
-  response.send = ((body?: unknown): Response =>
-    send(typeof body === 'number' ? String(body) : body)) as Response['send'];
+  response.send = ((...args: unknown[]): Response => {
+    const [body] = args;
+    return args.length === 1 && typeof body === 'number' ? send(String(body)) : send(...(args as [unknown]));
+  }) as Response['send'];
   next();
 }
 

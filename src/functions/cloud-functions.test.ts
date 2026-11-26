@@ -576,6 +576,22 @@ describe('CloudFunctions serve routing', () => {
     expect(loggedErrors).toEqual([]);
   });
 
+  it('keeps the status of the two-argument res.send forms, as Express does', async () => {
+    writeFunctionFile('missing.js', 'export default function missing(request, response) { response.send(404, "Not here"); }');
+    writeFunctionFile('gone.js', 'export default function gone(request, response) { response.send("gone", 410); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const missing = await sendRequest(port, '/missing');
+    const gone = await sendRequest(port, '/gone');
+
+    expect(missing.status).toBe(404);
+    expect(missing.body).toBe('Not here');
+    expect(gone.status).toBe(410);
+    expect(gone.body).toBe('gone');
+    expect(loggedErrors).toEqual([]);
+  });
+
   it('answers res.redirect(url) with a bare 307 and the location exactly as given, as deployed functions do', async () => {
     writeFunctionFile('go.js', 'export default function go(request, response) { response.redirect("/target?from=a b"); }');
     const port = await freePort();

@@ -537,6 +537,10 @@ The approved differences from V1 are these, and only these:
   The project `.env` is loaded before the functions are bundled. Azure and GCP still run the
   vendored V1 server, which leaves text and octet-stream bodies unparsed; locally a handler
   that reads the raw request stream for those two types gets an empty stream.
+  `res.redirect(url)` answers a bare 307 with the location as given, and `res.send(number)`
+  sends the number as the body with the current status (CL-8970); the two-argument
+  `res.send(status, body)` and `res.send(body, status)` forms keep Express's status. Azure and
+  GCP (V1) still answer `res.redirect(url)` with a 302 and a body, and `res.send(number)` with 500.
 - **A function that reaches a file outside `functions/` is warned about, not refused**, naming
   the function file that crosses the boundary.
 - **Errors name the user's file.** A function that fails to bundle or load stops serve with
