@@ -8,7 +8,7 @@ import type {
 } from 'express';
 import express from 'express';
 import type { Express } from 'express-serve-static-core';
-import { ReadStream, existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'fs';
 import type { Server } from 'http';
 import { isBuiltin } from 'module';
 import type { AddressInfo } from 'net';
@@ -221,10 +221,30 @@ function warnLateChange(answering: Answering): void {
   console.log(styled(warning, 'yellow', process.stdout.isTTY === true));
 }
 
+function remainingPipes(source: Readable): number {
+  return (source as unknown as { _readableState: { pipes: unknown[] } })._readableState.pipes.length;
+}
+
 function release(source: Readable, response: Response): void {
   source.unpipe(response);
-  if (source instanceof ReadStream) {
+  if (remainingPipes(source) === 0) {
     source.destroy();
+  }
+}
+
+function isNoOpEnd(method: string, args: unknown[]): boolean {
+  const chunk = args[0];
+  return method === 'end' && (typeof chunk === 'function' || !chunk);
+}
+
+function answerServerError(response: Response): void {
+  response.statusCode = 500;
+  response.statusMessage = '';
+  try {
+    response.end();
+  } catch (error) {
+    console.error(error);
+    response.destroy();
   }
 }
 
@@ -236,7 +256,7 @@ function guardLateChanges(response: Response, answering: Answering): void {
     }
     const change = (methods[method] as (...args: unknown[]) => unknown).bind(response);
     methods[method] = (...args: unknown[]): unknown => {
-      if (!response.writableEnded) {
+      if (!response.writableEnded || isNoOpEnd(method, args)) {
         return change(...args);
       }
       warnLateChange(answering);
@@ -289,18 +309,13 @@ function endLikeDeployedFunctions(response: Response, answering: Answering): voi
     response.end();
   } catch (error) {
     console.error(error);
-    response.statusCode = 500;
-    response.statusMessage = '';
-    response.end();
+    answerServerError(response);
   }
-  answering.pipedSources.forEach((source) => {
-    release(source, response);
-  });
 }
 
-function trackAnswering(response: Response, requestedUrl: string): Answering {
+function trackAnswering(request: Request, response: Response): Answering {
   const answering: Answering = {
-    requestedUrl,
+    requestedUrl: request.originalUrl,
     handlerReturned: false,
     filesInFlight: 0,
     warned: false,
@@ -312,6 +327,11 @@ function trackAnswering(response: Response, requestedUrl: string): Answering {
       return;
     }
     answering.pipedSources.add(source);
+  });
+  response.once('close', () => {
+    answering.pipedSources.forEach((source) => {
+      release(source, response);
+    });
   });
   trackFileAnswers(response, answering);
   guardLateChanges(response, answering);
@@ -441,13 +461,13 @@ export class CloudFunctions {
   private applyAppRouter(cloudFunctionResources: CloudFunctionResource[], app: Express): void {
     cloudFunctionResources.forEach((cloudFunctionResource) => {
       app.all(cloudFunctionResource.apiResourceURI, async (request: Request, response: Response) => {
-        const answering = trackAnswering(response, request.originalUrl);
+        const answering = trackAnswering(request, response);
         try {
           await cloudFunctionResource.handler(request, response);
         } catch (error) {
           console.error(error);
           if (!response.writableEnded) {
-            response.status(500).send();
+            answerServerError(response);
           }
         }
         answering.handlerReturned = true;

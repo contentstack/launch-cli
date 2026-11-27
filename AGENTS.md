@@ -552,13 +552,16 @@ The approved differences from V1 are these, and only these:
   response whose headers were already sent, or that `res.sendFile`/`res.download` is still
   sending, is left for the handler to end; a file send that throws, or whose callback leaves the
   response open, is ended the same way once it settles. Once a response has ended, for whatever
-  reason, any later change to it (`end`, `write`, header calls, a file send, and so `send`, `json`
-  and `redirect`) is ignored with one `warn:` line naming the requested URL instead of crashing
-  serve; a callback passed to it gets `ERR_STREAM_WRITE_AFTER_END` (`write`) or
-  `ERR_STREAM_ALREADY_FINISHED`, as Node does. A stream piped into a response serve ends this way,
-  or into one that has already ended, is unpiped, and a file stream among them is destroyed, so
-  serve does not keep its file descriptor open; a stream the function owns otherwise is left
-  alone. An invalid status on a response serve ends for the handler is logged and answered 500.
+  reason, any later change to it (`end` with a body, `write`, header calls, a file send, and so
+  `send`, `json` and `redirect`) is ignored with one `warn:` line naming the requested URL instead
+  of crashing serve; a callback passed to it gets `ERR_STREAM_WRITE_AFTER_END` (`write`) or
+  `ERR_STREAM_ALREADY_FINISHED`, as Node does. An `end()` with no body is Node's own no-op and is
+  not warned about (`res.json(data).end()`). Once a response closes, or when a stream is piped
+  into one that has already ended, every stream piped into it is unpiped, and destroyed unless it
+  still feeds another destination, so serve keeps no file descriptor, upstream socket or child
+  process open; a shared stream piped elsewhere too keeps flowing there. If ending the response
+  for the handler fails (an invalid status, a content-length mismatch), or a handler throws, serve
+  logs the error and answers a plain 500, dropping the connection if even that cannot be sent.
   So a callback that answers after the handler returned gets an empty response, exactly as on AWS.
   Because serve wraps `res.sendFile`/`download`/`sendfile` to track them, Express's deprecation
   warning for the lowercase `res.sendfile` names serve's file, not the function's. Azure and GCP (V1) still

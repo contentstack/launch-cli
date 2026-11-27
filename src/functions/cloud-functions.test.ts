@@ -131,6 +131,7 @@ afterEach(async () => {
   delete (globalThis as Record<string, unknown>).lateResult;
   delete (globalThis as Record<string, unknown>).piped;
   delete (globalThis as Record<string, unknown>).hub;
+  delete (globalThis as Record<string, unknown>).received;
   delete process.env.LAUNCH_TEST_PAGE;
 });
 
@@ -829,7 +830,7 @@ describe('CloudFunctions serve routing', () => {
     expect((loggedErrors[0] as Error).message).toBe('boom');
   }, 4000);
 
-  it('releases a file stream piped into a response after it was ended, and leaves a stream the function owns open', async () => {
+  it('releases a file stream piped into a response after it was ended, and leaves a stream that still feeds another destination flowing', async () => {
     writeProjectFile('page.html', '<p>page</p>');
     process.env.LAUNCH_TEST_PAGE = join(workspace, 'page.html');
     writeFunctionFile(
@@ -838,7 +839,7 @@ describe('CloudFunctions serve routing', () => {
     );
     writeFunctionFile(
       'hub.js',
-      'import { PassThrough } from "node:stream"; globalThis.hub = globalThis.hub ?? new PassThrough(); export default function hub(request, response) { globalThis.hub.pipe(response); }',
+      'import { PassThrough, Writable } from "node:stream"; globalThis.received = globalThis.received ?? []; globalThis.hub = globalThis.hub ?? new PassThrough(); if (globalThis.hub.listenerCount("data") === 0) { globalThis.hub.pipe(new Writable({ write(chunk, encoding, done) { globalThis.received.push(String(chunk)); done(); } })); } export default function hub(request, response) { setTimeout(() => globalThis.hub.pipe(response), 20); }',
     );
     const port = await freePort();
 
@@ -848,12 +849,118 @@ describe('CloudFunctions serve routing', () => {
     const source = (globalThis as Record<string, unknown>).piped as { destroyed: boolean };
     await eventually(() => source.destroyed);
     const hub = await sendRequest(port, '/hub');
-    const hubStream = (globalThis as Record<string, unknown>).hub as { destroyed: boolean };
+    await new Promise((done) => setTimeout(done, 50));
+    const hubStream = (globalThis as Record<string, unknown>).hub as { destroyed: boolean; write: (chunk: string) => void };
+    hubStream.write('after');
+    await eventually(() => ((globalThis as Record<string, unknown>).received as string[]).includes('after'));
 
     expect(latePipe).toMatchObject({ status: 200, body: '' });
     expect(source.destroyed).toBe(true);
     expect(hub).toMatchObject({ status: 200, body: '' });
     expect(hubStream.destroyed).toBe(false);
+  }, 4000);
+
+  it('destroys a stream piped into a response it ends when nothing else reads it, and spares one that still feeds another destination', async () => {
+    writeFunctionFile(
+      'proxy.js',
+      'import { PassThrough } from "node:stream"; export default function proxy(request, response) { globalThis.piped = new PassThrough(); globalThis.piped.pipe(response); }',
+    );
+    writeFunctionFile('shared.js', 'import { PassThrough, Writable } from "node:stream"; globalThis.received = globalThis.received ?? []; globalThis.hub = globalThis.hub ?? new PassThrough(); if (globalThis.hub.listenerCount("data") === 0) { globalThis.hub.pipe(new Writable({ write(chunk, encoding, done) { globalThis.received.push(String(chunk)); done(); } })); } export default function shared(request, response) { globalThis.hub.pipe(response); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const proxy = await sendRequest(port, '/proxy');
+    const shared = await sendRequest(port, '/shared');
+    const upstream = (globalThis as Record<string, unknown>).piped as { destroyed: boolean };
+    const hubStream = (globalThis as Record<string, unknown>).hub as { destroyed: boolean; write: (chunk: string) => void };
+    hubStream.write('after');
+    await eventually(() => ((globalThis as Record<string, unknown>).received as string[]).includes('after'));
+
+    expect(proxy).toMatchObject({ status: 200, body: '' });
+    expect(upstream.destroyed).toBe(true);
+    expect(shared).toMatchObject({ status: 200, body: '' });
+    expect(hubStream.destroyed).toBe(false);
+  }, 4000);
+
+  it('releases a file stream the handler piped when the handler ended the response itself', async () => {
+    writeProjectFile('page.html', '<p>page</p>');
+    process.env.LAUNCH_TEST_PAGE = join(workspace, 'page.html');
+    writeFunctionFile(
+      'pipeThenEnd.js',
+      'import { createReadStream } from "node:fs"; export default function pipeThenEnd(request, response) { globalThis.piped = createReadStream(process.env.LAUNCH_TEST_PAGE); globalThis.piped.pipe(response); response.end("done"); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const pipeThenEnd = await sendRequest(port, '/pipeThenEnd');
+    const source = (globalThis as Record<string, unknown>).piped as { destroyed: boolean };
+    await eventually(() => source.destroyed);
+
+    expect(pipeThenEnd).toMatchObject({ status: 200, body: 'done' });
+    expect(source.destroyed).toBe(true);
+  }, 4000);
+
+  it('answers with the request body when the handler pipes the request into its response', async () => {
+    writeFunctionFile('echo.js', 'export default function echo(request, response) { request.pipe(response); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const echo = await sendRequest(port, '/echo', { method: 'POST', headers: { 'content-type': 'image/png' }, body: 'pixels' });
+
+    expect(echo).toMatchObject({ status: 200, body: 'pixels' });
+  }, 4000);
+
+  it('passes a no-op end on an ended response through without a late-change warning', async () => {
+    writeFunctionFile(
+      'noopEnd.js',
+      'export default function noopEnd(request, response) { response.status(200).json({ ok: true }).end(); response.end(); response.end(() => { globalThis.lateDone = true; }); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const noopEnd = await sendRequest(port, '/noopEnd');
+    await eventually(() => (globalThis as Record<string, unknown>).lateDone === true);
+
+    expect(noopEnd).toMatchObject({ status: 200, body: '{"ok":true}' });
+    expect(loggedLines.filter((line) => line.startsWith('warn:'))).toEqual([]);
+    expect(loggedErrors).toEqual([]);
+  }, 4000);
+
+  it('answers 500 and keeps serving when a handler that set an invalid status message throws', async () => {
+    writeFunctionFile(
+      'badThrow.js',
+      'export default function badThrow(request, response) { response.statusMessage = "Done \u2713"; throw new Error("boom"); }',
+    );
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const badThrow = await sendRequest(port, '/badThrow');
+    const next = await sendRequest(port, '/next');
+
+    expect(badThrow).toMatchObject({ status: 500, body: '' });
+    expect(next).toMatchObject({ status: 200, body: 'alive' });
+    expect((loggedErrors[0] as Error).message).toBe('boom');
+  }, 4000);
+
+  it('drops the connection and keeps serving when ending the response for the handler fails twice', async () => {
+    writeFunctionFile(
+      'mismatch.js',
+      'export default function mismatch(request, response) { response.strictContentLength = true; response.setHeader("content-length", "5"); }',
+    );
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const mismatch = await sendRequest(port, '/mismatch').catch((error: NodeJS.ErrnoException) => error.code);
+    const next = await sendRequest(port, '/next');
+
+    expect(mismatch).toBe('ECONNRESET');
+    expect(next).toMatchObject({ status: 200, body: 'alive' });
+    expect(loggedErrors.map((error) => (error as NodeJS.ErrnoException).code)).toEqual([
+      'ERR_HTTP_CONTENT_LENGTH_MISMATCH',
+      'ERR_HTTP_CONTENT_LENGTH_MISMATCH',
+    ]);
   }, 4000);
 
   it('serves and ends responses on an Express without res.sendfile, as Express 5 ships', async () => {
