@@ -8,7 +8,7 @@ import type {
 } from 'express';
 import express from 'express';
 import type { Express } from 'express-serve-static-core';
-import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'fs';
+import { ReadStream, existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'fs';
 import type { Server } from 'http';
 import { isBuiltin } from 'module';
 import type { AddressInfo } from 'net';
@@ -206,7 +206,7 @@ interface Answering {
 type ResponseMethods = Record<string, unknown>;
 
 function alreadyFinished(method: string): NodeJS.ErrnoException {
-  const code = method === 'write' ? 'ERR_STREAM_WRITE_AFTER_END' : 'ERR_STREAM_ALREADY_FINISHED';
+  const code = method === 'write' || method === 'end' ? 'ERR_STREAM_WRITE_AFTER_END' : 'ERR_STREAM_ALREADY_FINISHED';
   return Object.assign(new Error('The response was already ended.'), { code });
 }
 
@@ -221,14 +221,21 @@ function warnLateChange(answering: Answering): void {
   console.log(styled(warning, 'yellow', process.stdout.isTTY === true));
 }
 
-function remainingPipes(source: Readable): number {
-  return (source as unknown as { _readableState: { pipes: unknown[] } })._readableState.pipes.length;
+function hasNoReader(file: ReadStream): boolean {
+  return file.listenerCount('data') === 0 && file.listenerCount('readable') === 0;
 }
 
 function release(source: Readable, response: Response): void {
+  if (typeof source.unpipe !== 'function') {
+    return;
+  }
   source.unpipe(response);
-  if (remainingPipes(source) === 0) {
-    source.destroy();
+  if (source instanceof ReadStream) {
+    setImmediate(() => {
+      if (!source.destroyed && hasNoReader(source)) {
+        source.destroy();
+      }
+    });
   }
 }
 
@@ -238,6 +245,9 @@ function isNoOpEnd(method: string, args: unknown[]): boolean {
 }
 
 function answerServerError(response: Response): void {
+  if (!response.headersSent) {
+    response.getHeaderNames().forEach((name) => response.removeHeader(name));
+  }
   response.statusCode = 500;
   response.statusMessage = '';
   try {
@@ -322,7 +332,7 @@ function trackAnswering(request: Request, response: Response): Answering {
     pipedSources: new Set(),
   };
   response.on('pipe', (source: Readable) => {
-    if (response.writableEnded) {
+    if (response.writableEnded || response.destroyed) {
       release(source, response);
       return;
     }
