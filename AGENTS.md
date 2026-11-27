@@ -558,16 +558,17 @@ The approved differences from V1 are these, and only these:
   with a body) or `ERR_STREAM_ALREADY_FINISHED`, as Node does. An `end()` with no body is Node's own
   no-op and is not warned about (`res.json(data).end()`). Once a response closes, or when a stream
   is piped into one that has already ended or whose client has gone, each stream piped into it is
-  unpiped (if it can be) once `pipe()` has returned. On the next turn a request or upstream body
-  (`http.IncomingMessage`) is drained, so its connection is freed; a file stream (`fs.ReadStream`)
-  that nothing else reads is destroyed, so it does not keep its file descriptor open; and a stream
-  that still has a `'data'` reader is resumed so that reader gets the rest. Any other stream is left
-  paused, as Node leaves it after an unpipe, for the function to resume or close: a file stream
-  behind a transform (for example gzip) or a child's stdout then stays open until the function
-  closes it. If ending the response for the
-  handler fails (an invalid status, a content-length mismatch), or a handler throws before its
-  headers were sent, serve logs the error and answers a `cache-control: no-store` 500 without the
-  headers the handler had set, dropping the connection if even that cannot be sent.
+  unpiped (if it can be). On the next turn the exchange's own request body is drained, as Node
+  would dump it, so the connection can serve its next request; a file stream (`fs.ReadStream`) that
+  nothing else reads is destroyed, so it does not keep its file descriptor open; and a stream that
+  still has a `'data'` reader is resumed so that reader gets the rest. Any other stream is left
+  paused, as Node leaves it after an unpipe (a stream piped into an already-ended response is
+  paused again after `pipe()` resumes it), for the function to resume or close: a file stream or
+  the request behind a transform (for example gzip), a child's stdout or an upstream body then
+  stays open, or stalls that keep-alive connection, until the function closes it. If ending the
+  response for the handler fails (an invalid status, a content-length mismatch), or a handler throws
+  before its headers were sent, serve logs the error and answers a `cache-control: no-store` 500
+  without the headers the handler had set, dropping the connection if even that cannot be sent.
   So a callback that answers after the handler returned gets an empty response, exactly as on AWS.
   Because serve wraps `res.sendFile`/`download`/`sendfile` to track them, Express's deprecation
   warning for the lowercase `res.sendfile` names serve's file, not the function's. Azure and GCP (V1) still

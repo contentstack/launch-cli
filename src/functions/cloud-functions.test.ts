@@ -134,6 +134,7 @@ afterEach(async () => {
   delete (globalThis as Record<string, unknown>).received;
   delete (globalThis as Record<string, unknown>).iterated;
   delete process.env.LAUNCH_TEST_PAGE;
+  delete process.env.LAUNCH_TEST_UPSTREAM;
 });
 
 function toDataURL(source: string): string {
@@ -901,10 +902,16 @@ describe('CloudFunctions serve routing', () => {
       'foreign.js',
       'export default function foreign(request, response) { response.emit("pipe", { unpipe() {} }); response.emit("pipe", { unpipe() {}, listenerCount(event) { return event === "data" ? 1 : 0; } }); response.end("foreign"); }',
     );
+    writeFunctionFile(
+      'lateForeign.js',
+      'export default function lateForeign(request, response) { response.end("late"); setTimeout(() => { response.emit("pipe", { unpipe() {} }); response.emit("pipe", { unpipe() {}, once(event, listener) { listener(); }, removeListener() {} }); response.emit("pipe", { unpipe() {}, once(event, listener) { listener(); }, removeListener() {}, listenerCount() { return 0; } }); response.emit("pipe", { unpipe() {}, once(event, listener) { listener(); }, removeListener() {}, pause() {} }); response.emit("pipe", { unpipe() {}, pause() {} }); globalThis.lateDone = true; }, 20); }',
+    );
     writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
     const port = await freePort();
 
     await new CloudFunctions(workspace).serve(port);
+    const lateForeign = await sendRequest(port, '/lateForeign');
+    await eventually(() => (globalThis as Record<string, unknown>).lateDone === true);
     const legacy = await sendRequest(port, '/legacy');
     const modernish = await sendRequest(port, '/modernish');
     await eventually(() => (globalThis as Record<string, unknown>).lateResult === 'resumed');
@@ -916,6 +923,7 @@ describe('CloudFunctions serve routing', () => {
     expect(modernish).toMatchObject({ status: 200, body: 'v3' });
     expect((globalThis as Record<string, unknown>).lateResult).toBe('resumed');
     expect(foreign).toMatchObject({ status: 200, body: 'foreign' });
+    expect(lateForeign).toMatchObject({ status: 200, body: 'late' });
     expect(next).toMatchObject({ status: 200, body: 'alive' });
     expect(loggedErrors).toEqual([]);
   }, 4000);
@@ -987,6 +995,71 @@ describe('CloudFunctions serve routing', () => {
     expect(lateQueue).toMatchObject({ status: 200, body: 'done' });
     expect(queue.readableFlowing).toBe(false);
     expect(queue.readableLength).toBe(4);
+  }, 4000);
+
+  it('releases a stream piped into an already-ended response at once, so a shared hub writes nothing to it, and re-pauses an endless one', async () => {
+    writeFunctionFile(
+      'lateHub.js',
+      'import { PassThrough, Writable } from "node:stream"; export default function lateHub(request, response) { response.end("done"); setTimeout(() => { globalThis.received = []; globalThis.hub = new PassThrough(); globalThis.hub.pipe(new Writable({ write(chunk, encoding, done) { globalThis.received.push(String(chunk)); done(); } })); globalThis.hub.pipe(response); globalThis.hub.write("x"); globalThis.lateDone = true; }, 20); }',
+    );
+    writeFunctionFile(
+      'lateEndless.js',
+      'import { Readable } from "node:stream"; export default function lateEndless(request, response) { response.end("done"); setTimeout(() => { globalThis.lateResult = 0; globalThis.piped = new Readable({ read() { globalThis.lateResult += 1; this.push(globalThis.lateResult > 10000 ? null : Buffer.alloc(1024)); } }); globalThis.piped.pipe(response); }, 20); }',
+    );
+    writeFunctionFile(
+      'lateFlowing.js',
+      'import { PassThrough, Writable } from "node:stream"; export default function lateFlowing(request, response) { response.end("done"); const sink = new Writable({ write(chunk, encoding, done) { done(); } }); globalThis.openStream = new PassThrough(); globalThis.openStream.pipe(sink); setTimeout(() => { globalThis.openStream.pipe(response); setTimeout(() => { globalThis.openStream.unpipe(sink); globalThis.openStream.resume(); globalThis.lateDone = true; }, 30); }, 20); }',
+    );
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    await sendRequest(port, '/lateFlowing');
+    await eventually(() => (globalThis as Record<string, unknown>).lateDone === true);
+    await new Promise((done) => setTimeout(done, 10));
+    const ownResume = ((globalThis as Record<string, unknown>).openStream as { readableFlowing: boolean | null }).readableFlowing;
+    await sendRequest(port, '/lateHub');
+    await eventually(() => ((globalThis as Record<string, unknown>).received as string[] | undefined)?.includes('x') === true);
+    await new Promise((done) => setTimeout(done, 20));
+    ((globalThis as Record<string, unknown>).hub as { write: (chunk: string) => void }).write('y');
+    await eventually(() => ((globalThis as Record<string, unknown>).received as string[]).includes('y'));
+    await sendRequest(port, '/lateEndless');
+    await new Promise((done) => setTimeout(done, 80));
+    const next = await sendRequest(port, '/next');
+
+    expect(ownResume).toBe(true);
+    expect((globalThis as Record<string, unknown>).received).toEqual(['x', 'y']);
+    expect(loggedLines.filter((line) => line.startsWith('warn: /lateHub'))).toEqual([]);
+    expect(next).toMatchObject({ status: 200, body: 'alive' });
+    expect((globalThis as Record<string, unknown>).piped as { readableFlowing: boolean | null }).toMatchObject({ readableFlowing: false });
+    expect((globalThis as Record<string, unknown>).lateResult).toBeLessThan(100);
+  }, 4000);
+
+  it('drains only the request of the exchange, and leaves an upstream body piped into the response paused', async () => {
+    const upstream = createServer((_request, upstreamResponse) => {
+      upstreamResponse.write('a');
+    });
+    await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', () => resolve()));
+    process.env.LAUNCH_TEST_UPSTREAM = `http://127.0.0.1:${(upstream.address() as AddressInfo).port}/`;
+    writeFunctionFile(
+      'relay.js',
+      'import http from "node:http"; export default function relay(request, response) { response.end("done"); http.get(process.env.LAUNCH_TEST_UPSTREAM, (upstreamBody) => { globalThis.piped = upstreamBody; upstreamBody.pipe(response); globalThis.lateDone = true; }); }',
+    );
+    const port = await freePort();
+
+    try {
+      await new CloudFunctions(workspace).serve(port);
+      const relay = await sendRequest(port, '/relay');
+      await eventually(() => (globalThis as Record<string, unknown>).lateDone === true);
+      await new Promise((done) => setTimeout(done, 50));
+
+      expect(relay).toMatchObject({ status: 200, body: 'done' });
+      expect((globalThis as Record<string, unknown>).piped as { readableFlowing: boolean | null }).toMatchObject({ readableFlowing: false });
+    } finally {
+      ((globalThis as Record<string, unknown>).piped as { destroy?: () => void } | undefined)?.destroy?.();
+      upstream.closeAllConnections();
+      await new Promise<void>((resolve) => upstream.close(() => resolve()));
+    }
   }, 4000);
 
   it('drains a request body piped into a response it ends, so the keep-alive connection answers the next request', async () => {

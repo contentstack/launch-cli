@@ -9,7 +9,6 @@ import type {
 import express from 'express';
 import type { Express } from 'express-serve-static-core';
 import { ReadStream, existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'fs';
-import { IncomingMessage } from 'http';
 import type { Server } from 'http';
 import { isBuiltin } from 'module';
 import type { AddressInfo } from 'net';
@@ -197,6 +196,7 @@ const LATE_CHANGE_METHODS = [
 ] as const;
 
 interface Answering {
+  request: Readable;
   requestedUrl: string;
   handlerReturned: boolean;
   filesInFlight: number;
@@ -222,8 +222,8 @@ function warnLateChange(answering: Answering): void {
   console.log(styled(warning, 'yellow', process.stdout.isTTY === true));
 }
 
-function settleReleased(source: Readable): void {
-  if (source instanceof IncomingMessage) {
+function settleReleased(source: Readable, request: Readable): void {
+  if (source === request) {
     source.resume();
     return;
   }
@@ -240,12 +240,23 @@ function settleReleased(source: Readable): void {
   }
 }
 
-function release(source: Readable, response: Response): void {
+function pauseOnResume(source: Readable): void {
+  if (typeof source.once !== 'function' || typeof source.pause !== 'function') {
+    return;
+  }
+  const pause = (): void => {
+    source.pause();
+  };
+  source.once('resume', pause);
+  setImmediate(() => source.removeListener('resume', pause));
+}
+
+function release(source: Readable, response: Response, request: Readable): void {
   if (typeof source.unpipe !== 'function') {
     return;
   }
   source.unpipe(response);
-  setImmediate(() => settleReleased(source));
+  setImmediate(() => settleReleased(source, request));
 }
 
 function isNoOpEnd(method: string, args: unknown[]): boolean {
@@ -335,6 +346,7 @@ function endLikeDeployedFunctions(response: Response, answering: Answering): voi
 
 function trackAnswering(request: Request, response: Response): Answering {
   const answering: Answering = {
+    request,
     requestedUrl: request.originalUrl,
     handlerReturned: false,
     filesInFlight: 0,
@@ -343,14 +355,15 @@ function trackAnswering(request: Request, response: Response): Answering {
   };
   response.on('pipe', (source: Readable) => {
     if (response.writableEnded || response.destroyed) {
-      process.nextTick(() => release(source, response));
+      release(source, response, request);
+      pauseOnResume(source);
       return;
     }
     answering.pipedSources.add(source);
   });
   response.once('close', () => {
     answering.pipedSources.forEach((source) => {
-      release(source, response);
+      release(source, response, request);
     });
   });
   trackFileAnswers(response, answering);

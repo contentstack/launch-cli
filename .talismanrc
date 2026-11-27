@@ -287,7 +287,7 @@ fileignoreconfig:
 - filename: test/integration/projects-list-command.test.ts
   checksum: 038f5cd182e1fd0105e6e10dde7f5068a0c15883222450f72ea3904890a56c0c
 - filename: src/functions/cloud-functions.test.ts
-  checksum: 7a9226b7f7e029734b33a1c4461373415e8be27f22274c7ee7c5bdd65b5e18cc
+  checksum: 126ebc9a778b18a0601e5c11cbf1b6441a5989b558bb276ae640cbc7b33fe712
 - filename: src/functions/function.errors.ts
   checksum: a24194bef73c8db8c28b8ac104955f2f22abdc8c8d0608fa36a39032055bda57
 - filename: src/transport/proxy.test.ts
