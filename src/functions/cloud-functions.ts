@@ -1,3 +1,4 @@
+import type { Readable } from 'node:stream';
 import { parse as parseCookieHeader } from 'cookie';
 import dotenv from 'dotenv';
 import type {
@@ -7,7 +8,7 @@ import type {
 } from 'express';
 import express from 'express';
 import type { Express } from 'express-serve-static-core';
-import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'fs';
+import { ReadStream, existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'fs';
 import type { Server } from 'http';
 import { isBuiltin } from 'module';
 import type { AddressInfo } from 'net';
@@ -182,6 +183,194 @@ function sendLikeDeployedFunctions(_request: Request, response: Response, next: 
   next();
 }
 
+const FILE_ANSWER_METHODS = ['sendFile', 'download', 'sendfile'] as const;
+const LATE_CHANGE_METHODS = [
+  'end',
+  'write',
+  'writeHead',
+  'setHeader',
+  'removeHeader',
+  'appendHeader',
+  'setHeaders',
+  ...FILE_ANSWER_METHODS,
+] as const;
+
+interface Answering {
+  request: Readable;
+  requestedUrl: string;
+  handlerReturned: boolean;
+  filesInFlight: number;
+  warned: boolean;
+  pipedSources: Set<Readable>;
+}
+
+type ResponseMethods = Record<string, unknown>;
+
+function alreadyFinished(method: string): NodeJS.ErrnoException {
+  const code = method === 'write' || method === 'end' ? 'ERR_STREAM_WRITE_AFTER_END' : 'ERR_STREAM_ALREADY_FINISHED';
+  return Object.assign(new Error('The response was already ended.'), { code });
+}
+
+function warnLateChange(answering: Answering): void {
+  if (answering.warned) {
+    return;
+  }
+  answering.warned = true;
+  const warning =
+    `warn: ${answering.requestedUrl} changed its response after it had been ended. ` +
+    'The change was ignored; deployed AWS functions end the response when the handler returns.';
+  console.log(styled(warning, 'yellow', process.stdout.isTTY === true));
+}
+
+function settleReleased(source: Readable, request: Readable): void {
+  if (source === request) {
+    source.resume();
+    return;
+  }
+  if (typeof source.listenerCount !== 'function' || source.listenerCount('readable') > 0) {
+    return;
+  }
+  const read = source.listenerCount('data') > 0;
+  if (source instanceof ReadStream && !read) {
+    source.destroy();
+    return;
+  }
+  if (read && typeof source.resume === 'function') {
+    source.resume();
+  }
+}
+
+function pauseOnResume(source: Readable): void {
+  if (typeof source.once !== 'function' || typeof source.pause !== 'function') {
+    return;
+  }
+  const pause = (): void => {
+    source.pause();
+  };
+  source.once('resume', pause);
+  setImmediate(() => source.removeListener('resume', pause));
+}
+
+function release(source: Readable, response: Response, request: Readable): void {
+  if (typeof source.unpipe !== 'function') {
+    return;
+  }
+  source.unpipe(response);
+  setImmediate(() => settleReleased(source, request));
+}
+
+function isNoOpEnd(method: string, args: unknown[]): boolean {
+  const chunk = args[0];
+  return method === 'end' && (typeof chunk === 'function' || !chunk);
+}
+
+function answerServerError(response: Response): void {
+  if (!response.headersSent) {
+    response.getHeaderNames().forEach((name) => response.removeHeader(name));
+    response.setHeader('cache-control', 'no-store');
+  }
+  response.statusCode = 500;
+  response.statusMessage = '';
+  try {
+    response.end();
+  } catch (error) {
+    console.error(error);
+    response.destroy();
+  }
+}
+
+function guardLateChanges(response: Response, answering: Answering): void {
+  const methods = response as unknown as ResponseMethods;
+  LATE_CHANGE_METHODS.forEach((method) => {
+    if (typeof methods[method] !== 'function') {
+      return;
+    }
+    const change = (methods[method] as (...args: unknown[]) => unknown).bind(response);
+    methods[method] = (...args: unknown[]): unknown => {
+      if (!response.writableEnded || isNoOpEnd(method, args)) {
+        return change(...args);
+      }
+      warnLateChange(answering);
+      const callback = args[args.length - 1];
+      if (typeof callback === 'function') {
+        process.nextTick(callback, alreadyFinished(method));
+      }
+      return method === 'write' ? false : response;
+    };
+  });
+}
+
+function trackFileAnswers(response: Response, answering: Answering): void {
+  const methods = response as unknown as ResponseMethods;
+  FILE_ANSWER_METHODS.forEach((method) => {
+    if (typeof methods[method] !== 'function') {
+      return;
+    }
+    const sendFile = (methods[method] as (...args: unknown[]) => void).bind(response);
+    methods[method] = (...args: unknown[]): void => {
+      const callback = args[args.length - 1];
+      if (typeof callback !== 'function') {
+        sendFile(...args);
+        answering.filesInFlight += 1;
+        return;
+      }
+      sendFile(...args.slice(0, -1), (error: unknown) => {
+        answering.filesInFlight -= 1;
+        try {
+          callback(error);
+        } finally {
+          endLikeDeployedFunctions(response, answering);
+        }
+      });
+      answering.filesInFlight += 1;
+    };
+  });
+}
+
+function endLikeDeployedFunctions(response: Response, answering: Answering): void {
+  if (
+    !answering.handlerReturned ||
+    answering.filesInFlight > 0 ||
+    response.writableEnded ||
+    response.headersSent
+  ) {
+    return;
+  }
+  try {
+    response.end();
+  } catch (error) {
+    console.error(error);
+    answerServerError(response);
+  }
+}
+
+function trackAnswering(request: Request, response: Response): Answering {
+  const answering: Answering = {
+    request,
+    requestedUrl: request.originalUrl,
+    handlerReturned: false,
+    filesInFlight: 0,
+    warned: false,
+    pipedSources: new Set(),
+  };
+  response.on('pipe', (source: Readable) => {
+    if (response.writableEnded || response.destroyed) {
+      release(source, response, request);
+      pauseOnResume(source);
+      return;
+    }
+    answering.pipedSources.add(source);
+  });
+  response.once('close', () => {
+    answering.pipedSources.forEach((source) => {
+      release(source, response, request);
+    });
+  });
+  trackFileAnswers(response, answering);
+  guardLateChanges(response, answering);
+  return answering;
+}
+
 export function answerRequestError(
   error: Error & { status?: number; type?: string },
   _request: Request,
@@ -305,12 +494,17 @@ export class CloudFunctions {
   private applyAppRouter(cloudFunctionResources: CloudFunctionResource[], app: Express): void {
     cloudFunctionResources.forEach((cloudFunctionResource) => {
       app.all(cloudFunctionResource.apiResourceURI, async (request: Request, response: Response) => {
+        const answering = trackAnswering(request, response);
         try {
           await cloudFunctionResource.handler(request, response);
         } catch (error) {
           console.error(error);
-          response.status(500).send();
+          if (!response.writableEnded) {
+            answerServerError(response);
+          }
         }
+        answering.handlerReturned = true;
+        endLikeDeployedFunctions(response, answering);
       });
     });
   }

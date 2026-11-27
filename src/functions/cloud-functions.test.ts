@@ -2,11 +2,13 @@ import { randomUUID } from 'crypto';
 import fs, { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import type { Server } from 'http';
 import { createServer } from 'http';
-import { request as httpRequest } from 'http';
+import { Agent, request as httpRequest } from 'http';
 import type { AddressInfo } from 'net';
 import os, { tmpdir } from 'os';
 import { dirname, join, win32 } from 'path';
 import { pathToFileURL } from 'url';
+
+import express from 'express';
 
 import { answerRequestError, CloudFunctions, functionFilesImporting, isOutsideDirectory, listenFailure } from './cloud-functions';
 import { PortInUseError } from './function.errors';
@@ -30,6 +32,12 @@ let startedServers: Server[];
 let loggedLines: string[];
 let loggedErrors: unknown[];
 let exitCodes: (number | undefined)[];
+
+async function eventually(isDone: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 200 && !isDone(); attempt += 1) {
+    await new Promise((done) => setTimeout(done, 10));
+  }
+}
 
 function writeProjectFile(relativePath: string, source: string): void {
   const absolutePath = join(workspace, relativePath);
@@ -118,6 +126,15 @@ afterEach(async () => {
   );
   rmSync(workspace, { recursive: true, force: true });
   jest.restoreAllMocks();
+  delete (globalThis as Record<string, unknown>).openStream;
+  delete (globalThis as Record<string, unknown>).lateDone;
+  delete (globalThis as Record<string, unknown>).lateResult;
+  delete (globalThis as Record<string, unknown>).piped;
+  delete (globalThis as Record<string, unknown>).hub;
+  delete (globalThis as Record<string, unknown>).received;
+  delete (globalThis as Record<string, unknown>).iterated;
+  delete process.env.LAUNCH_TEST_PAGE;
+  delete process.env.LAUNCH_TEST_UPSTREAM;
 });
 
 function toDataURL(source: string): string {
@@ -621,6 +638,721 @@ describe('CloudFunctions serve routing', () => {
     expect(plain).toMatchObject({ status: 200, body: '{"a":1}', contentType: 'text/plain; charset=utf-8' });
     expect(loggedErrors).toEqual([]);
   });
+
+  it('ends a response the handler leaves open as soon as the handler finishes, keeping its status and headers, as deployed functions do', async () => {
+    writeFunctionFile(
+      'open.js',
+      'export default function open(request, response) { response.statusCode = 201; response.setHeader("cache-control", "max-age=5"); }',
+    );
+    writeFunctionFile('bare.js', 'export default function bare() {}');
+    writeFunctionFile(
+      'awaited.js',
+      'export default async function awaited(request, response) { await new Promise((done) => setTimeout(done, 20)); response.statusCode = 202; }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const open = await sendRequest(port, '/open');
+    const bare = await sendRequest(port, '/bare');
+    const awaited = await sendRequest(port, '/awaited');
+
+    expect(open).toMatchObject({ status: 201, body: '', cacheControl: 'max-age=5', contentType: undefined });
+    expect(bare).toMatchObject({ status: 200, body: '', cacheControl: 'no-store', contentType: undefined });
+    expect(awaited).toMatchObject({ status: 202, body: '' });
+    expect(loggedErrors).toEqual([]);
+  }, 4000);
+
+  it.each([
+    ['send', 'response.status(500).send("late")'],
+    ['json', 'response.json({ late: true })'],
+    ['end', 'response.end("late")'],
+    ['write', 'response.write("late")'],
+    ['writeHead', 'response.writeHead(500)'],
+    ['setHeader', 'response.setHeader("x-late", "yes")'],
+    ['redirect', 'response.redirect("/elsewhere")'],
+    ['sendStatus', 'response.sendStatus(204)'],
+    ['send with a 205 status', 'response.status(205).send()'],
+    ['removeHeader', 'response.removeHeader("x-late")'],
+    ['appendHeader', 'response.appendHeader("x-late", "yes")'],
+    ['setHeaders', 'response.setHeaders(new Map([["x-late", "yes"]]))'],
+    ['sendFile', 'response.sendFile(process.env.LAUNCH_TEST_PAGE)'],
+    ['download', 'response.download(process.env.LAUNCH_TEST_PAGE)'],
+    ['sendfile', 'response.sendfile(process.env.LAUNCH_TEST_PAGE)'],
+  ])('ignores a late %s after the handler finished, warns once, and keeps serving, where deployed functions have already answered', async (_method, lateCall) => {
+    writeProjectFile('page.html', '<p>page</p>');
+    process.env.LAUNCH_TEST_PAGE = join(workspace, 'page.html');
+    writeFunctionFile(
+      'late.js',
+      `export default function late(request, response) { setTimeout(() => { ${lateCall}; ${lateCall}; globalThis.lateDone = true; }, 50); }`,
+    );
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send(String(globalThis.lateDone)); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const late = await sendRequest(port, '/late?from=table');
+    await eventually(() => (globalThis as Record<string, unknown>).lateDone === true);
+    const next = await sendRequest(port, '/next');
+
+    expect(late).toMatchObject({ status: 200, body: '' });
+    expect(next).toMatchObject({ status: 200, body: 'true' });
+    expect(loggedLines.filter((line) => line.startsWith('warn: /late'))).toEqual([
+      'warn: /late?from=table changed its response after it had been ended. The change was ignored; deployed AWS functions end the response when the handler returns.',
+    ]);
+    expect(loggedErrors).toEqual([]);
+  }, 4000);
+
+  it('leaves a response the handler has started streaming open for the handler to end, as deployed functions do', async () => {
+    writeFunctionFile(
+      'stream.js',
+      'export default function stream(request, response) { response.write("part"); globalThis.openStream = response; }',
+    );
+    writeFunctionFile(
+      'finish.js',
+      'export default function finish(request, response) { globalThis.openStream.end("ial"); response.send("done"); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const stream = sendRequest(port, '/stream');
+    await eventually(() => (globalThis as Record<string, unknown>).openStream !== undefined);
+    const finish = await sendRequest(port, '/finish');
+
+    expect(await stream).toMatchObject({ status: 200, body: 'partial' });
+    expect(finish).toMatchObject({ status: 200, body: 'done' });
+    expect(loggedErrors).toEqual([]);
+  }, 4000);
+
+  it.each([
+    ['sendFile', 'response.sendFile(process.env.LAUNCH_TEST_PAGE)'],
+    ['download', 'response.download(process.env.LAUNCH_TEST_PAGE)'],
+    ['sendfile', 'response.sendfile(process.env.LAUNCH_TEST_PAGE)'],
+  ])('lets a file the handler starts sending with res.%s finish after the handler returns', async (_method, call) => {
+    writeProjectFile('page.html', '<p>page</p>');
+    process.env.LAUNCH_TEST_PAGE = join(workspace, 'page.html');
+    writeFunctionFile('file.js', `export default function file(request, response) { ${call}; }`);
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const file = await sendRequest(port, '/file');
+
+    expect(file).toMatchObject({ status: 200, body: '<p>page</p>' });
+    expect(loggedLines.filter((line) => line.startsWith('warn:'))).toEqual([]);
+    expect(loggedErrors).toEqual([]);
+  }, 4000);
+
+  it('ignores a late change after a file send without a callback has finished, warns once, and keeps serving', async () => {
+    writeProjectFile('page.html', '<p>page</p>');
+    process.env.LAUNCH_TEST_PAGE = join(workspace, 'page.html');
+    writeFunctionFile(
+      'file.js',
+      'export default function file(request, response) { response.sendFile(process.env.LAUNCH_TEST_PAGE); response.on("finish", () => setImmediate(() => { response.setHeader("x-late", "yes"); globalThis.lateDone = true; })); }',
+    );
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const file = await sendRequest(port, '/file');
+    await eventually(() => (globalThis as Record<string, unknown>).lateDone === true);
+    const next = await sendRequest(port, '/next');
+
+    expect(file).toMatchObject({ status: 200, body: '<p>page</p>' });
+    expect(next).toMatchObject({ status: 200, body: 'alive' });
+    expect(loggedLines.filter((line) => line.startsWith('warn: /file'))).toEqual([
+      'warn: /file changed its response after it had been ended. The change was ignored; deployed AWS functions end the response when the handler returns.',
+    ]);
+  }, 4000);
+
+  it('closes a stream piped into a response it ends for the handler, so serve does not keep it open', async () => {
+    writeProjectFile('page.html', '<p>page</p>');
+    process.env.LAUNCH_TEST_PAGE = join(workspace, 'page.html');
+    writeFunctionFile(
+      'piped.js',
+      'import { createReadStream } from "node:fs"; export default function piped(request, response) { globalThis.piped = createReadStream(process.env.LAUNCH_TEST_PAGE); globalThis.piped.pipe(response); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const piped = await sendRequest(port, '/piped');
+    const source = (globalThis as Record<string, unknown>).piped as { destroyed: boolean };
+    await eventually(() => source.destroyed);
+
+    expect(piped).toMatchObject({ status: 200, body: '' });
+    expect(source.destroyed).toBe(true);
+  }, 4000);
+
+  it('ignores a change made in the same tick right after the handler ended the response, warns once, and keeps serving', async () => {
+    writeFunctionFile(
+      'sameTick.js',
+      'export default function sameTick(request, response) { response.end("a"); response.write("b"); response.end("c"); }',
+    );
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const sameTick = await sendRequest(port, '/sameTick');
+    const next = await sendRequest(port, '/next');
+
+    expect(sameTick).toMatchObject({ status: 200, body: 'a' });
+    expect(next).toMatchObject({ status: 200, body: 'alive' });
+    expect(loggedLines.filter((line) => line.startsWith('warn: /sameTick'))).toEqual([
+      'warn: /sameTick changed its response after it had been ended. The change was ignored; deployed AWS functions end the response when the handler returns.',
+    ]);
+    expect(loggedErrors).toEqual([]);
+  }, 4000);
+
+  it('answers 500 and keeps serving when the response it ends for the handler has an invalid status', async () => {
+    writeFunctionFile('invalid.js', 'export default function invalid(request, response) { response.status(Number("abc")); }');
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const invalid = await sendRequest(port, '/invalid');
+    const next = await sendRequest(port, '/next');
+
+    expect(invalid).toMatchObject({ status: 500, body: '' });
+    expect(next).toMatchObject({ status: 200, body: 'alive' });
+    expect(loggedErrors).toHaveLength(1);
+    expect((loggedErrors[0] as NodeJS.ErrnoException).code).toBe('ERR_HTTP_INVALID_STATUS_CODE');
+  }, 4000);
+
+  it('logs an error thrown after the handler already answered without a 500 or a late-change warning', async () => {
+    writeFunctionFile(
+      'answered.js',
+      'export default async function answered(request, response) { response.send("ok"); await new Promise((done) => setTimeout(done, 10)); throw new Error("boom"); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const answered = await sendRequest(port, '/answered');
+    await eventually(() => loggedErrors.length > 0);
+
+    expect(answered).toMatchObject({ status: 200, body: 'ok' });
+    expect(loggedLines.filter((line) => line.startsWith('warn:'))).toEqual([]);
+    expect(loggedErrors).toHaveLength(1);
+    expect((loggedErrors[0] as Error).message).toBe('boom');
+  }, 4000);
+
+  it('releases a file stream piped into a response after it was ended, and leaves a stream that still feeds another destination flowing', async () => {
+    writeProjectFile('page.html', '<p>page</p>');
+    process.env.LAUNCH_TEST_PAGE = join(workspace, 'page.html');
+    writeFunctionFile(
+      'latePipe.js',
+      'import { createReadStream } from "node:fs"; export default function latePipe(request, response) { setTimeout(() => { globalThis.piped = createReadStream(process.env.LAUNCH_TEST_PAGE); globalThis.piped.pipe(response); globalThis.lateDone = true; }, 20); }',
+    );
+    writeFunctionFile(
+      'hub.js',
+      'import { PassThrough, Writable } from "node:stream"; globalThis.received = globalThis.received ?? []; globalThis.hub = globalThis.hub ?? new PassThrough(); if (globalThis.hub.listenerCount("data") === 0) { globalThis.hub.pipe(new Writable({ write(chunk, encoding, done) { globalThis.received.push(String(chunk)); done(); } })); } export default function hub(request, response) { setTimeout(() => globalThis.hub.pipe(response), 20); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const latePipe = await sendRequest(port, '/latePipe');
+    await eventually(() => (globalThis as Record<string, unknown>).lateDone === true);
+    const source = (globalThis as Record<string, unknown>).piped as { destroyed: boolean };
+    await eventually(() => source.destroyed);
+    const hub = await sendRequest(port, '/hub');
+    await new Promise((done) => setTimeout(done, 50));
+    const hubStream = (globalThis as Record<string, unknown>).hub as { destroyed: boolean; write: (chunk: string) => void };
+    hubStream.write('after');
+    await eventually(() => ((globalThis as Record<string, unknown>).received as string[]).includes('after'));
+
+    expect(latePipe).toMatchObject({ status: 200, body: '' });
+    expect(source.destroyed).toBe(true);
+    expect(hub).toMatchObject({ status: 200, body: '' });
+    expect(hubStream.destroyed).toBe(false);
+  }, 4000);
+
+  it('leaves a released stream that nothing reads paused for the function, and spares one that still feeds another destination', async () => {
+    writeFunctionFile(
+      'proxy.js',
+      'import { PassThrough } from "node:stream"; export default function proxy(request, response) { globalThis.piped = new PassThrough(); globalThis.piped.pipe(response); }',
+    );
+    writeFunctionFile('shared.js', 'import { PassThrough, Writable } from "node:stream"; globalThis.received = globalThis.received ?? []; globalThis.hub = globalThis.hub ?? new PassThrough(); if (globalThis.hub.listenerCount("data") === 0) { globalThis.hub.pipe(new Writable({ write(chunk, encoding, done) { globalThis.received.push(String(chunk)); done(); } })); } export default function shared(request, response) { globalThis.hub.pipe(response); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const proxy = await sendRequest(port, '/proxy');
+    const shared = await sendRequest(port, '/shared');
+    const upstream = (globalThis as Record<string, unknown>).piped as { destroyed: boolean };
+    const hubStream = (globalThis as Record<string, unknown>).hub as { destroyed: boolean; write: (chunk: string) => void };
+    hubStream.write('after');
+    await eventually(() => ((globalThis as Record<string, unknown>).received as string[]).includes('after'));
+
+    await new Promise((done) => setTimeout(done, 50));
+    (upstream as unknown as { write: (chunk: string) => void }).write('kept');
+
+    expect(proxy).toMatchObject({ status: 200, body: '' });
+    expect(upstream.destroyed).toBe(false);
+    expect((upstream as unknown as { readableFlowing: boolean | null }).readableFlowing).toBe(false);
+    expect((upstream as unknown as { readableLength: number }).readableLength).toBe(4);
+    expect(shared).toMatchObject({ status: 200, body: '' });
+    expect(hubStream.destroyed).toBe(false);
+  }, 4000);
+
+  it('keeps serving when the handler pipes a legacy stream, a non-core stream or a stream-like object into its response', async () => {
+    writeFunctionFile(
+      'legacy.js',
+      'import { Stream } from "node:stream"; export default function legacy(request, response) { new Stream().pipe(response); response.end("legacy"); }',
+    );
+    writeFunctionFile(
+      'modernish.js',
+      'import { Stream } from "node:stream"; export default function modernish(request, response) { const source = new Stream(); source.unpipe = () => source; source.resume = () => { globalThis.lateResult = "resumed"; }; source.on("data", () => {}); source.pipe(response); response.end("v3"); }',
+    );
+    writeFunctionFile(
+      'foreign.js',
+      'export default function foreign(request, response) { response.emit("pipe", { unpipe() {} }); response.emit("pipe", { unpipe() {}, listenerCount(event) { return event === "data" ? 1 : 0; } }); response.end("foreign"); }',
+    );
+    writeFunctionFile(
+      'lateForeign.js',
+      'export default function lateForeign(request, response) { response.end("late"); setTimeout(() => { response.emit("pipe", { unpipe() {} }); response.emit("pipe", { unpipe() {}, once(event, listener) { listener(); }, removeListener() {} }); response.emit("pipe", { unpipe() {}, once(event, listener) { listener(); }, removeListener() {}, listenerCount() { return 0; } }); response.emit("pipe", { unpipe() {}, once(event, listener) { listener(); }, removeListener() {}, pause() {} }); response.emit("pipe", { unpipe() {}, pause() {} }); globalThis.lateDone = true; }, 20); }',
+    );
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const lateForeign = await sendRequest(port, '/lateForeign');
+    await eventually(() => (globalThis as Record<string, unknown>).lateDone === true);
+    const legacy = await sendRequest(port, '/legacy');
+    const modernish = await sendRequest(port, '/modernish');
+    await eventually(() => (globalThis as Record<string, unknown>).lateResult === 'resumed');
+    const foreign = await sendRequest(port, '/foreign');
+    await new Promise((done) => setTimeout(done, 20));
+    const next = await sendRequest(port, '/next');
+
+    expect(legacy).toMatchObject({ status: 200, body: 'legacy' });
+    expect(modernish).toMatchObject({ status: 200, body: 'v3' });
+    expect((globalThis as Record<string, unknown>).lateResult).toBe('resumed');
+    expect(foreign).toMatchObject({ status: 200, body: 'foreign' });
+    expect(lateForeign).toMatchObject({ status: 200, body: 'late' });
+    expect(next).toMatchObject({ status: 200, body: 'alive' });
+    expect(loggedErrors).toEqual([]);
+  }, 4000);
+
+  it('lets a file stream piped late into an ended response keep feeding another destination or reader', async () => {
+    writeProjectFile('page.html', '<p>page</p>');
+    process.env.LAUNCH_TEST_PAGE = join(workspace, 'page.html');
+    writeFunctionFile(
+      'tee.js',
+      'import { createReadStream } from "node:fs"; import { Writable } from "node:stream"; export default function tee(request, response) { setTimeout(() => { globalThis.received = []; const file = createReadStream(process.env.LAUNCH_TEST_PAGE); file.pipe(response); file.pipe(new Writable({ write(chunk, encoding, done) { globalThis.received.push(String(chunk)); done(); } })); }, 20); }',
+    );
+    writeFunctionFile(
+      'reader.js',
+      'import { createReadStream } from "node:fs"; export default function reader(request, response) { setTimeout(() => { globalThis.lateResult = []; const file = createReadStream(process.env.LAUNCH_TEST_PAGE); file.on("data", (chunk) => globalThis.lateResult.push(String(chunk))); file.pipe(response); }, 20); }',
+    );
+    writeFunctionFile(
+      'iterator.js',
+      'import { createReadStream } from "node:fs"; export default function iterator(request, response) { setTimeout(async () => { globalThis.iterated = []; const file = createReadStream(process.env.LAUNCH_TEST_PAGE); file.pipe(response); try { for await (const chunk of file) { globalThis.iterated.push(String(chunk)); } } catch { globalThis.iterated.push("destroyed"); } globalThis.lateDone = true; }, 20); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    await sendRequest(port, '/tee');
+    await eventually(() => ((globalThis as Record<string, unknown>).received as string[] | undefined)?.join('') === '<p>page</p>');
+    await sendRequest(port, '/reader');
+    await eventually(() => ((globalThis as Record<string, unknown>).lateResult as string[] | undefined)?.join('') === '<p>page</p>');
+
+    await sendRequest(port, '/iterator');
+    await eventually(() => (globalThis as Record<string, unknown>).lateDone === true);
+
+    expect(((globalThis as Record<string, unknown>).received as string[]).join('')).toBe('<p>page</p>');
+    expect(((globalThis as Record<string, unknown>).lateResult as string[]).join('')).toBe('<p>page</p>');
+    expect(((globalThis as Record<string, unknown>).iterated as string[]).join('')).toBe('<p>page</p>');
+  }, 4000);
+
+  it('lets a file stream with a side reader finish and close once its response closes', async () => {
+    writeProjectFile('page.html', '<p>page</p>');
+    process.env.LAUNCH_TEST_PAGE = join(workspace, 'page.html');
+    writeFunctionFile(
+      'sideReader.js',
+      'import { createReadStream } from "node:fs"; export default function sideReader(request, response) { globalThis.lateResult = []; globalThis.piped = createReadStream(process.env.LAUNCH_TEST_PAGE); globalThis.piped.on("data", (chunk) => globalThis.lateResult.push(String(chunk))); globalThis.piped.pipe(response); response.end("done"); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const sideReader = await sendRequest(port, '/sideReader');
+    const source = (globalThis as Record<string, unknown>).piped as { destroyed: boolean };
+    await eventually(() => source.destroyed);
+
+    expect(sideReader).toMatchObject({ status: 200, body: 'done' });
+    expect(((globalThis as Record<string, unknown>).lateResult as string[]).join('')).toBe('<p>page</p>');
+    expect(source.destroyed).toBe(true);
+  }, 4000);
+
+  it('leaves a stream piped into an already-ended response paused, as on close', async () => {
+    writeFunctionFile(
+      'lateQueue.js',
+      'import { PassThrough } from "node:stream"; export default function lateQueue(request, response) { response.end("done"); setTimeout(() => { globalThis.piped = new PassThrough(); globalThis.piped.pipe(response); globalThis.lateDone = true; }, 20); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const lateQueue = await sendRequest(port, '/lateQueue');
+    await eventually(() => (globalThis as Record<string, unknown>).lateDone === true);
+    await new Promise((done) => setTimeout(done, 20));
+    const queue = (globalThis as Record<string, unknown>).piped as { readableFlowing: boolean | null; readableLength: number; write: (chunk: string) => void };
+    queue.write('kept');
+
+    expect(lateQueue).toMatchObject({ status: 200, body: 'done' });
+    expect(queue.readableFlowing).toBe(false);
+    expect(queue.readableLength).toBe(4);
+  }, 4000);
+
+  it('releases a stream piped into an already-ended response at once, so a shared hub writes nothing to it, and re-pauses an endless one', async () => {
+    writeFunctionFile(
+      'lateHub.js',
+      'import { PassThrough, Writable } from "node:stream"; export default function lateHub(request, response) { response.end("done"); setTimeout(() => { globalThis.received = []; globalThis.hub = new PassThrough(); globalThis.hub.pipe(new Writable({ write(chunk, encoding, done) { globalThis.received.push(String(chunk)); done(); } })); globalThis.hub.pipe(response); globalThis.hub.write("x"); globalThis.lateDone = true; }, 20); }',
+    );
+    writeFunctionFile(
+      'lateEndless.js',
+      'import { Readable } from "node:stream"; export default function lateEndless(request, response) { response.end("done"); setTimeout(() => { globalThis.lateResult = 0; globalThis.piped = new Readable({ read() { globalThis.lateResult += 1; this.push(globalThis.lateResult > 10000 ? null : Buffer.alloc(1024)); } }); globalThis.piped.pipe(response); }, 20); }',
+    );
+    writeFunctionFile(
+      'lateFlowing.js',
+      'import { PassThrough, Writable } from "node:stream"; export default function lateFlowing(request, response) { response.end("done"); const sink = new Writable({ write(chunk, encoding, done) { done(); } }); globalThis.openStream = new PassThrough(); globalThis.openStream.pipe(sink); setTimeout(() => { globalThis.openStream.pipe(response); setTimeout(() => { globalThis.openStream.unpipe(sink); globalThis.openStream.resume(); globalThis.lateDone = true; }, 30); }, 20); }',
+    );
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    await sendRequest(port, '/lateFlowing');
+    await eventually(() => (globalThis as Record<string, unknown>).lateDone === true);
+    await new Promise((done) => setTimeout(done, 10));
+    const ownResume = ((globalThis as Record<string, unknown>).openStream as { readableFlowing: boolean | null }).readableFlowing;
+    await sendRequest(port, '/lateHub');
+    await eventually(() => ((globalThis as Record<string, unknown>).received as string[] | undefined)?.includes('x') === true);
+    await new Promise((done) => setTimeout(done, 20));
+    ((globalThis as Record<string, unknown>).hub as { write: (chunk: string) => void }).write('y');
+    await eventually(() => ((globalThis as Record<string, unknown>).received as string[]).includes('y'));
+    await sendRequest(port, '/lateEndless');
+    await new Promise((done) => setTimeout(done, 80));
+    const next = await sendRequest(port, '/next');
+
+    expect(ownResume).toBe(true);
+    expect((globalThis as Record<string, unknown>).received).toEqual(['x', 'y']);
+    expect(loggedLines.filter((line) => line.startsWith('warn: /lateHub'))).toEqual([]);
+    expect(next).toMatchObject({ status: 200, body: 'alive' });
+    expect((globalThis as Record<string, unknown>).piped as { readableFlowing: boolean | null }).toMatchObject({ readableFlowing: false });
+    expect((globalThis as Record<string, unknown>).lateResult).toBeLessThan(100);
+  }, 4000);
+
+  it('drains only the request of the exchange, and leaves an upstream body piped into the response paused', async () => {
+    const upstream = createServer((_request, upstreamResponse) => {
+      upstreamResponse.write('a');
+    });
+    await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', () => resolve()));
+    process.env.LAUNCH_TEST_UPSTREAM = `http://127.0.0.1:${(upstream.address() as AddressInfo).port}/`;
+    writeFunctionFile(
+      'relay.js',
+      'import http from "node:http"; export default function relay(request, response) { response.end("done"); http.get(process.env.LAUNCH_TEST_UPSTREAM, (upstreamBody) => { globalThis.piped = upstreamBody; upstreamBody.pipe(response); globalThis.lateDone = true; }); }',
+    );
+    const port = await freePort();
+
+    try {
+      await new CloudFunctions(workspace).serve(port);
+      const relay = await sendRequest(port, '/relay');
+      await eventually(() => (globalThis as Record<string, unknown>).lateDone === true);
+      await new Promise((done) => setTimeout(done, 50));
+
+      expect(relay).toMatchObject({ status: 200, body: 'done' });
+      expect((globalThis as Record<string, unknown>).piped as { readableFlowing: boolean | null }).toMatchObject({ readableFlowing: false });
+    } finally {
+      ((globalThis as Record<string, unknown>).piped as { destroy?: () => void } | undefined)?.destroy?.();
+      upstream.closeAllConnections();
+      await new Promise<void>((resolve) => upstream.close(() => resolve()));
+    }
+  }, 4000);
+
+  it('drains a request body piped into a response it ends, so the keep-alive connection answers the next request', async () => {
+    writeFunctionFile('echoLate.js', 'export default function echoLate(request, response) { request.pipe(response); }');
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
+    const port = await freePort();
+    const agent = new Agent({ keepAlive: true, maxSockets: 1 });
+
+    try {
+      await new CloudFunctions(workspace).serve(port);
+      const echoLate = new Promise<number>((resolve, reject) => {
+        const clientRequest = httpRequest(
+          { host: '127.0.0.1', port, path: '/echoLate', method: 'POST', agent, headers: { 'content-type': 'image/png', 'content-length': String(1024 * 1024) } },
+          (response) => {
+            response.resume();
+            response.on('end', () => resolve(response.statusCode as number));
+          },
+        );
+        clientRequest.on('error', reject);
+        clientRequest.flushHeaders();
+        setTimeout(() => clientRequest.end(Buffer.alloc(1024 * 1024)), 100);
+      });
+      const next = new Promise<string>((resolve, reject) => {
+        httpRequest({ host: '127.0.0.1', port, path: '/next', agent }, (response) => {
+          let body = '';
+          response.setEncoding('utf8');
+          response.on('data', (chunk) => {
+            body += chunk;
+          });
+          response.on('end', () => resolve(body));
+        })
+          .on('error', reject)
+          .end();
+      });
+      const answered = await Promise.race([next, new Promise<string>((resolve) => setTimeout(() => resolve('no answer'), 1500))]);
+
+      expect(await echoLate).toBe(200);
+      expect(answered).toBe('alive');
+    } finally {
+      agent.destroy();
+    }
+  }, 4000);
+
+  it('keeps serving after it releases an endless stream that nothing reads', async () => {
+    writeFunctionFile(
+      'endless.js',
+      'import { Readable } from "node:stream"; export default function endless(request, response) { globalThis.lateResult = 0; globalThis.piped = new Readable({ read() { globalThis.lateResult += 1; this.push(globalThis.lateResult > 10000 ? null : Buffer.alloc(1024)); } }); globalThis.piped.pipe(response); response.end("done"); }',
+    );
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const endless = await sendRequest(port, '/endless');
+    await new Promise((done) => setTimeout(done, 50));
+    const next = await sendRequest(port, '/next');
+
+    expect(endless).toMatchObject({ status: 200, body: 'done' });
+    expect(next).toMatchObject({ status: 200, body: 'alive' });
+    expect((globalThis as Record<string, unknown>).piped as { destroyed: boolean }).toMatchObject({ destroyed: false, readableFlowing: false });
+    expect((globalThis as Record<string, unknown>).lateResult).toBeLessThan(100);
+  }, 4000);
+
+  it('releases a file stream piped after the client disconnected', async () => {
+    writeProjectFile('page.html', '<p>page</p>');
+    process.env.LAUNCH_TEST_PAGE = join(workspace, 'page.html');
+    writeFunctionFile(
+      'gone.js',
+      'import { createReadStream } from "node:fs"; export default async function gone(request, response) { await new Promise((done) => setTimeout(done, 100)); globalThis.piped = createReadStream(process.env.LAUNCH_TEST_PAGE); globalThis.piped.pipe(response); globalThis.lateDone = true; }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    await new Promise<void>((resolve) => {
+      const clientRequest = httpRequest({ host: '127.0.0.1', port, path: '/gone' });
+      clientRequest.on('error', () => resolve());
+      clientRequest.end();
+      setTimeout(() => clientRequest.destroy(), 30);
+    });
+    await eventually(() => (globalThis as Record<string, unknown>).lateDone === true);
+    const source = (globalThis as Record<string, unknown>).piped as { destroyed: boolean };
+    await eventually(() => source.destroyed);
+
+    expect(source.destroyed).toBe(true);
+  }, 4000);
+
+  it('answers its 500 without the headers the failed handler had set', async () => {
+    writeFunctionFile(
+      'stale.js',
+      'export default function stale(request, response) { response.setHeader("content-length", "5"); response.setHeader("set-cookie", "a=1"); throw new Error("boom"); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const stale = await new Promise<{ status: number; headers: Record<string, unknown>; body: string }>((resolve, reject) => {
+      httpRequest({ host: '127.0.0.1', port, path: '/stale' }, (response) => {
+        let body = '';
+        response.setEncoding('utf8');
+        response.on('data', (chunk) => {
+          body += chunk;
+        });
+        response.on('end', () => resolve({ status: response.statusCode as number, headers: response.headers, body }));
+      })
+        .on('error', reject)
+        .end();
+    });
+
+    expect(stale.status).toBe(500);
+    expect(stale.body).toBe('');
+    expect(stale.headers['set-cookie']).toBeUndefined();
+    expect(stale.headers['content-length']).not.toBe('5');
+    expect(stale.headers['cache-control']).toBe('no-store');
+  }, 4000);
+
+  it('releases a file stream the handler piped when the handler ended the response itself', async () => {
+    writeProjectFile('page.html', '<p>page</p>');
+    process.env.LAUNCH_TEST_PAGE = join(workspace, 'page.html');
+    writeFunctionFile(
+      'pipeThenEnd.js',
+      'import { createReadStream } from "node:fs"; export default function pipeThenEnd(request, response) { globalThis.piped = createReadStream(process.env.LAUNCH_TEST_PAGE); globalThis.piped.pipe(response); response.end("done"); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const pipeThenEnd = await sendRequest(port, '/pipeThenEnd');
+    const source = (globalThis as Record<string, unknown>).piped as { destroyed: boolean };
+    await eventually(() => source.destroyed);
+
+    expect(pipeThenEnd).toMatchObject({ status: 200, body: 'done' });
+    expect(source.destroyed).toBe(true);
+  }, 4000);
+
+  it('answers with the request body when the handler pipes the request into its response', async () => {
+    writeFunctionFile('echo.js', 'export default function echo(request, response) { request.pipe(response); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const echo = await sendRequest(port, '/echo', { method: 'POST', headers: { 'content-type': 'image/png' }, body: 'pixels' });
+
+    expect(echo).toMatchObject({ status: 200, body: 'pixels' });
+  }, 4000);
+
+  it('passes a no-op end on an ended response through without a late-change warning', async () => {
+    writeFunctionFile(
+      'noopEnd.js',
+      'export default function noopEnd(request, response) { response.status(200).json({ ok: true }).end(); response.end(); response.end(() => { globalThis.lateDone = true; }); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const noopEnd = await sendRequest(port, '/noopEnd');
+    await eventually(() => (globalThis as Record<string, unknown>).lateDone === true);
+
+    expect(noopEnd).toMatchObject({ status: 200, body: '{"ok":true}' });
+    expect(loggedLines.filter((line) => line.startsWith('warn:'))).toEqual([]);
+    expect(loggedErrors).toEqual([]);
+  }, 4000);
+
+  it('answers 500 and keeps serving when a handler that set an invalid status message throws', async () => {
+    writeFunctionFile(
+      'badThrow.js',
+      'export default function badThrow(request, response) { response.statusMessage = "Done \u2713"; throw new Error("boom"); }',
+    );
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const badThrow = await sendRequest(port, '/badThrow');
+    const next = await sendRequest(port, '/next');
+
+    expect(badThrow).toMatchObject({ status: 500, body: '' });
+    expect(next).toMatchObject({ status: 200, body: 'alive' });
+    expect((loggedErrors[0] as Error).message).toBe('boom');
+  }, 4000);
+
+  it('drops the connection and keeps serving when ending the response for the handler fails twice', async () => {
+    writeFunctionFile(
+      'mismatch.js',
+      'export default function mismatch(request, response) { response.strictContentLength = true; response.setHeader("content-length", "5"); }',
+    );
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const mismatch = await sendRequest(port, '/mismatch').catch((error: NodeJS.ErrnoException) => error.code);
+    const next = await sendRequest(port, '/next');
+
+    expect(mismatch).toBe('ECONNRESET');
+    expect(next).toMatchObject({ status: 200, body: 'alive' });
+    expect(loggedErrors.map((error) => (error as NodeJS.ErrnoException).code)).toEqual([
+      'ERR_HTTP_CONTENT_LENGTH_MISMATCH',
+      'ERR_HTTP_CONTENT_LENGTH_MISMATCH',
+    ]);
+  }, 4000);
+
+  it('serves and ends responses on an Express without res.sendfile, as Express 5 ships', async () => {
+    const expressResponse = express.response as unknown as Record<string, unknown>;
+    const sendfile = expressResponse.sendfile;
+    delete expressResponse.sendfile;
+    writeFunctionFile(
+      'modern.js',
+      'export default function modern(request, response) { response.statusCode = 202; }',
+    );
+    const port = await freePort();
+
+    try {
+      await new CloudFunctions(workspace).serve(port);
+      const modern = await sendRequest(port, '/modern');
+
+      expect(modern).toMatchObject({ status: 202, body: '' });
+    } finally {
+      expressResponse.sendfile = sendfile;
+    }
+  }, 4000);
+
+  it('ends a response like deployed functions when a file send throws or its callback leaves the response open', async () => {
+    writeProjectFile('page.html', '<p>page</p>');
+    process.env.LAUNCH_TEST_PAGE = join(workspace, 'page.html');
+    writeFunctionFile(
+      'relative.js',
+      'export default function relative(request, response) { try { response.sendFile("page.html"); } catch { response.status(400); } }',
+    );
+    writeFunctionFile(
+      'missing.js',
+      'export default function missing(request, response) { response.sendFile(`${process.env.LAUNCH_TEST_PAGE}.missing`, (error) => { if (error) { response.status(404); } }); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const relative = await sendRequest(port, '/relative');
+    const missing = await sendRequest(port, '/missing');
+
+    expect(relative).toMatchObject({ status: 400, body: '' });
+    expect(missing).toMatchObject({ status: 404, body: '' });
+    expect(loggedErrors).toEqual([]);
+  }, 4000);
+
+  it('calls the callback of a late end or write with an error, as Node does, and a late write returns false', async () => {
+    writeFunctionFile(
+      'late.js',
+      'export default function late(request, response) { setTimeout(() => { const wrote = response.write("x", (error) => { globalThis.lateResult = { ...globalThis.lateResult, wrote, writeError: error.code }; }); response.end("y", (error) => { globalThis.lateResult = { ...globalThis.lateResult, endError: error.code }; globalThis.lateDone = true; }); }, 20); }',
+    );
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.json(globalThis.lateResult); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    await sendRequest(port, '/late');
+    await eventually(() => (globalThis as Record<string, unknown>).lateDone === true);
+    const next = await sendRequest(port, '/next');
+
+    expect(JSON.parse(next.body)).toEqual({
+      wrote: false,
+      writeError: 'ERR_STREAM_WRITE_AFTER_END',
+      endError: 'ERR_STREAM_WRITE_AFTER_END',
+    });
+  }, 4000);
+
+  it.each([
+    ['threw after starting a late answer', 'setTimeout(() => { response.send("again"); globalThis.lateDone = true; }, 20); throw new Error("boom");', 500],
+    ['ended the response and answered again later', 'response.send("ok"); setTimeout(() => { response.send("again"); globalThis.lateDone = true; }, 20);', 200],
+  ])('keeps serving and warns once when a handler that %s', async (_case, body, status) => {
+    writeFunctionFile('twice.js', `export default async function twice(request, response) { ${body} }`);
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const twice = await sendRequest(port, '/twice');
+    await eventually(() => (globalThis as Record<string, unknown>).lateDone === true);
+    const next = await sendRequest(port, '/next');
+
+    expect(twice.status).toBe(status);
+    expect(next).toMatchObject({ status: 200, body: 'alive' });
+    expect(loggedLines.filter((line) => line.startsWith('warn: /twice'))).toEqual([
+      'warn: /twice changed its response after it had been ended. The change was ignored; deployed AWS functions end the response when the handler returns.',
+    ]);
+  }, 4000);
+
+  it('ends a response the handler started writing and then threw on, logs the error, and keeps serving', async () => {
+    writeFunctionFile(
+      'broken.js',
+      'export default async function broken(request, response) { response.write("part"); throw new Error("boom"); }',
+    );
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const broken = await sendRequest(port, '/broken');
+    const next = await sendRequest(port, '/next');
+
+    expect(broken).toMatchObject({ status: 200, body: 'part' });
+    expect(next).toMatchObject({ status: 200, body: 'alive' });
+    expect(loggedErrors).toHaveLength(1);
+    expect((loggedErrors[0] as Error).message).toBe('boom');
+  }, 4000);
 
   it('answers res.redirect(url) with a bare 307 and the location exactly as given, as deployed functions do', async () => {
     writeFunctionFile('go.js', 'export default function go(request, response) { response.redirect("/target?from=a b"); }');
