@@ -1,3 +1,4 @@
+import type { Readable } from 'node:stream';
 import { parse as parseCookieHeader } from 'cookie';
 import dotenv from 'dotenv';
 import type {
@@ -199,10 +200,12 @@ interface Answering {
   handlerReturned: boolean;
   filesInFlight: number;
   ignoringLateChanges: boolean;
+  pipedSources: Set<Readable>;
 }
 
-function alreadyFinished(): NodeJS.ErrnoException {
-  return Object.assign(new Error('The response was already ended.'), { code: 'ERR_STREAM_ALREADY_FINISHED' });
+function alreadyFinished(method: string): NodeJS.ErrnoException {
+  const code = method === 'write' ? 'ERR_STREAM_WRITE_AFTER_END' : 'ERR_STREAM_ALREADY_FINISHED';
+  return Object.assign(new Error('The response was already ended.'), { code });
 }
 
 function ignoreLateChanges(response: Response, answering: Answering): void {
@@ -217,12 +220,12 @@ function ignoreLateChanges(response: Response, answering: Answering): void {
         warned = true;
         const warning =
           `warn: ${answering.requestedUrl} changed its response after it had been ended. ` +
-          'The change was ignored; deployed functions end the response when the handler returns.';
+          'The change was ignored; deployed AWS functions end the response when the handler returns.';
         console.log(styled(warning, 'yellow', process.stdout.isTTY === true));
       }
       const callback = args[args.length - 1];
       if (typeof callback === 'function') {
-        process.nextTick(callback, alreadyFinished());
+        process.nextTick(callback, alreadyFinished(method));
       }
       return method === 'write' ? false : response;
     };
@@ -241,11 +244,26 @@ function endLikeDeployedFunctions(response: Response, answering: Answering): voi
     return;
   }
   response.end();
+  answering.pipedSources.forEach((source) => {
+    source.destroy();
+  });
   ignoreLateChanges(response, answering);
 }
 
 function trackAnswering(response: Response, requestedUrl: string): Answering {
-  const answering: Answering = { requestedUrl, handlerReturned: false, filesInFlight: 0, ignoringLateChanges: false };
+  const answering: Answering = {
+    requestedUrl,
+    handlerReturned: false,
+    filesInFlight: 0,
+    ignoringLateChanges: false,
+    pipedSources: new Set(),
+  };
+  response.on('pipe', (source: Readable) => {
+    answering.pipedSources.add(source);
+  });
+  response.once('finish', () => {
+    ignoreLateChanges(response, answering);
+  });
   FILE_ANSWER_METHODS.forEach((method) => {
     const sendFile = response[method].bind(response) as (...args: unknown[]) => void;
     (response as unknown as Record<string, unknown>)[method] = (...args: unknown[]): void => {

@@ -554,8 +554,10 @@ The approved differences from V1 are these, and only these:
   response open, is ended the same way once it settles. Once a response has ended, for whatever
   reason, any later change to it (`end`, `write`, header calls, a file send, and so `send`, `json`
   and `redirect`) is ignored with one `warn:` line naming the requested URL instead of crashing
-  serve; a callback passed to it gets `ERR_STREAM_ALREADY_FINISHED`, as Node does. So a callback
-  that answers after the handler returned gets an empty response, exactly as on AWS. Azure and GCP (V1) still
+  serve; a callback passed to it gets `ERR_STREAM_WRITE_AFTER_END` (`write`) or
+  `ERR_STREAM_ALREADY_FINISHED`, as Node does. A stream piped into a response serve ends this way
+  is destroyed, so serve does not keep it open. So a callback that answers after the handler
+  returned gets an empty response, exactly as on AWS. Azure and GCP (V1) still
   deliver such a late answer as written, and answer a handler that never ends its response with
   504 CF005 after the timeout.
 - **A function that reaches a file outside `functions/` is warned about, not refused**, naming

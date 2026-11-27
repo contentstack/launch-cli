@@ -127,6 +127,7 @@ afterEach(async () => {
   delete (globalThis as Record<string, unknown>).openStream;
   delete (globalThis as Record<string, unknown>).lateDone;
   delete (globalThis as Record<string, unknown>).lateResult;
+  delete (globalThis as Record<string, unknown>).piped;
   delete process.env.LAUNCH_TEST_PAGE;
 });
 
@@ -689,7 +690,7 @@ describe('CloudFunctions serve routing', () => {
     expect(late).toMatchObject({ status: 200, body: '' });
     expect(next).toMatchObject({ status: 200, body: 'true' });
     expect(loggedLines.filter((line) => line.startsWith('warn: /late'))).toEqual([
-      'warn: /late?from=table changed its response after it had been ended. The change was ignored; deployed functions end the response when the handler returns.',
+      'warn: /late?from=table changed its response after it had been ended. The change was ignored; deployed AWS functions end the response when the handler returns.',
     ]);
     expect(loggedErrors).toEqual([]);
   }, 4000);
@@ -733,6 +734,46 @@ describe('CloudFunctions serve routing', () => {
     expect(loggedErrors).toEqual([]);
   }, 4000);
 
+  it('ignores a late change after a file send without a callback has finished, warns once, and keeps serving', async () => {
+    writeProjectFile('page.html', '<p>page</p>');
+    process.env.LAUNCH_TEST_PAGE = join(workspace, 'page.html');
+    writeFunctionFile(
+      'file.js',
+      'export default function file(request, response) { response.sendFile(process.env.LAUNCH_TEST_PAGE); setTimeout(() => { response.setHeader("x-late", "yes"); globalThis.lateDone = true; }, 100); }',
+    );
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const file = await sendRequest(port, '/file');
+    await eventually(() => (globalThis as Record<string, unknown>).lateDone === true);
+    const next = await sendRequest(port, '/next');
+
+    expect(file).toMatchObject({ status: 200, body: '<p>page</p>' });
+    expect(next).toMatchObject({ status: 200, body: 'alive' });
+    expect(loggedLines.filter((line) => line.startsWith('warn: /file'))).toEqual([
+      'warn: /file changed its response after it had been ended. The change was ignored; deployed AWS functions end the response when the handler returns.',
+    ]);
+  }, 4000);
+
+  it('closes a stream piped into a response it ends for the handler, so serve does not keep it open', async () => {
+    writeProjectFile('page.html', '<p>page</p>');
+    process.env.LAUNCH_TEST_PAGE = join(workspace, 'page.html');
+    writeFunctionFile(
+      'piped.js',
+      'import { createReadStream } from "node:fs"; export default function piped(request, response) { globalThis.piped = createReadStream(process.env.LAUNCH_TEST_PAGE); globalThis.piped.pipe(response); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const piped = await sendRequest(port, '/piped');
+    const source = (globalThis as Record<string, unknown>).piped as { destroyed: boolean };
+    await eventually(() => source.destroyed);
+
+    expect(piped).toMatchObject({ status: 200, body: '' });
+    expect(source.destroyed).toBe(true);
+  }, 4000);
+
   it('ends a response like deployed functions when a file send throws or its callback leaves the response open', async () => {
     writeProjectFile('page.html', '<p>page</p>');
     process.env.LAUNCH_TEST_PAGE = join(workspace, 'page.html');
@@ -770,7 +811,7 @@ describe('CloudFunctions serve routing', () => {
 
     expect(JSON.parse(next.body)).toEqual({
       wrote: false,
-      writeError: 'ERR_STREAM_ALREADY_FINISHED',
+      writeError: 'ERR_STREAM_WRITE_AFTER_END',
       endError: 'ERR_STREAM_ALREADY_FINISHED',
     });
   }, 4000);
@@ -791,7 +832,7 @@ describe('CloudFunctions serve routing', () => {
     expect(twice.status).toBe(status);
     expect(next).toMatchObject({ status: 200, body: 'alive' });
     expect(loggedLines.filter((line) => line.startsWith('warn: /twice'))).toEqual([
-      'warn: /twice changed its response after it had been ended. The change was ignored; deployed functions end the response when the handler returns.',
+      'warn: /twice changed its response after it had been ended. The change was ignored; deployed AWS functions end the response when the handler returns.',
     ]);
   }, 4000);
 
