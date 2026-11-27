@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import fs, { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -52,6 +52,22 @@ describe('walkFileSystem', () => {
     mkdirSync(join(workspace, 'a', 'b'), { recursive: true });
 
     expect(await collect(workspace)).toEqual([]);
+  });
+
+  it('yields the entries of a directory in name order whatever order the file system returns them in', async () => {
+    const fileEntry = (name: string) => ({ name, isDirectory: () => false, isFile: () => true });
+    async function* entriesInDiskOrder() {
+      yield fileEntry('b.js');
+      yield fileEntry('a.js');
+    }
+    jest.spyOn(fs.promises, 'opendir').mockResolvedValue(entriesInDiskOrder() as unknown as fs.Dir);
+
+    const found: string[] = [];
+    for await (const filePath of walkFileSystem(workspace)) {
+      found.push(filePath);
+    }
+
+    expect(found).toEqual([join(workspace, 'a.js'), join(workspace, 'b.js')]);
   });
 
   it('rejects when the directory does not exist', async () => {

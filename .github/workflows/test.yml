@@ -1,9 +1,9 @@
 name: test
 on:
   pull_request:
-    branches: [feature/development-v2]
+    branches: [v2-dev, v2-staging, v2-beta]
   push:
-    branches: [feature/development-v2]
+    branches: [v2-dev, v2-staging, v2-beta]
 
 jobs:
   test:
@@ -16,4 +16,4 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run build
-      - run: npm run test:coverage
+      - run: npm test
