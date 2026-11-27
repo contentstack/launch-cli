@@ -126,6 +126,8 @@ afterEach(async () => {
   jest.restoreAllMocks();
   delete (globalThis as Record<string, unknown>).openStream;
   delete (globalThis as Record<string, unknown>).lateDone;
+  delete (globalThis as Record<string, unknown>).lateResult;
+  delete process.env.LAUNCH_TEST_PAGE;
 });
 
 function toDataURL(source: string): string {
@@ -666,7 +668,12 @@ describe('CloudFunctions serve routing', () => {
     ['removeHeader', 'response.removeHeader("x-late")'],
     ['appendHeader', 'response.appendHeader("x-late", "yes")'],
     ['setHeaders', 'response.setHeaders(new Map([["x-late", "yes"]]))'],
+    ['sendFile', 'response.sendFile(process.env.LAUNCH_TEST_PAGE)'],
+    ['download', 'response.download(process.env.LAUNCH_TEST_PAGE)'],
+    ['sendfile', 'response.sendfile(process.env.LAUNCH_TEST_PAGE)'],
   ])('ignores a late %s after the handler finished, warns once, and keeps serving, where deployed functions have already answered', async (_method, lateCall) => {
+    writeProjectFile('page.html', '<p>page</p>');
+    process.env.LAUNCH_TEST_PAGE = join(workspace, 'page.html');
     writeFunctionFile(
       'late.js',
       `export default function late(request, response) { setTimeout(() => { ${lateCall}; ${lateCall}; globalThis.lateDone = true; }, 50); }`,
@@ -682,7 +689,7 @@ describe('CloudFunctions serve routing', () => {
     expect(late).toMatchObject({ status: 200, body: '' });
     expect(next).toMatchObject({ status: 200, body: 'true' });
     expect(loggedLines.filter((line) => line.startsWith('warn: /late'))).toEqual([
-      'warn: /late?from=table answered after its handler returned. Deployed functions have already ended the response by then, so this answer was ignored.',
+      'warn: /late?from=table changed its response after it had been ended. The change was ignored; deployed functions end the response when the handler returns.',
     ]);
     expect(loggedErrors).toEqual([]);
   }, 4000);
@@ -711,6 +718,7 @@ describe('CloudFunctions serve routing', () => {
   it.each([
     ['sendFile', 'response.sendFile(process.env.LAUNCH_TEST_PAGE)'],
     ['download', 'response.download(process.env.LAUNCH_TEST_PAGE)'],
+    ['sendfile', 'response.sendfile(process.env.LAUNCH_TEST_PAGE)'],
   ])('lets a file the handler starts sending with res.%s finish after the handler returns', async (_method, call) => {
     writeProjectFile('page.html', '<p>page</p>');
     process.env.LAUNCH_TEST_PAGE = join(workspace, 'page.html');
@@ -723,7 +731,68 @@ describe('CloudFunctions serve routing', () => {
     expect(file).toMatchObject({ status: 200, body: '<p>page</p>' });
     expect(loggedLines.filter((line) => line.startsWith('warn:'))).toEqual([]);
     expect(loggedErrors).toEqual([]);
-    delete process.env.LAUNCH_TEST_PAGE;
+  }, 4000);
+
+  it('ends a response like deployed functions when a file send throws or its callback leaves the response open', async () => {
+    writeProjectFile('page.html', '<p>page</p>');
+    process.env.LAUNCH_TEST_PAGE = join(workspace, 'page.html');
+    writeFunctionFile(
+      'relative.js',
+      'export default function relative(request, response) { try { response.sendFile("page.html"); } catch { response.status(400); } }',
+    );
+    writeFunctionFile(
+      'missing.js',
+      'export default function missing(request, response) { response.sendFile(`${process.env.LAUNCH_TEST_PAGE}.missing`, (error) => { if (error) { response.status(404); } }); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const relative = await sendRequest(port, '/relative');
+    const missing = await sendRequest(port, '/missing');
+
+    expect(relative).toMatchObject({ status: 400, body: '' });
+    expect(missing).toMatchObject({ status: 404, body: '' });
+    expect(loggedErrors).toEqual([]);
+  }, 4000);
+
+  it('calls the callback of a late end or write with an error, as Node does, and a late write returns false', async () => {
+    writeFunctionFile(
+      'late.js',
+      'export default function late(request, response) { setTimeout(() => { const wrote = response.write("x", (error) => { globalThis.lateResult = { ...globalThis.lateResult, wrote, writeError: error.code }; }); response.end("y", (error) => { globalThis.lateResult = { ...globalThis.lateResult, endError: error.code }; globalThis.lateDone = true; }); }, 20); }',
+    );
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.json(globalThis.lateResult); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    await sendRequest(port, '/late');
+    await eventually(() => (globalThis as Record<string, unknown>).lateDone === true);
+    const next = await sendRequest(port, '/next');
+
+    expect(JSON.parse(next.body)).toEqual({
+      wrote: false,
+      writeError: 'ERR_STREAM_ALREADY_FINISHED',
+      endError: 'ERR_STREAM_ALREADY_FINISHED',
+    });
+  }, 4000);
+
+  it.each([
+    ['threw after starting a late answer', 'setTimeout(() => { response.send("again"); globalThis.lateDone = true; }, 20); throw new Error("boom");', 500],
+    ['ended the response and answered again later', 'response.send("ok"); setTimeout(() => { response.send("again"); globalThis.lateDone = true; }, 20);', 200],
+  ])('keeps serving and warns once when a handler that %s', async (_case, body, status) => {
+    writeFunctionFile('twice.js', `export default async function twice(request, response) { ${body} }`);
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const twice = await sendRequest(port, '/twice');
+    await eventually(() => (globalThis as Record<string, unknown>).lateDone === true);
+    const next = await sendRequest(port, '/next');
+
+    expect(twice.status).toBe(status);
+    expect(next).toMatchObject({ status: 200, body: 'alive' });
+    expect(loggedLines.filter((line) => line.startsWith('warn: /twice'))).toEqual([
+      'warn: /twice changed its response after it had been ended. The change was ignored; deployed functions end the response when the handler returns.',
+    ]);
   }, 4000);
 
   it('ends a response the handler started writing and then threw on, logs the error, and keeps serving', async () => {

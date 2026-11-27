@@ -550,9 +550,12 @@ The approved differences from V1 are these, and only these:
   A handler that returns (or whose promise settles) without ending its response is ended for it
   at once with the status and headers it set, as AWS's `finalizeResponse` does (CL-8970); a
   response whose headers were already sent, or that `res.sendFile`/`res.download` is still
-  sending, is left for the handler to end. Anything the handler writes after that is ignored with
-  one `warn:` line naming the requested URL instead of crashing serve, so a callback that answers
-  after the handler returned gets an empty response, exactly as on AWS. Azure and GCP (V1) still
+  sending, is left for the handler to end; a file send that throws, or whose callback leaves the
+  response open, is ended the same way once it settles. Once a response has ended, for whatever
+  reason, any later change to it (`end`, `write`, header calls, a file send, and so `send`, `json`
+  and `redirect`) is ignored with one `warn:` line naming the requested URL instead of crashing
+  serve; a callback passed to it gets `ERR_STREAM_ALREADY_FINISHED`, as Node does. So a callback
+  that answers after the handler returned gets an empty response, exactly as on AWS. Azure and GCP (V1) still
   deliver such a late answer as written, and answer a handler that never ends its response with
   504 CF005 after the timeout.
 - **A function that reaches a file outside `functions/` is warned about, not refused**, naming
@@ -1092,6 +1095,10 @@ and the agent would then wait forever for a port that never opens. Never replace
 2.x build without changing `SERVER_COMMAND` to `launch:functions:serve` in the same change. The same
 applies to any customer `package.json` script that runs `launch:functions`: it is a release-note line
 for 2.0, and the umbrella `@contentstack/cli` must keep pinning `cli-launch@^1` until 2.0 is GA.
+Moving Azure and GCP to 2.x also changes how their functions answer: 2.x serve ends a response the
+handler leaves open as AWS does (CL-8970), so a handler that answers from a callback after it
+returned, which those clouds deliver today, gets an empty response instead. Say so in the agent's
+release notes.
 
 **`this.dataDir`.** `LaunchCommand` already computed the data directory to find `.cs-launch.json`;
 it now exposes it, because `projects:create` has to zip that same directory and `--data-dir` is a

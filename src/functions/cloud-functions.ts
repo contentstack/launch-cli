@@ -182,7 +182,8 @@ function sendLikeDeployedFunctions(_request: Request, response: Response, next: 
   next();
 }
 
-const LATE_ANSWER_METHODS = [
+const FILE_ANSWER_METHODS = ['sendFile', 'download', 'sendfile'] as const;
+const LATE_CHANGE_METHODS = [
   'end',
   'write',
   'writeHead',
@@ -190,43 +191,82 @@ const LATE_ANSWER_METHODS = [
   'removeHeader',
   'appendHeader',
   'setHeaders',
+  ...FILE_ANSWER_METHODS,
 ] as const;
-const FILE_ANSWER_METHODS = ['sendFile', 'download'] as const;
-const sendingFile = new WeakSet<Response>();
 
-function trackFileAnswers(response: Response): void {
-  FILE_ANSWER_METHODS.forEach((method) => {
-    const answer = response[method].bind(response) as (...args: unknown[]) => void;
-    (response as unknown as Record<string, unknown>)[method] = (...args: unknown[]): void => {
-      sendingFile.add(response);
-      answer(...args);
+interface Answering {
+  requestedUrl: string;
+  handlerReturned: boolean;
+  filesInFlight: number;
+  ignoringLateChanges: boolean;
+}
+
+function alreadyFinished(): NodeJS.ErrnoException {
+  return Object.assign(new Error('The response was already ended.'), { code: 'ERR_STREAM_ALREADY_FINISHED' });
+}
+
+function ignoreLateChanges(response: Response, answering: Answering): void {
+  if (answering.ignoringLateChanges) {
+    return;
+  }
+  answering.ignoringLateChanges = true;
+  let warned = false;
+  LATE_CHANGE_METHODS.forEach((method) => {
+    (response as unknown as Record<string, unknown>)[method] = (...args: unknown[]): unknown => {
+      if (!warned) {
+        warned = true;
+        const warning =
+          `warn: ${answering.requestedUrl} changed its response after it had been ended. ` +
+          'The change was ignored; deployed functions end the response when the handler returns.';
+        console.log(styled(warning, 'yellow', process.stdout.isTTY === true));
+      }
+      const callback = args[args.length - 1];
+      if (typeof callback === 'function') {
+        process.nextTick(callback, alreadyFinished());
+      }
+      return method === 'write' ? false : response;
     };
   });
 }
 
-function ignoreLateAnswers(response: Response, requestedUrl: string): void {
-  let warned = false;
-  const ignore = (): Response => {
-    if (!warned) {
-      warned = true;
-      const warning =
-        `warn: ${requestedUrl} answered after its handler returned. ` +
-        'Deployed functions have already ended the response by then, so this answer was ignored.';
-      console.log(styled(warning, 'yellow', process.stdout.isTTY === true));
-    }
-    return response;
-  };
-  LATE_ANSWER_METHODS.forEach((method) => {
-    (response as unknown as Record<string, unknown>)[method] = ignore;
-  });
-}
-
-function endLikeDeployedFunctions(response: Response, requestedUrl: string): void {
-  if (response.writableEnded || response.headersSent || sendingFile.has(response)) {
+function endLikeDeployedFunctions(response: Response, answering: Answering): void {
+  if (!answering.handlerReturned || answering.filesInFlight > 0) {
+    return;
+  }
+  if (response.writableEnded) {
+    ignoreLateChanges(response, answering);
+    return;
+  }
+  if (response.headersSent) {
     return;
   }
   response.end();
-  ignoreLateAnswers(response, requestedUrl);
+  ignoreLateChanges(response, answering);
+}
+
+function trackAnswering(response: Response, requestedUrl: string): Answering {
+  const answering: Answering = { requestedUrl, handlerReturned: false, filesInFlight: 0, ignoringLateChanges: false };
+  FILE_ANSWER_METHODS.forEach((method) => {
+    const sendFile = response[method].bind(response) as (...args: unknown[]) => void;
+    (response as unknown as Record<string, unknown>)[method] = (...args: unknown[]): void => {
+      const callback = args[args.length - 1];
+      if (typeof callback !== 'function') {
+        sendFile(...args);
+        answering.filesInFlight += 1;
+        return;
+      }
+      sendFile(...args.slice(0, -1), (error: unknown) => {
+        answering.filesInFlight -= 1;
+        try {
+          callback(error);
+        } finally {
+          endLikeDeployedFunctions(response, answering);
+        }
+      });
+      answering.filesInFlight += 1;
+    };
+  });
+  return answering;
 }
 
 export function answerRequestError(
@@ -352,14 +392,15 @@ export class CloudFunctions {
   private applyAppRouter(cloudFunctionResources: CloudFunctionResource[], app: Express): void {
     cloudFunctionResources.forEach((cloudFunctionResource) => {
       app.all(cloudFunctionResource.apiResourceURI, async (request: Request, response: Response) => {
+        const answering = trackAnswering(response, request.originalUrl);
         try {
-          trackFileAnswers(response);
           await cloudFunctionResource.handler(request, response);
-          endLikeDeployedFunctions(response, request.originalUrl);
         } catch (error) {
           console.error(error);
           response.status(500).send();
         }
+        answering.handlerReturned = true;
+        endLikeDeployedFunctions(response, answering);
       });
     });
   }
