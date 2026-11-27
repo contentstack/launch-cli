@@ -622,6 +622,81 @@ describe('CloudFunctions serve routing', () => {
     expect(loggedErrors).toEqual([]);
   });
 
+  it('ends a response the handler leaves open as soon as the handler finishes, keeping its status and headers, as deployed functions do', async () => {
+    writeFunctionFile(
+      'open.js',
+      'export default function open(request, response) { response.statusCode = 201; response.setHeader("cache-control", "max-age=5"); }',
+    );
+    writeFunctionFile('bare.js', 'export default function bare() {}');
+    writeFunctionFile(
+      'awaited.js',
+      'export default async function awaited(request, response) { await new Promise((done) => setTimeout(done, 20)); response.statusCode = 202; }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const open = await sendRequest(port, '/open');
+    const bare = await sendRequest(port, '/bare');
+    const awaited = await sendRequest(port, '/awaited');
+
+    expect(open).toMatchObject({ status: 201, body: '', cacheControl: 'max-age=5', contentType: undefined });
+    expect(bare).toMatchObject({ status: 200, body: '', cacheControl: 'no-store', contentType: undefined });
+    expect(awaited).toMatchObject({ status: 202, body: '' });
+    expect(loggedErrors).toEqual([]);
+  }, 4000);
+
+  it.each([
+    ['send', 'response.status(500).send("late")'],
+    ['json', 'response.json({ late: true })'],
+    ['end', 'response.end("late")'],
+    ['write', 'response.write("late")'],
+    ['writeHead', 'response.writeHead(500)'],
+    ['setHeader', 'response.setHeader("x-late", "yes")'],
+    ['redirect', 'response.redirect("/elsewhere")'],
+  ])('ignores a late %s after the handler finished, warns once, and keeps serving, where deployed functions have already answered', async (_method, lateCall) => {
+    writeFunctionFile(
+      'late.js',
+      `export default function late(request, response) { setTimeout(() => { ${lateCall}; ${lateCall}; globalThis.lateDone = true; }, 50); }`,
+    );
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send(String(globalThis.lateDone)); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const late = await sendRequest(port, '/late');
+    await new Promise((done) => setTimeout(done, 150));
+    const next = await sendRequest(port, '/next');
+
+    expect(late).toMatchObject({ status: 200, body: '' });
+    expect(next).toMatchObject({ status: 200, body: 'true' });
+    expect(loggedLines.filter((line) => line.startsWith('warn: /late'))).toEqual([
+      'warn: /late answered after its handler returned. Deployed functions have already ended the response by then, so this answer was ignored.',
+    ]);
+    expect(loggedErrors).toEqual([]);
+    delete (globalThis as Record<string, unknown>).lateDone;
+  }, 4000);
+
+  it('leaves a response the handler has started streaming open for the handler to end, as deployed functions do', async () => {
+    writeFunctionFile(
+      'stream.js',
+      'export default function stream(request, response) { response.write("part"); globalThis.openStream = response; }',
+    );
+    writeFunctionFile(
+      'finish.js',
+      'export default function finish(request, response) { globalThis.openStream.end("ial"); response.send("done"); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const stream = sendRequest(port, '/stream');
+    await new Promise((done) => setTimeout(done, 300));
+    const finish = await sendRequest(port, '/finish');
+
+    expect(await stream).toMatchObject({ status: 200, body: 'partial' });
+    expect(finish).toMatchObject({ status: 200, body: 'done' });
+    expect(loggedErrors).toEqual([]);
+    delete (globalThis as Record<string, unknown>).openStream;
+  }, 4000);
+
   it('answers res.redirect(url) with a bare 307 and the location exactly as given, as deployed functions do', async () => {
     writeFunctionFile('go.js', 'export default function go(request, response) { response.redirect("/target?from=a b"); }');
     const port = await freePort();

@@ -182,6 +182,33 @@ function sendLikeDeployedFunctions(_request: Request, response: Response, next: 
   next();
 }
 
+const LATE_ANSWER_METHODS = ['end', 'write', 'writeHead', 'setHeader'] as const;
+
+function ignoreLateAnswers(response: Response, route: string): void {
+  let warned = false;
+  const ignore = (): Response => {
+    if (!warned) {
+      warned = true;
+      const warning =
+        `warn: ${route} answered after its handler returned. ` +
+        'Deployed functions have already ended the response by then, so this answer was ignored.';
+      console.log(styled(warning, 'yellow', process.stdout.isTTY === true));
+    }
+    return response;
+  };
+  LATE_ANSWER_METHODS.forEach((method) => {
+    (response as unknown as Record<string, unknown>)[method] = ignore;
+  });
+}
+
+function endLikeDeployedFunctions(response: Response, route: string): void {
+  if (response.writableEnded || response.headersSent) {
+    return;
+  }
+  response.end();
+  ignoreLateAnswers(response, route);
+}
+
 export function answerRequestError(
   error: Error & { status?: number; type?: string },
   _request: Request,
@@ -307,6 +334,7 @@ export class CloudFunctions {
       app.all(cloudFunctionResource.apiResourceURI, async (request: Request, response: Response) => {
         try {
           await cloudFunctionResource.handler(request, response);
+          endLikeDeployedFunctions(response, cloudFunctionResource.apiResourceURI);
         } catch (error) {
           console.error(error);
           response.status(500).send();
