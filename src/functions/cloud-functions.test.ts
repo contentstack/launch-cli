@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import fs, { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import type { Server } from 'http';
 import { createServer } from 'http';
@@ -132,7 +132,6 @@ afterEach(async () => {
   delete (globalThis as Record<string, unknown>).piped;
   delete (globalThis as Record<string, unknown>).hub;
   delete (globalThis as Record<string, unknown>).received;
-  delete (globalThis as Record<string, unknown>).ReadableV3;
   delete (globalThis as Record<string, unknown>).iterated;
   delete process.env.LAUNCH_TEST_PAGE;
 });
@@ -878,21 +877,23 @@ describe('CloudFunctions serve routing', () => {
     hubStream.write('after');
     await eventually(() => ((globalThis as Record<string, unknown>).received as string[]).includes('after'));
 
+    await new Promise((done) => setTimeout(done, 50));
+
     expect(proxy).toMatchObject({ status: 200, body: '' });
     expect(upstream.destroyed).toBe(false);
+    expect((upstream as unknown as { readableFlowing: boolean | null }).readableFlowing).toBe(true);
     expect(shared).toMatchObject({ status: 200, body: '' });
     expect(hubStream.destroyed).toBe(false);
   }, 4000);
 
-  it('keeps serving when the handler pipes a legacy stream or a readable-stream v3 stream into its response', async () => {
-    (globalThis as Record<string, unknown>).ReadableV3 = (jest.requireActual('readable-stream') as { Readable: unknown }).Readable;
+  it('keeps serving when the handler pipes a legacy stream, or one shaped like readable-stream v2/v3, into its response', async () => {
     writeFunctionFile(
       'legacy.js',
       'import { Stream } from "node:stream"; export default function legacy(request, response) { new Stream().pipe(response); response.end("legacy"); }',
     );
     writeFunctionFile(
       'modernish.js',
-      'export default function modernish(request, response) { new globalThis.ReadableV3({ read() {} }).pipe(response); response.end("v3"); }',
+      'import { Stream } from "node:stream"; export default function modernish(request, response) { const source = new Stream(); source.unpipe = () => source; source._readableState = { pipes: null, pipesCount: 0 }; source.pipe(response); response.end("v3"); }',
     );
     writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
     const port = await freePort();
@@ -938,6 +939,43 @@ describe('CloudFunctions serve routing', () => {
     expect(((globalThis as Record<string, unknown>).received as string[]).join('')).toBe('<p>page</p>');
     expect(((globalThis as Record<string, unknown>).lateResult as string[]).join('')).toBe('<p>page</p>');
     expect(((globalThis as Record<string, unknown>).iterated as string[]).join('')).toBe('<p>page</p>');
+  }, 4000);
+
+  it('lets a file stream with a side reader finish and close once its response closes', async () => {
+    writeProjectFile('page.html', '<p>page</p>');
+    process.env.LAUNCH_TEST_PAGE = join(workspace, 'page.html');
+    writeFunctionFile(
+      'sideReader.js',
+      'import { createReadStream } from "node:fs"; export default function sideReader(request, response) { globalThis.lateResult = []; globalThis.piped = createReadStream(process.env.LAUNCH_TEST_PAGE); globalThis.piped.on("data", (chunk) => globalThis.lateResult.push(String(chunk))); globalThis.piped.pipe(response); response.end("done"); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const sideReader = await sendRequest(port, '/sideReader');
+    const source = (globalThis as Record<string, unknown>).piped as { destroyed: boolean };
+    await eventually(() => source.destroyed);
+
+    expect(sideReader).toMatchObject({ status: 200, body: 'done' });
+    expect(((globalThis as Record<string, unknown>).lateResult as string[]).join('')).toBe('<p>page</p>');
+    expect(source.destroyed).toBe(true);
+  }, 4000);
+
+  it('drains a transform it unpiped, so the file stream feeding it finishes and closes', async () => {
+    writeFileSync(join(workspace, 'big.bin'), randomBytes(1024 * 1024));
+    process.env.LAUNCH_TEST_PAGE = join(workspace, 'big.bin');
+    writeFunctionFile(
+      'zipped.js',
+      'import { createReadStream } from "node:fs"; import { createGzip } from "node:zlib"; export default function zipped(request, response) { globalThis.piped = createReadStream(process.env.LAUNCH_TEST_PAGE); globalThis.piped.pipe(createGzip()).pipe(response); response.end("done"); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const zipped = await sendRequest(port, '/zipped');
+    const source = (globalThis as Record<string, unknown>).piped as { destroyed: boolean };
+    await eventually(() => source.destroyed);
+
+    expect(zipped).toMatchObject({ status: 200, body: 'done' });
+    expect(source.destroyed).toBe(true);
   }, 4000);
 
   it('releases a file stream piped after the client disconnected', async () => {
@@ -988,6 +1026,7 @@ describe('CloudFunctions serve routing', () => {
     expect(stale.body).toBe('');
     expect(stale.headers['set-cookie']).toBeUndefined();
     expect(stale.headers['content-length']).not.toBe('5');
+    expect(stale.headers['cache-control']).toBe('no-store');
   }, 4000);
 
   it('releases a file stream the handler piped when the handler ended the response itself', async () => {

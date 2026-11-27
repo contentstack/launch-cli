@@ -221,8 +221,17 @@ function warnLateChange(answering: Answering): void {
   console.log(styled(warning, 'yellow', process.stdout.isTTY === true));
 }
 
-function hasNoReader(file: ReadStream): boolean {
-  return file.listenerCount('data') === 0 && file.listenerCount('readable') === 0;
+function settleReleased(source: Readable): void {
+  if (source.listenerCount('readable') > 0) {
+    return;
+  }
+  if (source instanceof ReadStream && source.listenerCount('data') === 0) {
+    source.destroy();
+    return;
+  }
+  if (typeof source.resume === 'function') {
+    source.resume();
+  }
 }
 
 function release(source: Readable, response: Response): void {
@@ -230,13 +239,7 @@ function release(source: Readable, response: Response): void {
     return;
   }
   source.unpipe(response);
-  if (source instanceof ReadStream) {
-    setImmediate(() => {
-      if (!source.destroyed && hasNoReader(source)) {
-        source.destroy();
-      }
-    });
-  }
+  setImmediate(() => settleReleased(source));
 }
 
 function isNoOpEnd(method: string, args: unknown[]): boolean {
@@ -247,6 +250,7 @@ function isNoOpEnd(method: string, args: unknown[]): boolean {
 function answerServerError(response: Response): void {
   if (!response.headersSent) {
     response.getHeaderNames().forEach((name) => response.removeHeader(name));
+    response.setHeader('cache-control', 'no-store');
   }
   response.statusCode = 500;
   response.statusMessage = '';
