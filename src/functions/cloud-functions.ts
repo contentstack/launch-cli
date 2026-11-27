@@ -8,7 +8,7 @@ import type {
 } from 'express';
 import express from 'express';
 import type { Express } from 'express-serve-static-core';
-import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'fs';
+import { ReadStream, existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'fs';
 import type { Server } from 'http';
 import { isBuiltin } from 'module';
 import type { AddressInfo } from 'net';
@@ -199,30 +199,47 @@ interface Answering {
   requestedUrl: string;
   handlerReturned: boolean;
   filesInFlight: number;
-  ignoringLateChanges: boolean;
+  warned: boolean;
   pipedSources: Set<Readable>;
 }
+
+type ResponseMethods = Record<string, unknown>;
 
 function alreadyFinished(method: string): NodeJS.ErrnoException {
   const code = method === 'write' ? 'ERR_STREAM_WRITE_AFTER_END' : 'ERR_STREAM_ALREADY_FINISHED';
   return Object.assign(new Error('The response was already ended.'), { code });
 }
 
-function ignoreLateChanges(response: Response, answering: Answering): void {
-  if (answering.ignoringLateChanges) {
+function warnLateChange(answering: Answering): void {
+  if (answering.warned) {
     return;
   }
-  answering.ignoringLateChanges = true;
-  let warned = false;
+  answering.warned = true;
+  const warning =
+    `warn: ${answering.requestedUrl} changed its response after it had been ended. ` +
+    'The change was ignored; deployed AWS functions end the response when the handler returns.';
+  console.log(styled(warning, 'yellow', process.stdout.isTTY === true));
+}
+
+function release(source: Readable, response: Response): void {
+  source.unpipe(response);
+  if (source instanceof ReadStream) {
+    source.destroy();
+  }
+}
+
+function guardLateChanges(response: Response, answering: Answering): void {
+  const methods = response as unknown as ResponseMethods;
   LATE_CHANGE_METHODS.forEach((method) => {
-    (response as unknown as Record<string, unknown>)[method] = (...args: unknown[]): unknown => {
-      if (!warned) {
-        warned = true;
-        const warning =
-          `warn: ${answering.requestedUrl} changed its response after it had been ended. ` +
-          'The change was ignored; deployed AWS functions end the response when the handler returns.';
-        console.log(styled(warning, 'yellow', process.stdout.isTTY === true));
+    if (typeof methods[method] !== 'function') {
+      return;
+    }
+    const change = (methods[method] as (...args: unknown[]) => unknown).bind(response);
+    methods[method] = (...args: unknown[]): unknown => {
+      if (!response.writableEnded) {
+        return change(...args);
       }
+      warnLateChange(answering);
       const callback = args[args.length - 1];
       if (typeof callback === 'function') {
         process.nextTick(callback, alreadyFinished(method));
@@ -232,41 +249,14 @@ function ignoreLateChanges(response: Response, answering: Answering): void {
   });
 }
 
-function endLikeDeployedFunctions(response: Response, answering: Answering): void {
-  if (!answering.handlerReturned || answering.filesInFlight > 0) {
-    return;
-  }
-  if (response.writableEnded) {
-    ignoreLateChanges(response, answering);
-    return;
-  }
-  if (response.headersSent) {
-    return;
-  }
-  response.end();
-  answering.pipedSources.forEach((source) => {
-    source.destroy();
-  });
-  ignoreLateChanges(response, answering);
-}
-
-function trackAnswering(response: Response, requestedUrl: string): Answering {
-  const answering: Answering = {
-    requestedUrl,
-    handlerReturned: false,
-    filesInFlight: 0,
-    ignoringLateChanges: false,
-    pipedSources: new Set(),
-  };
-  response.on('pipe', (source: Readable) => {
-    answering.pipedSources.add(source);
-  });
-  response.once('finish', () => {
-    ignoreLateChanges(response, answering);
-  });
+function trackFileAnswers(response: Response, answering: Answering): void {
+  const methods = response as unknown as ResponseMethods;
   FILE_ANSWER_METHODS.forEach((method) => {
-    const sendFile = response[method].bind(response) as (...args: unknown[]) => void;
-    (response as unknown as Record<string, unknown>)[method] = (...args: unknown[]): void => {
+    if (typeof methods[method] !== 'function') {
+      return;
+    }
+    const sendFile = (methods[method] as (...args: unknown[]) => void).bind(response);
+    methods[method] = (...args: unknown[]): void => {
       const callback = args[args.length - 1];
       if (typeof callback !== 'function') {
         sendFile(...args);
@@ -284,6 +274,47 @@ function trackAnswering(response: Response, requestedUrl: string): Answering {
       answering.filesInFlight += 1;
     };
   });
+}
+
+function endLikeDeployedFunctions(response: Response, answering: Answering): void {
+  if (
+    !answering.handlerReturned ||
+    answering.filesInFlight > 0 ||
+    response.writableEnded ||
+    response.headersSent
+  ) {
+    return;
+  }
+  try {
+    response.end();
+  } catch (error) {
+    console.error(error);
+    response.statusCode = 500;
+    response.statusMessage = '';
+    response.end();
+  }
+  answering.pipedSources.forEach((source) => {
+    release(source, response);
+  });
+}
+
+function trackAnswering(response: Response, requestedUrl: string): Answering {
+  const answering: Answering = {
+    requestedUrl,
+    handlerReturned: false,
+    filesInFlight: 0,
+    warned: false,
+    pipedSources: new Set(),
+  };
+  response.on('pipe', (source: Readable) => {
+    if (response.writableEnded) {
+      release(source, response);
+      return;
+    }
+    answering.pipedSources.add(source);
+  });
+  trackFileAnswers(response, answering);
+  guardLateChanges(response, answering);
   return answering;
 }
 
@@ -415,7 +446,9 @@ export class CloudFunctions {
           await cloudFunctionResource.handler(request, response);
         } catch (error) {
           console.error(error);
-          response.status(500).send();
+          if (!response.writableEnded) {
+            response.status(500).send();
+          }
         }
         answering.handlerReturned = true;
         endLikeDeployedFunctions(response, answering);

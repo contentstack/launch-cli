@@ -555,9 +555,13 @@ The approved differences from V1 are these, and only these:
   reason, any later change to it (`end`, `write`, header calls, a file send, and so `send`, `json`
   and `redirect`) is ignored with one `warn:` line naming the requested URL instead of crashing
   serve; a callback passed to it gets `ERR_STREAM_WRITE_AFTER_END` (`write`) or
-  `ERR_STREAM_ALREADY_FINISHED`, as Node does. A stream piped into a response serve ends this way
-  is destroyed, so serve does not keep it open. So a callback that answers after the handler
-  returned gets an empty response, exactly as on AWS. Azure and GCP (V1) still
+  `ERR_STREAM_ALREADY_FINISHED`, as Node does. A stream piped into a response serve ends this way,
+  or into one that has already ended, is unpiped, and a file stream among them is destroyed, so
+  serve does not keep its file descriptor open; a stream the function owns otherwise is left
+  alone. An invalid status on a response serve ends for the handler is logged and answered 500.
+  So a callback that answers after the handler returned gets an empty response, exactly as on AWS.
+  Because serve wraps `res.sendFile`/`download`/`sendfile` to track them, Express's deprecation
+  warning for the lowercase `res.sendfile` names serve's file, not the function's. Azure and GCP (V1) still
   deliver such a late answer as written, and answer a handler that never ends its response with
   504 CF005 after the timeout.
 - **A function that reaches a file outside `functions/` is warned about, not refused**, naming

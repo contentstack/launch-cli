@@ -8,6 +8,8 @@ import os, { tmpdir } from 'os';
 import { dirname, join, win32 } from 'path';
 import { pathToFileURL } from 'url';
 
+import express from 'express';
+
 import { answerRequestError, CloudFunctions, functionFilesImporting, isOutsideDirectory, listenFailure } from './cloud-functions';
 import { PortInUseError } from './function.errors';
 import * as loader from './load-data-url';
@@ -128,6 +130,7 @@ afterEach(async () => {
   delete (globalThis as Record<string, unknown>).lateDone;
   delete (globalThis as Record<string, unknown>).lateResult;
   delete (globalThis as Record<string, unknown>).piped;
+  delete (globalThis as Record<string, unknown>).hub;
   delete process.env.LAUNCH_TEST_PAGE;
 });
 
@@ -739,7 +742,7 @@ describe('CloudFunctions serve routing', () => {
     process.env.LAUNCH_TEST_PAGE = join(workspace, 'page.html');
     writeFunctionFile(
       'file.js',
-      'export default function file(request, response) { response.sendFile(process.env.LAUNCH_TEST_PAGE); setTimeout(() => { response.setHeader("x-late", "yes"); globalThis.lateDone = true; }, 100); }',
+      'export default function file(request, response) { response.sendFile(process.env.LAUNCH_TEST_PAGE); response.on("finish", () => setImmediate(() => { response.setHeader("x-late", "yes"); globalThis.lateDone = true; })); }',
     );
     writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
     const port = await freePort();
@@ -772,6 +775,105 @@ describe('CloudFunctions serve routing', () => {
 
     expect(piped).toMatchObject({ status: 200, body: '' });
     expect(source.destroyed).toBe(true);
+  }, 4000);
+
+  it('ignores a change made in the same tick right after the handler ended the response, warns once, and keeps serving', async () => {
+    writeFunctionFile(
+      'sameTick.js',
+      'export default function sameTick(request, response) { response.end("a"); response.write("b"); response.end("c"); }',
+    );
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const sameTick = await sendRequest(port, '/sameTick');
+    const next = await sendRequest(port, '/next');
+
+    expect(sameTick).toMatchObject({ status: 200, body: 'a' });
+    expect(next).toMatchObject({ status: 200, body: 'alive' });
+    expect(loggedLines.filter((line) => line.startsWith('warn: /sameTick'))).toEqual([
+      'warn: /sameTick changed its response after it had been ended. The change was ignored; deployed AWS functions end the response when the handler returns.',
+    ]);
+    expect(loggedErrors).toEqual([]);
+  }, 4000);
+
+  it('answers 500 and keeps serving when the response it ends for the handler has an invalid status', async () => {
+    writeFunctionFile('invalid.js', 'export default function invalid(request, response) { response.status(Number("abc")); }');
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const invalid = await sendRequest(port, '/invalid');
+    const next = await sendRequest(port, '/next');
+
+    expect(invalid).toMatchObject({ status: 500, body: '' });
+    expect(next).toMatchObject({ status: 200, body: 'alive' });
+    expect(loggedErrors).toHaveLength(1);
+    expect((loggedErrors[0] as NodeJS.ErrnoException).code).toBe('ERR_HTTP_INVALID_STATUS_CODE');
+  }, 4000);
+
+  it('logs an error thrown after the handler already answered without a 500 or a late-change warning', async () => {
+    writeFunctionFile(
+      'answered.js',
+      'export default async function answered(request, response) { response.send("ok"); await new Promise((done) => setTimeout(done, 10)); throw new Error("boom"); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const answered = await sendRequest(port, '/answered');
+    await eventually(() => loggedErrors.length > 0);
+
+    expect(answered).toMatchObject({ status: 200, body: 'ok' });
+    expect(loggedLines.filter((line) => line.startsWith('warn:'))).toEqual([]);
+    expect(loggedErrors).toHaveLength(1);
+    expect((loggedErrors[0] as Error).message).toBe('boom');
+  }, 4000);
+
+  it('releases a file stream piped into a response after it was ended, and leaves a stream the function owns open', async () => {
+    writeProjectFile('page.html', '<p>page</p>');
+    process.env.LAUNCH_TEST_PAGE = join(workspace, 'page.html');
+    writeFunctionFile(
+      'latePipe.js',
+      'import { createReadStream } from "node:fs"; export default function latePipe(request, response) { setTimeout(() => { globalThis.piped = createReadStream(process.env.LAUNCH_TEST_PAGE); globalThis.piped.pipe(response); globalThis.lateDone = true; }, 20); }',
+    );
+    writeFunctionFile(
+      'hub.js',
+      'import { PassThrough } from "node:stream"; globalThis.hub = globalThis.hub ?? new PassThrough(); export default function hub(request, response) { globalThis.hub.pipe(response); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const latePipe = await sendRequest(port, '/latePipe');
+    await eventually(() => (globalThis as Record<string, unknown>).lateDone === true);
+    const source = (globalThis as Record<string, unknown>).piped as { destroyed: boolean };
+    await eventually(() => source.destroyed);
+    const hub = await sendRequest(port, '/hub');
+    const hubStream = (globalThis as Record<string, unknown>).hub as { destroyed: boolean };
+
+    expect(latePipe).toMatchObject({ status: 200, body: '' });
+    expect(source.destroyed).toBe(true);
+    expect(hub).toMatchObject({ status: 200, body: '' });
+    expect(hubStream.destroyed).toBe(false);
+  }, 4000);
+
+  it('serves and ends responses on an Express without res.sendfile, as Express 5 ships', async () => {
+    const expressResponse = express.response as unknown as Record<string, unknown>;
+    const sendfile = expressResponse.sendfile;
+    delete expressResponse.sendfile;
+    writeFunctionFile(
+      'modern.js',
+      'export default function modern(request, response) { response.statusCode = 202; }',
+    );
+    const port = await freePort();
+
+    try {
+      await new CloudFunctions(workspace).serve(port);
+      const modern = await sendRequest(port, '/modern');
+
+      expect(modern).toMatchObject({ status: 202, body: '' });
+    } finally {
+      expressResponse.sendfile = sendfile;
+    }
   }, 4000);
 
   it('ends a response like deployed functions when a file send throws or its callback leaves the response open', async () => {
