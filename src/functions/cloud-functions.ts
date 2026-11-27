@@ -9,6 +9,7 @@ import type {
 import express from 'express';
 import type { Express } from 'express-serve-static-core';
 import { ReadStream, existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'fs';
+import { IncomingMessage } from 'http';
 import type { Server } from 'http';
 import { isBuiltin } from 'module';
 import type { AddressInfo } from 'net';
@@ -222,6 +223,10 @@ function warnLateChange(answering: Answering): void {
 }
 
 function settleReleased(source: Readable): void {
+  if (source instanceof IncomingMessage) {
+    source.resume();
+    return;
+  }
   if (typeof source.listenerCount !== 'function' || source.listenerCount('readable') > 0) {
     return;
   }
@@ -338,7 +343,7 @@ function trackAnswering(request: Request, response: Response): Answering {
   };
   response.on('pipe', (source: Readable) => {
     if (response.writableEnded || response.destroyed) {
-      release(source, response);
+      process.nextTick(() => release(source, response));
       return;
     }
     answering.pipedSources.add(source);

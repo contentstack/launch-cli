@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import fs, { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import type { Server } from 'http';
 import { createServer } from 'http';
-import { request as httpRequest } from 'http';
+import { Agent, request as httpRequest } from 'http';
 import type { AddressInfo } from 'net';
 import os, { tmpdir } from 'os';
 import { dirname, join, win32 } from 'path';
@@ -970,10 +970,70 @@ describe('CloudFunctions serve routing', () => {
     expect(source.destroyed).toBe(true);
   }, 4000);
 
+  it('leaves a stream piped into an already-ended response paused, as on close', async () => {
+    writeFunctionFile(
+      'lateQueue.js',
+      'import { PassThrough } from "node:stream"; export default function lateQueue(request, response) { response.end("done"); setTimeout(() => { globalThis.piped = new PassThrough(); globalThis.piped.pipe(response); globalThis.lateDone = true; }, 20); }',
+    );
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const lateQueue = await sendRequest(port, '/lateQueue');
+    await eventually(() => (globalThis as Record<string, unknown>).lateDone === true);
+    await new Promise((done) => setTimeout(done, 20));
+    const queue = (globalThis as Record<string, unknown>).piped as { readableFlowing: boolean | null; readableLength: number; write: (chunk: string) => void };
+    queue.write('kept');
+
+    expect(lateQueue).toMatchObject({ status: 200, body: 'done' });
+    expect(queue.readableFlowing).toBe(false);
+    expect(queue.readableLength).toBe(4);
+  }, 4000);
+
+  it('drains a request body piped into a response it ends, so the keep-alive connection answers the next request', async () => {
+    writeFunctionFile('echoLate.js', 'export default function echoLate(request, response) { request.pipe(response); }');
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
+    const port = await freePort();
+    const agent = new Agent({ keepAlive: true, maxSockets: 1 });
+
+    try {
+      await new CloudFunctions(workspace).serve(port);
+      const echoLate = new Promise<number>((resolve, reject) => {
+        const clientRequest = httpRequest(
+          { host: '127.0.0.1', port, path: '/echoLate', method: 'POST', agent, headers: { 'content-type': 'image/png', 'content-length': String(1024 * 1024) } },
+          (response) => {
+            response.resume();
+            response.on('end', () => resolve(response.statusCode as number));
+          },
+        );
+        clientRequest.on('error', reject);
+        clientRequest.flushHeaders();
+        setTimeout(() => clientRequest.end(Buffer.alloc(1024 * 1024)), 100);
+      });
+      const next = new Promise<string>((resolve, reject) => {
+        httpRequest({ host: '127.0.0.1', port, path: '/next', agent }, (response) => {
+          let body = '';
+          response.setEncoding('utf8');
+          response.on('data', (chunk) => {
+            body += chunk;
+          });
+          response.on('end', () => resolve(body));
+        })
+          .on('error', reject)
+          .end();
+      });
+      const answered = await Promise.race([next, new Promise<string>((resolve) => setTimeout(() => resolve('no answer'), 1500))]);
+
+      expect(await echoLate).toBe(200);
+      expect(answered).toBe('alive');
+    } finally {
+      agent.destroy();
+    }
+  }, 4000);
+
   it('keeps serving after it releases an endless stream that nothing reads', async () => {
     writeFunctionFile(
       'endless.js',
-      'import { Readable } from "node:stream"; export default function endless(request, response) { globalThis.piped = new Readable({ read() { this.push(Buffer.alloc(1024)); } }); globalThis.piped.pipe(response); response.end("done"); }',
+      'import { Readable } from "node:stream"; export default function endless(request, response) { globalThis.lateResult = 0; globalThis.piped = new Readable({ read() { globalThis.lateResult += 1; this.push(globalThis.lateResult > 10000 ? null : Buffer.alloc(1024)); } }); globalThis.piped.pipe(response); response.end("done"); }',
     );
     writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
     const port = await freePort();
@@ -985,7 +1045,8 @@ describe('CloudFunctions serve routing', () => {
 
     expect(endless).toMatchObject({ status: 200, body: 'done' });
     expect(next).toMatchObject({ status: 200, body: 'alive' });
-    expect((globalThis as Record<string, unknown>).piped as { destroyed: boolean }).toMatchObject({ destroyed: false });
+    expect((globalThis as Record<string, unknown>).piped as { destroyed: boolean }).toMatchObject({ destroyed: false, readableFlowing: false });
+    expect((globalThis as Record<string, unknown>).lateResult).toBeLessThan(100);
   }, 4000);
 
   it('releases a file stream piped after the client disconnected', async () => {
