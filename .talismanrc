@@ -240,7 +240,7 @@ fileignoreconfig:
     - "a project name passed on argv to the project resolver"
     - "expect\\(Object.keys\\(DEPENDENCIES\\)\\).toEqual\\(\\['project', 'env'\\]\\)"
 - filename: AGENTS.md
-  checksum: d4e594dd66506cded5d4e36b52cc5dd918b2bf7800991f14e41d33c4837a72fe
+  checksum: 682bf14598b3f679daa9693faf34ecfbfdd5de6ce733ec2b82d3af2a5cddbabc
   allowed_patterns:
     - "Do not add an exemption to a guard to make a new file pass"
     - "passes its own error wording to `client.request\\(req, MESSAGES\\)`"
@@ -287,7 +287,7 @@ fileignoreconfig:
 - filename: test/integration/projects-list-command.test.ts
   checksum: 038f5cd182e1fd0105e6e10dde7f5068a0c15883222450f72ea3904890a56c0c
 - filename: src/functions/cloud-functions.test.ts
-  checksum: 4ecfc8deb42597cda166c7156720901c12665c1439495b4f3b35b942db4fda49
+  checksum: fc0fdeb281fcc60fa2379d8e11993b9f91acd239c87851ed6ff672231e4cebd5
 - filename: src/functions/function.errors.ts
   checksum: a24194bef73c8db8c28b8ac104955f2f22abdc8c8d0608fa36a39032055bda57
 - filename: src/transport/proxy.test.ts
