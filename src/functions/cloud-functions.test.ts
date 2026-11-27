@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'crypto';
+import { randomUUID } from 'crypto';
 import fs, { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import type { Server } from 'http';
 import { createServer } from 'http';
@@ -861,7 +861,7 @@ describe('CloudFunctions serve routing', () => {
     expect(hubStream.destroyed).toBe(false);
   }, 4000);
 
-  it('leaves a stream that is not a file stream to the function after unpiping it, and spares one that still feeds another destination', async () => {
+  it('leaves a released stream that nothing reads paused for the function, and spares one that still feeds another destination', async () => {
     writeFunctionFile(
       'proxy.js',
       'import { PassThrough } from "node:stream"; export default function proxy(request, response) { globalThis.piped = new PassThrough(); globalThis.piped.pipe(response); }',
@@ -878,22 +878,28 @@ describe('CloudFunctions serve routing', () => {
     await eventually(() => ((globalThis as Record<string, unknown>).received as string[]).includes('after'));
 
     await new Promise((done) => setTimeout(done, 50));
+    (upstream as unknown as { write: (chunk: string) => void }).write('kept');
 
     expect(proxy).toMatchObject({ status: 200, body: '' });
     expect(upstream.destroyed).toBe(false);
-    expect((upstream as unknown as { readableFlowing: boolean | null }).readableFlowing).toBe(true);
+    expect((upstream as unknown as { readableFlowing: boolean | null }).readableFlowing).toBe(false);
+    expect((upstream as unknown as { readableLength: number }).readableLength).toBe(4);
     expect(shared).toMatchObject({ status: 200, body: '' });
     expect(hubStream.destroyed).toBe(false);
   }, 4000);
 
-  it('keeps serving when the handler pipes a legacy stream, or one shaped like readable-stream v2/v3, into its response', async () => {
+  it('keeps serving when the handler pipes a legacy stream, a non-core stream or a stream-like object into its response', async () => {
     writeFunctionFile(
       'legacy.js',
       'import { Stream } from "node:stream"; export default function legacy(request, response) { new Stream().pipe(response); response.end("legacy"); }',
     );
     writeFunctionFile(
       'modernish.js',
-      'import { Stream } from "node:stream"; export default function modernish(request, response) { const source = new Stream(); source.unpipe = () => source; source._readableState = { pipes: null, pipesCount: 0 }; source.pipe(response); response.end("v3"); }',
+      'import { Stream } from "node:stream"; export default function modernish(request, response) { const source = new Stream(); source.unpipe = () => source; source.resume = () => { globalThis.lateResult = "resumed"; }; source.on("data", () => {}); source.pipe(response); response.end("v3"); }',
+    );
+    writeFunctionFile(
+      'foreign.js',
+      'export default function foreign(request, response) { response.emit("pipe", { unpipe() {} }); response.emit("pipe", { unpipe() {}, listenerCount(event) { return event === "data" ? 1 : 0; } }); response.end("foreign"); }',
     );
     writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
     const port = await freePort();
@@ -901,11 +907,15 @@ describe('CloudFunctions serve routing', () => {
     await new CloudFunctions(workspace).serve(port);
     const legacy = await sendRequest(port, '/legacy');
     const modernish = await sendRequest(port, '/modernish');
+    await eventually(() => (globalThis as Record<string, unknown>).lateResult === 'resumed');
+    const foreign = await sendRequest(port, '/foreign');
     await new Promise((done) => setTimeout(done, 20));
     const next = await sendRequest(port, '/next');
 
     expect(legacy).toMatchObject({ status: 200, body: 'legacy' });
     expect(modernish).toMatchObject({ status: 200, body: 'v3' });
+    expect((globalThis as Record<string, unknown>).lateResult).toBe('resumed');
+    expect(foreign).toMatchObject({ status: 200, body: 'foreign' });
     expect(next).toMatchObject({ status: 200, body: 'alive' });
     expect(loggedErrors).toEqual([]);
   }, 4000);
@@ -960,22 +970,22 @@ describe('CloudFunctions serve routing', () => {
     expect(source.destroyed).toBe(true);
   }, 4000);
 
-  it('drains a transform it unpiped, so the file stream feeding it finishes and closes', async () => {
-    writeFileSync(join(workspace, 'big.bin'), randomBytes(1024 * 1024));
-    process.env.LAUNCH_TEST_PAGE = join(workspace, 'big.bin');
+  it('keeps serving after it releases an endless stream that nothing reads', async () => {
     writeFunctionFile(
-      'zipped.js',
-      'import { createReadStream } from "node:fs"; import { createGzip } from "node:zlib"; export default function zipped(request, response) { globalThis.piped = createReadStream(process.env.LAUNCH_TEST_PAGE); globalThis.piped.pipe(createGzip()).pipe(response); response.end("done"); }',
+      'endless.js',
+      'import { Readable } from "node:stream"; export default function endless(request, response) { globalThis.piped = new Readable({ read() { this.push(Buffer.alloc(1024)); } }); globalThis.piped.pipe(response); response.end("done"); }',
     );
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
     const port = await freePort();
 
     await new CloudFunctions(workspace).serve(port);
-    const zipped = await sendRequest(port, '/zipped');
-    const source = (globalThis as Record<string, unknown>).piped as { destroyed: boolean };
-    await eventually(() => source.destroyed);
+    const endless = await sendRequest(port, '/endless');
+    await new Promise((done) => setTimeout(done, 50));
+    const next = await sendRequest(port, '/next');
 
-    expect(zipped).toMatchObject({ status: 200, body: 'done' });
-    expect(source.destroyed).toBe(true);
+    expect(endless).toMatchObject({ status: 200, body: 'done' });
+    expect(next).toMatchObject({ status: 200, body: 'alive' });
+    expect((globalThis as Record<string, unknown>).piped as { destroyed: boolean }).toMatchObject({ destroyed: false });
   }, 4000);
 
   it('releases a file stream piped after the client disconnected', async () => {

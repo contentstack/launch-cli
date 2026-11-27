@@ -559,13 +559,14 @@ The approved differences from V1 are these, and only these:
   no-op and is not warned about (`res.json(data).end()`). Once a response closes, or when a stream
   is piped into one that has already ended or whose client has gone, each stream piped into it is
   unpiped (if it can be). On the next turn a file stream (`fs.ReadStream`) that nothing else reads
-  is destroyed, and any other stream not read through `'readable'` is resumed, so it drains and
-  finishes as it would on AWS (a side `'data'` reader, a transform feeding the response, a child's
-  stdout, an upstream body) instead of holding a file descriptor, socket or child open; serve never
-  destroys a stream the function owns. If ending the response for the handler fails (an invalid
-  status, a content-length mismatch), or a handler throws before its headers were sent, serve logs
-  the error and answers a `cache-control: no-store` 500 without the headers the handler had set,
-  dropping the connection if even that cannot be sent.
+  is destroyed, so it does not keep its file descriptor open; that is the one kind of stream serve
+  closes for the function. A stream that still has a `'data'` reader is resumed so that reader gets
+  the rest. Any other stream is left paused, as Node leaves it after an unpipe, for the function to
+  resume or close: a file stream behind a transform (for example gzip), a child's stdout or an
+  upstream body then stays open until the function closes it. If ending the response for the
+  handler fails (an invalid status, a content-length mismatch), or a handler throws before its
+  headers were sent, serve logs the error and answers a `cache-control: no-store` 500 without the
+  headers the handler had set, dropping the connection if even that cannot be sent.
   So a callback that answers after the handler returned gets an empty response, exactly as on AWS.
   Because serve wraps `res.sendFile`/`download`/`sendfile` to track them, Express's deprecation
   warning for the lowercase `res.sendfile` names serve's file, not the function's. Azure and GCP (V1) still

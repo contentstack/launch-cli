@@ -222,14 +222,15 @@ function warnLateChange(answering: Answering): void {
 }
 
 function settleReleased(source: Readable): void {
-  if (source.listenerCount('readable') > 0) {
+  if (typeof source.listenerCount !== 'function' || source.listenerCount('readable') > 0) {
     return;
   }
-  if (source instanceof ReadStream && source.listenerCount('data') === 0) {
+  const read = source.listenerCount('data') > 0;
+  if (source instanceof ReadStream && !read) {
     source.destroy();
     return;
   }
-  if (typeof source.resume === 'function') {
+  if (read && typeof source.resume === 'function') {
     source.resume();
   }
 }
