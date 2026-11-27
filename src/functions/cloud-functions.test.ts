@@ -31,6 +31,12 @@ let loggedLines: string[];
 let loggedErrors: unknown[];
 let exitCodes: (number | undefined)[];
 
+async function eventually(isDone: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 200 && !isDone(); attempt += 1) {
+    await new Promise((done) => setTimeout(done, 10));
+  }
+}
+
 function writeProjectFile(relativePath: string, source: string): void {
   const absolutePath = join(workspace, relativePath);
   mkdirSync(dirname(absolutePath), { recursive: true });
@@ -118,6 +124,8 @@ afterEach(async () => {
   );
   rmSync(workspace, { recursive: true, force: true });
   jest.restoreAllMocks();
+  delete (globalThis as Record<string, unknown>).openStream;
+  delete (globalThis as Record<string, unknown>).lateDone;
 });
 
 function toDataURL(source: string): string {
@@ -653,6 +661,11 @@ describe('CloudFunctions serve routing', () => {
     ['writeHead', 'response.writeHead(500)'],
     ['setHeader', 'response.setHeader("x-late", "yes")'],
     ['redirect', 'response.redirect("/elsewhere")'],
+    ['sendStatus', 'response.sendStatus(204)'],
+    ['send with a 205 status', 'response.status(205).send()'],
+    ['removeHeader', 'response.removeHeader("x-late")'],
+    ['appendHeader', 'response.appendHeader("x-late", "yes")'],
+    ['setHeaders', 'response.setHeaders(new Map([["x-late", "yes"]]))'],
   ])('ignores a late %s after the handler finished, warns once, and keeps serving, where deployed functions have already answered', async (_method, lateCall) => {
     writeFunctionFile(
       'late.js',
@@ -662,17 +675,16 @@ describe('CloudFunctions serve routing', () => {
     const port = await freePort();
 
     await new CloudFunctions(workspace).serve(port);
-    const late = await sendRequest(port, '/late');
-    await new Promise((done) => setTimeout(done, 150));
+    const late = await sendRequest(port, '/late?from=table');
+    await eventually(() => (globalThis as Record<string, unknown>).lateDone === true);
     const next = await sendRequest(port, '/next');
 
     expect(late).toMatchObject({ status: 200, body: '' });
     expect(next).toMatchObject({ status: 200, body: 'true' });
     expect(loggedLines.filter((line) => line.startsWith('warn: /late'))).toEqual([
-      'warn: /late answered after its handler returned. Deployed functions have already ended the response by then, so this answer was ignored.',
+      'warn: /late?from=table answered after its handler returned. Deployed functions have already ended the response by then, so this answer was ignored.',
     ]);
     expect(loggedErrors).toEqual([]);
-    delete (globalThis as Record<string, unknown>).lateDone;
   }, 4000);
 
   it('leaves a response the handler has started streaming open for the handler to end, as deployed functions do', async () => {
@@ -688,13 +700,48 @@ describe('CloudFunctions serve routing', () => {
 
     await new CloudFunctions(workspace).serve(port);
     const stream = sendRequest(port, '/stream');
-    await new Promise((done) => setTimeout(done, 300));
+    await eventually(() => (globalThis as Record<string, unknown>).openStream !== undefined);
     const finish = await sendRequest(port, '/finish');
 
     expect(await stream).toMatchObject({ status: 200, body: 'partial' });
     expect(finish).toMatchObject({ status: 200, body: 'done' });
     expect(loggedErrors).toEqual([]);
-    delete (globalThis as Record<string, unknown>).openStream;
+  }, 4000);
+
+  it.each([
+    ['sendFile', 'response.sendFile(process.env.LAUNCH_TEST_PAGE)'],
+    ['download', 'response.download(process.env.LAUNCH_TEST_PAGE)'],
+  ])('lets a file the handler starts sending with res.%s finish after the handler returns', async (_method, call) => {
+    writeProjectFile('page.html', '<p>page</p>');
+    process.env.LAUNCH_TEST_PAGE = join(workspace, 'page.html');
+    writeFunctionFile('file.js', `export default function file(request, response) { ${call}; }`);
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const file = await sendRequest(port, '/file');
+
+    expect(file).toMatchObject({ status: 200, body: '<p>page</p>' });
+    expect(loggedLines.filter((line) => line.startsWith('warn:'))).toEqual([]);
+    expect(loggedErrors).toEqual([]);
+    delete process.env.LAUNCH_TEST_PAGE;
+  }, 4000);
+
+  it('ends a response the handler started writing and then threw on, logs the error, and keeps serving', async () => {
+    writeFunctionFile(
+      'broken.js',
+      'export default async function broken(request, response) { response.write("part"); throw new Error("boom"); }',
+    );
+    writeFunctionFile('next.js', 'export default function next(request, response) { response.send("alive"); }');
+    const port = await freePort();
+
+    await new CloudFunctions(workspace).serve(port);
+    const broken = await sendRequest(port, '/broken');
+    const next = await sendRequest(port, '/next');
+
+    expect(broken).toMatchObject({ status: 200, body: 'part' });
+    expect(next).toMatchObject({ status: 200, body: 'alive' });
+    expect(loggedErrors).toHaveLength(1);
+    expect((loggedErrors[0] as Error).message).toBe('boom');
   }, 4000);
 
   it('answers res.redirect(url) with a bare 307 and the location exactly as given, as deployed functions do', async () => {

@@ -549,10 +549,12 @@ The approved differences from V1 are these, and only these:
   and `res.json`.
   A handler that returns (or whose promise settles) without ending its response is ended for it
   at once with the status and headers it set, as AWS's `finalizeResponse` does (CL-8970); a
-  response whose headers were already sent is left for the handler to end. Anything the handler
-  writes after that is ignored with one `warn:` line instead of crashing serve, so a callback that
-  answers after the handler returned gets an empty response, exactly as on AWS. Azure and GCP (V1)
-  answer a handler that never ends its response with 504 CF005 after the timeout.
+  response whose headers were already sent, or that `res.sendFile`/`res.download` is still
+  sending, is left for the handler to end. Anything the handler writes after that is ignored with
+  one `warn:` line naming the requested URL instead of crashing serve, so a callback that answers
+  after the handler returned gets an empty response, exactly as on AWS. Azure and GCP (V1) still
+  deliver such a late answer as written, and answer a handler that never ends its response with
+  504 CF005 after the timeout.
 - **A function that reaches a file outside `functions/` is warned about, not refused**, naming
   the function file that crosses the boundary.
 - **Errors name the user's file.** A function that fails to bundle or load stops serve with

@@ -182,15 +182,35 @@ function sendLikeDeployedFunctions(_request: Request, response: Response, next: 
   next();
 }
 
-const LATE_ANSWER_METHODS = ['end', 'write', 'writeHead', 'setHeader'] as const;
+const LATE_ANSWER_METHODS = [
+  'end',
+  'write',
+  'writeHead',
+  'setHeader',
+  'removeHeader',
+  'appendHeader',
+  'setHeaders',
+] as const;
+const FILE_ANSWER_METHODS = ['sendFile', 'download'] as const;
+const sendingFile = new WeakSet<Response>();
 
-function ignoreLateAnswers(response: Response, route: string): void {
+function trackFileAnswers(response: Response): void {
+  FILE_ANSWER_METHODS.forEach((method) => {
+    const answer = response[method].bind(response) as (...args: unknown[]) => void;
+    (response as unknown as Record<string, unknown>)[method] = (...args: unknown[]): void => {
+      sendingFile.add(response);
+      answer(...args);
+    };
+  });
+}
+
+function ignoreLateAnswers(response: Response, requestedUrl: string): void {
   let warned = false;
   const ignore = (): Response => {
     if (!warned) {
       warned = true;
       const warning =
-        `warn: ${route} answered after its handler returned. ` +
+        `warn: ${requestedUrl} answered after its handler returned. ` +
         'Deployed functions have already ended the response by then, so this answer was ignored.';
       console.log(styled(warning, 'yellow', process.stdout.isTTY === true));
     }
@@ -201,12 +221,12 @@ function ignoreLateAnswers(response: Response, route: string): void {
   });
 }
 
-function endLikeDeployedFunctions(response: Response, route: string): void {
-  if (response.writableEnded || response.headersSent) {
+function endLikeDeployedFunctions(response: Response, requestedUrl: string): void {
+  if (response.writableEnded || response.headersSent || sendingFile.has(response)) {
     return;
   }
   response.end();
-  ignoreLateAnswers(response, route);
+  ignoreLateAnswers(response, requestedUrl);
 }
 
 export function answerRequestError(
@@ -333,8 +353,9 @@ export class CloudFunctions {
     cloudFunctionResources.forEach((cloudFunctionResource) => {
       app.all(cloudFunctionResource.apiResourceURI, async (request: Request, response: Response) => {
         try {
+          trackFileAnswers(response);
           await cloudFunctionResource.handler(request, response);
-          endLikeDeployedFunctions(response, cloudFunctionResource.apiResourceURI);
+          endLikeDeployedFunctions(response, request.originalUrl);
         } catch (error) {
           console.error(error);
           response.status(500).send();
